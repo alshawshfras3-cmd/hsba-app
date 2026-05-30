@@ -1,58 +1,100 @@
 import { TermOutput, SectorId, TermMode } from '../../types';
+import { 
+  getAgeInMonths, 
+  getStandardizedDate, 
+  convertGregorianToHijri 
+} from '../date-utils';
+
+export interface ExtendedTermOutput extends TermOutput {
+  currentAgeMonths: number;
+  monthsBeforeRetirement: number;
+  remainingMonthsToMaxAge: number;
+  monthsAfterRetirement: number;
+  calendarUsed: 'hijri' | 'gregorian';
+  ruleSource: 'termRule' | 'bankFallback';
+}
 
 export function calculateFinanceTerm(params: {
-  bankId: string;
   sectorId: SectorId;
   birthYear: number;
   birthMonth: number;
+  birthDay: number;
+  birthCalendar: 'gregorian' | 'hijri';
+
   retirementAge: number;
-  maxTermMonthsBank: number;
-  maxAgeAtEndBank: number;
-  monthsAfterRetirementBank: number;
-  allowAfterRetirementBank: boolean;
+  displayRetirementAge?: number;
+
+  maxTermMonths: number;
+  maxAgeAtEnd: number;
+  allowedMonthsAfterRetirement: number;
+  allowAfterRetirement: boolean;
+  calendarType: 'gregorian' | 'hijri';
+  minTermMonths: number;
+
   selectedMode: TermMode;
   manualTermMonths?: number;
-}): TermOutput {
+
+  ruleSource: 'termRule' | 'bankFallback';
+}): ExtendedTermOutput {
   const {
     sectorId,
     birthYear,
     birthMonth,
+    birthDay,
+    birthCalendar,
     retirementAge,
-    maxTermMonthsBank,
-    maxAgeAtEndBank,
-    monthsAfterRetirementBank,
-    allowAfterRetirementBank,
+    displayRetirementAge,
+
+    maxTermMonths,
+    maxAgeAtEnd,
+    allowedMonthsAfterRetirement,
+    allowAfterRetirement,
+    calendarType,
+    minTermMonths,
+
     selectedMode,
-    manualTermMonths = 300
+    manualTermMonths = 300,
+    ruleSource
   } = params;
 
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1;
+  const today = new Date();
 
-  const currentAgeMonths = Math.max(0, (currentYear - birthYear) * 12 + (currentMonth - birthMonth));
-  const retirementAgeMonths = retirementAge * 12;
+  // 1. Calculate age in months using the rules calendar
+  const currentAgeMonths = getAgeInMonths(
+    { year: birthYear, month: birthMonth, day: birthDay, calendar: birthCalendar },
+    today,
+    calendarType
+  );
 
-  // 1. Calculate months before retirement
+  const retirementAgeMonths = Math.round(retirementAge * 12);
+
+  // 2. Count months before retirement
   const monthsBeforeRetirement = Math.max(0, retirementAgeMonths - currentAgeMonths);
 
-  // 2. Post-retirement eligibility
+  // 3. Post-retirement eligibility extension
   let monthsAfterRetirement = 0;
-  if (sectorId !== 'retired' && allowAfterRetirementBank) {
-    monthsAfterRetirement = monthsAfterRetirementBank;
+  if (sectorId !== 'retired' && allowAfterRetirement) {
+    monthsAfterRetirement = allowedMonthsAfterRetirement;
   }
 
-  // 3. Max months limited by age
-  const maxAgeAtEndMonths = maxAgeAtEndBank * 12;
+  // 4. Max months permitted by the age at the end of financing
+  const maxAgeAtEndMonths = maxAgeAtEnd * 12;
   const remainingMonthsToMaxAge = Math.max(0, maxAgeAtEndMonths - currentAgeMonths);
 
-  // 4. Calculate maximum allowable term based on rules
+  // 5. Capping months before retirement to statutory 25 years (300 months) for risk control
+  const cappedMonthsBefore = Math.min(monthsBeforeRetirement, 300);
+
   const ruleLimitTerm = sectorId === 'retired'
     ? remainingMonthsToMaxAge
-    : (monthsBeforeRetirement + monthsAfterRetirement);
+    : (cappedMonthsBefore + monthsAfterRetirement);
+
+  // Risk profile cap: if remaining term before retirement is >= 240 months (20 years), absolute limit is 25 years (300 months)
+  const maxTermAllowed = (sectorId !== 'retired' && monthsBeforeRetirement >= 240)
+    ? 300
+    : maxTermMonths;
 
   const absoluteMaxTerm = Math.min(
-    maxTermMonthsBank,
+    maxTermAllowed,
     remainingMonthsToMaxAge,
     ruleLimitTerm
   );
@@ -69,20 +111,28 @@ export function calculateFinanceTerm(params: {
       totalMonths = absoluteMaxTerm;
       reductionReason = 'تم تقليص المدة لتتجاوز الضوابط العمرية أو لوائح جهة الإقراض.';
     } else {
-      totalMonths = requested;
+      totalMonths = Math.max(minTermMonths, requested);
     }
   }
 
-  // Double check reductions and identify why
-  if (totalMonths < maxTermMonthsBank && selectedMode === 'max') {
-    if (remainingMonthsToMaxAge < maxTermMonthsBank && remainingMonthsToMaxAge <= ruleLimitTerm) {
-      reductionReason = `تم تقليص مدة التمويل لتتجاوز العمر الأقصى للعميل عند نهاية التمويل البالغ ${maxAgeAtEndBank} سنة.`;
-    } else if (ruleLimitTerm < maxTermMonthsBank) {
-      reductionReason = `تم تقليص مدة التمويل بسبب بلوغ سن التقاعد (${Math.round(retirementAge)} سنة) مع الحدود المسموح بها بعد التقاعد.`;
+  // Limit minimum term
+  if (totalMonths < minTermMonths) {
+    totalMonths = minTermMonths;
+  }
+
+  // Set precise reduction explanations for the diagnostics log
+  if (sectorId !== 'retired' && monthsBeforeRetirement >= 240 && totalMonths <= 300 && selectedMode === 'max') {
+    reductionReason = 'تم تحديد مدة التمويل بـ 25 سنة كحد أقصى للمرحله قبل التقاعد وفق سياسة إدارة المخاطر لدى جهة التمويل.';
+  } else if (totalMonths < maxTermMonths && selectedMode === 'max') {
+    if (remainingMonthsToMaxAge < maxTermMonths && remainingMonthsToMaxAge <= ruleLimitTerm) {
+      reductionReason = `تم تقليص مدة التمويل لتتجاوز العمر الأقصى للعميل عند نهاية التمويل البالغ ${maxAgeAtEnd} سنة.`;
+    } else if (ruleLimitTerm < maxTermMonths) {
+      const displayAge = displayRetirementAge ?? Math.round(retirementAge);
+      reductionReason = `تم تقليص مدة التمويل بسبب بلوغ سن التقاعد (${displayAge} سنة) مع الحدود المسموح بها بعد التقاعد.`;
     }
   }
 
-  // Compute final months apportionment (before vs after retirement)
+  // Distribute actual before vs after retirement months
   let actualMonthsBefore = 0;
   let actualMonthsAfter = 0;
 
@@ -90,7 +140,7 @@ export function calculateFinanceTerm(params: {
     actualMonthsBefore = 0;
     actualMonthsAfter = totalMonths;
   } else {
-    actualMonthsBefore = Math.min(totalMonths, monthsBeforeRetirement);
+    actualMonthsBefore = Math.min(totalMonths, monthsBeforeRetirement, 300);
     actualMonthsAfter = Math.max(0, totalMonths - actualMonthsBefore);
   }
 
@@ -100,6 +150,10 @@ export function calculateFinanceTerm(params: {
     totalMonths,
     totalYears: Number((totalMonths / 12).toFixed(1)),
     reductionReason,
-    selectedTermMode: selectedMode
+    selectedTermMode: selectedMode,
+    currentAgeMonths,
+    remainingMonthsToMaxAge,
+    calendarUsed: calendarType,
+    ruleSource
   };
 }

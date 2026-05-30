@@ -1,4 +1,12 @@
-export type SectorId = 'government_civilian' | 'military' | 'private' | 'retired';
+export type SectorId =
+  | 'government_civilian' // حكومي مدني
+  | 'semi_gov' // شبه حكومي
+  | 'companies' // موظف شركات
+  | 'military' // عسكري (حقل أب)
+  | 'military_officer' // ضابط عسكري
+  | 'military_individual' // فرد عسكري
+  | 'private'
+  | 'retired';
 export type CalendarType = 'hijri' | 'gregorian';
 export type ProductId = 'real_estate' | 'personal' | 'both' | 'real_estate_with_personal_existing' | 'real_estate_only' | 'personal_only' | 'real_estate_with_new_personal' | 'real_estate_with_existing_personal';
 export type SupportType = 'none' | 'monthly' | 'downpayment';
@@ -7,6 +15,7 @@ export type CalculationStatus = 'approved' | 'rejected' | 'warning';
 
 export interface Bank {
   id: string; // e.g. 'alahli', 'rajhi'
+  institutionType: 'bank' | 'finance_company';
   nameAr: string;
   nameEn: string;
   logoColor: string; // for custom stylized fintech logos
@@ -153,7 +162,7 @@ export interface PersonalFinanceRules {
   maxAge: number;
   retireeDsrPercentage: number; // e.g. 25
   isActive: boolean;
-  calculationMethod?: 'multiplier' | 'pmt';
+  calculationMethod?: 'multiplier' | 'pmt' | 'flat_rate';
   pathType?: 'personal_only' | 'real_estate_with_new_personal';
   customerStatus?: 'active_employee' | 'retired';
 }
@@ -190,7 +199,7 @@ export interface UserSubscription {
   id: string;
   username: string;
   email: string;
-  role: 'admin' | 'user';
+  role: 'admin' | 'manager' | 'user';
   plan: 'free' | 'premium' | 'enterprise';
   calculationsCount: number;
   expiryDate: string;
@@ -203,6 +212,7 @@ export interface NetSalaryOutput {
   deductionAmount: number;
   netSalary: number;
   calculationMethod: 'direct' | 'details';
+  breakdown?: any;
 }
 
 export interface PensionOutput {
@@ -249,8 +259,21 @@ export interface PersonalFinanceOutput {
   profitAmount: number;
   totalProfitPercentage: number;
   termMonths: number;
-  calculationMethod?: 'multiplier' | 'pmt';
+  calculationMethod?: 'multiplier' | 'pmt' | 'flat_rate';
   multiplier?: number;
+  diagnostics?: {
+    ruleId?: string;
+    bankId: string;
+    customerStatus: string;
+    pathType: string;
+    dsr: number;
+    termMonths: number;
+    calculationMethod: string;
+    multiplier?: number;
+    flatRate?: number;
+    source: 'bank_specific' | 'default_bank' | 'fallback';
+    error?: string;
+  };
 }
 
 export interface RealEstateFinanceOutput {
@@ -283,6 +306,7 @@ export interface BankCalculationResult {
   realEstateAmount: number;
   personalAmount: number;
   housingSupportAmount: number;
+  supportType?: 'none' | 'monthly' | 'downpayment';
   totalPurchasingPower: number;
   monthlyInstallmentBeforeRetirement: number;
   monthlyInstallmentAfterRetirement: number;
@@ -292,11 +316,46 @@ export interface BankCalculationResult {
   personalCoefficient?: number;
   personalTotalRepayment?: number;
   personalProfitAmount?: number;
-  personalCalculationMethod?: 'multiplier' | 'pmt';
+  personalCalculationMethod?: 'multiplier' | 'pmt' | 'flat_rate';
+  personalDiagnostics?: any;
   rejectionReason?: string;
   netSalary: number;
   retirementAge: number;
   pensionSalary: number;
+  pensionDiagnostic?: any;
+  monthlyInstallmentAfterPersonal?: number;
+  personalInstallmentAmount?: number;
+  realEstateInstallmentOnly?: number;
+  diagnostics?: any;
+  existingMonthlyObligations?: number;
+  obligationRemainingMonths?: number;
+  realEstateStage1?: number;
+  totalCustomerStage1?: number;
+  realEstateStage2?: number;
+  realEstateStage3?: number;
+  stage1Months?: number;
+  stage2Months?: number;
+  stage3Months?: number;
   diagnosticMessages: string[];
   diagnosticSteps: string[];
+}
+
+export interface SavedResult {
+  id: string;
+  user_id?: string;
+  created_at: string;
+  title: string;
+  finance_type: string;
+  sector: string;
+  bank_name: string;
+  real_estate_amount: number;
+  personal_amount: number;
+  monthly_installment: number;
+  term_months: number;
+  support_type: string;
+  net_salary: number;
+  profit_margin: number;
+  eligibility_status: string;
+  payload: BankCalculationResult;
+  customer_name?: string;
 }

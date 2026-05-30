@@ -2,51 +2,41 @@ import { PersonalFinanceOutput, PersonalFinanceRules, SectorId } from '../../typ
 
 export function getPersonalFinanceRule(params: {
   bankId: string;
-  pathType: 'personal_only' | 'real_estate_with_new_personal';
-  customerStatus: 'active_employee' | 'retired';
+  pathType: 'personal_only' | 'real_estate_with_new_personal' | 'real_estate_with_existing_personal';
+  customerStatus: 'active' | 'retired' | 'active_employee';
   rules: PersonalFinanceRules[];
-}): PersonalFinanceRules {
+}): PersonalFinanceRules | null {
   const { bankId, pathType, customerStatus, rules } = params;
 
-  // 1. Find specific rule for bank + pathType + customerStatus
+  // Standardize customerStatus
+  const isRetired = customerStatus === 'retired';
+  const targetStatus: 'active_employee' | 'retired' = isRetired ? 'retired' : 'active_employee';
+
+  // Standardize pathType for searching
+  let targetPathType: 'personal_only' | 'real_estate_with_new_personal' = 'personal_only';
+  if (pathType === 'real_estate_with_new_personal') {
+    targetPathType = 'real_estate_with_new_personal';
+  }
+
+  // 1. Try to find precise bank match
   let rule = rules.find(
     r => r.bankId === bankId &&
-    r.pathType === pathType &&
-    r.customerStatus === customerStatus &&
+    r.pathType === targetPathType &&
+    r.customerStatus === targetStatus &&
     r.isActive
   );
 
-  // 2. If not found, find rule for 'all'/default + pathType + customerStatus
+  // 2. Fall back to 'all' default bank match
   if (!rule) {
     rule = rules.find(
-      r => r.bankId === 'all' &&
-      r.pathType === pathType &&
-      r.customerStatus === customerStatus &&
+      r => (r.bankId === 'all' || r.bankId === 'default') &&
+      r.pathType === targetPathType &&
+      r.customerStatus === targetStatus &&
       r.isActive
     );
   }
 
-  // Safe fallback if still not found
-  if (!rule) {
-    return {
-      bankId: 'all',
-      sectorId: 'all',
-      dsrPercentage: customerStatus === 'retired' ? 25 : 33,
-      termMonths: 60,
-      financeCoefficient: 50.42,
-      annualMargin: 2.50,
-      minSalary: 4000,
-      minAge: 18,
-      maxAge: 65,
-      retireeDsrPercentage: 25,
-      isActive: true,
-      calculationMethod: 'multiplier',
-      pathType,
-      customerStatus
-    };
-  }
-
-  return rule;
+  return rule || null;
 }
 
 export function calculatePersonalFinance(params: {
@@ -55,17 +45,21 @@ export function calculatePersonalFinance(params: {
   sectorId: SectorId;
   bankId: string;
   rules: PersonalFinanceRules[];
-  productId?: string; // To detect pathType or handle legacy
+  productId?: string;
+  monthsBeforeRetirement?: number;
+  remainingMonthsToMaxAge?: number;
 }): PersonalFinanceOutput {
-  const { netSalary, obligations, sectorId, bankId, rules, productId } = params;
+  const { netSalary, obligations, sectorId, bankId, rules, productId, monthsBeforeRetirement, remainingMonthsToMaxAge } = params;
 
   // Map sectorId to customerStatus
-  const customerStatus: 'active_employee' | 'retired' = sectorId === 'retired' ? 'retired' : 'active_employee';
+  const customerStatus: 'active' | 'retired' = sectorId === 'retired' ? 'retired' : 'active';
 
   // Map productId to pathType
-  let pathType: 'personal_only' | 'real_estate_with_new_personal' = 'personal_only';
+  let pathType: 'personal_only' | 'real_estate_with_new_personal' | 'real_estate_with_existing_personal' = 'personal_only';
   if (productId === 'both' || productId === 'real_estate_with_new_personal') {
     pathType = 'real_estate_with_new_personal';
+  } else if (productId === 'real_estate_with_personal_existing' || productId === 'real_estate_with_existing_personal') {
+    pathType = 'real_estate_with_existing_personal';
   }
 
   // Get matching rule
@@ -76,14 +70,85 @@ export function calculatePersonalFinance(params: {
     rules
   });
 
-  const dsrPercent = rule.dsrPercentage;
-  const termMonths = rule.termMonths;
-  const coeff = rule.financeCoefficient;
-  const calculationMethod = rule.calculationMethod || 'multiplier';
+  const targetStatus = customerStatus === 'retired' ? 'retired' : 'active_employee';
+
+  let source: 'bank_specific' | 'default_bank' | 'fallback' = 'fallback';
+  let matchError: string | undefined = undefined;
+
+  let finalRule = rule;
+
+  if (rule) {
+    source = rule.bankId === bankId ? 'bank_specific' : 'default_bank';
+  } else {
+    // If the customer is retired and no rule is found, we should NOT fall back to active employee
+    if (customerStatus === 'retired') {
+      matchError = "لا توجد قاعدة تمويل شخصي للمتقاعد لهذا البنك";
+    } else {
+      source = 'fallback';
+      finalRule = {
+        bankId: bankId,
+        sectorId: 'all',
+        dsrPercentage: 33.33,
+        termMonths: 60,
+        financeCoefficient: 0,
+        annualMargin: 4.80,
+        minSalary: 4000,
+        minAge: 18,
+        maxAge: 65,
+        retireeDsrPercentage: 25,
+        isActive: true,
+        calculationMethod: 'flat_rate',
+        pathType: pathType === 'real_estate_with_existing_personal' ? 'personal_only' : pathType,
+        customerStatus: 'active_employee'
+      };
+    }
+  }
+
+  if (matchError || !finalRule) {
+    return {
+      personalFinanceAmount: 0,
+      monthlyInstallment: 0,
+      totalRepayment: 0,
+      profitAmount: 0,
+      totalProfitPercentage: 0,
+      termMonths: 0,
+      calculationMethod: undefined,
+      multiplier: undefined,
+      diagnostics: {
+        ruleId: undefined,
+        bankId: bankId,
+        customerStatus: targetStatus,
+        pathType: pathType,
+        dsr: 0,
+        termMonths: 0,
+        calculationMethod: 'none',
+        source: 'fallback',
+        error: matchError
+      }
+    };
+  }
+
+  const dsrPercent = finalRule.dsrPercentage;
+  const ruleTermMonths = finalRule.termMonths;
+  const coeff = finalRule.financeCoefficient;
+  const calculationMethod = finalRule.calculationMethod || 'flat_rate';
+
+  // تحديد مدة التمويل الشخصي الفعلية
+  let termMonths = ruleTermMonths;
+  if (customerStatus === 'retired') {
+    termMonths = remainingMonthsToMaxAge
+      ? Math.min(ruleTermMonths, remainingMonthsToMaxAge)
+      : ruleTermMonths;
+  } else {
+    termMonths = monthsBeforeRetirement
+      ? Math.min(ruleTermMonths, monthsBeforeRetirement)
+      : ruleTermMonths;
+  }
+  if (termMonths < 1) termMonths = 1;
 
   // Max personal installment allowed
   const maxDsrInstallment = netSalary * (dsrPercent / 100);
-  
+
   // Installment available after subtracting other debts/obligations
   let rawInstallment = maxDsrInstallment - obligations;
   if (rawInstallment < 0) {
@@ -95,7 +160,7 @@ export function calculatePersonalFinance(params: {
   let profitAmount = 0;
 
   if (calculationMethod === 'pmt') {
-    const annualMargin = rule.annualMargin;
+    const annualMargin = finalRule.annualMargin;
     const monthlyRate = annualMargin / 100 / 12;
     if (monthlyRate > 0) {
       personalFinanceAmount = rawInstallment * (1 - Math.pow(1 + monthlyRate, -termMonths)) / monthlyRate;
@@ -104,14 +169,27 @@ export function calculatePersonalFinance(params: {
     }
     totalRepayment = rawInstallment * termMonths;
     profitAmount = totalRepayment - personalFinanceAmount;
-  } else {
-    // multiplier (معامل التمويل)
+  } else if (calculationMethod === 'multiplier') {
     personalFinanceAmount = rawInstallment * coeff;
+    totalRepayment = rawInstallment * termMonths;
+    profitAmount = totalRepayment - personalFinanceAmount;
+  } else {
+    // flat_rate or flat
+    const annualMargin = finalRule.annualMargin;
+    const termYears = termMonths / 12;
+    const denominator = 1 + (annualMargin / 100) * termYears;
+    personalFinanceAmount = (rawInstallment * termMonths) / denominator;
     totalRepayment = rawInstallment * termMonths;
     profitAmount = totalRepayment - personalFinanceAmount;
   }
 
-  // "لا تقرّب القسط قبل الحساب. استخدم القسط الخام للحسابات، وقرّب فقط عند العرض"
+  // Calculate annualMarginApprox for multiplier mode (for displaying and diagnostic fields)
+  let annualMarginApprox: number | undefined = undefined;
+  if (calculationMethod === 'multiplier' && personalFinanceAmount > 0) {
+    annualMarginApprox = (profitAmount / personalFinanceAmount) / (termMonths / 12) * 100;
+  }
+
+  // Rounding values
   const roundedPersonalFinanceAmount = Math.ceil(personalFinanceAmount);
   const roundedTotalRepayment = Math.round(totalRepayment);
   const roundedProfitAmount = roundedTotalRepayment - roundedPersonalFinanceAmount;
@@ -122,12 +200,25 @@ export function calculatePersonalFinance(params: {
 
   return {
     personalFinanceAmount: roundedPersonalFinanceAmount,
-    monthlyInstallment: Math.round(rawInstallment), // Display installment is rounded for the UI
+    monthlyInstallment: Math.round(rawInstallment),
     totalRepayment: roundedTotalRepayment,
     profitAmount: roundedProfitAmount,
     totalProfitPercentage,
     termMonths,
     calculationMethod,
-    multiplier: coeff
+    multiplier: coeff,
+    diagnostics: {
+      ruleId: finalRule.id,
+      bankId: finalRule.bankId,
+      customerStatus: targetStatus,
+      pathType: pathType,
+      dsr: dsrPercent,
+      termMonths: termMonths,
+      calculationMethod,
+      multiplier: coeff,
+      flatRate: annualMarginApprox !== undefined ? Number(annualMarginApprox.toFixed(2)) : finalRule.annualMargin,
+      source
+    }
   };
 }
+

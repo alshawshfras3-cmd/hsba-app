@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import {
   Bank,
   ProductAcceptance,
@@ -32,6 +32,9 @@ import {
   initialUserSubscriptions
 } from '../seeds';
 
+import { supabase, hasSupabaseKeys } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
+
 interface AppContextType {
   banks: Bank[];
   setBanks: React.Dispatch<React.SetStateAction<Bank[]>>;
@@ -64,10 +67,26 @@ interface AppContextType {
   setActiveNav: (val: 'calculator' | 'admin') => void;
   adminSubPage: string;
   setAdminSubPage: (val: string) => void;
+  activeStepLabel: string;
+  setActiveStepLabel: (val: string) => void;
+  currentStep: number;
+  setCurrentStep: (val: number | ((prev: number) => number)) => void;
+  results: any[] | null;
+  setResults: (val: any[] | null) => void;
+  isMobileSettingsOpen: boolean;
+  setIsMobileSettingsOpen: (val: boolean) => void;
 
   hasUnsavedChanges: boolean;
   saveChanges: () => void;
   cancelChanges: () => void;
+
+  // Supabase Auth and Roles state
+  user: any;
+  setUser: React.Dispatch<React.SetStateAction<any>>;
+  userRole: 'admin' | 'manager' | 'user' | null;
+  authLoading: boolean;
+  isSettingsLoading: boolean;
+  signOut: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -84,6 +103,7 @@ interface AdminSettings {
   supportSettings: SupportSettings;
   personalRules: PersonalFinanceRules[];
   advancedRules: AdvancedRule[];
+  userSubscriptions?: UserSubscription[];
 }
 
 const getInitialSettings = (): AdminSettings => {
@@ -104,6 +124,7 @@ const getInitialSettings = (): AdminSettings => {
           supportSettings: parsed.supportSettings || initialSupportSettings,
           personalRules: parsed.personalRules || initialPersonalFinanceRules,
           advancedRules: parsed.advancedRules || initialAdvancedRules,
+          userSubscriptions: parsed.userSubscriptions || initialUserSubscriptions,
         };
       }
     }
@@ -122,6 +143,7 @@ const getInitialSettings = (): AdminSettings => {
     supportSettings: initialSupportSettings,
     personalRules: initialPersonalFinanceRules,
     advancedRules: initialAdvancedRules,
+    userSubscriptions: initialUserSubscriptions,
   };
 };
 
@@ -141,12 +163,131 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [advancedRules, setAdvancedRules] = useState<AdvancedRule[]>(initialData.advancedRules);
 
   const [calculationLogs, setCalculationLogs] = useState<CalculationLog[]>(initialCalculationLogs);
-  const [userSubscriptions, setUserSubscriptions] = useState<UserSubscription[]>(initialUserSubscriptions);
+  const [userSubscriptions, setUserSubscriptions] = useState<UserSubscription[]>(initialData.userSubscriptions || initialUserSubscriptions);
 
   const [activeNav, setActiveNav] = useState<'calculator' | 'admin'>('calculator');
   const [adminSubPage, setAdminSubPage] = useState<string>('banks');
+  const [activeStepLabel, setActiveStepLabel] = useState<string>('نوع الحسبة');
+  const [currentStep, setCurrentStep] = useState<number>(1);
+  const [results, setResults] = useState<any[] | null>(null);
+  const [isMobileSettingsOpen, setIsMobileSettingsOpen] = useState<boolean>(false);
 
   const [savedSettings, setSavedSettings] = useState<AdminSettings>(initialData);
+
+  // Consume from custom AuthProvider
+  const { user, setUser, profile, isAdmin, isManager, canAccessDashboard, signOut, loading: authLoading } = useAuth();
+  const userRole = isAdmin ? 'admin' : (isManager ? 'manager' : 'user');
+
+  const [isSettingsLoading, setIsSettingsLoading] = useState(true);
+
+  // 1. Fetch from Supabase system_settings and initialize / sync on mount
+  useEffect(() => {
+    async function loadConfig() {
+      if (!hasSupabaseKeys) {
+        console.warn("Supabase configuration keys missing. Running with local browser persistent cache.");
+        setIsSettingsLoading(false);
+        return;
+      }
+      setIsSettingsLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('system_settings')
+          .select('key, value');
+
+        if (error) {
+          console.error("Error reading from system_settings table:", error);
+          throw error;
+        }
+
+        if (data && data.length > 0) {
+          const loaded: Record<string, any> = {};
+          for (const row of data) {
+            let val = row.value;
+            if (row.key === 'personal_finance_rules' && Array.isArray(val)) {
+              val = val.map((rule: any) => {
+                const bankId = rule.bankId || 'all';
+                const margin = bankId === 'rajhi' ? 4.59 : (bankId === 'alahli' ? 5.00 : 4.80);
+                if (rule.calculationMethod === 'multiplier' || rule.financeCoefficient > 0 || rule.annualMargin === 2.50) {
+                  return {
+                    ...rule,
+                    calculationMethod: 'flat_rate',
+                    financeCoefficient: 0,
+                    annualMargin: rule.annualMargin || margin
+                  };
+                }
+                return rule;
+              });
+            }
+            loaded[row.key] = val;
+          }
+
+          if (loaded.banks) setBanks(loaded.banks);
+          if (loaded.product_acceptance) setProducts(loaded.product_acceptance);
+          if (loaded.military_ranks) setMilitaryRanks(loaded.military_ranks);
+          if (loaded.salary_rules) setSalaryRules(loaded.salary_rules);
+          if (loaded.pension_rules) setPensionRules(loaded.pension_rules);
+          if (loaded.term_rules) setTermRules(loaded.term_rules);
+          if (loaded.margin_rules) setMarginRules(loaded.margin_rules);
+          if (loaded.dsr_rules) setDsrRules(loaded.dsr_rules);
+          if (loaded.support_settings) setSupportSettings(loaded.support_settings);
+          if (loaded.personal_finance_rules) setPersonalRules(loaded.personal_finance_rules);
+          if (loaded.advanced_rules) setAdvancedRules(loaded.advanced_rules);
+          if (loaded.user_subscriptions) setUserSubscriptions(loaded.user_subscriptions);
+
+          setSavedSettings({
+            banks: loaded.banks || initialBanks,
+            products: loaded.product_acceptance || initialProductAcceptance,
+            militaryRanks: loaded.military_ranks || initialMilitaryRanks,
+            salaryRules: loaded.salary_rules || initialSalaryRules,
+            pensionRules: loaded.pension_rules || initialPensionRules,
+            termRules: loaded.term_rules || initialTermRules,
+            marginRules: loaded.margin_rules || initialMarginRules,
+            dsrRules: loaded.dsr_rules || initialDsrRules,
+            supportSettings: loaded.support_settings || initialSupportSettings,
+            personalRules: loaded.personal_finance_rules || initialPersonalFinanceRules,
+            advancedRules: loaded.advanced_rules || initialAdvancedRules,
+            userSubscriptions: loaded.user_subscriptions || initialUserSubscriptions,
+          });
+        } else {
+          // Table exists but is completely empty? Warm up the system_settings table
+          console.log("No dynamic system_settings keys found in Supabase. Creating default configuration roles...");
+          const defaultsToSeed = [
+            { key: 'banks', value: initialBanks },
+            { key: 'product_acceptance', value: initialProductAcceptance },
+            { key: 'military_ranks', value: initialMilitaryRanks },
+            { key: 'salary_rules', value: initialSalaryRules },
+            { key: 'pension_rules', value: initialPensionRules },
+            { key: 'term_rules', value: initialTermRules },
+            { key: 'margin_rules', value: initialMarginRules },
+            { key: 'dsr_rules', value: initialDsrRules },
+            { key: 'support_settings', value: initialSupportSettings },
+            { key: 'personal_finance_rules', value: initialPersonalFinanceRules },
+            { key: 'advanced_rules', value: initialAdvancedRules },
+            { key: 'user_subscriptions', value: initialUserSubscriptions }
+          ];
+
+          for (const item of defaultsToSeed) {
+            await supabase.from('system_settings').upsert({ key: item.key, value: item.value });
+          }
+        }
+      } catch (err) {
+        console.warn("Supabase granular system_settings load failed. Using local storage or seed defaults gracefully.", err);
+      } finally {
+        setIsSettingsLoading(false);
+      }
+    }
+
+    loadConfig();
+  }, []);
+
+  // Synchronise path for diagnostics direct link route
+  useEffect(() => {
+    const isDiagnostics = window.location.pathname === '/admin/diagnostics' || window.location.hash === '#/admin/diagnostics';
+    if (isDiagnostics) {
+      setActiveNav('admin');
+      setAdminSubPage('diagnostics');
+    }
+  }, []);
 
   const currentSettings: AdminSettings = {
     banks,
@@ -160,16 +301,49 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     supportSettings,
     personalRules,
     advancedRules,
+    userSubscriptions,
   };
 
   const hasUnsavedChanges = JSON.stringify(currentSettings) !== JSON.stringify(savedSettings);
 
-  const saveChanges = () => {
+  const saveChanges = async () => {
     setSavedSettings(currentSettings);
+    // Save locally
     try {
       localStorage.setItem("hasba_admin_settings", JSON.stringify(currentSettings));
     } catch (e) {
       console.error("Error saving hasba_admin_settings to localStorage:", e);
+    }
+
+    // Save dynamically to granular Supabase keys in system_settings table
+    if (hasSupabaseKeys) {
+      try {
+        const itemsToSave = [
+          { key: 'banks', value: banks },
+          { key: 'product_acceptance', value: products },
+          { key: 'military_ranks', value: militaryRanks },
+          { key: 'salary_rules', value: salaryRules },
+          { key: 'pension_rules', value: pensionRules },
+          { key: 'term_rules', value: termRules },
+          { key: 'margin_rules', value: marginRules },
+          { key: 'dsr_rules', value: dsrRules },
+          { key: 'support_settings', value: supportSettings },
+          { key: 'personal_finance_rules', value: personalRules },
+          { key: 'advanced_rules', value: advancedRules },
+          { key: 'user_subscriptions', value: userSubscriptions }
+        ];
+
+        for (const item of itemsToSave) {
+          await supabase.from('system_settings').upsert({
+            key: item.key,
+            value: item.value,
+            updated_at: new Date().toISOString()
+          });
+        }
+        console.log("All settings successfully synced to granular keys in system_settings database");
+      } catch (err) {
+        console.error("Failed to save granular settings to Supabase:", err);
+      }
     }
   };
 
@@ -185,6 +359,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setSupportSettings(savedSettings.supportSettings);
     setPersonalRules(savedSettings.personalRules);
     setAdvancedRules(savedSettings.advancedRules);
+    if (savedSettings.userSubscriptions) {
+      setUserSubscriptions(savedSettings.userSubscriptions);
+    }
   };
 
   return (
@@ -220,9 +397,25 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         setActiveNav,
         adminSubPage,
         setAdminSubPage,
+        activeStepLabel,
+        setActiveStepLabel,
+        currentStep,
+        setCurrentStep,
+        results,
+        setResults,
+        isMobileSettingsOpen,
+        setIsMobileSettingsOpen,
         hasUnsavedChanges,
         saveChanges,
-        cancelChanges
+        cancelChanges,
+
+        // Auth
+        user,
+        setUser,
+        userRole,
+        authLoading,
+        isSettingsLoading,
+        signOut
       }}
     >
       <div dir="rtl" className="min-h-screen bg-[#F5F7FA] font-sans antialiased text-[#111827]">

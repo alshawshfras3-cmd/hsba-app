@@ -3,6 +3,7 @@ import { Bank } from '../types';
 export const initialBanks: Bank[] = [
   {
     id: 'alahli',
+    institutionType: 'bank',
     nameAr: 'البنك الأهلي السعودي',
     nameEn: 'SNB',
     logoColor: 'from-emerald-700 to-emerald-950',
@@ -18,6 +19,7 @@ export const initialBanks: Bank[] = [
   },
   {
     id: 'rajhi',
+    institutionType: 'bank',
     nameAr: 'مصرف الراجحي',
     nameEn: 'Al Rajhi Bank',
     logoColor: 'from-blue-700 to-blue-950',
@@ -33,6 +35,7 @@ export const initialBanks: Bank[] = [
   },
   {
     id: 'alinma',
+    institutionType: 'bank',
     nameAr: 'مصرف الإنماء',
     nameEn: 'Alinma Bank',
     logoColor: 'from-amber-600 to-amber-950',
@@ -48,6 +51,7 @@ export const initialBanks: Bank[] = [
   },
   {
     id: 'fransi',
+    institutionType: 'bank',
     nameAr: 'البنك السعودي الفرنسي',
     nameEn: 'BSF',
     logoColor: 'from-cyan-600 to-cyan-950',
@@ -63,6 +67,7 @@ export const initialBanks: Bank[] = [
   },
   {
     id: 'bidaya',
+    institutionType: 'finance_company',
     nameAr: 'بداية لتمويل المنازل',
     nameEn: 'Bidaya Finance',
     logoColor: 'from-rose-600 to-rose-950',
@@ -78,6 +83,7 @@ export const initialBanks: Bank[] = [
   },
   {
     id: 'albilad',
+    institutionType: 'bank',
     nameAr: 'بنك البلاد',
     nameEn: 'Bank Albilad',
     logoColor: 'from-teal-600 to-teal-950',
@@ -93,6 +99,7 @@ export const initialBanks: Bank[] = [
   },
   {
     id: 'alarabi',
+    institutionType: 'bank',
     nameAr: 'البنك العربي الوطني',
     nameEn: 'ANB',
     logoColor: 'from-indigo-700 to-indigo-950',

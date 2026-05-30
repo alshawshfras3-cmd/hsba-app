@@ -7,11 +7,29 @@ export function calculateNetSalary(params: {
   otherAllowances?: number;
   method: 'direct' | 'details';
   directNetSalary?: number;
+  directPensionSalary?: number;
   rules: NetSalaryRule[];
 }): NetSalaryOutput {
-  const { sectorId, basicSalary = 0, housingAllowance = 0, otherAllowances = 0, method, directNetSalary = 0, rules } = params;
+  const { sectorId, basicSalary = 0, housingAllowance = 0, otherAllowances = 0, method, directNetSalary = 0, directPensionSalary = 0, rules } = params;
 
-  if (method === 'direct' || sectorId === 'retired') {
+  if (sectorId === 'retired') {
+    const pension = Number(directPensionSalary ?? 0);
+    return {
+      grossSalary: pension,
+      deductionAmount: 0,
+      netSalary: pension,
+      calculationMethod: 'direct',
+      breakdown: {
+        basicSalary: pension,
+        housingAllowance: 0,
+        otherAllowances: 0,
+        deductionRate: 0,
+        deductionBase: 0
+      }
+    };
+  }
+
+  if (method === 'direct') {
     return {
       grossSalary: directNetSalary,
       deductionAmount: 0,

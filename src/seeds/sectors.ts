@@ -32,7 +32,7 @@ export const initialSectors: Sector[] = [
     needsRank: false,
     defaultRetirementAge: 60,
     pensionMultiplier: 480,
-    isActive: true
+    isActive: false
   },
   {
     id: 'retired',

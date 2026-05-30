@@ -5,6 +5,8 @@ const banksList = ['all', 'alahli', 'rajhi', 'alinma', 'fransi', 'bidaya', 'albi
 const rules: PersonalFinanceRules[] = [];
 
 banksList.forEach((bankId) => {
+  const marginValue = bankId === 'rajhi' ? 4.59 : (bankId === 'alahli' ? 5.00 : 4.80);
+
   // 1. Personal only + active_employee
   rules.push({
     id: `rule-${bankId}-personal-active`,
@@ -12,14 +14,14 @@ banksList.forEach((bankId) => {
     sectorId: 'all',
     dsrPercentage: 33,
     termMonths: 60,
-    financeCoefficient: 50.42,
-    annualMargin: 2.50,
+    financeCoefficient: 0,
+    annualMargin: marginValue,
     minSalary: 4000,
     minAge: 18,
     maxAge: 65,
     retireeDsrPercentage: 25,
     isActive: true,
-    calculationMethod: 'multiplier',
+    calculationMethod: 'flat_rate',
     pathType: 'personal_only',
     customerStatus: 'active_employee'
   });
@@ -31,14 +33,14 @@ banksList.forEach((bankId) => {
     sectorId: 'retired',
     dsrPercentage: 25,
     termMonths: 60,
-    financeCoefficient: 50.42,
-    annualMargin: 2.50,
+    financeCoefficient: 0,
+    annualMargin: marginValue,
     minSalary: 4000,
     minAge: 18,
     maxAge: 65,
     retireeDsrPercentage: 25,
     isActive: true,
-    calculationMethod: 'multiplier',
+    calculationMethod: 'flat_rate',
     pathType: 'personal_only',
     customerStatus: 'retired'
   });
@@ -50,14 +52,14 @@ banksList.forEach((bankId) => {
     sectorId: 'all',
     dsrPercentage: 33,
     termMonths: 60,
-    financeCoefficient: 50.42,
-    annualMargin: 2.50,
+    financeCoefficient: 0,
+    annualMargin: marginValue,
     minSalary: 4000,
     minAge: 18,
     maxAge: 65,
     retireeDsrPercentage: 25,
     isActive: true,
-    calculationMethod: 'multiplier',
+    calculationMethod: 'flat_rate',
     pathType: 'real_estate_with_new_personal',
     customerStatus: 'active_employee'
   });
@@ -69,14 +71,14 @@ banksList.forEach((bankId) => {
     sectorId: 'retired',
     dsrPercentage: 25,
     termMonths: 60,
-    financeCoefficient: 50.42,
-    annualMargin: 2.50,
+    financeCoefficient: 0,
+    annualMargin: marginValue,
     minSalary: 4000,
     minAge: 18,
     maxAge: 65,
     retireeDsrPercentage: 25,
     isActive: true,
-    calculationMethod: 'multiplier',
+    calculationMethod: 'flat_rate',
     pathType: 'real_estate_with_new_personal',
     customerStatus: 'retired'
   });

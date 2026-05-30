@@ -56,6 +56,8 @@ export function runDiagnostics(params: {
     status = 'rejected';
     messages.push(`تم رفض الطلب: القطاع المستهدف (${
       sectorId === 'government_civilian' ? 'حكومي مدني' :
+      sectorId === 'semi_gov' ? 'شبه حكومي' :
+      sectorId === 'companies' ? 'موظف شركات' :
       sectorId === 'military' ? 'عسكري' :
       sectorId === 'private' ? 'قطاع خاص' : 'متقاعد'
     }) غير مقبول لدى ${bankName} لهذا المنتج.`);

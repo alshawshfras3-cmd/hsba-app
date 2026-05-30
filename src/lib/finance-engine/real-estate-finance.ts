@@ -44,15 +44,18 @@ export function calculateRealEstateFinance(params: {
   }
 
   if (monthsBeforeRetirement === 0 && monthsAfterRetirement > 0) {
-    let installmentRetired = Math.max(0, pensionSalaryAfter * (dsrAfter / 100) - obligations);
-    if (supportType === 'monthly') {
-      installmentRetired += monthlySupport;
-    }
+    const effectiveSalaryRetired = pensionSalaryAfter + (supportType === 'monthly' ? monthlySupport : 0);
+    const installmentRetired = Math.max(0, effectiveSalaryRetired * (dsrAfter / 100) - obligations);
+
     const totalCashflow = installmentRetired * monthsAfterRetirement;
     const termYears = monthsAfterRetirement / 12;
     const denominator = 1 + (annualMargin / 100) * termYears;
     const realEstateFinanceAmount = Math.round(totalCashflow / denominator);
-    const housingSupportAmount = supportType === 'downpayment' ? downPaymentSupport : monthlySupport * monthsAfterRetirement;
+
+    const housingSupportAmount = supportType === 'downpayment'
+      ? downPaymentSupport
+      : monthlySupport;
+
     const totalPurchasingPower = realEstateFinanceAmount + (supportType === 'downpayment' ? downPaymentSupport : 0);
     return {
       realEstateFinanceAmount,
@@ -70,21 +73,14 @@ export function calculateRealEstateFinance(params: {
 
   // Calculate pre-retirement monthly installment capacity
   // Installment capacity = Net * DSR - obligations
-  let installmentBefore = (netSalaryBefore * (dsrBefore / 100)) - obligations;
-  if (installmentBefore < 0) installmentBefore = 0;
-
-  // If support is monthly, add it to the installment capacity
-  let appliedMonthlySupport = 0;
-  if (supportType === 'monthly' && monthsBeforeRetirement > 0) {
-    appliedMonthlySupport = monthlySupport;
-    installmentBefore += monthlySupport;
-  }
+  const effectiveSalaryBefore = netSalaryBefore + (supportType === 'monthly' ? monthlySupport : 0);
+  let installmentBefore = Math.max(0, effectiveSalaryBefore * (dsrBefore / 100) - obligations);
 
   // Calculate post-retirement monthly installment capacity
+  const effectiveSalaryAfter = pensionSalaryAfter + (supportType === 'monthly' ? monthlySupport : 0);
   let installmentAfter = 0;
   if (monthsAfterRetirement > 0) {
-    installmentAfter = pensionSalaryAfter * (dsrAfter / 100);
-    if (installmentAfter < 0) installmentAfter = 0;
+    installmentAfter = Math.max(0, effectiveSalaryAfter * (dsrAfter / 100));
   }
 
   // Total cashflow represents the lifetime installment contributions of the contract
@@ -100,7 +96,9 @@ export function calculateRealEstateFinance(params: {
   const profitAmount = Math.max(0, totalRepayment - realEstateFinanceAmount);
 
   // Total Housing support received over the term
-  const housingSupportAmount = (appliedMonthlySupport * monthsBeforeRetirement) + (supportType === 'downpayment' ? downPaymentSupport : 0);
+  const housingSupportAmount = supportType === 'downpayment'
+    ? downPaymentSupport
+    : monthlySupport;
 
   // Purchasing power = loan amount + cash grant (if downpayment type)
   let totalPurchasingPower = realEstateFinanceAmount;
