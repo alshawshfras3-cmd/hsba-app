@@ -27,11 +27,9 @@ export const fallbackPensionRules: PensionCalculationRule[] = [
 
 export const fallbackSectorMappings: SectorClassificationMapping[] = [
   { id: '21', bankId: 'ahli', sectorId: 'gov_civil', bankSectorId: 'strong', labelAr: 'حكومي — قوي' },
-  { id: '22', bankId: 'ahli', sectorId: 'military_officer', bankSectorId: 'strong', labelAr: 'عسكري (ضباط) — قوي' },
+  { id: '22', bankId: 'ahli', sectorId: 'military', bankSectorId: 'strong', labelAr: 'عسكري — قوي' },
   { id: '23', bankId: 'ahli', sectorId: 'semi_gov', bankSectorId: 'strong', labelAr: 'شبه حكومي — قوي' },
-  { id: '24', bankId: 'ahli', sectorId: 'companies', bankSectorId: 'strong', labelAr: 'شركات كبرى — قوي' },
-  { id: '25', bankId: 'ahli', sectorId: 'military_individual', bankSectorId: 'weak', labelAr: 'أفراد عسكريين — ضعيف' },
-  { id: '26', bankId: 'ahli', sectorId: 'private', bankSectorId: 'weak', labelAr: 'خاص بدون اتفاقية — ضعيف' }
+  { id: '24', bankId: 'ahli', sectorId: 'companies', bankSectorId: 'strong', labelAr: 'شركات كبرى — قوي' }
 ];
 
 export const fallbackBankRetirementRules: BankRetirementRule[] = [
@@ -44,26 +42,6 @@ export const fallbackBankRetirementRules: BankRetirementRule[] = [
     approvedSalaryMultiplier: 1.345,
     calculationMethod: 'service_based',
     divisorMonths: 480,
-    enabled: true
-  },
-  {
-    id: 'r_military_officer',
-    bankId: 'rajhi',
-    sectorId: 'military_officer',
-    approvedSalarySource: 'basic_only',
-    approvedSalaryMultiplier: 1.345,
-    calculationMethod: 'service_based',
-    divisorMonths: 420,
-    enabled: true
-  },
-  {
-    id: 'r_military_individual',
-    bankId: 'rajhi',
-    sectorId: 'military_individual',
-    approvedSalarySource: 'basic_only',
-    approvedSalaryMultiplier: 1.345,
-    calculationMethod: 'service_based',
-    divisorMonths: 420,
     enabled: true
   },
   {
@@ -90,16 +68,6 @@ export const fallbackBankRetirementRules: BankRetirementRule[] = [
     id: 'r_companies',
     bankId: 'rajhi',
     sectorId: 'companies',
-    approvedSalarySource: 'basic_housing',
-    approvedSalaryMultiplier: 1.0,
-    calculationMethod: 'service_based',
-    divisorMonths: 480,
-    enabled: true
-  },
-  {
-    id: 'r_private',
-    bankId: 'rajhi',
-    sectorId: 'private',
     approvedSalarySource: 'basic_housing',
     approvedSalaryMultiplier: 1.0,
     calculationMethod: 'service_based',
@@ -426,4 +394,3 @@ export async function saveBankRetirementRule(rule: BankRetirementRule): Promise<
     savePensionCalculationRule(penRule)
   ]);
 }
-

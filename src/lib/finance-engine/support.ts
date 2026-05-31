@@ -1,55 +1,34 @@
-import { HousingSupportOutput, SupportType, SupportSettings, SupportMonthlyBracket, SupportDownpaymentBracket } from '../../types';
+import { HousingSupportOutput, SupportType, SupportSettings, HousingSupportTier, AdvancePaymentTier } from '../../types';
+import { getHousingSupport, getAdvancePayment } from '../housingSupportService';
 
 /**
- * دالة تبحث عن الشريحة الصحيحة للدعم السكني الشهري بناءً على صافي الراتب
+ * دالة تبحث عن الشريحة الصحيحة للدعم السكني الشهري بناءً على صافي الراتب بقيمة استيفاء خطي
  */
-export function getMonthlyHousingSupport(netSalary: number, monthlyBrackets: SupportMonthlyBracket[]): number {
-  const bracket = getMonthlyHousingSupportBracket(netSalary, monthlyBrackets);
-  return bracket ? bracket.supportAmount : 0;
-}
-
-/**
- * دالة تبحث عن الشريحة الصحيحة للدعم السكني الشهري بناءً على صافي الراتب لترجع الشريحة بالكامل
- */
-export function getMonthlyHousingSupportBracket(netSalary: number, monthlyBrackets: SupportMonthlyBracket[]): SupportMonthlyBracket | null {
-  if (!monthlyBrackets || monthlyBrackets.length === 0) {
-    return null;
-  }
-  return monthlyBrackets.find(b => {
-    const toSalaryVal = b.toSalary;
-    const hasNoLimit = toSalaryVal === null || toSalaryVal === undefined || toSalaryVal === 999999 || toSalaryVal === 0;
-    return netSalary >= b.fromSalary && (hasNoLimit || netSalary <= toSalaryVal);
-  }) || null;
+export function getMonthlyHousingSupport(
+  netSalary: number, 
+  tiers?: HousingSupportTier[]
+): number {
+  return getHousingSupport(netSalary, tiers);
 }
 
 /**
  * دالة تبحث عن الشريحة الصحيحة لدعم الدفعة بناءً على صافي الراتب
  */
-export function getDownPaymentSupport(netSalary: number, downPaymentBrackets: SupportDownpaymentBracket[]): number {
-  const bracket = getDownPaymentSupportBracket(netSalary, downPaymentBrackets);
-  return bracket ? bracket.supportAmount : 0;
-}
-
-/**
- * دالة تبحث عن الشريحة الصحيحة لدعم الدفعة بناءً على صافي الراتب لترجع الشريحة بالكامل
- */
-export function getDownPaymentSupportBracket(netSalary: number, downPaymentBrackets: SupportDownpaymentBracket[]): SupportDownpaymentBracket | null {
-  if (!downPaymentBrackets || downPaymentBrackets.length === 0) {
-    return null;
-  }
-  return downPaymentBrackets.find(b => {
-    const toSalaryVal = b.toSalary;
-    const hasNoLimit = toSalaryVal === null || toSalaryVal === undefined || toSalaryVal === 999999 || toSalaryVal === 0;
-    return netSalary >= b.fromSalary && (hasNoLimit || netSalary <= toSalaryVal);
-  }) || null;
+export function getDownPaymentSupport(
+  netSalary: number, 
+  tiers?: AdvancePaymentTier[]
+): number {
+  return getAdvancePayment(netSalary, tiers);
 }
 
 export function calculateHousingSupport(params: {
   netSalary: number;
   supportType: SupportType | 'down_payment';
   settings: SupportSettings;
+  housingSupportTiers?: HousingSupportTier[];
+  advancePaymentTiers?: AdvancePaymentTier[];
 }): HousingSupportOutput {
-  const { netSalary, supportType, settings } = params;
+  const { netSalary, supportType, housingSupportTiers, advancePaymentTiers } = params;
 
   // توحيد نوع الدعم لدعم كلتا الحالتين
   const normalizedSupportType = (supportType === 'down_payment' || supportType === 'downpayment') ? 'downpayment' : supportType;
@@ -64,32 +43,24 @@ export function calculateHousingSupport(params: {
   }
 
   if (normalizedSupportType === 'monthly') {
-    const bracket = getMonthlyHousingSupportBracket(netSalary, settings.monthlyBrackets);
-    const amount = bracket ? bracket.supportAmount : 416;
-    const bracketLabel = bracket 
-      ? `من ${bracket.fromSalary} إلى ${bracket.toSalary === 999999 || !bracket.toSalary ? 'فأكثر' : bracket.toSalary}` 
-      : 'شريحة غير محددة';
+    const amount = getHousingSupport(netSalary, housingSupportTiers);
     
     return {
       monthlySupport: amount,
       downPaymentSupport: 0,
       supportType: 'monthly',
-      appliedRule: `تم اختيار دعم شهري ${amount} ريال لأن صافي الراتب ${netSalary} يقع في شريحة ${bracketLabel}.`
+      appliedRule: `قيمة الدعم السكني الشهري المتواصل المحسوب: ${Math.round(amount)} ريال (طريقة الاستيفاء الخطي للراجحي).`
     };
   }
 
   if (normalizedSupportType === 'downpayment') {
-    const bracket = getDownPaymentSupportBracket(netSalary, settings.downpaymentBrackets);
-    const amount = bracket ? bracket.supportAmount : 100000;
-    const bracketLabel = bracket 
-      ? `من ${bracket.fromSalary} إلى ${bracket.toSalary === 999999 || !bracket.toSalary ? 'فأكثر' : bracket.toSalary}` 
-      : 'شريحة غير محددة';
+    const amount = getAdvancePayment(netSalary, advancePaymentTiers);
 
     return {
       monthlySupport: 0,
       downPaymentSupport: amount,
       supportType: 'downpayment',
-      appliedRule: `تم اختيار دعم دفعة بقيمة ${amount.toLocaleString('ar-SA')} ريال لأن صافي الراتب ${netSalary} يقع في شريحة ${bracketLabel}.`
+      appliedRule: `قيمة دعم الدفعة المقدمة غير المستردة المحسوبة: ${amount.toLocaleString('ar-SA')} ريال.`
     };
   }
 

@@ -43,18 +43,25 @@ export function calculateRealEstateFinance(params: {
     };
   }
 
+  // حساب الدعم المطبق في الخصم الشهري (دعم الراجحي)
+  // إذا كانت فترة التمويل تزيد عن 240 شهراً (20 سنة)، نستغرق الدعم على كامل الفترة (القسط الشهري مدعوم بـ 240 / فترة التمويل)
+  const supportInDeduction = supportType === 'monthly'
+    ? (totalMonths > 240 ? (monthlySupport * 240) / totalMonths : monthlySupport)
+    : 0;
+
+  // إجمالي الدعم المستلم طوال فترة التمويل (بحد أقصى 240 شهر)
+  const totalHousingSupportReceived = supportType === 'monthly'
+    ? (monthlySupport * Math.min(totalMonths, 240))
+    : (supportType === 'downpayment' ? downPaymentSupport : 0);
+
   if (monthsBeforeRetirement === 0 && monthsAfterRetirement > 0) {
-    const effectiveSalaryRetired = pensionSalaryAfter + (supportType === 'monthly' ? monthlySupport : 0);
+    const effectiveSalaryRetired = pensionSalaryAfter + supportInDeduction;
     const installmentRetired = Math.max(0, effectiveSalaryRetired * (dsrAfter / 100) - obligations);
 
     const totalCashflow = installmentRetired * monthsAfterRetirement;
     const termYears = monthsAfterRetirement / 12;
     const denominator = 1 + (annualMargin / 100) * termYears;
     const realEstateFinanceAmount = Math.round(totalCashflow / denominator);
-
-    const housingSupportAmount = supportType === 'downpayment'
-      ? downPaymentSupport
-      : monthlySupport;
 
     const totalPurchasingPower = realEstateFinanceAmount + (supportType === 'downpayment' ? downPaymentSupport : 0);
     return {
@@ -64,30 +71,27 @@ export function calculateRealEstateFinance(params: {
       totalCashflow,
       totalRepayment: Math.round(totalCashflow),
       profitAmount: Math.max(0, Math.round(totalCashflow) - realEstateFinanceAmount),
-      housingSupportAmount,
+      housingSupportAmount: totalHousingSupportReceived,
       totalPurchasingPower,
       annualMargin,
       termMonths: monthsAfterRetirement
     };
   }
 
-  // Calculate pre-retirement monthly installment capacity
-  // Installment capacity = Net * DSR - obligations
-  const effectiveSalaryBefore = netSalaryBefore + (supportType === 'monthly' ? monthlySupport : 0);
+  // حساب القدرة الاستقطاعية قبل التقاعد مع دمج دعم القسط الشهري
+  const effectiveSalaryBefore = netSalaryBefore + supportInDeduction;
   let installmentBefore = Math.max(0, effectiveSalaryBefore * (dsrBefore / 100) - obligations);
 
-  // Calculate post-retirement monthly installment capacity
-  const effectiveSalaryAfter = pensionSalaryAfter + (supportType === 'monthly' ? monthlySupport : 0);
+  // حساب القدرة الاستقطاعية بعد التقاعد مع دمج دعم القسط الشهري
+  const effectiveSalaryAfter = pensionSalaryAfter + supportInDeduction;
   let installmentAfter = 0;
   if (monthsAfterRetirement > 0) {
     installmentAfter = Math.max(0, effectiveSalaryAfter * (dsrAfter / 100));
   }
 
-  // Total cashflow represents the lifetime installment contributions of the contract
+  // إجمالي التدفق النقدي للأقساط لمزج قبل وبعد التقاعد
   const totalCashflow = (installmentBefore * monthsBeforeRetirement) + (installmentAfter * monthsAfterRetirement);
 
-  // Present Value (PV) / Loan Amount calculation matching the user's explicit equation:
-  // Loan Amount = Total Cashflow / (1 + (annualMargin/100) * (termYears))
   const termYears = totalMonths / 12;
   const denominator = 1 + (annualMargin / 100) * termYears;
 
@@ -95,16 +99,8 @@ export function calculateRealEstateFinance(params: {
   const totalRepayment = Math.round(totalCashflow);
   const profitAmount = Math.max(0, totalRepayment - realEstateFinanceAmount);
 
-  // Total Housing support received over the term
-  const housingSupportAmount = supportType === 'downpayment'
-    ? downPaymentSupport
-    : monthlySupport;
-
-  // Purchasing power = loan amount + cash grant (if downpayment type)
-  let totalPurchasingPower = realEstateFinanceAmount;
-  if (supportType === 'downpayment') {
-    totalPurchasingPower += downPaymentSupport;
-  }
+  // القدرة الشرائية الكلية = مبلغ التمويل + منحة الدفعة المقدمة (إذا كانت من نوع دفعة مقدمة)
+  const totalPurchasingPower = realEstateFinanceAmount + (supportType === 'downpayment' ? downPaymentSupport : 0);
 
   return {
     realEstateFinanceAmount: Math.round(realEstateFinanceAmount),
@@ -113,7 +109,7 @@ export function calculateRealEstateFinance(params: {
     totalCashflow,
     totalRepayment,
     profitAmount,
-    housingSupportAmount,
+    housingSupportAmount: totalHousingSupportReceived,
     totalPurchasingPower,
     annualMargin,
     termMonths: totalMonths

@@ -9,6 +9,26 @@ import {
 } from '../date-utils';
 import { ApprovedSalarySourceRule, PensionCalculationRule, SectorClassificationMapping, BankRetirementRule, PensionLibraryRule, BankSectorPensionRule } from '../../types/pension-rules';
 
+const getSectorRetirementAge = (sectorId: string, defaultValue = 60): number => {
+  try {
+    const saved = localStorage.getItem("hasba_custom_sectors");
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed)) {
+        let idToLookup = sectorId;
+        if (sectorId === 'gov_civil') idToLookup = 'government_civilian';
+        const matched = parsed.find(s => s.id === sectorId || s.id === idToLookup);
+        if (matched && typeof matched.retirementAge === 'number' && matched.retirementAge > 0) {
+          return matched.retirementAge;
+        }
+      }
+    }
+  } catch (e) {
+    console.error("Error reading sector retirement age:", e);
+  }
+  return defaultValue;
+};
+
 export function getBankRetirementRule(params: {
   bankId: string;
   sectorId: string;
@@ -157,7 +177,8 @@ export function calculatePensionSalary(params: {
   );
 
   // 2. Determine retirement age (e.g., 60 years or military specific)
-  const retirementAge = retirementAgeCustom || (sectorId === 'military' ? 45 : 60);
+  const isMilitary = (sectorId as string) === 'military';
+  const retirementAge = retirementAgeCustom || (isMilitary ? 45 : getSectorRetirementAge(sectorId, 60));
   const retirementAgeMonths = Math.round(retirementAge * 12);
 
   // 3. Months until retirement
@@ -218,7 +239,7 @@ export function calculatePensionSalary(params: {
   }
 
   // 6. Select pension multiplier (e.g. 420 for military, 480 for civilians)
-  const multiplier = pensionMultiplierCustom || (sectorId === 'military' ? 420 : 480);
+  const multiplier = pensionMultiplierCustom || (isMilitary ? 420 : 480);
 
   // 7. Calculate pension salary
   // Formula: Pension = Basic * serviceMonthsAtRetirement / multiplier (capped at basic salary)
@@ -245,10 +266,11 @@ export function normalizeSectorId(sectorId: string): string {
     'gov_civil':           'gov_civil',
     'companies':           'companies',
     'semi_gov':            'semi_gov',
-    'military':            'military',            // حقل أب — fallback للراجحي
-    'military_officer':    'military_officer',    // ضابط — للأهلي
-    'military_individual': 'military_individual', // فرد — للأهلي
-    'private':             'private',
+    'military':            'military',
+    'military_individual': 'military',
+    'military_enlisted':   'military',
+    'military_officer':    'military',
+    'private':             'companies', // private mapped to companies
     'retired':             'retired',
   };
   return map[sectorId] || sectorId;
@@ -645,19 +667,15 @@ export function getPensionRuleForBankAndSector(
   rankId?: string
 ) {
   let normalizedSector = normalizeSectorId(sectorId);
-  const isMilitary = normalizedSector === 'military' || normalizedSector === 'military_officer' || normalizedSector === 'military_individual';
+  const isMilitary = normalizedSector === 'military';
   
-  let ruleSector = normalizedSector;
-  if (isMilitary) {
-    ruleSector = 'military';
-  }
+  let ruleSector = isMilitary ? 'military' : normalizedSector;
 
   const sectorNamesAr: Record<string, string> = {
-    gov_civil: "حكومي مدني",
+    gov_civil: "مدني حكومي",
     military: "عسكري",
     semi_gov: "شبه حكومي",
     companies: "موظف شركات",
-    private: "قطاع خاص",
     retired: "متقاعد"
   };
 
@@ -711,16 +729,13 @@ export function getPensionRuleForBankAndSector(
   if (isAlahli) {
     // Alahli default fixed percentage behavior for remaining active sectors
     let isGroupA = true;
-    if (ruleSector === 'military') {
-      if (rankId) {
-        // Enlisted ranks in Group B: jundi, areef, wakeel_raqeeb
-        if (['jundi', 'areef', 'wakeel_raqeeb'].includes(rankId)) {
-          isGroupA = false;
-        }
-      } else if (normalizedSector === 'military_individual') {
+    if (isMilitary) {
+      const isOfficerList = ['mulazim', 'mulazim_pilot', 'naqeeb', 'naqeeb_pilot', 'raid', 'raid_pilot', 'muqaddam', 'muqaddam_pilot', 'aqeed', 'aqeed_pilot', 'ameed', 'ameed_pilot', 'liwa', 'liwa_pilot'];
+      const isOfficer = rankId ? isOfficerList.includes(rankId) : false;
+      if (!isOfficer) {
         isGroupA = false;
       }
-    } else if (ruleSector === 'private') {
+    } else if (normalizedSector === 'companies') {
       isGroupA = false;
     }
 
@@ -772,16 +787,16 @@ export function getPensionRuleForBankAndSector(
     let noGrowthAboveYears = 0;
     let capAtApprovedSalary = true;
 
-    if (ruleSector === 'military') {
+    if (isMilitary) {
       divisorYears = 35;
     }
 
-    if (ruleSector === 'gov_civil' || ruleSector === 'military') {
+    if (normalizedSector === 'gov_civil' || isMilitary) {
       growthRate = 2.5;
       growthMinYears = 5;
       growthMaxYears = 12;
       noGrowthAboveYears = 25;
-    } else if (ruleSector === 'semi_gov') {
+    } else if (normalizedSector === 'semi_gov') {
       growthRate = 1.25;
       growthMinYears = 5;
       growthMaxYears = 12;
@@ -824,7 +839,7 @@ export function calculatePensionSalaryByRule(params: CalculateRulePensionParams)
   } = params;
 
   let normalizedSector = normalizeSectorId(sectorId);
-  const isMilitary = normalizedSector === 'military' || normalizedSector === 'military_officer' || normalizedSector === 'military_individual';
+  const isMilitary = normalizedSector === 'military';
   if (isMilitary) {
     normalizedSector = 'military';
   }
@@ -992,11 +1007,11 @@ try {
   });
   console.assert(test5 === 5175, `❌ فشل اختبار 5: المتوقع 5175 وجد ${test5}`);
 
-  // اختبار 6: قاعدة خاص أساسي + سكن
+  // اختبار 6: قاعدة شركات أساسي + سكن
   const test6 = calculatePensionFromTemplate({
     template: {
-      id: "tpl_private_basic_housing",
-      name: "خدمة خاص 480 - أساسي + سكن",
+      id: "tpl_companies_basic_housing",
+      name: "خدمة شركات 480 - أساسي + سكن",
       calcMethod: "service_growth",
       salarySource: "basic_housing",
       divisorYears: 40,

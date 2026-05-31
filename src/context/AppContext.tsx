@@ -13,7 +13,9 @@ import {
   PersonalFinanceRules,
   AdvancedRule,
   CalculationLog,
-  UserSubscription
+  UserSubscription,
+  HousingSupportTier,
+  AdvancePaymentTier
 } from '../types';
 
 import {
@@ -31,6 +33,15 @@ import {
   initialCalculationLogs,
   initialUserSubscriptions
 } from '../seeds';
+
+import {
+  fetchHousingSupportTiers,
+  fetchAdvancePaymentTiers,
+  saveHousingSupportTiers,
+  saveAdvancePaymentTiers,
+  DEFAULT_HOUSING_SUPPORT_TIERS,
+  DEFAULT_ADVANCE_PAYMENT_TIERS
+} from '../lib/housingSupportService';
 
 import { supabase, hasSupabaseKeys } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -54,6 +65,10 @@ interface AppContextType {
   setDsrRules: React.Dispatch<React.SetStateAction<DsrRule[]>>;
   supportSettings: SupportSettings;
   setSupportSettings: React.Dispatch<React.SetStateAction<SupportSettings>>;
+  housingSupportTiers: HousingSupportTier[];
+  setHousingSupportTiers: React.Dispatch<React.SetStateAction<HousingSupportTier[]>>;
+  advancePaymentTiers: AdvancePaymentTier[];
+  setAdvancePaymentTiers: React.Dispatch<React.SetStateAction<AdvancePaymentTier[]>>;
   personalRules: PersonalFinanceRules[];
   setPersonalRules: React.Dispatch<React.SetStateAction<PersonalFinanceRules[]>>;
   advancedRules: AdvancedRule[];
@@ -101,6 +116,8 @@ interface AdminSettings {
   marginRules: MarginRule[];
   dsrRules: DsrRule[];
   supportSettings: SupportSettings;
+  housingSupportTiers: HousingSupportTier[];
+  advancePaymentTiers: AdvancePaymentTier[];
   personalRules: PersonalFinanceRules[];
   advancedRules: AdvancedRule[];
   userSubscriptions?: UserSubscription[];
@@ -112,16 +129,27 @@ const getInitialSettings = (): AdminSettings => {
     if (saved) {
       const parsed = JSON.parse(saved);
       if (parsed && typeof parsed === 'object') {
+        const savedMilitaryRanks = parsed.militaryRanks || [];
+        const needsRanksUpgrade = savedMilitaryRanks.length === 0 || 
+          savedMilitaryRanks.some((r: any) => !r.hasOwnProperty('sectorScope') || !r.sectorScope || r.sectorScope === 'military_officer' || r.sectorScope === 'military_enlisted');
+
+        const savedTermRules = parsed.termRules || [];
+        const needsTermRulesUpgrade = savedTermRules.length === 0 || 
+          savedTermRules.length < 5 || 
+          savedTermRules.some((r: any) => r.bankId === 'rajhi' && r.sectorId === 'gov_civil' && r.maxTermMonths === 300);
+
         return {
           banks: parsed.banks || initialBanks,
           products: parsed.products || initialProductAcceptance,
-          militaryRanks: parsed.militaryRanks || initialMilitaryRanks,
+          militaryRanks: needsRanksUpgrade ? initialMilitaryRanks : savedMilitaryRanks,
           salaryRules: parsed.salaryRules || initialSalaryRules,
           pensionRules: parsed.pensionRules || initialPensionRules,
-          termRules: parsed.termRules || initialTermRules,
+          termRules: needsTermRulesUpgrade ? initialTermRules : savedTermRules,
           marginRules: parsed.marginRules || initialMarginRules,
           dsrRules: parsed.dsrRules || initialDsrRules,
           supportSettings: parsed.supportSettings || initialSupportSettings,
+          housingSupportTiers: parsed.housingSupportTiers || DEFAULT_HOUSING_SUPPORT_TIERS,
+          advancePaymentTiers: parsed.advancePaymentTiers || DEFAULT_ADVANCE_PAYMENT_TIERS,
           personalRules: parsed.personalRules || initialPersonalFinanceRules,
           advancedRules: parsed.advancedRules || initialAdvancedRules,
           userSubscriptions: parsed.userSubscriptions || initialUserSubscriptions,
@@ -141,6 +169,8 @@ const getInitialSettings = (): AdminSettings => {
     marginRules: initialMarginRules,
     dsrRules: initialDsrRules,
     supportSettings: initialSupportSettings,
+    housingSupportTiers: [...DEFAULT_HOUSING_SUPPORT_TIERS],
+    advancePaymentTiers: [...DEFAULT_ADVANCE_PAYMENT_TIERS],
     personalRules: initialPersonalFinanceRules,
     advancedRules: initialAdvancedRules,
     userSubscriptions: initialUserSubscriptions,
@@ -159,6 +189,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [marginRules, setMarginRules] = useState<MarginRule[]>(initialData.marginRules);
   const [dsrRules, setDsrRules] = useState<DsrRule[]>(initialData.dsrRules);
   const [supportSettings, setSupportSettings] = useState<SupportSettings>(initialData.supportSettings);
+  const [housingSupportTiers, setHousingSupportTiers] = useState<HousingSupportTier[]>(initialData.housingSupportTiers);
+  const [advancePaymentTiers, setAdvancePaymentTiers] = useState<AdvancePaymentTier[]>(initialData.advancePaymentTiers);
   const [personalRules, setPersonalRules] = useState<PersonalFinanceRules[]>(initialData.personalRules);
   const [advancedRules, setAdvancedRules] = useState<AdvancedRule[]>(initialData.advancedRules);
 
@@ -221,9 +253,16 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
             loaded[row.key] = val;
           }
 
+          let loadedMilitaryRanks = loaded.military_ranks || [];
+          const needsRanksUpgrade = loadedMilitaryRanks.length === 0 || 
+            loadedMilitaryRanks.some((r: any) => !r.hasOwnProperty('sectorScope') || !r.sectorScope || r.sectorScope === 'military_officer' || r.sectorScope === 'military_enlisted');
+          if (needsRanksUpgrade) {
+            loadedMilitaryRanks = initialMilitaryRanks;
+          }
+
           if (loaded.banks) setBanks(loaded.banks);
           if (loaded.product_acceptance) setProducts(loaded.product_acceptance);
-          if (loaded.military_ranks) setMilitaryRanks(loaded.military_ranks);
+          setMilitaryRanks(loadedMilitaryRanks);
           if (loaded.salary_rules) setSalaryRules(loaded.salary_rules);
           if (loaded.pension_rules) setPensionRules(loaded.pension_rules);
           if (loaded.term_rules) setTermRules(loaded.term_rules);
@@ -234,16 +273,23 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           if (loaded.advanced_rules) setAdvancedRules(loaded.advanced_rules);
           if (loaded.user_subscriptions) setUserSubscriptions(loaded.user_subscriptions);
 
+          const hSupport = await fetchHousingSupportTiers();
+          const aPayment = await fetchAdvancePaymentTiers();
+          setHousingSupportTiers(hSupport);
+          setAdvancePaymentTiers(aPayment);
+
           setSavedSettings({
             banks: loaded.banks || initialBanks,
             products: loaded.product_acceptance || initialProductAcceptance,
-            militaryRanks: loaded.military_ranks || initialMilitaryRanks,
+            militaryRanks: loadedMilitaryRanks,
             salaryRules: loaded.salary_rules || initialSalaryRules,
             pensionRules: loaded.pension_rules || initialPensionRules,
             termRules: loaded.term_rules || initialTermRules,
             marginRules: loaded.margin_rules || initialMarginRules,
             dsrRules: loaded.dsr_rules || initialDsrRules,
             supportSettings: loaded.support_settings || initialSupportSettings,
+            housingSupportTiers: hSupport,
+            advancePaymentTiers: aPayment,
             personalRules: loaded.personal_finance_rules || initialPersonalFinanceRules,
             advancedRules: loaded.advanced_rules || initialAdvancedRules,
             userSubscriptions: loaded.user_subscriptions || initialUserSubscriptions,
@@ -299,6 +345,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     marginRules,
     dsrRules,
     supportSettings,
+    housingSupportTiers,
+    advancePaymentTiers,
     personalRules,
     advancedRules,
     userSubscriptions,
@@ -318,6 +366,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     // Save dynamically to granular Supabase keys in system_settings table
     if (hasSupabaseKeys) {
       try {
+        await saveHousingSupportTiers(housingSupportTiers);
+        await saveAdvancePaymentTiers(advancePaymentTiers);
+
         const itemsToSave = [
           { key: 'banks', value: banks },
           { key: 'product_acceptance', value: products },
@@ -357,6 +408,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setMarginRules(savedSettings.marginRules);
     setDsrRules(savedSettings.dsrRules);
     setSupportSettings(savedSettings.supportSettings);
+    setHousingSupportTiers(savedSettings.housingSupportTiers);
+    setAdvancePaymentTiers(savedSettings.advancePaymentTiers);
     setPersonalRules(savedSettings.personalRules);
     setAdvancedRules(savedSettings.advancedRules);
     if (savedSettings.userSubscriptions) {
@@ -385,6 +438,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         setDsrRules,
         supportSettings,
         setSupportSettings,
+        housingSupportTiers,
+        setHousingSupportTiers,
+        advancePaymentTiers,
+        setAdvancePaymentTiers,
         personalRules,
         setPersonalRules,
         advancedRules,

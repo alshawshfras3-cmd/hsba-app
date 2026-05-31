@@ -12,6 +12,7 @@ export interface ExtendedTermOutput extends TermOutput {
   monthsAfterRetirement: number;
   calendarUsed: 'hijri' | 'gregorian';
   ruleSource: 'termRule' | 'bankFallback';
+  isAgeLimitingFactor?: boolean;
 }
 
 export function calculateFinanceTerm(params: {
@@ -81,29 +82,36 @@ export function calculateFinanceTerm(params: {
   const maxAgeAtEndMonths = maxAgeAtEnd * 12;
   const remainingMonthsToMaxAge = Math.max(0, maxAgeAtEndMonths - currentAgeMonths);
 
-  // 5. Capping months before retirement to statutory 25 years (300 months) for risk control
-  const cappedMonthsBefore = Math.min(monthsBeforeRetirement, 300);
+  // Hierarchical Capping Logic:
+  // - Start from absolute maxTermMonths from rules
+  let absoluteMaxTerm = maxTermMonths;
+  let isAgeLimitingFactor = false;
 
+  // Level A: Cap by max age at end of financing
+  if (absoluteMaxTerm > remainingMonthsToMaxAge) {
+    absoluteMaxTerm = remainingMonthsToMaxAge;
+    isAgeLimitingFactor = true;
+  }
+
+  // Level B: Cap by sector statutory service rules (months before + allowed months after retirement)
   const ruleLimitTerm = sectorId === 'retired'
-    ? remainingMonthsToMaxAge
-    : (cappedMonthsBefore + monthsAfterRetirement);
+    ? maxTermMonths
+    : (monthsBeforeRetirement + monthsAfterRetirement);
 
-  // Risk profile cap: if remaining term before retirement is >= 240 months (20 years), absolute limit is 25 years (300 months)
-  const maxTermAllowed = (sectorId !== 'retired' && monthsBeforeRetirement >= 240)
-    ? 300
-    : maxTermMonths;
+  if (absoluteMaxTerm > ruleLimitTerm) {
+    absoluteMaxTerm = ruleLimitTerm;
+    // If the sector service rules capped it even further than the age cap did,
+    // then age limit is NOT the active limiting constraint!
+    isAgeLimitingFactor = false;
+  }
 
-  const absoluteMaxTerm = Math.min(
-    maxTermAllowed,
-    remainingMonthsToMaxAge,
-    ruleLimitTerm
-  );
-
+  // Selected Modes
   let totalMonths = absoluteMaxTerm;
   let reductionReason = '';
 
   if (selectedMode === 'until_retirement' && sectorId !== 'retired') {
     totalMonths = Math.min(absoluteMaxTerm, monthsBeforeRetirement);
+    isAgeLimitingFactor = false;
     reductionReason = 'تم تحديد مدة التمويل لتنتهي عند التقاعد بناءً على طلبك.';
   } else if (selectedMode === 'manual') {
     const requested = manualTermMonths;
@@ -112,6 +120,7 @@ export function calculateFinanceTerm(params: {
       reductionReason = 'تم تقليص المدة لتتجاوز الضوابط العمرية أو لوائح جهة الإقراض.';
     } else {
       totalMonths = Math.max(minTermMonths, requested);
+      isAgeLimitingFactor = false;
     }
   }
 
@@ -121,9 +130,7 @@ export function calculateFinanceTerm(params: {
   }
 
   // Set precise reduction explanations for the diagnostics log
-  if (sectorId !== 'retired' && monthsBeforeRetirement >= 240 && totalMonths <= 300 && selectedMode === 'max') {
-    reductionReason = 'تم تحديد مدة التمويل بـ 25 سنة كحد أقصى للمرحله قبل التقاعد وفق سياسة إدارة المخاطر لدى جهة التمويل.';
-  } else if (totalMonths < maxTermMonths && selectedMode === 'max') {
+  if (totalMonths < maxTermMonths && selectedMode === 'max') {
     if (remainingMonthsToMaxAge < maxTermMonths && remainingMonthsToMaxAge <= ruleLimitTerm) {
       reductionReason = `تم تقليص مدة التمويل لتتجاوز العمر الأقصى للعميل عند نهاية التمويل البالغ ${maxAgeAtEnd} سنة.`;
     } else if (ruleLimitTerm < maxTermMonths) {
@@ -140,7 +147,7 @@ export function calculateFinanceTerm(params: {
     actualMonthsBefore = 0;
     actualMonthsAfter = totalMonths;
   } else {
-    actualMonthsBefore = Math.min(totalMonths, monthsBeforeRetirement, 300);
+    actualMonthsBefore = Math.min(totalMonths, monthsBeforeRetirement);
     actualMonthsAfter = Math.max(0, totalMonths - actualMonthsBefore);
   }
 
@@ -154,6 +161,7 @@ export function calculateFinanceTerm(params: {
     currentAgeMonths,
     remainingMonthsToMaxAge,
     calendarUsed: calendarType,
-    ruleSource
+    ruleSource,
+    isAgeLimitingFactor
   };
 }

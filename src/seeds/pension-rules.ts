@@ -2,7 +2,7 @@ import { PensionRule } from '../types';
 
 export const initialPensionRules: PensionRule[] = [
   {
-    sectorId: 'government_civilian',
+    sectorId: 'gov_civil',
     retirementAge: 60,
     pensionMultiplier: 480, // service months divided by 480 (40 years of service max)
     ageCalcCalendar: 'hijri',
@@ -11,7 +11,16 @@ export const initialPensionRules: PensionRule[] = [
     isActive: true
   },
   {
-    sectorId: 'private',
+    sectorId: 'semi_gov',
+    retirementAge: 60,
+    pensionMultiplier: 480,
+    ageCalcCalendar: 'gregorian',
+    serviceCalcCalendar: 'gregorian',
+    roundServiceMonths: true,
+    isActive: true
+  },
+  {
+    sectorId: 'companies',
     retirementAge: 60,
     pensionMultiplier: 480,
     ageCalcCalendar: 'gregorian',

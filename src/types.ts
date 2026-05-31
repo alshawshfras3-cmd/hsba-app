@@ -1,12 +1,9 @@
 export type SectorId =
-  | 'government_civilian' // حكومي مدني
-  | 'semi_gov' // شبه حكومي
-  | 'companies' // موظف شركات
-  | 'military' // عسكري (حقل أب)
-  | 'military_officer' // ضابط عسكري
-  | 'military_individual' // فرد عسكري
-  | 'private'
-  | 'retired';
+  | 'gov_civil'          // مدني حكومي — سن تقاعد ثابت
+  | 'military'           // عسكري
+  | 'semi_gov'           // شبه حكومي — سن تقاعد ثابت
+  | 'companies'          // موظف شركات — سن تقاعد ثابت
+  | 'retired';           // متقاعد
 export type CalendarType = 'hijri' | 'gregorian';
 export type ProductId = 'real_estate' | 'personal' | 'both' | 'real_estate_with_personal_existing' | 'real_estate_only' | 'personal_only' | 'real_estate_with_new_personal' | 'real_estate_with_existing_personal';
 export type SupportType = 'none' | 'monthly' | 'downpayment';
@@ -66,6 +63,7 @@ export interface MilitaryRank {
   pensionMultiplier: number; // e.g. 420
   displayOrder: number;
   isActive: boolean;
+  sectorScope?: 'enlisted' | 'officer';
 }
 
 export interface NetSalaryRule {
@@ -92,6 +90,7 @@ export interface PensionRule {
 export interface TermRule {
   bankId: string;
   sectorId: SectorId;
+  militarySubType?: 'officer' | 'enlisted' | 'all';
   rankId: string; // or 'all'
   productId: ProductId;
   supportType: 'all' | SupportType;
@@ -338,6 +337,7 @@ export interface BankCalculationResult {
   stage3Months?: number;
   diagnosticMessages: string[];
   diagnosticSteps: string[];
+  isAgeLimitingFactor?: boolean;
 }
 
 export interface SavedResult {
@@ -359,3 +359,19 @@ export interface SavedResult {
   payload: BankCalculationResult;
   customer_name?: string;
 }
+
+export interface HousingSupportTier {
+  id: string;
+  min_salary: number;
+  max_salary: number;
+  amount_at_min: number;
+  amount_at_max: number;
+  sort_order: number;
+}
+
+export interface AdvancePaymentTier {
+  id: string;
+  salary_threshold: number;
+  amount: number;
+}
+

@@ -2,8 +2,8 @@ import { Sector } from '../types';
 
 export const initialSectors: Sector[] = [
   {
-    id: 'government_civilian',
-    nameAr: 'حكومي مدني',
+    id: 'gov_civil',
+    nameAr: 'مدني حكومي',
     deductionPercentage: 9.0, // 9% GOSI/PPA deduction
     deductionBase: 'basic_housing',
     needsServiceDate: true,
@@ -24,15 +24,26 @@ export const initialSectors: Sector[] = [
     isActive: true
   },
   {
-    id: 'private',
-    nameAr: 'قطاع خاص',
+    id: 'semi_gov',
+    nameAr: 'شبه حكومي',
+    deductionPercentage: 9.0,
+    deductionBase: 'basic_housing',
+    needsServiceDate: true,
+    needsRank: false,
+    defaultRetirementAge: 60,
+    pensionMultiplier: 480,
+    isActive: true
+  },
+  {
+    id: 'companies',
+    nameAr: 'موظف شركات',
     deductionPercentage: 9.75, // GOSI deduction (9% + 0.75% Saned)
     deductionBase: 'basic_housing',
     needsServiceDate: true,
     needsRank: false,
     defaultRetirementAge: 60,
     pensionMultiplier: 480,
-    isActive: false
+    isActive: true
   },
   {
     id: 'retired',

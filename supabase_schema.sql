@@ -200,3 +200,113 @@ on conflict (bank_id, sector_id)
 do update set
   bank_sector_id = excluded.bank_sector_id,
   label_ar = excluded.label_ar;
+
+
+-- =========================================================================
+-- جدول حفظ عروض الحسبة والتمويل (saved_results) للمستخدمين
+-- =========================================================================
+
+create table if not exists saved_results (
+  id                  uuid primary key default gen_random_uuid(),
+  user_id             uuid not null references auth.users(id) on delete cascade,
+  created_at          timestamptz default now(),
+  title               text not null,
+  finance_type        text not null,
+  sector              text not null,
+  bank_name           text not null,
+  real_estate_amount  numeric(15,2) default 0,
+  personal_amount     numeric(15,2) default 0,
+  monthly_installment numeric(15,2) default 0,
+  term_months         integer not null,
+  support_type        text default 'none',
+  net_salary          numeric(15,2) default 0,
+  profit_margin       numeric(5,2) default 0,
+  eligibility_status  text default 'eligible',
+  payload             jsonb default '{}'::jsonb
+);
+
+-- إنشاء كشافات لتحسين سرعة الاستعلام
+create index if not exists saved_results_user_idx on saved_results(user_id);
+create index if not exists saved_results_created_idx on saved_results(created_at desc);
+
+-- تفعيل الـ RLS لحماية خصوصية بيانات المستخدمين
+alter table saved_results enable row level security;
+
+-- السماح للمستخدمين بالتحكم في سجلاتهم المحفوظة فقط
+drop policy if exists "users_select_own" on saved_results;
+create policy "users_select_own" on saved_results
+  for select using (auth.uid() = user_id);
+
+drop policy if exists "users_insert_own" on saved_results;
+create policy "users_insert_own" on saved_results
+  for insert with check (auth.uid() = user_id);
+
+drop policy if exists "users_delete_own" on saved_results;
+create policy "users_delete_own" on saved_results
+  for delete using (auth.uid() = user_id);
+
+
+-- =========================================================================
+-- جدول شرائح الدعم السكني المتدرج (housing_support_tiers)
+-- =========================================================================
+
+create table if not exists housing_support_tiers (
+  id             uuid primary key default gen_random_uuid(),
+  min_salary     numeric(15,2) not null,
+  max_salary     numeric(15,2) not null,
+  amount_at_min  numeric(15,2) not null,
+  amount_at_max  numeric(15,2) not null,
+  sort_order     integer not null default 0,
+  created_at     timestamptz default now(),
+  updated_at     timestamptz default now()
+);
+
+alter table housing_support_tiers enable row level security;
+
+drop policy if exists "read_all" on housing_support_tiers;
+create policy "read_all" on housing_support_tiers for select using (true);
+
+drop policy if exists "admin_write" on housing_support_tiers;
+create policy "admin_write" on housing_support_tiers for all using (auth.jwt() ->> 'role' = 'admin');
+
+-- تعبئة الشرائح الرسمية المؤكدة من بنك الراجحي
+insert into housing_support_tiers (sort_order, min_salary, max_salary, amount_at_min, amount_at_max)
+values
+  (1, 0, 3000, 0, 0),
+  (2, 3000, 4000, 1350, 1206),
+  (3, 4000, 5000, 1206, 1073),
+  (4, 5000, 6000, 1073, 955),
+  (5, 6000, 7000, 955, 850),
+  (6, 7000, 8000, 850, 757),
+  (7, 8000, 9000, 757, 673),
+  (8, 9000, 10000, 673, 599)
+on conflict do nothing;
+
+-- =========================================================================
+-- جدول عتبات الدفعة المقدمة غير المستردة (advance_payment_tiers)
+-- =========================================================================
+
+create table if not exists advance_payment_tiers (
+  id               uuid primary key default gen_random_uuid(),
+  salary_threshold numeric(15,2) not null,
+  amount           numeric(15,2) not null,
+  created_at       timestamptz default now(),
+  updated_at       timestamptz default now()
+);
+
+alter table advance_payment_tiers enable row level security;
+
+drop policy if exists "read_all" on advance_payment_tiers;
+create policy "read_all" on advance_payment_tiers for select using (true);
+
+drop policy if exists "admin_write" on advance_payment_tiers;
+create policy "admin_write" on advance_payment_tiers for all using (auth.jwt() ->> 'role' = 'admin');
+
+-- تعبئة عتبات الدفعة المقدمة
+insert into advance_payment_tiers (salary_threshold, amount)
+values
+  (9999.99, 150000), -- للرواتب أقل من 10000
+  (10000.00, 100000) -- للرواتب 10000 وأكثر
+on conflict do nothing;
+
+

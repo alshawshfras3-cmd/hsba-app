@@ -24,7 +24,7 @@ export default function ResultsGrid({
   existingMonthlyObligations = 0,
   obligationRemainingMonths = 0,
   mainFinanceType = 'real_estate',
-  sectorId = 'government_civilian'
+  sectorId = 'gov_civil'
 }: ResultsGridProps) {
   const { user, userSubscriptions, setUserSubscriptions } = useAppState();
   const [activeSort, setActiveSort] = useState<'power' | 'installment' | 'margin' | 'term'>('power');
@@ -53,12 +53,13 @@ export default function ResultsGrid({
 
   const getSectorArabicName = (secId?: string) => {
     switch (secId) {
-      case 'government_civilian': return 'حكومي مدني';
-      case 'military': return 'عسكري (موحد)';
+      case 'government_civilian':
+      case 'gov_civil': return 'حكومي مدني';
+      case 'military': return 'عسكري';
       case 'military_officer': return 'عسكري (ضابط)';
       case 'military_individual': return 'عسكري (أفراد)';
       case 'semi_gov': return 'شبه حكومي';
-      case 'companies': return 'قطاع خاص (شركات)';
+      case 'companies': return 'موظف شركات';
       case 'retired': return 'متقاعد';
       default: return secId || 'قطاع غير محدد';
     }
@@ -264,11 +265,16 @@ export default function ResultsGrid({
                   </div>
                   <div>
                     <h3 className="font-bold text-[#111827] text-lg">{offer.bankName}</h3>
-                    <p className="text-xs text-[#6B7280]">
+                    <p className={`text-xs ${offer.isAgeLimitingFactor ? 'text-rose-600 font-bold animate-pulse' : 'text-[#6B7280]'}`}>
                       {mainFinanceType === 'personal_only' 
                         ? 'مدة التمويل الشخصي: 5 سنوات (60 شهراً)' 
                         : `مدة التمويل العقاري: ${Math.floor(offer.termMonths / 12)} سنة ${Math.round(offer.termMonths % 12) > 0 ? `و ${Math.round(offer.termMonths % 12)} أشهر` : ''}`}
                     </p>
+                    {offer.isAgeLimitingFactor && (
+                      <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-extrabold text-[#991B1B] bg-red-100/50 border border-red-200 px-2 py-0.5 rounded-md">
+                        ⚠️ العمر يحدّ من مدة سداد التمويل
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -785,15 +791,14 @@ export default function ResultsGrid({
                           <div className="flex justify-between font-sans">
                             <span className="text-gray-500">القطاع الفعلي المطبق:</span>
                             <span className="font-semibold">
-                              {selectedOffer.pensionDiagnostic.effectiveSectorId === 'government_civilian' && 'حكومي مدني'}
-                              {selectedOffer.pensionDiagnostic.effectiveSectorId === 'gov_civil' && 'حكومي مدني'}
+                              {['government_civilian', 'gov_civil'].includes(selectedOffer.pensionDiagnostic.effectiveSectorId) && 'حكومي مدني'}
                               {selectedOffer.pensionDiagnostic.effectiveSectorId === 'semi_gov' && 'شبه حكومي'}
                               {selectedOffer.pensionDiagnostic.effectiveSectorId === 'companies' && 'شركات كبرى (أرامكو/سابك)'}
+                              {selectedOffer.pensionDiagnostic.effectiveSectorId === 'military' && 'عسكري'}
                               {selectedOffer.pensionDiagnostic.effectiveSectorId === 'military_officer' && 'عسكري (ضباط)'}
                               {selectedOffer.pensionDiagnostic.effectiveSectorId === 'military_individual' && 'عسكري (أفراد)'}
-                              {selectedOffer.pensionDiagnostic.effectiveSectorId === 'private' && 'قطاع خاص'}
                               {selectedOffer.pensionDiagnostic.effectiveSectorId === 'retired' && 'متقاعد حالي'}
-                              {!['government_civilian', 'gov_civil', 'semi_gov', 'companies', 'military_officer', 'military_individual', 'private', 'retired'].includes(selectedOffer.pensionDiagnostic.effectiveSectorId) && selectedOffer.pensionDiagnostic.effectiveSectorId}
+                              {!['government_civilian', 'gov_civil', 'semi_gov', 'companies', 'military', 'military_officer', 'military_individual', 'retired'].includes(selectedOffer.pensionDiagnostic.effectiveSectorId) && selectedOffer.pensionDiagnostic.effectiveSectorId}
                             </span>
                           </div>
                           <div className="flex justify-between">

@@ -183,7 +183,7 @@ export function useSettings() {
     dsrRules: settings.dsr_rules ?? DEFAULTS.dsr_rules,
     personalRules: settings.personal_finance_rules ?? DEFAULTS.personal_finance_rules,
     products: settings.product_acceptance ?? DEFAULTS.product_acceptance,
-    militaryRanks: settings.military_ranks ?? DEFAULTS.military_ranks,
+    militaryRanks: (settings.military_ranks && Array.isArray(settings.military_ranks) && settings.military_ranks.length > 0 && settings.military_ranks.every((r: any) => r.hasOwnProperty('sectorScope') && r.sectorScope)) ? settings.military_ranks : DEFAULTS.military_ranks,
     pensionRules: settings.pension_rules ?? DEFAULTS.pension_rules,
     supportSettings: settings.support_settings ?? DEFAULTS.support_settings,
     salaryRules: settings.salary_rules ?? DEFAULTS.salary_rules,

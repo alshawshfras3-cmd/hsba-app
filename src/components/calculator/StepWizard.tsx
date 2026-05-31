@@ -31,6 +31,26 @@ import {
   calculatePensionFromRule 
 } from '../../lib/finance-engine/pension';
 
+const getSectorRetirementAge = (sectorId: string, defaultValue = 60): number => {
+  try {
+    const saved = localStorage.getItem("hasba_custom_sectors");
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed)) {
+        let idToLookup = sectorId;
+        if (sectorId === 'gov_civil') idToLookup = 'gov_civil';
+        const matched = parsed.find((s: any) => s.id === sectorId || s.id === idToLookup);
+        if (matched && typeof matched.retirementAge === 'number' && matched.retirementAge > 0) {
+          return matched.retirementAge;
+        }
+      }
+    }
+  } catch (e) {
+    console.error("Error reading sector retirement age:", e);
+  }
+  return defaultValue;
+};
+
 export const militaryRanksData = {
   enlisted: [
     { id: 'jundi', name: 'جندي / جندي أول',   retirementAge: 44, ahliGroup: 'B' },
@@ -88,6 +108,8 @@ export default function StepWizard() {
     marginRules,
     dsrRules,
     supportSettings,
+    housingSupportTiers,
+    advancePaymentTiers,
     personalRules,
     termRules,
     setCalculationLogs,
@@ -104,7 +126,7 @@ export default function StepWizard() {
   const [customerStatus, setCustomerStatus] = useState<'active_employee' | 'retired'>('active_employee');
 
   const [productId, setProductId] = useState<ProductId>('real_estate');
-  const [sectorId, setSectorId] = useState<SectorId>('government_civilian');
+  const [sectorId, setSectorId] = useState<SectorId>('gov_civil');
   const [militaryType, setMilitaryType] = useState<'officer' | 'individual' | ''>('');
   const [rankId, setRankId] = useState<string>('jundi');
 
@@ -115,9 +137,11 @@ export default function StepWizard() {
   const [retirementAge, setRetirementAge] = useState<number>(60);
   const [ahliGroup, setAhliGroup] = useState<'A' | 'B' | ''>('');
 
-  const effectiveSectorId = sectorId === 'military'
-    ? (militaryType === 'officer' ? 'military_officer' : (militaryType === 'individual' ? 'military_individual' : 'military' as SectorId))
-    : sectorId;
+  const effectiveSectorId = sectorId === 'government_civilian' || (sectorId as string) === 'gov_civil'
+    ? 'gov_civil' as SectorId
+    : ((sectorId as string) === 'military'
+        ? 'military' as SectorId
+        : sectorId);
 
   // Dates
   const [birthYear, setBirthYear] = useState<number>(1990);
@@ -281,8 +305,9 @@ export default function StepWizard() {
       );
 
   const liveRetirementAgeRule = pensionRules.find(r => r.sectorId === effectiveSectorId) || pensionRules.find(r => r.sectorId === sectorId);
-  const liveRetirementAge = sector === 'military'
-    ? (customMilitaryRanks.find(r => r.id === rankId)?.retirementAge || retirementAge || 44)
+  const isMilitary = effectiveSectorId === 'military' || sector === 'military' || (sectorId as string) === 'military';
+  const liveRetirementAge = isMilitary
+    ? (militaryRanks.find(r => r.id === rankId)?.retirementAge || retirementAge || 44)
     : (liveRetirementAgeRule?.retirementAge || 60);
 
   const liveYearsToRetirement = Math.max(0, liveRetirementAge - (pensionCalcObj.currentAgeMonths / 12));
@@ -449,7 +474,7 @@ export default function StepWizard() {
 
     const calcParams = {
       sectorId: effectiveSectorId,
-      militarySubType: sectorId === 'military' ? (militaryType === 'officer' ? 'military_officer' : 'military_individual') as 'military_officer' | 'military_individual' : undefined,
+      militarySubType: ((effectiveSectorId === 'military' || sectorId === 'military') ? ((militarySubtype === 'officer' || militaryType === 'officer') ? 'military_officer' : 'military_individual') : undefined) as 'military_officer' | 'military_individual' | undefined,
       productId,
       birthYear,
       birthMonth,
@@ -459,7 +484,7 @@ export default function StepWizard() {
       appointmentMonth: effectiveSectorId === 'retired' ? undefined : appointmentMonth,
       appointmentDay: effectiveSectorId === 'retired' ? undefined : appointmentDay,
       appointmentCalendar: effectiveSectorId === 'retired' ? undefined : appointmentCalendar,
-      rankId: (effectiveSectorId === 'military_officer' || effectiveSectorId === 'military_individual' || sectorId === 'military') ? rankId : undefined,
+      rankId: (effectiveSectorId === 'military' || sectorId === 'military') ? rankId : undefined,
       salaryMode,
       basicSalary,
       housingAllowance,
@@ -476,12 +501,14 @@ export default function StepWizard() {
 
       banks,
       products,
-      militaryRanks: customMilitaryRanks,
+      militaryRanks,
       salaryRules,
       pensionRules,
       marginRules,
       dsrRules,
       supportSettings,
+      housingSupportTiers,
+      advancePaymentTiers,
       personalRules,
       termRules,
       bankSectorRules
@@ -690,7 +717,7 @@ export default function StepWizard() {
                   onClick={() => {
                     setCustomerStatus('active_employee');
                     if (sectorId === 'retired') {
-                      setSectorId('government_civilian');
+                      setSectorId('gov_civil');
                     }
                   }}
                   className={`flex items-center gap-4 text-right p-4 cursor-pointer transition-all border-y border-r border-l-4 rounded-xl shadow-xs md:flex-col md:text-center md:items-center md:p-6 md:rounded-2xl md:border-l ${
@@ -771,12 +798,12 @@ export default function StepWizard() {
                   onClick={() => setRealEstateSubType('real_estate_with_new_personal')}
                   className={`flex items-center gap-4 text-right p-4 cursor-pointer transition-all border-y border-r border-l-4 rounded-xl shadow-xs md:flex-col md:text-center md:items-center md:p-6 md:rounded-2xl md:border-l ${
                     realEstateSubType === 'real_estate_with_new_personal' 
-                      ? 'border-l-indigo-500 border-y-indigo-500/10 border-r-indigo-500/10 bg-indigo-50/20 md:border-indigo-500' 
+                      ? 'border-l-[#0057B8] border-y-[#0057B8]/10 border-r-[#0057B8]/10 bg-[#0057B8]/5 md:border-[#0057B8]' 
                       : 'border-l-slate-200 border-y-slate-200 border-r-slate-200 bg-white hover:bg-slate-50 md:border-gray-200'
                   }`}
                 >
                   <div className="flex items-center gap-3 md:flex-col md:items-center w-full">
-                    <div className="w-10 h-10 md:w-12 md:h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center shrink-0 md:mx-auto md:mb-2">
+                    <div className="w-10 h-10 md:w-12 md:h-12 bg-indigo-50 text-[#0057B8] rounded-xl flex items-center justify-center shrink-0 md:mx-auto md:mb-2">
                       <Scale className="w-5 h-5 md:w-6 md:h-6" />
                     </div>
                     <div className="text-right md:text-center flex-1">
@@ -799,50 +826,61 @@ export default function StepWizard() {
 
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 {[
-                  { id: 'government_civilian', sectorIdStr: 'gov_civil', label: 'حكومي مدني', icon: Briefcase },
-                  { id: 'military', sectorIdStr: 'military', label: 'عسكري', icon: User },
-                  { id: 'semi_gov', sectorIdStr: 'semi_gov', label: 'شبه حكومي', icon: Scale },
-                  { id: 'companies', sectorIdStr: 'companies', label: 'موظف شركات', icon: Briefcase },
-                  { id: 'retired', sectorIdStr: 'retired', label: 'متقاعد حالي', icon: Coins }
+                  { id: 'gov_civil', label: 'حكومي مدني', icon: Briefcase },
+                  { id: 'military', label: 'عسكري', icon: User },
+                  { id: 'semi_gov', label: 'شبه حكومي', icon: Scale },
+                  { id: 'companies', label: 'موظف شركات', icon: Briefcase },
+                  { id: 'retired', label: 'متقاعد حالي', icon: Coins }
                 ].map((sec) => (
                   <div
                     key={sec.id}
                     id={`sector-card-${sec.id}`}
                     onClick={() => {
                       setSectorId(sec.id as SectorId);
-                      setSector(sec.sectorIdStr);
+                      setSector(sec.id);
                       
                       if (sec.id === 'retired') {
                         setSalaryMode('direct');
-                        setRetirementAge(60);
+                        setRetirementAge(getSectorRetirementAge('retired', 60));
                         setAhliGroup('');
                         setMilitarySubtype('');
                         setMilitaryRank('');
                         setMilitaryType('');
-                      } else if (sec.id === 'government_civilian') {
-                        setRetirementAge(60);
+                      } else if (sec.id === 'gov_civil') {
+                        setRetirementAge(getSectorRetirementAge('gov_civil', 60));
                         setAhliGroup('A');
                         setMilitarySubtype('');
                         setMilitaryRank('');
                         setMilitaryType('');
                       } else if (sec.id === 'semi_gov') {
-                        setRetirementAge(60);
+                        setRetirementAge(getSectorRetirementAge('semi_gov', 60));
                         setAhliGroup('A');
                         setMilitarySubtype('');
                         setMilitaryRank('');
                         setMilitaryType('');
                       } else if (sec.id === 'companies') {
-                        setRetirementAge(60);
+                        setRetirementAge(getSectorRetirementAge('companies', 60));
                         setAhliGroup('A');
                         setMilitarySubtype('');
                         setMilitaryRank('');
                         setMilitaryType('');
                       } else if (sec.id === 'military') {
-                        setMilitarySubtype('');
-                        setMilitaryRank('');
-                        setMilitaryType('');
-                        setRetirementAge(44);
-                        setAhliGroup('B');
+                        setMilitarySubtype('enlisted');
+                        setMilitaryType('individual');
+                        const enlistedRanks = militaryRanks.filter(r => r.sectorScope === 'enlisted' && r.isActive);
+                        const sorted = [...enlistedRanks].sort((a,b) => a.displayOrder - b.displayOrder);
+                        const firstEnRank = sorted[0];
+                        if (firstEnRank) {
+                          setRankId(firstEnRank.id);
+                          setMilitaryRank(firstEnRank.nameAr);
+                          setRetirementAge(firstEnRank.retirementAge);
+                          setAhliGroup(firstEnRank.ahliGroup || 'B');
+                        } else {
+                          setRankId('jundi');
+                          setMilitaryRank('جندي / جندي أول');
+                          setRetirementAge(44);
+                          setAhliGroup('B');
+                        }
                       }
                     }}
                     className={`flex items-center gap-3 text-right p-4 cursor-pointer transition-all border-y border-r border-l-4 rounded-xl shadow-xs md:flex-col md:text-center md:items-center md:justify-center md:p-5 md:rounded-2xl md:border-l ${
@@ -859,107 +897,81 @@ export default function StepWizard() {
                 ))}
               </div>
 
-              {/* Military Subtype Selector shown if sector is military */}
-              {sectorId === 'military' && (
-                <div className="bg-gradient-to-br from-indigo-50/50 to-blue-50/50 rounded-2xl p-6 border border-indigo-100/50 mt-6 space-y-4 animate-fade-in shadow-xs text-right">
-                  <span className="block text-xs font-bold text-gray-700 mb-2">حدد تصنيف العسكري:</span>
-                  <div className="grid grid-cols-2 gap-4">
-                    {[
-                      { id: 'officer', subtype: 'officer', label: 'ضابط' },
-                      { id: 'individual', subtype: 'enlisted', label: 'فرد' }
-                    ].map((type) => (
-                      <div
-                        key={type.id}
-                        id={`military-type-${type.id}`}
-                        onClick={() => {
-                          const sub = type.subtype as 'officer' | 'enlisted';
-                          setMilitarySubtype(sub);
-                          setMilitaryType(type.id as 'officer' | 'individual');
-                          
-                          // Pre-select first rank
-                          const firstRank = militaryRanksData[sub][0];
-                          if (firstRank) {
-                            setMilitaryRank(firstRank.name);
-                            setRetirementAge(firstRank.retirementAge);
-                            setAhliGroup(firstRank.ahliGroup);
-                            
-                            // Set legacy rankId as fallback
-                            const legacyMap: Record<string, string> = {
-                              'جندي / جندي أول': 'jundi',
-                              'ملازم / ملازم أول': 'mulazim'
-                            };
-                            setRankId(legacyMap[firstRank.name] || 'jundi');
-                          }
-                        }}
-                        className={`border rounded-2xl p-4 text-center cursor-pointer transition-all ${
-                          militaryType === type.id
-                            ? 'border-[#0057B8] bg-[#0057B8]/5 ring-1 ring-[#0057B8]'
-                            : 'border-gray-200 bg-white hover:bg-gray-50'
-                        }`}
-                      >
-                        <span className="text-xs font-bold text-[#111827] block">{type.label}</span>
-                      </div>
-                    ))}
+              {/* Dynamic Rank selector shown for military sectors */}
+              {(sectorId === 'military') && (
+                <div id="military-rank-selector-wrapper" className="bg-gray-50 rounded-2xl p-6 border border-gray-200 mt-6 animate-fade-in text-right space-y-4">
+                  {/* Category subclass selector */}
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-gray-700">تصنيف الخدمة العسكرية:</label>
+                    <div className="grid grid-cols-2 gap-3">
+                      {[
+                        { id: 'enlisted', type: 'individual', scope: 'enlisted', label: 'عسكري أفراد' },
+                        { id: 'officer', type: 'officer', scope: 'officer', label: 'عسكري ضباط' }
+                      ].map((sub) => {
+                        const isSelected = militarySubtype === sub.id;
+                        return (
+                          <button
+                            key={sub.id}
+                            type="button"
+                            onClick={() => {
+                              setMilitarySubtype(sub.id as 'enlisted' | 'officer');
+                              setMilitaryType(sub.type as 'officer' | 'individual');
+                              const targetScope = sub.scope;
+                              const filteredRanks = militaryRanks.filter(r => r.sectorScope === targetScope && r.isActive);
+                              const sorted = [...filteredRanks].sort((a, b) => a.displayOrder - b.displayOrder);
+                              const firstRank = sorted[0];
+                              if (firstRank) {
+                                setRankId(firstRank.id);
+                                setMilitaryRank(firstRank.nameAr);
+                                setRetirementAge(firstRank.retirementAge);
+                                setAhliGroup(firstRank.ahliGroup || (sub.id === 'officer' ? 'A' : 'B'));
+                              }
+                            }}
+                            className={`py-2.5 px-4 rounded-xl text-xs font-bold transition-all border text-center ${
+                              isSelected
+                                ? 'bg-[#0057B8] text-white border-[#0057B8] shadow-xs'
+                                : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                            }`}
+                          >
+                            {sub.label}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              )}
 
-              {/* Rank selector shown for military subtype only */}
-              {sectorId === 'military' && militarySubtype && (
-                <div className="bg-gray-50 rounded-2xl p-6 border border-gray-200 mt-6 animate-fade-in text-right space-y-4">
                   <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-2">الرتبة العسكرية للعميل:</label>
+                    <label className="block text-xs font-bold text-gray-700 mb-2 font-sans">الرتبة العسكرية:</label>
                     <select
                       id="rank-select"
-                      value={militaryRank}
+                      value={rankId}
                       onChange={(e) => {
-                        const selectedRankName = e.target.value;
-                        setMilitaryRank(selectedRankName);
+                        const selectedId = e.target.value;
+                        setRankId(selectedId);
                         
-                        const rankList = militaryRanksData[militarySubtype as 'officer' | 'enlisted'];
-                        const matched = rankList.find(r => r.name === selectedRankName);
+                        const matched = militaryRanks.find(r => r.id === selectedId);
                         if (matched) {
+                          setMilitaryRank(matched.nameAr);
                           setRetirementAge(matched.retirementAge);
-                          setAhliGroup(matched.ahliGroup);
-                          
-                          // legacy rankId mapping
-                          const legacyMap: Record<string, string> = {
-                            'جندي / جندي أول': 'jundi',
-                            'عريف': 'areef',
-                            'وكيل رقيب': 'wakeel_raqeeb',
-                            'رقيب / رقيب أول': 'raqeeb',
-                            'رئيس رقباء': 'rayees_ruqaba',
-                            'ملازم / ملازم أول': 'mulazim',
-                            'ملازم طيار': 'mulazim',
-                            'نقيب': 'naqeeb',
-                            'نقيب طيار': 'naqeeb',
-                            'رائد': 'raid',
-                            'رائد طيار': 'raid',
-                            'مقدم': 'muqaddam',
-                            'مقدم طيار': 'muqaddam',
-                            'عقيد': 'aqeed',
-                            'عقيد طيار': 'aqeed',
-                            'عميد': 'ameed',
-                            'عميد طيار': 'ameed',
-                            'لواء': 'liwa',
-                            'لواء طيار': 'liwa'
-                          };
-                          setRankId(legacyMap[selectedRankName] || 'jundi');
+                          setAhliGroup(matched.ahliGroup || (militarySubtype === 'officer' ? 'A' : 'B'));
                         }
                       }}
-                      className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] focus:border-transparent"
+                      className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] focus:border-transparent cursor-pointer"
                     >
-                      {militaryRanksData[militarySubtype as 'officer' | 'enlisted'].map((rank) => (
-                        <option key={rank.name} value={rank.name}>
-                          {rank.name}
-                        </option>
-                      ))}
+                      {militaryRanks
+                        .filter(rank => rank.sectorScope === (militarySubtype === 'officer' ? 'officer' : 'enlisted') && rank.isActive)
+                        .sort((a, b) => a.displayOrder - b.displayOrder)
+                        .map((rank) => (
+                          <option key={rank.id} value={rank.id}>
+                            {rank.nameAr}
+                          </option>
+                        ))}
                     </select>
                   </div>
 
                   <div className="bg-white p-3.5 rounded-xl border border-gray-100 text-xs font-semibold text-gray-600 text-center animate-fade-in">
                     <div>
-                      <span className="text-gray-400">سن التقاعد: </span>
+                      <span className="text-gray-400">سن التقاعد للرتبة: </span>
                       <strong className="text-gray-900">{retirementAge} سنة</strong>
                     </div>
                   </div>
@@ -1112,41 +1124,52 @@ export default function StepWizard() {
                   <span className="block text-xs font-bold text-gray-700 mb-3 text-right">القطاع المهني لجهة العمل التابع لها:</span>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     {[
-                      { id: 'government_civilian', sectorIdStr: 'gov_civil', label: 'حكومي مدني' },
-                      { id: 'military', sectorIdStr: 'military', label: 'عسكري' },
-                      { id: 'semi_gov', sectorIdStr: 'semi_gov', label: 'شبه حكومي' },
-                      { id: 'companies', sectorIdStr: 'companies', label: 'موظف شركات' }
+                      { id: 'gov_civil', label: 'حكومي مدني' },
+                      { id: 'military', label: 'عسكري' },
+                      { id: 'semi_gov', label: 'شبه حكومي' },
+                      { id: 'companies', label: 'موظف شركات' }
                     ].map((sec) => (
                       <button
                         key={sec.id}
                         type="button"
                         onClick={() => {
                           setSectorId(sec.id as SectorId);
-                          setSector(sec.sectorIdStr);
-                          if (sec.id === 'government_civilian') {
-                            setRetirementAge(60);
+                          setSector(sec.id);
+                          if (sec.id === 'gov_civil') {
+                            setRetirementAge(getSectorRetirementAge('gov_civil', 60));
                             setAhliGroup('A');
                             setMilitarySubtype('');
                             setMilitaryRank('');
                             setMilitaryType('');
                           } else if (sec.id === 'semi_gov') {
-                            setRetirementAge(60);
+                            setRetirementAge(getSectorRetirementAge('semi_gov', 60));
                             setAhliGroup('A');
                             setMilitarySubtype('');
                             setMilitaryRank('');
                             setMilitaryType('');
                           } else if (sec.id === 'companies') {
-                            setRetirementAge(60);
+                            setRetirementAge(getSectorRetirementAge('companies', 60));
                             setAhliGroup('A');
                             setMilitarySubtype('');
                             setMilitaryRank('');
                             setMilitaryType('');
                           } else if (sec.id === 'military') {
-                            setMilitarySubtype('');
-                            setMilitaryRank('');
-                            setMilitaryType('');
-                            setRetirementAge(44);
-                            setAhliGroup('B');
+                            setMilitarySubtype('enlisted');
+                            setMilitaryType('individual');
+                            const enlistedRanks = militaryRanks.filter(r => r.sectorScope === 'enlisted' && r.isActive);
+                            const sorted = [...enlistedRanks].sort((a,b) => a.displayOrder - b.displayOrder);
+                            const firstEnRank = sorted[0];
+                            if (firstEnRank) {
+                              setRankId(firstEnRank.id);
+                              setMilitaryRank(firstEnRank.nameAr);
+                              setRetirementAge(firstEnRank.retirementAge);
+                              setAhliGroup(firstEnRank.ahliGroup || 'B');
+                            } else {
+                              setRankId('jundi');
+                              setMilitaryRank('جندي / جندي أول');
+                              setRetirementAge(44);
+                              setAhliGroup('B');
+                            }
                           }
                         }}
                         className={`py-2 px-3 rounded-xl text-xs font-bold transition-all border ${
@@ -1160,107 +1183,81 @@ export default function StepWizard() {
                     ))}
                   </div>
 
-                  {/* Military Type Selector shown inside personal only sector picker if sectorId is military */}
-                  {sectorId === 'military' && (
-                    <div className="bg-[#1e293b]/5 rounded-xl p-4 border border-gray-200/50 mt-4 space-y-3 animate-fade-in text-right">
-                      <span className="block text-[11px] font-bold text-gray-600">حدد تصنيف العسكري:</span>
-                      <div className="grid grid-cols-2 gap-3">
-                        {[
-                          { id: 'officer', subtype: 'officer', label: 'ضابط' },
-                          { id: 'individual', subtype: 'enlisted', label: 'فرد' }
-                        ].map((type) => (
-                          <button
-                            key={type.id}
-                            type="button"
-                            onClick={() => {
-                              const sub = type.subtype as 'officer' | 'enlisted';
-                              setMilitarySubtype(sub);
-                              setMilitaryType(type.id as 'officer' | 'individual');
-                              
-                              // Pre-select first rank
-                              const firstRank = militaryRanksData[sub][0];
-                              if (firstRank) {
-                                setMilitaryRank(firstRank.name);
-                                setRetirementAge(firstRank.retirementAge);
-                                setAhliGroup(firstRank.ahliGroup);
-                                
-                                // Set legacy rankId as fallback
-                                const legacyMap: Record<string, string> = {
-                                  'جندي / جندي أول': 'jundi',
-                                  'ملازم / ملازم أول': 'mulazim'
-                                };
-                                setRankId(legacyMap[firstRank.name] || 'jundi');
-                              }
-                            }}
-                            className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all border ${
-                              militaryType === type.id
-                                ? 'bg-[#0057B8] text-white border-[#0057B8] shadow-xs ring-1 ring-[#0057B8]'
-                                : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-                            }`}
-                          >
-                            {type.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
                   {/* Optional Rank Select for Military in Personal Only flow */}
-                  {sectorId === 'military' && militarySubtype && (
-                    <div className="mt-4 animate-fade-in text-right space-y-3">
+                  {(sectorId === 'military') && (
+                    <div className="mt-4 animate-fade-in text-right space-y-4">
+                      {/* Sub-class buttons */}
+                      <div className="space-y-1.5">
+                        <label className="block text-[11px] font-bold text-gray-600">فئة القطاع العسكري:</label>
+                        <div className="grid grid-cols-2 gap-3">
+                          {[
+                            { id: 'enlisted', type: 'individual', scope: 'enlisted', label: 'عسكري أفراد' },
+                            { id: 'officer', type: 'officer', scope: 'officer', label: 'عسكري ضباط' }
+                          ].map((sub) => {
+                            const isSelected = militarySubtype === sub.id;
+                            return (
+                              <button
+                                key={sub.id}
+                                type="button"
+                                onClick={() => {
+                                  setMilitarySubtype(sub.id as 'enlisted' | 'officer');
+                                  setMilitaryType(sub.type as 'officer' | 'individual');
+                                  const targetScope = sub.scope;
+                                  const filteredRanks = militaryRanks.filter(r => r.sectorScope === targetScope && r.isActive);
+                                  const sorted = [...filteredRanks].sort((a, b) => a.displayOrder - b.displayOrder);
+                                  const firstRank = sorted[0];
+                                  if (firstRank) {
+                                    setRankId(firstRank.id);
+                                    setMilitaryRank(firstRank.nameAr);
+                                    setRetirementAge(firstRank.retirementAge);
+                                    setAhliGroup(firstRank.ahliGroup || (sub.id === 'officer' ? 'A' : 'B'));
+                                  }
+                                }}
+                                className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all border text-center ${
+                                  isSelected
+                                    ? 'bg-[#0057B8] text-white border-[#0057B8] shadow-xs'
+                                    : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                                }`}
+                              >
+                                {sub.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
                       <div>
-                        <label className="block text-[11px] font-bold text-gray-600 mb-2">الرتبة العسكرية:</label>
+                        <label className="block text-[11px] font-bold text-gray-600 mb-2 font-sans">الرتبة العسكرية:</label>
                         <select
                           id="rank-select-salary"
-                          value={militaryRank}
+                          value={rankId}
                           onChange={(e) => {
-                            const selectedRankName = e.target.value;
-                            setMilitaryRank(selectedRankName);
+                            const selectedId = e.target.value;
+                            setRankId(selectedId);
                             
-                            const rankList = militaryRanksData[militarySubtype as 'officer' | 'enlisted'];
-                            const matched = rankList.find(r => r.name === selectedRankName);
+                            const matched = militaryRanks.find(r => r.id === selectedId);
                             if (matched) {
+                              setMilitaryRank(matched.nameAr);
                               setRetirementAge(matched.retirementAge);
-                              setAhliGroup(matched.ahliGroup);
-                              
-                              // legacy rankId mapping
-                              const legacyMap: Record<string, string> = {
-                                'جندي / جندي أول': 'jundi',
-                                'عريف': 'areef',
-                                'وكيل رقيب': 'wakeel_raqeeb',
-                                'رقيب / رقيب أول': 'raqeeb',
-                                'رئيس رقباء': 'rayees_ruqaba',
-                                'ملازم / ملازم أول': 'mulazim',
-                                'ملازم طيار': 'mulazim',
-                                'نقيب': 'naqeeb',
-                                'نقيب طيار': 'naqeeb',
-                                'رائد': 'raid',
-                                'رائد طيار': 'raid',
-                                'مقدم': 'muqaddam',
-                                'مقدم طيار': 'muqaddam',
-                                'عقيد': 'aqeed',
-                                'عقيد طيار': 'aqeed',
-                                'عميد': 'ameed',
-                                'عميد طيار': 'ameed',
-                                'لواء': 'liwa',
-                                'لواء طيار': 'liwa'
-                              };
-                              setRankId(legacyMap[selectedRankName] || 'jundi');
+                              setAhliGroup(matched.ahliGroup || (militarySubtype === 'officer' ? 'A' : 'B'));
                             }
                           }}
-                          className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] focus:border-transparent"
+                          className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] focus:border-transparent cursor-pointer"
                         >
-                          {militaryRanksData[militarySubtype as 'officer' | 'enlisted'].map((rank) => (
-                            <option key={rank.name} value={rank.name}>
-                              {rank.name} (سن تقاعد الرتبة: {rank.retirementAge} سنة)
-                            </option>
-                          ))}
+                          {militaryRanks
+                            .filter(rank => rank.sectorScope === (militarySubtype === 'officer' ? 'officer' : 'enlisted') && rank.isActive)
+                            .sort((a, b) => a.displayOrder - b.displayOrder)
+                            .map((rank) => (
+                              <option key={rank.id} value={rank.id}>
+                                {rank.nameAr} (سن تقاعد الرتبة: {rank.retirementAge} سنة)
+                              </option>
+                            ))}
                         </select>
                       </div>
 
                       <div className="bg-white p-3.5 rounded-xl border border-gray-200/50 text-xs font-semibold text-gray-600 text-center animate-fade-in">
                         <div>
-                          <span className="text-gray-400">سن التقاعد: </span>
+                          <span className="text-gray-400">سن التقاعد للرتبة: </span>
                           <strong className="text-gray-950">{retirementAge} سنة</strong>
                         </div>
                       </div>

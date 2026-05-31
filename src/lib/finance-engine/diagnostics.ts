@@ -54,13 +54,15 @@ export function runDiagnostics(params: {
   // Step 3: Check sector restrictions
   if (!acceptance.allowedSectors.includes(sectorId)) {
     status = 'rejected';
-    messages.push(`تم رفض الطلب: القطاع المستهدف (${
-      sectorId === 'government_civilian' ? 'حكومي مدني' :
-      sectorId === 'semi_gov' ? 'شبه حكومي' :
-      sectorId === 'companies' ? 'موظف شركات' :
-      sectorId === 'military' ? 'عسكري' :
-      sectorId === 'private' ? 'قطاع خاص' : 'متقاعد'
-    }) غير مقبول لدى ${bankName} لهذا المنتج.`);
+    const sectorDisplayAr: Record<string, string> = {
+      gov_civil: 'مدني حكومي',
+      military: 'عسكري',
+      semi_gov: 'شبه حكومي',
+      companies: 'موظف شركات',
+      retired: 'متقاعد'
+    };
+    const sectorName = sectorDisplayAr[sectorId as string] || sectorId;
+    messages.push(`تم رفض الطلب: القطاع المستهدف (${sectorName}) غير مقبول لدى ${bankName} لهذا المنتج.`);
   }
 
   // Step 4: Check minimum salary

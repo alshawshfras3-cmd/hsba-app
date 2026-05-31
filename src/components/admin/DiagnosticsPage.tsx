@@ -157,7 +157,7 @@ export function DiagnosticsPage() {
       run: () => {
         const out = calculateAll({
           bankId: 'rajhi',
-          sectorId: 'government_civilian',
+          sectorId: 'gov_civil',
           salaryMode: 'details',
           basicSalary: 9000,
           housingAllowance: 3000,
@@ -188,7 +188,7 @@ export function DiagnosticsPage() {
       run: () => {
         const out = calculateAll({
           bankId: 'ahli',
-          sectorId: 'government_civilian',
+          sectorId: 'gov_civil',
           salaryMode: 'details',
           basicSalary: 10000,
           housingAllowance: 3000,
@@ -219,7 +219,7 @@ export function DiagnosticsPage() {
       run: () => {
         const out = calculateAll({
           bankId: 'rajhi',
-          sectorId: 'private',
+          sectorId: 'companies',
           salaryMode: 'details',
           basicSalary: 9103,
           housingAllowance: 0,
@@ -353,7 +353,7 @@ export function DiagnosticsPage() {
     // We can infer case configs based on IDs
     if (testId === 'rajhi-civil') {
       setSelectedBankId('rajhi');
-      setSelectedSectorId('government_civilian');
+      setSelectedSectorId('gov_civil');
       setSalaryMode('details');
       setBasicSalary(9000);
       setHousingAllowance(3000);
@@ -371,7 +371,7 @@ export function DiagnosticsPage() {
       setTermYears(5);
     } else if (testId === 'ahli-strong-close') {
       setSelectedBankId('ahli');
-      setSelectedSectorId('government_civilian');
+      setSelectedSectorId('gov_civil');
       setSalaryMode('details');
       setBasicSalary(10000);
       setHousingAllowance(3000);
@@ -389,7 +389,7 @@ export function DiagnosticsPage() {
       setTermYears(5);
     } else if (testId === 'rajhi-real-estate') {
       setSelectedBankId('rajhi');
-      setSelectedSectorId('private');
+      setSelectedSectorId('companies');
       setSalaryMode('details');
       setBasicSalary(9103);
       setHousingAllowance(0);
@@ -479,6 +479,7 @@ export function DiagnosticsPage() {
                   className="w-full px-3 py-2 text-xs font-bold bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg focus:ring-1 focus:ring-[#0057B8] outline-none"
                 >
                   <option value="gov_civil">حكومي مدني</option>
+                  <option value="semi_gov">شبه حكومي</option>
                   <option value="military">عسكري</option>
                   <option value="companies">شركات كبرى</option>
                   <option value="retired">متقاعد</option>

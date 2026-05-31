@@ -44,6 +44,8 @@ import {
   saveWithVersioning,
   toUUID
 } from '../../lib/adminOperations';
+import { getHousingSupport, getAdvancePayment } from '../../lib/housingSupportService';
+import { HousingSupportTier, AdvancePaymentTier } from '../../types';
 
 const LOGO_COLOR_PRESETS = [
   { value: 'from-emerald-700 to-emerald-950', name: 'أخضر داكن (الأهلي)' },
@@ -66,7 +68,7 @@ const productTypesList = [
 ];
 
 const sectorsList = [
-  { id: 'government_civilian', nameAr: 'حكومي مدني' },
+  { id: 'gov_civil', nameAr: 'حكومي مدني' },
   { id: 'semi_gov', nameAr: 'شبه حكومي' },
   { id: 'companies', nameAr: 'موظف شركات' },
   { id: 'military', nameAr: 'عسكري' },
@@ -83,6 +85,8 @@ export default function AdminDashboard() {
     marginRules, setMarginRules,
     dsrRules, setDsrRules,
     supportSettings, setSupportSettings,
+    housingSupportTiers, setHousingSupportTiers,
+    advancePaymentTiers, setAdvancePaymentTiers,
     personalRules, setPersonalRules,
     advancedRules, setAdvancedRules,
     calculationLogs, setCalculationLogs,
@@ -113,6 +117,22 @@ export default function AdminDashboard() {
 
   // Common UI State helpers
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+
+  // Support state controllers
+  const [editHousingTierId, setEditHousingTierId] = useState<string | null>(null);
+  const [hMinSalary, setHMinSalary] = useState<number>(0);
+  const [hMaxSalary, setHMaxSalary] = useState<number>(0);
+  const [hAmountMin, setHAmountMin] = useState<number>(0);
+  const [hAmountMax, setHAmountMax] = useState<number>(0);
+  const [hSortOrder, setHSortOrder] = useState<number>(1);
+  const [isAddingHousing, setIsAddingHousing] = useState<boolean>(false);
+
+  const [editAdvanceTierId, setEditAdvanceTierId] = useState<string | null>(null);
+  const [aSalaryThreshold, setASalaryThreshold] = useState<number>(0);
+  const [aAmount, setAAmount] = useState<number>(0);
+  const [isAddingAdvance, setIsAddingAdvance] = useState<boolean>(false);
+
+  const [supportTestSalary, setSupportTestSalary] = useState<string>('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [pensionActiveTab, setPensionActiveTab] = useState<'approved_salary' | 'pension_calc' | 'sector_class' | 'rule_test' | 'rules_library' | 'bank_sector_rules'>('bank_sector_rules');
   
@@ -243,7 +263,7 @@ export default function AdminDashboard() {
   const [isCopyBankModalOpen, setIsCopyBankModalOpen] = useState(false);
 
   const ensureBankSectorPensionRules = (allBanks: Bank[], currentRules: BankSectorPensionRule[]): BankSectorPensionRule[] => {
-    const allowedSectors = ['gov_civil', 'military', 'semi_gov', 'companies', 'private', 'retired'];
+    const allowedSectors = ['gov_civil', 'military', 'semi_gov', 'companies', 'retired'];
     const sectorMigrationMap: Record<string, string> = {
       government_civilian: 'gov_civil',
       military_officer: 'military',
@@ -330,15 +350,6 @@ export default function AdminDashboard() {
             growthMaxYears = 0;
             noGrowthAboveYears = 0;
             capAtApprovedSalary = true;
-          } else if (sectorId === 'private') {
-            salarySource = 'basic_only';
-            calcMethod = 'service_growth';
-            divisorYears = 40;
-            growthRate = 0;
-            growthMinYears = 0;
-            growthMaxYears = 0;
-            noGrowthAboveYears = 0;
-            capAtApprovedSalary = true;
           } else if (sectorId === 'retired') {
             salarySource = 'manual';
             calcMethod = 'direct';
@@ -380,7 +391,7 @@ export default function AdminDashboard() {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const allowedSectors = ['gov_civil', 'military', 'semi_gov', 'companies', 'private', 'retired'];
+          const allowedSectors = ['gov_civil', 'military', 'semi_gov', 'companies', 'retired'];
           const sectorMigrationMap: Record<string, string> = {
             government_civilian: 'gov_civil',
             military_officer: 'military',
@@ -463,16 +474,20 @@ export default function AdminDashboard() {
     pensionMultiplier: string;
     isActive: boolean;
   } | null>(null);
-  const [editingBankTerm, setEditingBankTerm] = useState<{
-    id: string;
-    nameAr: string;
-    maxTermMonths: string;
-    maxAgeAtEnd: string;
-    monthsAfterRetirement: string;
-    allowAfterRetirement: boolean;
-    calendarType: 'hijri' | 'gregorian';
-    isActive: boolean;
-  } | null>(null);
+  const [termActiveBankId, setTermActiveBankId] = useState('rajhi');
+  const [editingTermRule, setEditingTermRule] = useState<import("../../types").TermRule | null>(null);
+  const [editingTermRuleIndex, setEditingTermRuleIndex] = useState<number | null>(null);
+  const [isAddingTermRule, setIsAddingTermRule] = useState(false);
+
+  // Form states matching TermRule fields
+  const [termRuleFormSectorId, setTermRuleFormSectorId] = useState<import("../../types").SectorId | 'all'>('gov_civil');
+  const [termRuleFormMaxTermMonths, setTermRuleFormMaxTermMonths] = useState('360');
+  const [termRuleFormMaxAgeAtEnd, setTermRuleFormMaxAgeAtEnd] = useState('77');
+  const [termRuleFormCalendarType, setTermRuleFormCalendarType] = useState<import("../../types").CalendarType>('hijri');
+  const [termRuleFormAllowAfterRetirement, setTermRuleFormAllowAfterRetirement] = useState(true);
+  const [termRuleFormAllowedMonthsAfterRetirement, setTermRuleFormAllowedMonthsAfterRetirement] = useState('204');
+  const [termRuleFormMinTermMonths, setTermRuleFormMinTermMonths] = useState('60');
+  const [termRuleFormIsActive, setTermRuleFormIsActive] = useState(true);
 
   // Dynamic institution management states
   const [isInstitutionModalOpen, setIsInstitutionModalOpen] = useState(false);
@@ -534,7 +549,7 @@ export default function AdminDashboard() {
 
   // --- Sandbox / Rule Tester states ---
   const [sandboxBankId, setSandboxBankId] = useState('rajhi');
-  const [sandboxSectorId, setSandboxSectorId] = useState<SectorId>('government_civilian');
+  const [sandboxSectorId, setSandboxSectorId] = useState<SectorId>('gov_civil');
   const [sandboxSalaryMode, setSandboxSalaryMode] = useState<'direct' | 'details'>('details');
   const [sandboxBasic, setSandboxBasic] = useState(10000);
   const [sandboxHousing, setSandboxHousing] = useState(3000);
@@ -1136,7 +1151,7 @@ export default function AdminDashboard() {
   const [formAllowMonthlySupport, setFormAllowMonthlySupport] = useState(true);
   const [formAllowDownpaymentSupport, setFormAllowDownpaymentSupport] = useState(true);
   
-  const [formAllowedSectors, setFormAllowedSectors] = useState<SectorId[]>(['government_civilian', 'semi_gov', 'companies', 'military', 'private']);
+  const [formAllowedSectors, setFormAllowedSectors] = useState<SectorId[]>(['gov_civil', 'semi_gov', 'companies', 'military', 'retired']);
   const [formRejectionMessage, setFormRejectionMessage] = useState('');
   const [formIsActive, setFormIsActive] = useState(true);
   const [formError, setFormError] = useState('');
@@ -1258,23 +1273,45 @@ export default function AdminDashboard() {
   };
 
   // --- Sectors States & Management ---
-  const [sectors, setSectors] = useState([
-    { id: 'government_civilian', nameAr: 'حكومي مدني', isActive: true, notes: 'لا يحتاج رتبة' },
-    { id: 'semi_gov', nameAr: 'شبه حكومي', isActive: true, notes: 'لا يحتاج رتبة' },
-    { id: 'companies', nameAr: 'موظف شركات', isActive: true, notes: 'لا يحتاج رتبة' },
-    { id: 'military', nameAr: 'عسكري', isActive: true, notes: 'يحتاج اختيار رتبة' },
-    { id: 'private', nameAr: 'قطاع خاص', isActive: true, notes: 'لا يحتاج رتبة' },
-    { id: 'retired', nameAr: 'متقاعد', isActive: true, notes: 'لا يحتاج رتبة' }
-  ]);
+  const [sectors, setSectors] = useState(() => {
+    try {
+      const saved = localStorage.getItem("hasba_custom_sectors");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.filter((s: any) => s.id !== 'private' && s.id !== 'resident');
+        }
+      }
+    } catch (e) {
+      console.error("Error loading sectors:", e);
+    }
+    return [
+      { id: 'gov_civil', nameAr: 'حكومي مدني', isActive: true, retirementAge: 60, notes: 'لا يحتاج رتبة' },
+      { id: 'semi_gov', nameAr: 'شبه حكومي', isActive: true, retirementAge: 60, notes: 'لا يحتاج رتبة' },
+      { id: 'companies', nameAr: 'موظف شركات', isActive: true, retirementAge: 60, notes: 'لا يحتاج رتبة' },
+      { id: 'military', nameAr: 'عسكري', isActive: true, retirementAge: 0, notes: 'يحتاج اختيار رتبة (السن يأتي من الرتبة)' },
+      { id: 'retired', nameAr: 'متقاعد', isActive: true, retirementAge: 0, notes: 'لا ينطبق (متقاعد حالي)' }
+    ];
+  });
   const [isSectorModalOpen, setIsSectorModalOpen] = useState(false);
-  const [editingSector, setEditingSector] = useState<{ id: string; nameAr: string; isActive: boolean; notes: string } | null>(null);
+  const [editingSector, setEditingSector] = useState<{ id: string; nameAr: string; isActive: boolean; retirementAge?: number; notes: string } | null>(null);
   const [formSectorNameAr, setFormSectorNameAr] = useState('');
   const [formSectorIsActive, setFormSectorIsActive] = useState(true);
+  const [formSectorRetirementAge, setFormSectorRetirementAge] = useState('60');
 
-  const openEditSectorModal = (sec: { id: string; nameAr: string; isActive: boolean; notes: string }) => {
+  useEffect(() => {
+    try {
+      localStorage.setItem("hasba_custom_sectors", JSON.stringify(sectors));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [sectors]);
+
+  const openEditSectorModal = (sec: any) => {
     setEditingSector(sec);
     setFormSectorNameAr(sec.nameAr);
     setFormSectorIsActive(sec.isActive);
+    setFormSectorRetirementAge(String(sec.retirementAge || 60));
     setIsSectorModalOpen(true);
   };
 
@@ -1283,7 +1320,13 @@ export default function AdminDashboard() {
       showToast('يرجى إدخال اسم القطاع', 'refuse');
       return;
     }
-    setSectors(prev => prev.map(s => s.id === editingSector?.id ? { ...s, nameAr: formSectorNameAr, isActive: formSectorIsActive } : s));
+    const ageNum = parseInt(formSectorRetirementAge) || 60;
+    const updatedSectors = sectors.map(s => 
+      s.id === editingSector?.id 
+        ? { ...s, nameAr: formSectorNameAr, isActive: formSectorIsActive, retirementAge: (s.id === 'military' || s.id === 'retired') ? 0 : ageNum } 
+        : s
+    );
+    setSectors(updatedSectors);
     setIsSectorModalOpen(false);
     showToast('تم تحديث القطاع بنجاح!', 'success');
   };
@@ -1296,6 +1339,7 @@ export default function AdminDashboard() {
   const [formRankRetirementAge, setFormRankRetirementAge] = useState('');
   const [formRankDisplayOrder, setFormRankDisplayOrder] = useState('');
   const [formRankIsActive, setFormRankIsActive] = useState(true);
+  const [formRankScope, setFormRankScope] = useState<'enlisted' | 'officer'>('enlisted');
   const [rankError, setRankError] = useState('');
 
   const openEditRankModal = (rank: MilitaryRank) => {
@@ -1305,8 +1349,28 @@ export default function AdminDashboard() {
     setFormRankRetirementAge(String(rank.retirementAge ?? ''));
     setFormRankDisplayOrder(String(rank.displayOrder ?? ''));
     setFormRankIsActive(rank.isActive !== false);
+    setFormRankScope(rank.sectorScope || 'enlisted');
     setRankError('');
     setIsRankModalOpen(true);
+  };
+
+  const openAddRankModal = () => {
+    setEditingRank(null);
+    setFormRankNameAr('');
+    setFormRankId('');
+    setFormRankRetirementAge('');
+    setFormRankDisplayOrder(String(militaryRanks.length + 1));
+    setFormRankIsActive(true);
+    setFormRankScope('enlisted');
+    setRankError('');
+    setIsRankModalOpen(true);
+  };
+
+  const handleDeleteRank = (rankIdToDelete: string) => {
+    if (confirm('هل أنت متأكد من حذف هذه الرتبة العسكرية نهائياً؟ قد يؤثر الحذف على حسابات العملاء الذين يحملون هذه الرتبة.')) {
+      setMilitaryRanks(prev => prev.filter(r => r.id !== rankIdToDelete));
+      showToast('تم حذف الرتبة العسكرية بنجاح!', 'success');
+    }
   };
 
   const saveRank = () => {
@@ -1314,6 +1378,18 @@ export default function AdminDashboard() {
       setRankError('اسم الرتبة مطلوب.');
       return;
     }
+    
+    let cleanId = formRankId.trim().toLowerCase().replace(/\s+/g, '_');
+    if (!editingRank && !cleanId) {
+      setRankError('ID الرتبة مطلوب للرتبة الجديدة.');
+      return;
+    }
+
+    if (!editingRank && militaryRanks.some(r => r.id === cleanId)) {
+      setRankError('ID هذه الرتبة مستخدم بالفعل، يرجى اختيار معرف فريد.');
+      return;
+    }
+
     const ageStr = parseArabicAndEnglishNumber(formRankRetirementAge).trim();
     const orderStr = parseArabicAndEnglishNumber(formRankDisplayOrder).trim();
 
@@ -1330,22 +1406,38 @@ export default function AdminDashboard() {
       return;
     }
 
-    const updatedRank: MilitaryRank = {
-      ...editingRank!,
-      nameAr: formRankNameAr,
-      id: formRankId,
-      retirementAge: ageNum,
-      displayOrder: orderNum,
-      isActive: formRankIsActive
-    };
+    if (editingRank) {
+      // Editing Mode
+      const updatedRank: MilitaryRank = {
+        ...editingRank,
+        nameAr: formRankNameAr.trim(),
+        retirementAge: ageNum,
+        displayOrder: orderNum,
+        isActive: formRankIsActive,
+        sectorScope: formRankScope
+      };
+      setMilitaryRanks(prev => prev.map(r => r.id === editingRank.id ? updatedRank : r));
+      showToast('تم تحديث الرتبة العسكرية بنجاح!', 'success');
+    } else {
+      // Create Mode
+      const newRank: MilitaryRank = {
+        id: cleanId,
+        nameAr: formRankNameAr.trim(),
+        retirementAge: ageNum,
+        displayOrder: orderNum,
+        isActive: formRankIsActive,
+        sectorScope: formRankScope,
+        pensionMultiplier: 420
+      };
+      setMilitaryRanks(prev => [...prev, newRank]);
+      showToast('تم إضافة الرتبة العسكرية بنجاح!', 'success');
+    }
 
-    setMilitaryRanks(prev => prev.map(r => r.id === editingRank?.id ? updatedRank : r));
     setIsRankModalOpen(false);
-    showToast('تم تحديث الرتبة العسكرية بنجاح!', 'success');
   };
 
   // Filtering states for admin table
-  const [filterBank, setFilterBank] = useState('all');
+  const [filterBank, setFilterBank] = useState('rajhi');
   const [filterProductType, setFilterProductType] = useState('all');
   const [filterActiveStatus, setFilterActiveStatus] = useState('all');
   const [filterSupport, setFilterSupport] = useState('all');
@@ -1353,7 +1445,8 @@ export default function AdminDashboard() {
   const openAddProductModal = () => {
     try {
       setEditingProduct(null);
-      setFormBankId('alahli');
+      const activeBank = (filterBank && filterBank !== 'all') ? filterBank : 'rajhi';
+      setFormBankId(activeBank);
       setFormProductId('real_estate_only');
       setFormMinSalary('');
       setFormMinAge('');
@@ -1362,7 +1455,7 @@ export default function AdminDashboard() {
       setFormAllowUnsupported(true);
       setFormAllowMonthlySupport(true);
       setFormAllowDownpaymentSupport(true);
-      setFormAllowedSectors(['government_civilian', 'semi_gov', 'companies', 'military', 'private', 'retired']);
+      setFormAllowedSectors(['gov_civil', 'semi_gov', 'companies', 'military', 'retired']);
       setFormRejectionMessage('');
       setFormIsActive(true);
       setFormError('');
@@ -1654,7 +1747,7 @@ export default function AdminDashboard() {
           id: `${cleanId}_re_only`,
           bankId: cleanId,
           productId: 'real_estate_only',
-          allowedSectors: ['government_civilian', 'semi_gov', 'companies', 'military', 'private'],
+          allowedSectors: ['gov_civil', 'semi_gov', 'companies', 'military'],
           minAge: 18,
           maxAge: updatedBank.maxAgeAtEnd - 5,
           minSalary: instType === 'finance_company' ? 4000 : 5000,
@@ -1670,7 +1763,7 @@ export default function AdminDashboard() {
           id: `${cleanId}_pf_only`,
           bankId: cleanId,
           productId: 'personal_only',
-          allowedSectors: ['government_civilian', 'semi_gov', 'companies', 'military', 'private', 'retired'],
+          allowedSectors: ['gov_civil', 'semi_gov', 'companies', 'military', 'retired'],
           minAge: 18,
           maxAge: 65,
           minSalary: instType === 'finance_company' ? 3000 : 4000,
@@ -1686,7 +1779,7 @@ export default function AdminDashboard() {
           id: `${cleanId}_re_new_pf`,
           bankId: cleanId,
           productId: 'real_estate_with_new_personal',
-          allowedSectors: ['government_civilian', 'semi_gov', 'companies', 'military', 'private'],
+          allowedSectors: ['gov_civil', 'semi_gov', 'companies', 'military'],
           minAge: 21,
           maxAge: 60,
           minSalary: instType === 'finance_company' ? 6000 : 8000,
@@ -1702,7 +1795,7 @@ export default function AdminDashboard() {
           id: `${cleanId}_re_existing_pf`,
           bankId: cleanId,
           productId: 'real_estate_with_existing_personal',
-          allowedSectors: ['government_civilian', 'semi_gov', 'companies', 'military', 'private'],
+          allowedSectors: ['gov_civil', 'semi_gov', 'companies', 'military'],
           minAge: 21,
           maxAge: updatedBank.maxAgeAtEnd - 5,
           minSalary: instType === 'finance_company' ? 5000 : 6000,
@@ -1724,7 +1817,7 @@ export default function AdminDashboard() {
       const newTermRules: TermRule[] = [
         {
           bankId: cleanId,
-          sectorId: 'government_civilian',
+          sectorId: 'gov_civil',
           rankId: 'all',
           productId: 'both',
           supportType: 'all',
@@ -1754,7 +1847,7 @@ export default function AdminDashboard() {
         },
         {
           bankId: cleanId,
-          sectorId: 'private',
+          sectorId: 'companies',
           rankId: 'all',
           productId: 'both',
           supportType: 'all',
@@ -2528,24 +2621,37 @@ export default function AdminDashboard() {
               </button>
             </div>
 
-            {/* Filters Bar */}
-            <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* Filter Bank */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-gray-600">تصفية حسب البنك:</label>
-                <select
-                  id="filter-bank-select"
-                  value={filterBank}
-                  onChange={(e) => setFilterBank(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
-                >
-                  <option value="all">كل البنوك</option>
-                  {formBanksList.map(b => (
-                    <option key={b.id} value={b.id}>{b.nameAr}</option>
-                  ))}
-                </select>
-              </div>
+            {/* Banks Horizontal Scrollable Tabs */}
+            <div className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm overflow-x-auto whitespace-nowrap scrollbar-none flex gap-2.5" dir="rtl">
+              {formBanksList.map((b) => {
+                const count = products.filter(p => p.bankId === b.id).length;
+                const isSelected = filterBank === b.id;
+                return (
+                  <button
+                    key={b.id}
+                    type="button"
+                    onClick={() => setFilterBank(b.id)}
+                    className={`inline-flex items-center gap-2 px-4.5 py-2.5 rounded-xl text-xs font-bold transition-all border shrink-0 cursor-pointer ${
+                      isSelected
+                        ? 'bg-[#0057B8] text-white border-[#0057B8] shadow-sm shadow-[#0057B8]/20 scale-[1.01]'
+                        : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-250/60'
+                    }`}
+                  >
+                    <span>{b.nameAr}</span>
+                    <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded-lg min-w-[20px] text-[10px] font-extrabold ${
+                      isSelected
+                        ? 'bg-white/20 text-white'
+                        : 'bg-gray-200 text-gray-600'
+                    }`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
 
+            {/* Filters Bar */}
+            <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm grid grid-cols-1 sm:grid-cols-3 gap-4">
               {/* Filter Product Type */}
               <div className="space-y-1.5">
                 <label className="block text-xs font-bold text-gray-600">نوع المنتج:</label>
@@ -2680,11 +2786,10 @@ export default function AdminDashboard() {
                             <td className="p-4">
                               <div className="flex flex-wrap gap-1 max-w-[150px]">
                                 {(Array.isArray(prod.allowedSectors) ? prod.allowedSectors : []).map(sec => {
-                                  const secAr = sec === 'government_civilian' ? 'حكومي' :
+                                  const secAr = sec === 'government_civilian' || sec === 'gov_civil' ? 'حكومي' :
                                                 sec === 'semi_gov' ? 'شبه حكومي' :
                                                 sec === 'companies' ? 'موظف شركات' :
-                                                sec === 'military' ? 'عسكري' :
-                                                sec === 'private' ? 'خاص' : 'متقاعد';
+                                                sec === 'military' ? 'عسكري' : 'متقاعد';
                                   return (
                                     <span key={sec} className="bg-emerald-50 text-emerald-700 text-[9px] px-1.5 py-0.5 rounded font-semibold">
                                       {secAr}
@@ -2913,7 +3018,7 @@ export default function AdminDashboard() {
                       </div>
 
                       {/* Allowed Sectors */}
-                      <div className="space-y-2 border border-gray-100 bg-gray-50/50 p-4 rounded-2xl">
+                      <div className="space-y-2 border border-gray-100 bg-gray-50/50 p-3 rounded-2xl">
                         <label className="block text-xs font-bold text-gray-800">القطاعات المقبولة والمسموحة لقاعدة الشريك: *</label>
                         <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-6">
                           {sectorsList.map(sec => {
@@ -3018,7 +3123,7 @@ export default function AdminDashboard() {
                 <span>القسم الأول: القطاعات الوظيفية</span>
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {sectors.filter(sec => sec.id !== 'private').map((sec) => (
+                {sectors.map((sec) => (
                   <div key={sec.id} className="bg-white border border-[#E5E7EB] rounded-2xl p-5 shadow-xs space-y-4 flex flex-col justify-between hover:shadow-sm transition-shadow">
                     <div className="space-y-2">
                       <div className="flex justify-between items-start">
@@ -3032,6 +3137,24 @@ export default function AdminDashboard() {
                           <span className="font-semibold text-slate-400">Sector ID:</span>{' '}
                           <code className="bg-slate-50 px-1 py-0.5 rounded font-mono text-[10px] text-slate-600">{sec.id}</code>
                         </div>
+                        {sec.id !== 'military' && sec.id !== 'retired' && (
+                          <div>
+                            <span className="font-semibold text-slate-400">سن التقاعد الثابت:</span>{' '}
+                            <span className="font-bold text-slate-700">{sec.retirementAge || 60} سنة</span>
+                          </div>
+                        )}
+                        {sec.id === 'military' && (
+                          <div>
+                            <span className="font-semibold text-slate-400">سن التقاعد:</span>{' '}
+                            <span className="font-semibold text-slate-600 font-sans">من الرتبة العسكرية</span>
+                          </div>
+                        )}
+                        {sec.id === 'retired' && (
+                          <div>
+                            <span className="font-semibold text-slate-400">سن التقاعد:</span>{' '}
+                            <span className="font-semibold text-slate-500 font-sans">لا ينطبق</span>
+                          </div>
+                        )}
                         <p className="mt-1">ملاحظة: {sec.notes}</p>
                       </div>
                     </div>
@@ -3051,10 +3174,20 @@ export default function AdminDashboard() {
 
             {/* Section 2: Military Ranks Table */}
             <div className="space-y-4">
-              <h3 className="font-extrabold text-[#111827] text-sm flex items-center gap-1.5 border-b pb-2 border-gray-100">
-                <Award className="w-4 h-4 text-[#0057B8]" />
-                <span>القسم الثاني: الرتب العسكرية</span>
-              </h3>
+              <div className="flex justify-between items-center border-b pb-2 border-gray-100">
+                <h3 className="font-extrabold text-[#111827] text-sm flex items-center gap-1.5">
+                  <Award className="w-4 h-4 text-[#0057B8]" />
+                  <span>القسم الثاني: الرتب العسكرية</span>
+                </h3>
+                <button
+                  type="button"
+                  onClick={openAddRankModal}
+                  className="flex items-center gap-1 bg-[#0057B8] hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>إضافة رتبة عسكرية</span>
+                </button>
+              </div>
               
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
@@ -3063,19 +3196,29 @@ export default function AdminDashboard() {
                       <tr>
                         <th className="p-4 font-bold">الرتبة</th>
                         <th className="p-4 font-bold">Rank ID</th>
+                        <th className="p-4 font-bold text-center">النوع</th>
                         <th className="p-4 font-bold text-center">سن التقاعد</th>
                         <th className="p-4 font-bold text-center">ترتيب العرض</th>
                         <th className="p-4 font-bold text-center">الحالة</th>
                         <th className="p-4 font-bold text-center">الإجراءات</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-50 font-semibold">
+                    <tbody className="divide-y divide-gray-50 font-semibold font-sans">
                       {militaryRanks && militaryRanks.length > 0 ? (
                         militaryRanks.slice().sort((a, b) => (a.displayOrder ?? 99) - (b.displayOrder ?? 99)).map((rank) => (
                           <tr key={rank.id} className="hover:bg-slate-50 transition-colors">
                             <td className="p-4 text-xs font-bold text-slate-800">{rank.nameAr}</td>
                             <td className="p-4">
                               <code className="bg-slate-50 px-1.5 py-0.5 rounded font-mono text-[10px] text-slate-500">{rank.id}</code>
+                            </td>
+                            <td className="p-4 text-center text-xs">
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                rank.sectorScope === 'officer' 
+                                  ? 'bg-blue-50 text-[#0057B8]' 
+                                  : 'bg-indigo-50 text-indigo-700'
+                              }`}>
+                                {rank.sectorScope === 'officer' ? 'ضباط' : 'أفراد'}
+                              </span>
                             </td>
                             <td className="p-4 text-center font-sans">
                               {rank.retirementAge} سنة
@@ -3098,19 +3241,29 @@ export default function AdminDashboard() {
                               </button>
                             </td>
                             <td className="p-4 text-center">
-                              <button
-                                type="button"
-                                onClick={() => openEditRankModal(rank)}
-                                className="text-[#0057B8] hover:bg-blue-50 px-2.5 py-1 rounded-lg transition-colors text-xs font-bold cursor-pointer"
-                              >
-                                تعديل
-                              </button>
+                              <div className="flex items-center justify-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => openEditRankModal(rank)}
+                                  className="text-[#0057B8] hover:bg-blue-50 px-2.5 py-1 rounded-lg transition-colors text-xs font-bold cursor-pointer"
+                                >
+                                  تعديل
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteRank(rank.id)}
+                                  className="text-red-650 hover:bg-red-50 px-2.5 py-1 rounded-lg transition-colors text-xs font-bold cursor-pointer flex items-center gap-0.5"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  <span>حذف</span>
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={6} className="p-8 text-center text-gray-400">لا توجد رتب عسكرية مسجلة حالياً.</td>
+                          <td colSpan={7} className="p-8 text-center text-gray-400">لا توجد رتب عسكرية مسجلة حالياً.</td>
                         </tr>
                       )}
                     </tbody>
@@ -3133,7 +3286,7 @@ export default function AdminDashboard() {
                       <button
                         type="button"
                         onClick={() => setIsSectorModalOpen(false)}
-                        className="text-gray-400 hover:text-gray-600 focus:outline-none text-lg font-bold p-1 cursor-pointer"
+                        className="text-gray-400 hover:text-gray-650 focus:outline-none text-lg font-bold p-1 cursor-pointer"
                       >
                         ✕
                       </button>
@@ -3159,6 +3312,20 @@ export default function AdminDashboard() {
                           className="w-full bg-slate-100 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold text-gray-500 cursor-not-allowed focus:outline-none"
                         />
                       </div>
+
+                      {editingSector?.id !== 'military' && editingSector?.id !== 'retired' && (
+                        <div className="space-y-1.5 text-right">
+                          <label className="block text-xs font-bold text-gray-600">سن التقاعد الثابت:</label>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            value={formSectorRetirementAge}
+                            onChange={(e) => setFormSectorRetirementAge(e.target.value)}
+                            className="text-right w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            placeholder="مثال: 60"
+                          />
+                        </div>
+                      )}
 
                       <div className="flex items-center gap-3 pt-2">
                         <span className="text-xs font-bold text-gray-600">حالة التفعيل:</span>
@@ -3208,7 +3375,7 @@ export default function AdminDashboard() {
                   <div className="relative z-55 inline-block align-bottom bg-white rounded-3xl text-right overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-md sm:w-full border border-gray-100">
                     <div className="bg-gray-50 px-6 py-4 border-b border-gray-100 flex items-center justify-between">
                       <h3 className="text-sm font-extrabold text-gray-900" id="rank-modal-title">
-                        تعديل بيانات الرتبة العسكرية
+                        {editingRank ? 'تعديل بيانات الرتبة العسكرية' : 'إضافة رتبة عسكرية جديدة'}
                       </h3>
                       <button
                         type="button"
@@ -3232,28 +3399,50 @@ export default function AdminDashboard() {
                           type="text"
                           value={formRankNameAr}
                           onChange={(e) => setFormRankNameAr(e.target.value)}
+                          placeholder="مثال: جندي، رائد"
                           className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
                         />
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className="block text-xs font-bold text-gray-600">Rank ID:</label>
+                        <label className="block text-xs font-bold text-gray-600">Rank ID (معرف الرتبة):</label>
                         <input
                           type="text"
                           value={formRankId}
-                          disabled
-                          className="w-full bg-slate-100 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold text-gray-500 cursor-not-allowed focus:outline-none"
+                          onChange={(e) => setFormRankId(e.target.value)}
+                          disabled={editingRank !== null}
+                          placeholder="مثال: soldier, major"
+                          className={`w-full border rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none ${
+                            editingRank !== null 
+                              ? 'bg-slate-100 border-gray-200 text-gray-400 cursor-not-allowed' 
+                              : 'bg-slate-50 border-gray-200 text-gray-700 focus:ring-1 focus:ring-blue-500'
+                          }`}
                         />
+                        {!editingRank && (
+                          <p className="text-[10px] text-gray-400 font-sans">أدخل معرّف بالإنجليزية (مثل: colonel أو soldier_1).</p>
+                        )}
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className="block text-xs font-bold text-gray-600">سن التقاعد الإلزامي:</label>
+                        <label className="block text-xs font-bold text-gray-600">الفئة العسكرية (أفراد / ضباط):</label>
+                        <select
+                          value={formRankScope}
+                          onChange={(e) => setFormRankScope(e.target.value as 'enlisted' | 'officer')}
+                          className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        >
+                          <option value="enlisted">عسكري أفراد (enlisted)</option>
+                          <option value="officer">عسكري ضباط (officer)</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-bold text-gray-600">سن التقاعد الإلزامي للرتبة:</label>
                         <input
                           type="text"
                           inputMode="numeric"
                           value={formRankRetirementAge}
                           onChange={(e) => setFormRankRetirementAge(e.target.value)}
-                          className="text-right w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          className="text-right w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500 font-sans"
                           placeholder="مثال: 44"
                         />
                       </div>
@@ -3265,7 +3454,7 @@ export default function AdminDashboard() {
                           inputMode="numeric"
                           value={formRankDisplayOrder}
                           onChange={(e) => setFormRankDisplayOrder(e.target.value)}
-                          className="text-right w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          className="text-right w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500 font-sans"
                           placeholder="مثال: 1"
                         />
                       </div>
@@ -3275,13 +3464,13 @@ export default function AdminDashboard() {
                         <button
                           type="button"
                           onClick={() => setFormRankIsActive(!formRankIsActive)}
-                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                             formRankIsActive ? 'bg-[#0057B8]' : 'bg-slate-200'
                           }`}
                         >
                           <span
-                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
-                              formRankIsActive ? '-translate-x-5' : 'translate-x-0'
+                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                              formRankIsActive ? '-translate-x-4' : 'translate-x-0'
                             }`}
                           />
                         </button>
@@ -3294,7 +3483,7 @@ export default function AdminDashboard() {
                         onClick={saveRank}
                         className="bg-[#0057B8] hover:bg-blue-700 text-white px-5 py-2 rounded-xl text-xs font-bold transition-all shadow-sm hover:shadow cursor-pointer"
                       >
-                        حفظ التعديلات
+                        {editingRank ? 'حفظ التعديلات' : 'إضافة رتبة'}
                       </button>
                       <button
                         type="button"
@@ -3448,7 +3637,7 @@ export default function AdminDashboard() {
                   <button
                     type="button"
                     onClick={() => {
-                      const customId = prompt("أدخل الرمز التعريفي للقطاع بالإنجليزية (مثال: semi_gov, private):");
+                      const customId = prompt("أدخل الرمز التعريفي للقطاع بالإنجليزية (مثال: semi_gov, companies):");
                       if (!customId) return;
                       const customLabel = prompt("أدخل الاسم العربي لعرض القطاع:");
                       if (!customLabel) return;
@@ -4057,7 +4246,6 @@ export default function AdminDashboard() {
                     { id: 'companies', label: 'شركات كبرى (أرامكو/سابك)', defaultClass: 'strong' },
                     { id: 'military_officer', label: 'عسكري (ضباط)', defaultClass: 'strong' },
                     { id: 'military_individual', label: 'عسكري (أفراد)', defaultClass: 'weak' },
-                    { id: 'private', label: 'القطاع الخاص', defaultClass: 'weak' },
                     { id: 'retired', label: 'متقاعد حالي', defaultClass: 'strong' }
                   ].map((sec) => {
                     const customMapping = sectorMappings.find(m => m.bankId === 'alahli' && m.sectorId === sec.id);
@@ -4385,7 +4573,6 @@ export default function AdminDashboard() {
                       military: "عسكري",
                       semi_gov: "شبه حكومي",
                       companies: "موظف شركات",
-                      private: "قطاع خاص",
                       retired: "متقاعد"
                     };
 
@@ -4570,7 +4757,7 @@ export default function AdminDashboard() {
                   setSandboxOther(1500);
                   setSandboxDirectNet(16000);
                   setSandboxDirectPension(0);
-                  setSandboxSectorId('government_civilian');
+                  setSandboxSectorId('gov_civil');
                   setSandboxBankId(banks[0]?.id || 'rajhi');
                   setSandboxSelectedRuleId('auto');
                   setSandboxSalaryMode('details');
@@ -4614,9 +4801,10 @@ export default function AdminDashboard() {
                   onChange={(e) => setSandboxSectorId(e.target.value as SectorId)}
                   className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-700 outline-none"
                 >
-                  <option value="government_civilian">💼 حكومي مدني</option>
-                  <option value="military_officer">👮 عسكري (ضابط)</option>
-                  <option value="military_individual">🎖️ عسكري (فرد)</option>
+                  <option value="gov_civil">💼 حكومي مدني</option>
+                  <option value="military">👮 عسكري</option>
+                  <option value="semi_gov">🏢 شبه حكومي</option>
+                  <option value="companies">🏢 موظف شركات</option>
                   <option value="retired">👴 متقاعد</option>
                 </select>
               </div>
@@ -5011,277 +5199,308 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* VIEW 6: TERMS */}
+        {/* VIEW 6: TERM LIMITS AND DURATIONS - TABBED LAYOUT BY BANK AND RULES PER SECTOR */}
         {adminSubPage === 'terms' && (
           <div className="space-y-6">
-            <div className="flex justify-between items-center border-b border-[#F1F5F9] pb-4">
-              <div>
-                <h2 className="text-lg font-bold text-[#111827]">مدد التمويل والحدود</h2>
-                <p className="text-xs text-[#6B7280]">إدارة قواعد وضوابط مدد التمويل وحدود السن والتقاويم الخاصة بكل بنك.</p>
-              </div>
+            {/* Header */}
+            <div className="border-b border-[#F1F5F9] pb-4">
+              <h2 className="text-xl font-extrabold text-[#111827]">مدد التمويل والأعمار القصوى</h2>
+              <p className="text-xs text-[#6B7280] mt-1">صفحة إعداد مدد التمويل، الحدود، أنواع التقويم، وسياسة التقاعد لكل بنك موزعة حسب القطاع.</p>
             </div>
 
-            {/* 1. CHART / BRIEF LAW INFO */}
-            <div className="bg-[#F8FAFC] border border-[#E5E7EB] rounded-2xl p-6 text-right font-sans">
-              <h3 className="font-extrabold text-[#111827] text-sm mb-3">قانون مدة التمويل:</h3>
-              <p className="text-xs text-slate-600 mb-4 leading-relaxed">
-                يتم حساب مدة التمويل بالأشهر حسب الأقل من:
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex flex-col justify-between">
-                  <div>
-                    <span className="text-xs font-bold text-[#0057B8] block mb-1">1. أقصى مدة مسموحة للبنك</span>
-                    <p className="text-[11px] text-gray-500 leading-relaxed">الحد الأقصى الكلي لمدد التمويل المقررة في البنك.</p>
-                  </div>
-                </div>
-                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex flex-col justify-between">
-                  <div>
-                    <span className="text-xs font-bold text-amber-600 block mb-1">2. المدة حتى أقصى عمر عند نهاية التمويل</span>
-                    <p className="text-[11px] text-gray-500 leading-relaxed font-sans">المدة المتبقية للوصول لعمر الحد الأقصى لنهاية التمويل بالبنك.</p>
-                  </div>
-                </div>
-                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex flex-col justify-between">
-                  <div>
-                    <span className="text-xs font-bold text-emerald-600 block mb-1">3. المدة حتى سن التقاعد + أشهر السماح بعد التقاعد</span>
-                    <p className="text-[11px] text-gray-500 leading-relaxed font-sans">المدة المتبقية لسن تقاعد القطاع مضافاً إليها أشهر السماح المتاحة بعد التقاعد.</p>
-                  </div>
+            {/* Save notice & Action */}
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-right">
+              <div className="flex items-start gap-2.5">
+                <span className="text-lg">⚠️</span>
+                <div>
+                  <h4 className="text-[11px] font-extrabold text-amber-900">تغييرات غير محفوظة بمدد التمويل</h4>
+                  <p className="text-[10px] text-amber-700 mt-0.5 font-medium leading-relaxed">أنت تقوم بالتعديل في الذاكرة المؤقتة (المسودة). يجب الضغط على "حفظ التغييرات" لتمريرها وقبولها في محرك التمويل.</p>
                 </div>
               </div>
+              <button
+                type="button"
+                onClick={() => {
+                  showToast("تم ترسيخ وتعميد إعدادات مدد التمويل بنجاح في النظام.", "success");
+                }}
+                className="px-4.5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-[11px] font-bold rounded-xl shadow-xs transition-all shrink-0 cursor-pointer flex items-center gap-1"
+              >
+                <span>💾 حفظ التغييرات</span>
+              </button>
             </div>
 
-            {/* 2. TABLE OF BANKS TERMS */}
+            {/* 2. BANKS HORIZONTAL TABS */}
+            <div className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm overflow-x-auto whitespace-nowrap scrollbar-none flex gap-2.5" dir="rtl">
+              {formBanksList.map((b) => {
+                const count = termRules.filter(r => r.bankId === b.id).length;
+                const isSelected = termActiveBankId === b.id;
+                return (
+                  <button
+                    key={b.id}
+                    type="button"
+                    onClick={() => setTermActiveBankId(b.id)}
+                    className={`inline-flex items-center gap-2 px-4.5 py-2.5 rounded-xl text-xs font-bold transition-all border shrink-0 cursor-pointer ${
+                      isSelected
+                        ? 'bg-[#0057B8] text-white border-[#0057B8] shadow-sm shadow-[#0057B8]/20 scale-[1.01]'
+                        : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-250/60'
+                    }`}
+                  >
+                    <span>{b.nameAr}</span>
+                    <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded-lg min-w-[20px] text-[10px] font-extrabold ${
+                      isSelected
+                        ? 'bg-white/20 text-white'
+                        : 'bg-gray-200 text-gray-600'
+                    }`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Title & Add Term Rule Button */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+              <h3 className="text-sm font-extrabold text-[#111827]">
+                قواعد مدد التمويل لـ {formBanksList.find(b => b.id === termActiveBankId)?.nameAr || termActiveBankId}
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAddingTermRule(true);
+                  setEditingTermRule(null);
+                  setEditingTermRuleIndex(null);
+                  
+                  // Setup defaults
+                  setTermRuleFormSectorId('gov_civil');
+                  setTermRuleFormMaxTermMonths('360');
+                  setTermRuleFormMaxAgeAtEnd('77');
+                  setTermRuleFormCalendarType(termActiveBankId === 'rajhi' ? 'hijri' : 'gregorian');
+                  setTermRuleFormAllowAfterRetirement(true);
+                  setTermRuleFormAllowedMonthsAfterRetirement('204');
+                  setTermRuleFormMinTermMonths('60');
+                  setTermRuleFormIsActive(true);
+                }}
+                className="inline-flex items-center gap-1 px-4 py-2 bg-[#0057B8] text-white hover:bg-[#004bb0] rounded-xl text-xs font-bold shadow-sm transition-all shrink-0 cursor-pointer"
+              >
+                <span>+ إضافة قاعدة قطاع</span>
+              </button>
+            </div>
+
+            {/* 3. TABLE OF TERM RULES */}
             <div className="overflow-x-auto border border-gray-200 rounded-2xl bg-white shadow-xs">
               <table className="min-w-full divide-y divide-gray-200 text-right">
                 <thead className="bg-[#F8FAFC] text-[11px] font-bold text-gray-500 uppercase tracking-wider">
                   <tr>
-                    <th scope="col" className="px-6 py-4 text-right">البنك</th>
-                    <th scope="col" className="px-6 py-4 text-right">Bank ID</th>
-                    <th scope="col" className="px-6 py-4 text-right">أقصى مدة تمويل بالأشهر</th>
-                    <th scope="col" className="px-6 py-4 text-right">أقصى عمر عند نهاية التمويل</th>
-                    <th scope="col" className="px-6 py-4 text-right">أشهر السماح بعد التقاعد</th>
-                    <th scope="col" className="px-6 py-4 text-right">يسمح بعد التقاعد</th>
+                    <th scope="col" className="px-6 py-4 text-right">القطاع</th>
+                    <th scope="col" className="px-6 py-4 text-right">أقصى مدة</th>
+                    <th scope="col" className="px-6 py-4 text-right">أقصى عمر عند النهاية</th>
                     <th scope="col" className="px-6 py-4 text-right">نوع التقويم</th>
+                    <th scope="col" className="px-6 py-4 text-right">سماح بعد التقاعد</th>
+                    <th scope="col" className="px-6 py-4 text-right">أشهر السماح</th>
+                    <th scope="col" className="px-6 py-4 text-right">أقل مدة</th>
                     <th scope="col" className="px-6 py-4 text-right">الحالة</th>
                     <th scope="col" className="px-6 py-4 text-right">الإجراءات</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 text-xs font-semibold text-gray-700">
-                  {banks.map((bank) => (
-                    <tr key={bank.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap font-bold text-slate-800">
-                        <div className="flex items-center gap-2">
-                          <span className={`w-2.5 h-2.5 rounded-full bg-gradient-to-r ${bank.logoColor || 'from-[#0057B8] to-blue-900'} shrink-0`} />
-                          <span>{bank.nameAr}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-gray-500 font-mono text-[11px]">{bank.id}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-slate-700 font-mono">{bank.maxTermMonths} شهر</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-slate-700 font-mono">{bank.maxAgeAtEnd} سنة</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-slate-600 font-mono">
-                        {bank.allowAfterRetirement ? `${bank.monthsAfterRetirement} شهر` : '0'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-bold ${
-                          bank.allowAfterRetirement 
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' 
-                            : 'bg-rose-50 text-rose-700 border border-rose-100'
-                        }`}>
-                          {bank.allowAfterRetirement ? 'نعم' : 'لا'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-slate-600 text-xs text-right">
-                        {bank.calendarType === 'hijri' ? 'هجري' : 'ميلادي'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-bold ${
-                          bank.isActive 
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' 
-                            : 'bg-gray-100 text-gray-500 border border-gray-200'
-                        }`}>
-                          {bank.isActive ? 'مفعل' : 'غير مفعل'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingBankTerm({
-                                id: bank.id,
-                                nameAr: bank.nameAr,
-                                maxTermMonths: bank.maxTermMonths.toString(),
-                                maxAgeAtEnd: bank.maxAgeAtEnd.toString(),
-                                monthsAfterRetirement: bank.monthsAfterRetirement.toString(),
-                                allowAfterRetirement: bank.allowAfterRetirement,
-                                calendarType: bank.calendarType,
-                                isActive: bank.isActive
-                              });
-                            }}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 border border-[#E5E7EB] hover:border-[#0057B8] text-[#0057B8] hover:bg-[#0057B8]/5 rounded-lg transition-all font-bold text-[11px] cursor-pointer"
-                          >
-                            <span>تعديل</span>
-                          </button>
+                  {(() => {
+                    const filteredRules = termRules.filter(r => r.bankId === termActiveBankId);
+                    if (filteredRules.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan={9} className="px-6 py-12 text-center text-gray-400 font-medium text-xs font-sans">
+                            لا توجد قواعد مدة وحدود مسجلة لهذا البنك حالياً. اضغط على "+ إضافة قاعدة قطاع" لإنشاء أول قاعدة في المسودة.
+                          </td>
+                        </tr>
+                      );
+                    }
 
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const updated = banks.map(b => b.id === bank.id ? { ...b, isActive: !b.isActive } : b);
-                              setBanks(updated);
-                              showToast(`تم تغيير حالة البنك ${bank.nameAr} في المسودة.`, "success");
-                            }}
-                            className={`px-3 py-1.5 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${
-                              bank.isActive 
-                                ? 'bg-rose-50 border-rose-100 hover:bg-rose-100 text-rose-800' 
-                                : 'bg-[#0057B8]/5 border-[#0057B8]/10 hover:bg-[#0057B8]/10 text-[#0057B8]'
-                            }`}
-                          >
-                            {bank.isActive ? 'تعطيل' : 'تفعيل'}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                    return filteredRules.map((r, index) => {
+                      const absoluteIndex = termRules.findIndex(item => item === r);
+                      
+                      const sectorLabels: Record<string, string> = {
+                        gov_civil: 'حكومي مدني',
+                        military: 'عسكري',
+                        semi_gov: 'شبه حكومي',
+                        companies: 'موظف شركات',
+                        retired: 'متقاعد',
+                        all: 'الكل / عام'
+                      };
+
+                      const isMilitary = r.sectorId === 'military';
+                      const isRetired = r.sectorId === 'retired';
+
+                      return (
+                        <tr key={index} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-6 py-4 whitespace-nowrap font-bold text-slate-800">
+                            <div className="flex items-center gap-2">
+                              <span className="w-1.5 h-1.5 rounded-full bg-blue-600 shrink-0" />
+                              <span>{sectorLabels[r.sectorId] || r.sectorId}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap font-mono text-slate-700">{r.maxTermMonths} شهر</td>
+                          <td className="px-6 py-4 whitespace-nowrap font-mono text-slate-700">{r.maxAgeAtEnd} سنة</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-slate-600 text-xs">
+                            {r.calendarType === 'hijri' ? 'هجري' : 'ميلادي'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {isRetired ? (
+                              <span className="text-gray-400 font-sans">—</span>
+                            ) : (
+                              <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-bold ${
+                                r.allowAfterRetirement 
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' 
+                                  : 'bg-rose-50 text-rose-700 border border-rose-100'
+                              }`}>
+                                {r.allowAfterRetirement ? 'نعم' : 'لا'}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-slate-600 text-xs font-mono">
+                            {isMilitary ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-100 text-[10px] font-bold">ديناميكي</span>
+                            ) : isRetired ? (
+                              <span className="text-gray-400 font-sans">—</span>
+                            ) : (
+                              r.allowAfterRetirement ? `${r.allowedMonthsAfterRetirement} شهر` : '0'
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap font-mono text-slate-500 text-xs">{r.minTermMonths || 60} شهر</td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-bold ${
+                              r.isActive 
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' 
+                                : 'bg-gray-100 text-gray-500 border border-gray-200'
+                            }`}>
+                              {r.isActive ? 'مفعل' : 'معطل'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingTermRule(r);
+                                  setEditingTermRuleIndex(absoluteIndex);
+                                  setIsAddingTermRule(false);
+                                  
+                                  // Prepopulate
+                                  setTermRuleFormSectorId(r.sectorId);
+                                  setTermRuleFormMaxTermMonths(r.maxTermMonths.toString());
+                                  setTermRuleFormMaxAgeAtEnd(r.maxAgeAtEnd.toString());
+                                  setTermRuleFormCalendarType(r.calendarType);
+                                  setTermRuleFormAllowAfterRetirement(r.allowAfterRetirement);
+                                  setTermRuleFormAllowedMonthsAfterRetirement(r.allowedMonthsAfterRetirement.toString());
+                                  setTermRuleFormMinTermMonths((r.minTermMonths || 60).toString());
+                                  setTermRuleFormIsActive(r.isActive);
+                                }}
+                                className="inline-flex items-center gap-1 px-3 py-1.5 border border-[#E5E7EB] hover:border-[#0057B8] text-[#0057B8] hover:bg-[#0057B8]/5 rounded-lg transition-all font-bold text-[11px] cursor-pointer"
+                              >
+                                <span>تعديل</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (window.confirm('هل أنت متأكد من حذف قاعدة هذا القطاع؟')) {
+                                    const updated = [...termRules];
+                                    updated.splice(absoluteIndex, 1);
+                                    setTermRules(updated);
+                                    showToast("تم حذف قاعدة مدة القطاع بنجاح في المسودة.", "success");
+                                  }
+                                }}
+                                className="inline-flex items-center gap-1 px-3 py-1.5 border border-rose-100 hover:border-rose-500 text-rose-600 hover:bg-rose-50 rounded-lg transition-all font-bold text-[11px] cursor-pointer"
+                              >
+                                <span>حذف</span>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    });
+                  })()}
                 </tbody>
               </table>
             </div>
 
-            {/* 3. MODAL FOR EDITING BANK TERM */}
-            {editingBankTerm && (
+            {/* 4. MODAL FOR ADDING/EDITING TERM RULE */}
+            {(isAddingTermRule || editingTermRule) && (
               <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-                <div className="bg-white rounded-3xl border border-gray-200 p-6 md:p-8 w-full max-w-sm shadow-2xl animate-fade-in text-right font-sans">
+                <div className="bg-white rounded-3xl border border-gray-200 p-6 md:p-8 w-full max-w-md shadow-2xl animate-fade-in text-right font-sans">
                   <h3 className="text-sm font-extrabold text-[#111827] border-b border-gray-100 pb-3 mb-5">
-                    تعديل إعدادات التمويل - {editingBankTerm.nameAr}
+                    {isAddingTermRule ? '+ إضافة قاعدة قطاع جديدة' : 'تعديل قاعدة مدد التمويل'}
                   </h3>
 
                   <div className="space-y-4 text-right">
-                    {/* Bank Name */}
+                    {/* Bank Name (Auto-populated/locked) */}
                     <div>
-                      <label className="block text-xs font-bold text-gray-500 mb-1">اسم البنك:</label>
+                      <label className="block text-[11px] font-bold text-gray-500 mb-1">اسم البنك:</label>
                       <input
                         type="text"
                         disabled
-                        value={editingBankTerm.nameAr}
+                        value={formBanksList.find(b => b.id === termActiveBankId)?.nameAr || termActiveBankId}
                         className="w-full bg-gray-50 border border-gray-200 text-gray-400 rounded-xl px-4 py-2.5 text-xs font-bold cursor-not-allowed text-right focus:outline-none"
                       />
                     </div>
 
-                    {/* Bank ID */}
+                    {/* Sector select */}
                     <div>
-                      <label className="block text-xs font-bold text-gray-500 mb-1">Bank ID:</label>
-                      <input
-                        type="text"
-                        disabled
-                        value={editingBankTerm.id}
-                        className="w-full bg-gray-50 border border-gray-200 text-gray-400 rounded-xl px-4 py-2.5 text-xs font-mono font-semibold cursor-not-allowed text-right focus:outline-none"
-                      />
+                      <label className="block text-[11px] font-bold text-gray-700 mb-1.5">القطاع:</label>
+                      <select
+                        value={termRuleFormSectorId}
+                        onChange={(e) => setTermRuleFormSectorId(e.target.value as import("../../types").SectorId | 'all')}
+                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-right"
+                      >
+                        <option value="gov_civil">💼 حكومي مدني</option>
+                        <option value="military">🪖 عسكري</option>
+                        <option value="semi_gov">🏢 شبه حكومي</option>
+                        <option value="companies">🏢 موظف شركات</option>
+                        <option value="retired">👴 متقاعد</option>
+                        <option value="all">🌍 الكل / عام (احتياطي)</option>
+                      </select>
                     </div>
 
                     {/* Max Term Months */}
                     <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">أقصى مدة تمويل بالأشهر:</label>
+                      <label className="block text-[11px] font-bold text-gray-700 mb-1">أقصى مدة تمويل بالأشهر:</label>
                       <input
                         type="text"
                         inputMode="numeric"
-                        value={editingBankTerm.maxTermMonths}
+                        value={termRuleFormMaxTermMonths}
                         onChange={(e) => {
                           const val = e.target.value.replace(/[^0-9]/g, '');
-                          setEditingBankTerm(prev => prev ? { ...prev, maxTermMonths: val } : null);
+                          setTermRuleFormMaxTermMonths(val);
                         }}
-                        placeholder="أدخل عدد الأشهر"
-                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-right"
+                        placeholder="مثال: 360"
+                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-right font-mono"
                       />
                     </div>
 
                     {/* Max Age At End */}
                     <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">أقصى عمر عند نهاية التمويل:</label>
+                      <label className="block text-[11px] font-bold text-gray-700 mb-1">أقصى عمر عند نهاية التمويل:</label>
                       <input
                         type="text"
                         inputMode="numeric"
-                        value={editingBankTerm.maxAgeAtEnd}
+                        value={termRuleFormMaxAgeAtEnd}
                         onChange={(e) => {
                           const val = e.target.value.replace(/[^0-9]/g, '');
-                          setEditingBankTerm(prev => prev ? { ...prev, maxAgeAtEnd: val } : null);
+                          setTermRuleFormMaxAgeAtEnd(val);
                         }}
-                        placeholder="أدخل أقصى عمر"
-                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-right"
-                      />
-                    </div>
-
-                    {/* Is Post Retirement Allowed (allowAfterRetirement) */}
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-2">يسمح بعد التقاعد:</label>
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setEditingBankTerm(prev => {
-                            if (!prev) return null;
-                            return {
-                              ...prev,
-                              allowAfterRetirement: true
-                            };
-                          })}
-                          className={`flex-1 py-2 px-1 text-xs font-bold rounded-xl border text-center transition-all cursor-pointer ${
-                            editingBankTerm.allowAfterRetirement
-                              ? 'border-emerald-600 bg-emerald-50 text-emerald-800 font-bold'
-                              : 'border-gray-200 text-gray-500 hover:bg-gray-50'
-                          }`}
-                        >
-                          نعم
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setEditingBankTerm(prev => {
-                            if (!prev) return null;
-                            return {
-                              ...prev,
-                              allowAfterRetirement: false,
-                              monthsAfterRetirement: '0' // تصفير أشهر السماح عند الإلغاء
-                            };
-                          })}
-                          className={`flex-1 py-2 px-1 text-xs font-bold rounded-xl border text-center transition-all cursor-pointer ${
-                            !editingBankTerm.allowAfterRetirement
-                              ? 'border-rose-600 bg-rose-50 text-rose-800 font-bold'
-                              : 'border-gray-200 text-gray-500 hover:bg-gray-50'
-                          }`}
-                        >
-                          لا
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Months After Retirement */}
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">أشهر السماح بعد التقاعد:</label>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        disabled={!editingBankTerm.allowAfterRetirement}
-                        value={editingBankTerm.monthsAfterRetirement}
-                        onChange={(e) => {
-                          if (!editingBankTerm.allowAfterRetirement) return;
-                          const val = e.target.value.replace(/[^0-9]/g, '');
-                          setEditingBankTerm(prev => prev ? { ...prev, monthsAfterRetirement: val } : null);
-                        }}
-                        placeholder="أدخل عدد أشهر بعد التقاعد"
-                        className={`w-full border rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none text-right ${
-                          editingBankTerm.allowAfterRetirement 
-                            ? 'bg-white border-gray-200 focus:ring-2 focus:ring-[#0057B8]' 
-                            : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
-                        }`}
+                        placeholder="مثال: 77"
+                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-right font-mono"
                       />
                     </div>
 
                     {/* Calendar Type */}
                     <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-2">نوع التقويم:</label>
+                      <label className="block text-[11px] font-bold text-gray-700 mb-2">نوع التقويم:</label>
                       <div className="flex gap-2">
                         <button
                           type="button"
-                          onClick={() => setEditingBankTerm(prev => prev ? { ...prev, calendarType: 'hijri' } : null)}
+                          onClick={() => setTermRuleFormCalendarType('hijri')}
                           className={`flex-1 py-2 px-1 text-xs font-bold rounded-xl border text-center transition-all cursor-pointer ${
-                            editingBankTerm.calendarType === 'hijri'
-                              ? 'border-[#0057B8] bg-[#0057B8]/5 text-[#0057B8] font-bold'
+                            termRuleFormCalendarType === 'hijri'
+                              ? 'border-[#0057B8] bg-[#0057B8]/5 text-[#0057B8] font-bold font-bold'
                               : 'border-gray-200 text-gray-500 hover:bg-gray-50'
                           }`}
                         >
@@ -5289,10 +5508,10 @@ export default function AdminDashboard() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => setEditingBankTerm(prev => prev ? { ...prev, calendarType: 'gregorian' } : null)}
+                          onClick={() => setTermRuleFormCalendarType('gregorian')}
                           className={`flex-1 py-2 px-1 text-xs font-bold rounded-xl border text-center transition-all cursor-pointer ${
-                            editingBankTerm.calendarType === 'gregorian'
-                              ? 'border-[#0057B8] bg-[#0057B8]/5 text-[#0057B8] font-bold'
+                            termRuleFormCalendarType === 'gregorian'
+                              ? 'border-[#0057B8] bg-[#0057B8]/5 text-[#0057B8] font-bold font-bold'
                               : 'border-gray-200 text-gray-500 hover:bg-gray-50'
                           }`}
                         >
@@ -5301,16 +5520,96 @@ export default function AdminDashboard() {
                       </div>
                     </div>
 
+                    {/* Is Post Retirement Allowed (unless isRetired) */}
+                    {termRuleFormSectorId !== 'retired' && (
+                      <>
+                        <div>
+                          <label className="block text-[11px] font-bold text-gray-700 mb-2">السماح بعد التقاعد:</label>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setTermRuleFormAllowAfterRetirement(true)}
+                              className={`flex-1 py-2 px-1 text-xs font-bold rounded-xl border text-center transition-all cursor-pointer ${
+                                termRuleFormAllowAfterRetirement
+                                  ? 'border-emerald-600 bg-emerald-50 text-emerald-800 font-bold'
+                                  : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                              }`}
+                            >
+                              نعم
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setTermRuleFormAllowAfterRetirement(false);
+                                setTermRuleFormAllowedMonthsAfterRetirement('0');
+                              }}
+                              className={`flex-1 py-2 px-1 text-xs font-bold rounded-xl border text-center transition-all cursor-pointer ${
+                                !termRuleFormAllowAfterRetirement
+                                  ? 'border-rose-600 bg-rose-50 text-rose-800 font-bold'
+                                  : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                              }`}
+                            >
+                              لا
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Months After Retirement (Hidden/Note if military) */}
+                        <div>
+                          <label className="block text-[11px] font-bold text-gray-700 mb-1">أشهر السماح بعد التقاعد:</label>
+                          {(termRuleFormSectorId === 'military') ? (
+                            <div className="w-full bg-amber-50/70 text-right border border-amber-100 rounded-xl px-4 py-2.5 text-2xs font-extrabold text-amber-800 leading-snug">
+                              🛡️ يتم حساب أشهر السماح لقطاع العسكري ديناميكياً = (أقصى عمر − سن تقاعد الرتبة) × 12.
+                            </div>
+                          ) : (
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              disabled={!termRuleFormAllowAfterRetirement}
+                              value={termRuleFormAllowedMonthsAfterRetirement}
+                              onChange={(e) => {
+                                if (!termRuleFormAllowAfterRetirement) return;
+                                const val = e.target.value.replace(/[^0-9]/g, '');
+                                setTermRuleFormAllowedMonthsAfterRetirement(val);
+                              }}
+                              placeholder="مثال: 204"
+                              className={`w-full border rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none text-right font-mono ${
+                                termRuleFormAllowAfterRetirement 
+                                  ? 'bg-white border-gray-200 focus:ring-2 focus:ring-[#0057B8]' 
+                                  : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
+                              }`}
+                            />
+                          )}
+                        </div>
+                      </>
+                    )}
+
+                    {/* Min Term Months */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-gray-700 mb-1">أقل مدة تمويل بالأشهر:</label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={termRuleFormMinTermMonths}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/[^0-9]/g, '');
+                          setTermRuleFormMinTermMonths(val);
+                        }}
+                        placeholder="مثال: 60"
+                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-right font-mono"
+                      />
+                    </div>
+
                     {/* Active State */}
                     <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-2">مفعل / غير مفعل:</label>
+                      <label className="block text-[11px] font-bold text-gray-700 mb-2">الحالة:</label>
                       <div className="flex gap-2">
                         <button
                           type="button"
-                          onClick={() => setEditingBankTerm(prev => prev ? { ...prev, isActive: true } : null)}
+                          onClick={() => setTermRuleFormIsActive(true)}
                           className={`flex-1 py-2 px-1 text-xs font-bold rounded-xl border text-center transition-all cursor-pointer ${
-                            editingBankTerm.isActive
-                              ? 'border-emerald-600 bg-emerald-50 text-emerald-850 font-bold'
+                            termRuleFormIsActive
+                              ? 'border-emerald-600 bg-emerald-50 text-emerald-850 font-bold font-bold'
                               : 'border-gray-200 text-gray-500 hover:bg-gray-50'
                           }`}
                         >
@@ -5318,10 +5617,10 @@ export default function AdminDashboard() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => setEditingBankTerm(prev => prev ? { ...prev, isActive: false } : null)}
+                          onClick={() => setTermRuleFormIsActive(false)}
                           className={`flex-1 py-2 px-1 text-xs font-bold rounded-xl border text-center transition-all cursor-pointer ${
-                            !editingBankTerm.isActive
-                              ? 'border-rose-600 bg-rose-50 text-rose-850 font-bold'
+                            !termRuleFormIsActive
+                              ? 'border-rose-600 bg-rose-50 text-rose-850 font-bold font-bold'
                               : 'border-gray-200 text-gray-500 hover:bg-gray-50'
                           }`}
                         >
@@ -5335,7 +5634,11 @@ export default function AdminDashboard() {
                   <div className="flex items-center justify-end gap-3 mt-6 border-t border-gray-100 pt-4">
                     <button
                       type="button"
-                      onClick={() => setEditingBankTerm(null)}
+                      onClick={() => {
+                        setIsAddingTermRule(false);
+                        setEditingTermRule(null);
+                        setEditingTermRuleIndex(null);
+                      }}
                       className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition-all cursor-pointer"
                     >
                       إلغاء
@@ -5343,46 +5646,75 @@ export default function AdminDashboard() {
                     <button
                       type="button"
                       onClick={() => {
-                        const maxTermVal = parseInt(editingBankTerm.maxTermMonths, 10);
-                        const maxAgeVal = parseInt(editingBankTerm.maxAgeAtEnd, 10);
-                        const postRetVal = parseInt(editingBankTerm.monthsAfterRetirement, 10);
+                        const maxTermVal = parseInt(termRuleFormMaxTermMonths, 10);
+                        const maxAgeVal = parseInt(termRuleFormMaxAgeAtEnd, 10);
+                        const minTermVal = parseInt(termRuleFormMinTermMonths, 10);
+                        const isMil = termRuleFormSectorId === 'military';
+                        const postRetVal = isMil ? 120 : (parseInt(termRuleFormAllowedMonthsAfterRetirement, 10) || 0);
 
-                        if (isNaN(maxTermVal) || maxTermVal < 0) {
-                          alert("يرجى إدخال أقصى مدة تمويل صحيحة بالأرقام الإنجليزية");
+                        if (isNaN(maxTermVal) || maxTermVal <= 0) {
+                          alert("يرجى إدخال أقصى مدة تمويل صحيحة");
                           return;
                         }
-                        if (isNaN(maxAgeVal) || maxAgeVal < 0) {
-                          alert("يرجى إدخال أقصى عمر صحيح بالأرقام الإنجليزية");
+                        if (isNaN(maxAgeVal) || maxAgeVal <= 0) {
+                          alert("يرجى إدخال أقصى عمر صحيح");
                           return;
                         }
-                        if (editingBankTerm.allowAfterRetirement && (isNaN(postRetVal) || postRetVal < 0)) {
-                          alert("يرجى إدخال أشهر السماح بعد التقاعد بالأرقام الإنجليزية");
+                        if (isNaN(minTermVal) || minTermVal <= 0) {
+                          alert("يرجى إدخال أقل مدة تمويل صحيحة");
                           return;
                         }
 
-                        // التحديث بمسودة البنوك في السياق
-                        const updatedBanks = banks.map(b => {
-                          if (b.id === editingBankTerm.id) {
-                            return {
-                              ...b,
-                              maxTermMonths: maxTermVal,
-                              maxAgeAtEnd: maxAgeVal,
-                              monthsAfterRetirement: editingBankTerm.allowAfterRetirement ? postRetVal : 0,
-                              allowAfterRetirement: editingBankTerm.allowAfterRetirement,
-                              calendarType: editingBankTerm.calendarType,
-                              isActive: editingBankTerm.isActive
-                            };
+                        if (isAddingTermRule) {
+                          // Check duplicate
+                          const duplicate = termRules.some(r => r.bankId === termActiveBankId && r.sectorId === termRuleFormSectorId);
+                          if (duplicate) {
+                            alert("هناك قاعدة مسجلة بالفعل لهذا القطاع وتحت هذا البنك. يرجى تعديلها بدلاً من إضافة مكرر.");
+                            return;
                           }
-                          return b;
-                        });
 
-                        setBanks(updatedBanks);
-                        setEditingBankTerm(null);
-                        showToast("تم تطبيق التعديلات المؤقتة بنجاح كمسودة. يرجى الضغط على حفظ التغييرات لحفظها دائمًا.", "success");
+                          const newRule: import("../../types").TermRule = {
+                            bankId: termActiveBankId,
+                            sectorId: termRuleFormSectorId as import("../../types").SectorId,
+                            rankId: 'all',
+                            productId: 'real_estate',
+                            supportType: 'all',
+                            maxTermMonths: maxTermVal,
+                            maxAgeAtEnd: maxAgeVal,
+                            minTermMonths: minTermVal,
+                            allowAfterRetirement: termRuleFormSectorId === 'retired' ? false : termRuleFormAllowAfterRetirement,
+                            allowedMonthsAfterRetirement: termRuleFormSectorId === 'retired' ? 0 : postRetVal,
+                            calendarType: termRuleFormCalendarType,
+                            defaultTermMode: 'max',
+                            isActive: termRuleFormIsActive
+                          };
+
+                          setTermRules([...termRules, newRule]);
+                          setIsAddingTermRule(false);
+                          showToast("تم إضافة قاعدة قطاع جديدة بنجاح في المسودة.", "success");
+                        } else if (editingTermRuleIndex !== null) {
+                          const updated = [...termRules];
+                          updated[editingTermRuleIndex] = {
+                            ...updated[editingTermRuleIndex],
+                            sectorId: termRuleFormSectorId as import("../../types").SectorId,
+                            maxTermMonths: maxTermVal,
+                            maxAgeAtEnd: maxAgeVal,
+                            minTermMonths: minTermVal,
+                            allowAfterRetirement: termRuleFormSectorId === 'retired' ? false : termRuleFormAllowAfterRetirement,
+                            allowedMonthsAfterRetirement: termRuleFormSectorId === 'retired' ? 0 : postRetVal,
+                            calendarType: termRuleFormCalendarType,
+                            isActive: termRuleFormIsActive
+                          };
+
+                          setTermRules(updated);
+                          setEditingTermRule(null);
+                          setEditingTermRuleIndex(null);
+                          showToast("تم تطبيق التعديل بنجاح في المسودة.", "success");
+                        }
                       }}
                       className="px-5 py-2 bg-[#0057B8] hover:bg-[#004bb0] text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer"
                     >
-                      تطبيق التعديل
+                      تطبيق القاعدة
                     </button>
                   </div>
                 </div>
@@ -5390,6 +5722,7 @@ export default function AdminDashboard() {
             )}
           </div>
         )}
+
 
         {/* VIEW 7: MARGINS - GRID & INTERPOLATION */}
         {adminSubPage === 'margins' && (
@@ -6082,52 +6415,425 @@ export default function AdminDashboard() {
         {/* VIEW 9: SUPPORT (SAKANI) */}
         {adminSubPage === 'support' && (
           <div className="space-y-6">
-            <h2 className="text-lg font-bold text-[#111827]">جدول الدعم السكني بوزارة الإسكان (سكني)</h2>
-            <p className="text-xs text-[#6B7280]">تعديل شرائح الدعم الشهري المتواصل المعتمدة بالريال السعودي بدلالة الدخل.</p>
+            <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-xs leading-relaxed">
+              <h2 className="text-lg font-bold text-[#111827] mb-2 flex flex-wrap items-center gap-2">
+                <span className="p-1 px-2.5 bg-sky-50 text-[#0057B8] rounded-xl text-sm font-sans">جدول الدعم السكني</span>
+                إدارة شرائح الدعم السكني المعتمدة للحاسبة ولوحة الأدمن (سكني)
+              </h2>
+              <p className="text-xs text-[#6B7280]">
+                يمكنك الآن تعديل وإضافة وحذف شرائح الدعم السكني بنوعيه (الشهري المتواصل ودعم الدفعة المسبقة). يتم حفظ التعديلات وإدماجها في الحاسبة واللوحة تلقائياً بآلية الاستيفاء الخطي للراجحي.
+              </p>
+            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="border border-[#E5E7EB] rounded-2xl p-5 bg-white">
-                <h3 className="font-bold text-xs text-[#111827] border-b pb-2 mb-3">حوافز ودعم سكني الشهري المتواصل</h3>
-                <div className="space-y-3">
-                  {supportSettings.monthlyBrackets.map((br, index) => (
-                    <div key={index} className="flex justify-between items-center text-xs font-semibold bg-gray-50 p-2.5 rounded-xl border border-[#F1F5F9]">
-                      <span className="text-gray-500 font-sans">من {br.fromSalary.toLocaleString('ar-SA')} إلى {br.toSalary > 90000 ? 'أكثر' : br.toSalary.toLocaleString('ar-SA')} ريال:</span>
-                      <div className="flex items-center gap-1.5">
-                        <NumericInput
-                          id={`support-monthly-bracket-${index}`}
-                          value={br.supportAmount}
-                          onChange={(val) => {
-                            const newBrackets = [...supportSettings.monthlyBrackets];
-                            newBrackets[index].supportAmount = val;
-                            setSupportSettings({ ...supportSettings, monthlyBrackets: newBrackets });
-                          }}
-                          allowDecimals={true}
-                          className="w-16 text-center bg-white border border-gray-200 rounded px-1.5 py-0.5 text-xs font-semibold"
+            {/* Live Interactive Verification Tester */}
+            <div className="border border-indigo-100 rounded-2xl p-5 bg-gradient-to-r from-indigo-50/50 to-sky-50/20 shadow-xs">
+              <h3 className="font-bold text-xs text-indigo-950 mb-3 flex items-center gap-1.5 font-sans">
+                🧪 مُحاكي التحقق من مخرجات الدعم اللحظي (Simulated Live Tester)
+              </h3>
+              <div className="flex flex-wrap items-center gap-4 text-xs font-semibold">
+                <div className="flex items-center gap-2">
+                  <label htmlFor="test-salary-input" className="text-gray-600 font-sans">أدخل صافي راتب العميل للتجربة:</label>
+                  <input
+                    type="number"
+                    id="test-salary-input"
+                    className="w-32 bg-white border border-indigo-200 rounded-xl px-3 py-1.5 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 font-mono text-center text-xs"
+                    placeholder="مثال: 8500"
+                    value={supportTestSalary}
+                    onChange={(e) => setSupportTestSalary(e.target.value)}
+                  />
+                  <span className="text-gray-400">ريال</span>
+                </div>
+                {supportTestSalary && !isNaN(parseFloat(supportTestSalary)) && (
+                  <div className="bg-white border border-emerald-100 rounded-xl px-4 py-1.5 flex flex-wrap items-center gap-3 text-xs text-emerald-800 shadow-xs">
+                    <span className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                      الدعم الشهري (استيفاء خطي): 
+                      <strong className="text-emerald-700 font-mono mr-1">{Math.round(getHousingSupport(parseFloat(supportTestSalary), housingSupportTiers))} ريال</strong>
+                    </span>
+                    <span className="border-r border-gray-200 h-4 mx-1"></span>
+                    <span>
+                      دعم الدفعة المسبقة: 
+                      <strong className="text-indigo-700 font-mono mr-1">{(getAdvancePayment(parseFloat(supportTestSalary), advancePaymentTiers)).toLocaleString('ar-SA')} ريال</strong>
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              
+              {/* SECTION 1: MONTHLY SUBSIDIES */}
+              <div className="border border-[#E5E7EB] rounded-2xl p-5 bg-white space-y-4">
+                <div className="flex justify-between items-center border-b pb-2">
+                  <div>
+                    <h3 className="font-bold text-xs text-[#111827]">شرائح الدعم السكني الشهري المتواصل</h3>
+                    <p className="text-[10px] text-gray-500 font-medium">يتم الحساب بطريقة الاستيفاء الخطي من الشرائح المدخلة.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsAddingHousing(true);
+                      setHMinSalary(0);
+                      setHMaxSalary(0);
+                      setHAmountMin(0);
+                      setHAmountMax(0);
+                      setHSortOrder(housingSupportTiers.length + 1);
+                    }}
+                    className="p-1 px-3 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-xl text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    شريحة جديدة
+                  </button>
+                </div>
+
+                {isAddingHousing && (
+                  <div className="bg-emerald-50/30 border-2 border-dashed border-emerald-200 rounded-xl p-4 space-y-3">
+                    <h4 className="font-bold text-[11px] text-emerald-900">إضافة شريحة دعم شهري جديدة</h4>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] text-gray-500 mb-1">من راتب (الحد الأدنى):</label>
+                        <input
+                          type="number"
+                          className="w-full bg-white border border-gray-200 rounded-xl px-2 py-1 text-xs font-semibold text-center"
+                          value={hMinSalary}
+                          onChange={(e) => setHMinSalary(parseFloat(e.target.value) || 0)}
                         />
-                        <span className="text-gray-400">ريال / شهرياً</span>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-gray-500 mb-1">إلى راتب (الحد الأقصى):</label>
+                        <input
+                          type="number"
+                          className="w-full bg-white border border-gray-200 rounded-xl px-2 py-1 text-xs font-semibold text-center"
+                          value={hMaxSalary}
+                          onChange={(e) => setHMaxSalary(parseFloat(e.target.value) || 0)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-gray-500 mb-1">الدعم عند البداية:</label>
+                        <input
+                          type="number"
+                          className="w-full bg-white border border-gray-200 rounded-xl px-2 py-1 text-xs font-semibold text-center"
+                          value={hAmountMin}
+                          onChange={(e) => setHAmountMin(parseFloat(e.target.value) || 0)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-gray-500 mb-1">الدعم عند النهاية:</label>
+                        <input
+                          type="number"
+                          className="w-full bg-white border border-gray-200 rounded-xl px-2 py-1 text-xs font-semibold text-center"
+                          value={hAmountMax}
+                          onChange={(e) => setHAmountMax(parseFloat(e.target.value) || 0)}
+                        />
                       </div>
                     </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="border border-[#E5E7EB] rounded-2xl p-5 bg-white flex flex-col justify-between">
-                <div>
-                  <h3 className="font-bold text-xs text-[#111827] border-b pb-2 mb-3">دعم الدفعة المسبقة (غير المستردة)</h3>
-                  <div className="space-y-3 text-xs">
-                    {supportSettings.downpaymentBrackets.map((br, index) => (
-                      <div key={index} className="flex justify-between items-center bg-gray-50 p-3 rounded-xl border">
-                        <span className="text-gray-500 font-sans">الرواتب من {br.fromSalary} إلى {br.toSalary > 90000 ? 'أكثر' : br.toSalary}:</span>
-                        <span className="font-bold text-[#0EA5A4]">{(br.supportAmount).toLocaleString('ar-SA')} ريال</span>
-                      </div>
-                    ))}
+                    <div className="flex justify-end gap-1.5 text-[10px]">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newTier: HousingSupportTier = {
+                            id: `h_tier_${Date.now()}`,
+                            min_salary: hMinSalary,
+                            max_salary: hMaxSalary,
+                            amount_at_min: hAmountMin,
+                            amount_at_max: hAmountMax,
+                            sort_order: hSortOrder
+                          };
+                          setHousingSupportTiers([...housingSupportTiers, newTier].sort((a,b) => a.min_salary - b.min_salary));
+                          setIsAddingHousing(false);
+                        }}
+                        className="p-1 px-3 bg-emerald-600 text-white rounded-lg font-bold cursor-pointer hover:bg-emerald-700"
+                      >
+                        إضافة
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsAddingHousing(false)}
+                        className="p-1 px-3 bg-gray-200 text-gray-700 rounded-lg font-bold cursor-pointer hover:bg-gray-300"
+                      >
+                        إلغاء
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
 
-                <div className="bg-amber-50 rounded-2xl p-4 border border-amber-100 text-xs text-amber-800 leading-relaxed font-sans mt-4">
-                  نصيحة المنظم: يوصى بعدم إضافة دعم الدفعة المسبقة إلى أصل الدين (Loan Principal)، بل احتسابه فقط في نهاية الحسبة لتكبير القدرة الشرائية لتفادي فرض فوائد البنك على منحة الدولة.
+                <div className="space-y-2 overflow-y-auto max-h-[450px]">
+                  {housingSupportTiers?.map((br) => {
+                    const isEditing = editHousingTierId === br.id;
+                    return (
+                      <div key={br.id} className="flex flex-col text-xs font-semibold bg-gray-50 p-2.5 rounded-xl border border-[#F1F5F9] space-y-2">
+                        {isEditing ? (
+                          <div className="space-y-2">
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="block text-[9px] text-gray-500 mb-0.5">من راتب:</label>
+                                <input
+                                  type="number"
+                                  className="w-full bg-white border rounded px-1.5 py-0.5 text-xs font-semibold text-center"
+                                  value={hMinSalary}
+                                  onChange={(e) => setHMinSalary(parseFloat(e.target.value) || 0)}
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[9px] text-gray-500 mb-0.5">إلى راتب:</label>
+                                <input
+                                  type="number"
+                                  className="w-full bg-white border rounded px-1.5 py-0.5 text-xs font-semibold text-center"
+                                  value={hMaxSalary}
+                                  onChange={(e) => setHMaxSalary(parseFloat(e.target.value) || 0)}
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[9px] text-gray-500 mb-0.5">الدعم عند البداية:</label>
+                                <input
+                                  type="number"
+                                  className="w-full bg-white border rounded px-1.5 py-0.5 text-xs font-semibold text-center"
+                                  value={hAmountMin}
+                                  onChange={(e) => setHAmountMin(parseFloat(e.target.value) || 0)}
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[9px] text-gray-500 mb-0.5">الدعم عند النهاية:</label>
+                                <input
+                                  type="number"
+                                  className="w-full bg-white border rounded px-1.5 py-0.5 text-xs font-semibold text-center"
+                                  value={hAmountMax}
+                                  onChange={(e) => setHAmountMax(parseFloat(e.target.value) || 0)}
+                                />
+                              </div>
+                            </div>
+                            <div className="flex justify-end gap-1">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setHousingSupportTiers(
+                                    housingSupportTiers.map(t => 
+                                      t.id === br.id ? { 
+                                        ...t, 
+                                        min_salary: hMinSalary, 
+                                        max_salary: hMaxSalary, 
+                                        amount_at_min: hAmountMin, 
+                                        amount_at_max: hAmountMax 
+                                      } : t
+                                    ).sort((a,b) => a.min_salary - b.min_salary)
+                                  );
+                                  setEditHousingTierId(null);
+                                }}
+                                className="p-1 px-2.5 bg-[#0057B8] text-white rounded text-[10px] font-bold"
+                              >
+                                حفظ
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditHousingTierId(null)}
+                                className="p-1 px-2.5 bg-gray-200 text-gray-700 rounded text-[10px]"
+                              >
+                                إلغاء
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex justify-between items-center">
+                            <div className="text-gray-500 font-sans">
+                              الرواتب من <strong className="text-gray-800 font-mono">{(br.min_salary || 0).toLocaleString('ar-SA')}</strong> إلى 
+                              <strong className="text-gray-800 font-mono ml-1">{(br.max_salary || 0) > 90000 ? 'فأكثر' : (br.max_salary || 0).toLocaleString('ar-SA')}</strong> ريال:
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <div className="flex flex-col text-left items-end">
+                                <span className="text-emerald-700 font-bold font-mono bg-emerald-50 px-2 py-0.5 rounded-lg">إستيفاء: {br.amount_at_min} ← {br.amount_at_max} ريال</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditHousingTierId(br.id);
+                                    setHMinSalary(br.min_salary || 0);
+                                    setHMaxSalary(br.max_salary || 0);
+                                    setHAmountMin(br.amount_at_min || 0);
+                                    setHAmountMax(br.amount_at_max || 0);
+                                    setHSortOrder(br.sort_order || 1);
+                                  }}
+                                  className="p-1 text-[#0057B8] hover:bg-blue-50 rounded cursor-pointer"
+                                  title="تعديل"
+                                >
+                                  <Edit className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (confirm("هل أنت متأكد من حذف هذه الشريحة؟")) {
+                                      setHousingSupportTiers(housingSupportTiers.filter(t => t.id !== br.id));
+                                    }
+                                  }}
+                                  className="p-1 text-red-500 hover:bg-red-50 rounded cursor-pointer"
+                                  title="حذف"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
+
+              {/* SECTION 2: DOWNPAYMENT SUBSIDIES */}
+              <div className="border border-[#E5E7EB] rounded-2xl p-5 bg-white space-y-4">
+                <div className="flex justify-between items-center border-b pb-2">
+                  <div>
+                    <h3 className="font-bold text-xs text-[#111827]">شرائح دعم الدفعة المسبقة (منحة غير مستردة)</h3>
+                    <p className="text-[10px] text-gray-500 font-medium">المنحة المباشرة لتكبير أصل الدفعة في نهاية الحسبة.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsAddingAdvance(true);
+                      setASalaryThreshold(0);
+                      setAAmount(0);
+                    }}
+                    className="p-1 px-3 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-xl text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    شريحة جديدة
+                  </button>
+                </div>
+
+                {isAddingAdvance && (
+                  <div className="bg-emerald-50/30 border-2 border-dashed border-emerald-200 rounded-xl p-4 space-y-3">
+                    <h4 className="font-bold text-[11px] text-emerald-950">إضافة شريحة دعم دفعة جديدة</h4>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] text-gray-500 mb-1">عتبة الراتب (أقل من):</label>
+                        <input
+                          type="number"
+                          className="w-full bg-white border border-gray-200 rounded-xl px-2 py-1 text-xs font-semibold text-center"
+                          value={aSalaryThreshold}
+                          onChange={(e) => setASalaryThreshold(parseFloat(e.target.value) || 0)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-gray-500 mb-1">مبلغ الدعم:</label>
+                        <input
+                          type="number"
+                          className="w-full bg-white border border-gray-200 rounded-xl px-2 py-1 text-xs font-semibold text-center"
+                          value={aAmount}
+                          onChange={(e) => setAAmount(parseFloat(e.target.value) || 0)}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex justify-end gap-1.5 text-[10px]">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newTier: AdvancePaymentTier = {
+                            id: `a_tier_${Date.now()}`,
+                            salary_threshold: aSalaryThreshold,
+                            amount: aAmount
+                          };
+                          setAdvancePaymentTiers([...advancePaymentTiers, newTier].sort((a,b) => a.salary_threshold - b.salary_threshold));
+                          setIsAddingAdvance(false);
+                        }}
+                        className="p-1 px-3 bg-[#0EA5A4] text-white rounded-lg font-bold cursor-pointer hover:bg-teal-700"
+                      >
+                        إضافة
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsAddingAdvance(false)}
+                        className="p-1 px-3 bg-gray-200 text-gray-700 rounded-lg font-bold cursor-pointer hover:bg-gray-300"
+                      >
+                        إلغاء
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2 overflow-y-auto max-h-[450px]">
+                  {advancePaymentTiers?.map((br) => {
+                    const isEditing = editAdvanceTierId === br.id;
+                    return (
+                      <div key={br.id} className="flex justify-between items-center text-xs font-semibold bg-gray-50 p-2.5 rounded-xl border border-[#F1F5F9]">
+                        {isEditing ? (
+                          <div className="flex items-center gap-2 w-full">
+                            <div className="grid grid-cols-2 gap-2 w-full">
+                              <input
+                                type="number"
+                                className="bg-white border rounded px-1.5 py-0.5 text-xs font-semibold text-center"
+                                value={aSalaryThreshold}
+                                onChange={(e) => setASalaryThreshold(parseFloat(e.target.value) || 0)}
+                              />
+                              <input
+                                type="number"
+                                className="bg-white border rounded px-1.5 py-0.5 text-xs font-semibold text-center"
+                                value={aAmount}
+                                onChange={(e) => setAAmount(parseFloat(e.target.value) || 0)}
+                              />
+                            </div>
+                            <div className="flex gap-1">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setAdvancePaymentTiers(advancePaymentTiers.map(t => t.id === br.id ? { ...t, salary_threshold: aSalaryThreshold, amount: aAmount } : t).sort((a,b) => a.salary_threshold - b.salary_threshold));
+                                  setEditAdvanceTierId(null);
+                                }}
+                                className="p-1 px-2.5 bg-[#0057B8] text-white rounded text-[10px] font-bold"
+                              >
+                                حفظ
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditAdvanceTierId(null)}
+                                className="p-1 px-2.5 bg-gray-200 text-gray-700 rounded text-[10px]"
+                              >
+                                إلغاء
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <span className="text-gray-500 font-sans">
+                              الرواتب أقل من <strong className="text-gray-800 font-mono">{(br.salary_threshold || 0).toLocaleString('ar-SA')}</strong> ريال:
+                            </span>
+                            <div className="flex items-center gap-3">
+                              <span className="text-[#0EA5A4] font-bold font-mono">{(br.amount || 0).toLocaleString('ar-SA')} ريال</span>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditAdvanceTierId(br.id);
+                                    setASalaryThreshold(br.salary_threshold || 0);
+                                    setAAmount(br.amount || 0);
+                                  }}
+                                  className="p-1 text-[#0057B8] hover:bg-blue-50 rounded cursor-pointer"
+                                  title="تعديل"
+                                >
+                                  <Edit className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (confirm("هل أنت متأكد من حذف هذه الشريحة؟")) {
+                                      setAdvancePaymentTiers(advancePaymentTiers.filter(t => t.id !== br.id));
+                                    }
+                                  }}
+                                  className="p-1 text-red-500 hover:bg-red-50 rounded cursor-pointer"
+                                  title="حذف"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
             </div>
           </div>
         )}
@@ -6681,7 +7387,6 @@ export default function AdminDashboard() {
                        semi_gov: "شبه حكومي",
                        companies: "موظف شركات",
                           military: "عسكري",
-                          private: "قطاع خاص",
                           retired: "متقاعد"
                         };
                         return names[editingBankSectorRule.sectorId] || editingBankSectorRule.sectorId;
