@@ -480,7 +480,7 @@ export function calculateBanksFinancing(params: {
     // 6. Calculate Debt Service Ratio (DSR) limits
     const dsrBeforeResult = calculateDSR({
       bankId: bank.id,
-      productId: (productId === 'both' || productId === 'real_estate_with_new_personal' || productId === 'real_estate_with_personal_existing' || productId === 'real_estate_with_existing_personal') ? 'real_estate' : productId,
+      productId: productId,
       sectorId,
       supportType,
       phase: sectorId === 'retired' ? 'retired' : 'before_retirement',
@@ -490,7 +490,7 @@ export function calculateBanksFinancing(params: {
 
     const dsrAfterResult = calculateDSR({
       bankId: bank.id,
-      productId: (productId === 'both' || productId === 'real_estate_with_new_personal' || productId === 'real_estate_with_personal_existing' || productId === 'real_estate_with_existing_personal') ? 'real_estate' : productId,
+      productId: productId,
       sectorId,
       supportType,
       phase: sectorId === 'retired' ? 'retired' : 'after_retirement',
@@ -998,7 +998,7 @@ export function calculateAll(params: {
   // Calculate DSR rules
   const dsrBeforeResult = calculateDSR({
     bankId,
-    productId: (productId === 'both' || productId === 'real_estate_with_new_personal' || productId === 'real_estate_with_personal_existing' || productId === 'real_estate_with_existing_personal') ? 'real_estate' : productId,
+    productId: productId,
     sectorId,
     supportType: 'none',
     phase: sectorId === 'retired' ? 'retired' : 'before_retirement',
@@ -1008,7 +1008,7 @@ export function calculateAll(params: {
 
   const dsrAfterResult = calculateDSR({
     bankId,
-    productId: (productId === 'both' || productId === 'real_estate_with_new_personal' || productId === 'real_estate_with_personal_existing' || productId === 'real_estate_with_existing_personal') ? 'real_estate' : productId,
+    productId: productId,
     sectorId,
     supportType: 'none',
     phase: sectorId === 'retired' ? 'retired' : 'after_retirement',

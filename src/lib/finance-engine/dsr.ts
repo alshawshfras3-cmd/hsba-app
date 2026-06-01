@@ -13,9 +13,10 @@ export function mapProductIdToType(productId: string): 'real_estate_only' | 'rea
   return 'real_estate_only';
 }
 
-export function mapSupportType(supportType: string): 'none' | 'monthly' | 'down_payment' {
+export function mapSupportType(supportType: string): 'none' | 'monthly' | 'down_payment' | 'not_applicable' {
   if (supportType === 'monthly') return 'monthly';
   if (supportType === 'down_payment' || supportType === 'downpayment') return 'down_payment';
+  if (supportType === 'not_applicable') return 'not_applicable';
   return 'none';
 }
 
@@ -27,16 +28,15 @@ export function mapCustomerStage(phase: string): 'active_before_retirement' | 'r
 export function getDsrRule(params: {
   bankId: string;
   productType: 'real_estate_only' | 'real_estate_with_new_personal' | 'real_estate_with_existing_personal' | 'personal_only';
-  supportType: 'none' | 'monthly' | 'down_payment';
+  supportType: 'none' | 'monthly' | 'down_payment' | 'not_applicable';
   customerStage: 'active_before_retirement' | 'retired_after_retirement';
   dsrRules: DsrRule[];
 }): DsrRule {
   const { bankId, productType, supportType, customerStage, dsrRules } = params;
 
-  // 1. Check for duplicate active rules matching the selected bank
+  // 1. Check for duplicate active rules matching the selected bank by bankId + supportType + customerStage
   const bankMatches = dsrRules.filter(
     r => r.bankId === bankId &&
-         r.productType === productType &&
          r.supportType === supportType &&
          r.customerStage === customerStage &&
          r.active
@@ -44,7 +44,7 @@ export function getDsrRule(params: {
 
   if (bankMatches.length > 1) {
     throw new Error(
-      `مفرط: هناك أكثر من قاعدة DSR نشطة للجهة التمويلية (${bankId}) لنفس التوليفة (${productType} — ${supportType} — ${customerStage}). يرجى تفعيل واحدة فقط.`
+      `مفرط: هناك أكثر من قاعدة DSR نشطة للجهة التمويلية (${bankId}) لنفس التوليفة (${supportType} — ${customerStage}). يرجى تفعيل واحدة فقط.`
     );
   }
 
@@ -54,7 +54,6 @@ export function getDsrRule(params: {
   if (!rule) {
     const defaultMatches = dsrRules.filter(
       r => r.bankId === 'default' &&
-           r.productType === productType &&
            r.supportType === supportType &&
            r.customerStage === customerStage &&
            r.active
@@ -62,7 +61,7 @@ export function getDsrRule(params: {
 
     if (defaultMatches.length > 1) {
       throw new Error(
-        `مفرط: هناك أكثر من قاعدة DSR افتراضية (default) نشطة لنفس التوليفة (${productType} — ${supportType} — ${customerStage}). يرجى تفعيل واحدة فقط.`
+        `مفرط: هناك أكثر من قاعدة DSR افتراضية (default) نشطة لنفس التوليفة (${supportType} — ${customerStage}). يرجى تفعيل واحدة فقط.`
       );
     }
 
@@ -72,7 +71,7 @@ export function getDsrRule(params: {
   // 3. If still not found, throw error
   if (!rule) {
     throw new Error(
-      `مفقود: لم يتم العثور على قاعدة DSR مناسبة للمدخلات التالية: البنك (${bankId})، المنتج (${productType})، الدعم (${supportType})، المرحلة (${customerStage}). يرجى إضافة قاعدة DSR وتفعيلها للبنك أو قاعدة default.`
+      `مفقود: لم يتم العثور على قاعدة DSR مناسبة للمدخلات التالية: البنك (${bankId})، الدعم (${supportType})، المرحلة (${customerStage}). يرجى إضافة قاعدة DSR وتفعيلها للبنك.`
     );
   }
 
@@ -91,7 +90,7 @@ export function calculateDSR(params: {
   const { bankId, productId, supportType, phase, netSalary, dsrRules } = params;
 
   const productType = mapProductIdToType(productId);
-  const normalizedSupport = mapSupportType(supportType);
+  const normalizedSupport = productType === 'personal_only' ? 'not_applicable' : mapSupportType(supportType);
   const customerStage = mapCustomerStage(phase);
 
   try {

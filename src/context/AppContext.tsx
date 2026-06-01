@@ -149,6 +149,11 @@ const getInitialSettings = (): AdminSettings => {
           savedTermRules.length < 5 || 
           savedTermRules.some((r: any) => r.bankId === 'rajhi' && r.sectorId === 'gov_civil' && r.maxTermMonths === 300);
 
+        const savedDsrRules = parsed.dsrRules || [];
+        const needsDsrRulesUpgrade = savedDsrRules.length === 0 ||
+          savedDsrRules.length < 20 ||
+          savedDsrRules.some((r: any) => r.bankId === 'default');
+
         return {
           banks: parsed.banks || initialBanks,
           products: parsed.products || initialProductAcceptance,
@@ -157,7 +162,7 @@ const getInitialSettings = (): AdminSettings => {
           pensionRules: parsed.pensionRules || initialPensionRules,
           termRules: needsTermRulesUpgrade ? initialTermRules : savedTermRules,
           marginRules: upgradeMarginRules(parsed.marginRules || []),
-          dsrRules: parsed.dsrRules || initialDsrRules,
+          dsrRules: needsDsrRulesUpgrade ? initialDsrRules : savedDsrRules,
           supportSettings: parsed.supportSettings || initialSupportSettings,
           housingSupportTiers: parsed.housingSupportTiers || DEFAULT_HOUSING_SUPPORT_TIERS,
           advancePaymentTiers: parsed.advancePaymentTiers || DEFAULT_ADVANCE_PAYMENT_TIERS,

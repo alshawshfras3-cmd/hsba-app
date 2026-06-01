@@ -1059,8 +1059,7 @@ export default function AdminDashboard() {
   };
 
   // --- DSR Rules States & Management ---
-  const [filterDsrBank, setFilterDsrBank] = useState<string>('all');
-  const [filterDsrProduct, setFilterDsrProduct] = useState<string>('all');
+  const [filterDsrBank, setFilterDsrBank] = useState<string>('rajhi');
   const [filterDsrSupport, setFilterDsrSupport] = useState<string>('all');
   const [filterDsrStage, setFilterDsrStage] = useState<string>('all');
   const [filterDsrStatus, setFilterDsrStatus] = useState<string>('all');
@@ -1069,25 +1068,19 @@ export default function AdminDashboard() {
   const [editingDsrRule, setEditingDsrRule] = useState<DsrRule | null>(null);
 
   // Form states for adding/editing a DSR Rule
-  const [formDsrBankId, setFormDsrBankId] = useState<string>('default');
+  const [formDsrBankId, setFormDsrBankId] = useState<string>('rajhi');
   const [formDsrProductType, setFormDsrProductType] = useState<'real_estate_only' | 'real_estate_with_new_personal' | 'real_estate_with_existing_personal' | 'personal_only'>('real_estate_only');
-  const [formDsrSupportType, setFormDsrSupportType] = useState<'none' | 'monthly' | 'down_payment'>('none');
+  const [formDsrSupportType, setFormDsrSupportType] = useState<'none' | 'monthly' | 'down_payment' | 'not_applicable'>('none');
   const [formDsrCustomerStage, setFormDsrCustomerStage] = useState<'active_before_retirement' | 'retired_after_retirement'>('active_before_retirement');
   const [formDsrPercentStr, setFormDsrPercentStr] = useState<string>('');
   const [formDsrDeductExisting, setFormDsrDeductExisting] = useState<boolean>(true);
   const [formDsrActive, setFormDsrActive] = useState<boolean>(true);
   const [formDsrError, setFormDsrError] = useState<string>('');
 
-  const DSR_BANKS = [
-    { id: 'default', nameAr: 'الافتراضي العام (default)' },
-    ...banks.map(b => ({ id: b.id, nameAr: `${b.nameAr} (${b.id})` }))
-  ];
+  const DSR_BANKS = banks.map(b => ({ id: b.id, nameAr: b.nameAr }));
 
   const DSR_PRODUCT_TYPES = [
-    { id: 'real_estate_only', nameAr: 'عقاري فقط' },
-    { id: 'real_estate_with_new_personal', nameAr: 'عقاري + شخصي جديد' },
-    { id: 'real_estate_with_existing_personal', nameAr: 'عقاري مع شخصي قائم' },
-    { id: 'personal_only', nameAr: 'شخصي فقط' }
+    { id: 'real_estate_only', nameAr: 'تمويل عقاري' }
   ];
 
   const DSR_SUPPORT_TYPES = [
@@ -1103,7 +1096,7 @@ export default function AdminDashboard() {
 
   const handleOpenAddDsrModal = () => {
     setEditingDsrRule(null);
-    setFormDsrBankId('default');
+    setFormDsrBankId(filterDsrBank);
     setFormDsrProductType('real_estate_only');
     setFormDsrSupportType('none');
     setFormDsrCustomerStage('active_before_retirement');
@@ -1137,11 +1130,10 @@ export default function AdminDashboard() {
   const handleToggleDsrRuleActive = (id: string) => {
     const targetRule = dsrRules.find(r => r.id === id);
     if (targetRule && !targetRule.active) {
-      // Trying to activate, ensure no active duplicate exists
+      // Ensure no active duplicate exists with same bankId + supportType + customerStage
       const duplicateExists = dsrRules.some(
         r => r.id !== id &&
              r.bankId === targetRule.bankId &&
-             r.productType === targetRule.productType &&
              r.supportType === targetRule.supportType &&
              r.customerStage === targetRule.customerStage &&
              r.active
@@ -1162,11 +1154,7 @@ export default function AdminDashboard() {
       return;
     }
 
-    if (formDsrProductType === 'personal_only' && formDsrSupportType !== 'none') {
-      setFormDsrError('تنبيه: لا يمكن اختيار دعم سكني مع منتج التمويل الشخصي فقط.');
-      return;
-    }
-
+    const finalSupportType = formDsrSupportType === 'not_applicable' ? 'none' : formDsrSupportType;
     const ruleId = editingDsrRule ? editingDsrRule.id : `dsr_rule_${Date.now()}`;
 
     // Validate that no active duplicate will exist
@@ -1174,13 +1162,13 @@ export default function AdminDashboard() {
       const duplicateExists = dsrRules.some(
         r => r.id !== ruleId &&
              r.bankId === formDsrBankId &&
-             r.productType === formDsrProductType &&
-             r.supportType === formDsrSupportType &&
+             r.productType === 'real_estate_only' &&
+             r.supportType === finalSupportType &&
              r.customerStage === formDsrCustomerStage &&
              r.active
       );
       if (duplicateExists) {
-        setFormDsrError('خطأ تكرار: توجد بالفعل قاعدة أخرى مسجلة ونشطة لمزيج (البنك + المنتج + الدعم + المرحلة). لا يُسمح بأكثر من قاعدة نشطة للمفتاح نفسه.');
+        setFormDsrError('خطأ تكرار: توجد بالفعل قاعدة أخرى مسجلة ونشطة لمزيج (البنك + الدعم + المرحلة). لا يُسمح بأكثر من قاعدة نشطة للمفتاح نفسه.');
         return;
       }
     }
@@ -1188,8 +1176,8 @@ export default function AdminDashboard() {
     const newRule: DsrRule = {
       id: ruleId,
       bankId: formDsrBankId,
-      productType: formDsrProductType,
-      supportType: formDsrSupportType,
+      productType: 'real_estate_only',
+      supportType: finalSupportType,
       customerStage: formDsrCustomerStage,
       dsrPercent: val,
       deductExistingObligations: formDsrDeductExisting,
@@ -1227,6 +1215,7 @@ export default function AdminDashboard() {
   const [formError, setFormError] = useState('');
 
   // --- Personal Finance Rules States & Management ---
+  const [filterPfBank, setFilterPfBank] = useState<string>('rajhi');
   const [isPfModalOpen, setIsPfModalOpen] = useState(false);
   const [editingPfRule, setEditingPfRule] = useState<PersonalFinanceRules | null>(null);
 
@@ -1244,7 +1233,7 @@ export default function AdminDashboard() {
 
   const openAddPfModal = () => {
     setEditingPfRule(null);
-    setFormPfBankId('all');
+    setFormPfBankId(filterPfBank);
     setFormPfPathType('personal_only');
     setFormPfCustomerStatus('active_employee');
     setFormPfDsr('33');
@@ -6010,8 +5999,7 @@ export default function AdminDashboard() {
                 <button
                   type="button"
                   onClick={() => {
-                    const targetBank = filterDsrBank === 'all' ? 'rajhi' : filterDsrBank;
-                    setCopyTargetBank(targetBank);
+                    setCopyTargetBank(filterDsrBank);
                     setCopySourceBank('');
                     setCopySections(['dsr']);
                     setShowCopyModal(true);
@@ -6023,8 +6011,7 @@ export default function AdminDashboard() {
                 <button
                   type="button"
                   onClick={() => {
-                    const targetBank = filterDsrBank === 'all' ? 'rajhi' : filterDsrBank;
-                    openHistory('dsr_rules', targetBank, `سجل تغييرات نسب الاستقطاع DSR — ${formBanksList.find(b => b.id === targetBank)?.nameAr || targetBank}`);
+                    openHistory('dsr_rules', filterDsrBank, `سجل تغييرات نسب الاستقطاع DSR — ${formBanksList.find(b => b.id === filterDsrBank)?.nameAr || filterDsrBank}`);
                   }}
                   className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-100 text-[11px] font-bold text-slate-700 rounded-xl transition-all cursor-pointer flex items-center gap-1"
                 >
@@ -6033,40 +6020,34 @@ export default function AdminDashboard() {
               </div>
             </div>
 
+            {/* Bank Navigation Tabs for DSR */}
+            <div className="space-y-2">
+              <span className="text-xs font-bold text-gray-500 block mb-1 font-sans">اختر البنك لضبط حدود الاستقطاع DSR:</span>
+              <div className="flex flex-wrap gap-2 border-b border-gray-100 pb-3 font-sans">
+                {banks.map((b) => {
+                  const isSelected = filterDsrBank === b.id;
+                  return (
+                    <button
+                      key={b.id}
+                      type="button"
+                      onClick={() => setFilterDsrBank(b.id)}
+                      className={`px-4 py-2.5 text-xs font-extrabold rounded-xl transition-all cursor-pointer ${
+                        isSelected 
+                          ? 'bg-[#0057B8] text-white shadow-md' 
+                          : 'bg-white hover:bg-slate-50 text-gray-700 border border-gray-250 hover:border-gray-300'
+                      }`}
+                    >
+                      {b.nameAr}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* Filters Bar */}
-            <div className="bg-white border border-[#E5E7EB] rounded-2xl p-5 shadow-xs grid grid-cols-2 md:grid-cols-5 gap-3.5 text-xs font-bold font-sans text-gray-700">
+            <div className="bg-white border border-[#E5E7EB] rounded-2xl p-5 shadow-xs grid grid-cols-2 md:grid-cols-3 gap-3.5 text-xs font-bold font-sans text-gray-700">
               <div>
-                <label htmlFor="filter-dsr-bank" className="block text-slate-500 mb-1.5">البنك:</label>
-                <select
-                  id="filter-dsr-bank"
-                  value={filterDsrBank}
-                  onChange={(e) => setFilterDsrBank(e.target.value)}
-                  className="w-full bg-white border border-gray-200 rounded-xl px-2.5 py-2 cursor-pointer focus:outline-none focus:ring-1 focus:ring-[#0057B8] text-right font-semibold text-gray-800"
-                >
-                  <option value="all">الكل (All)</option>
-                  {DSR_BANKS.map(b => (
-                    <option key={b.id} value={b.id}>{b.nameAr}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label htmlFor="filter-dsr-product" className="block text-slate-500 mb-1.5"> نوع المنتج:</label>
-                <select
-                  id="filter-dsr-product"
-                  value={filterDsrProduct}
-                  onChange={(e) => setFilterDsrProduct(e.target.value)}
-                  className="w-full bg-white border border-gray-200 rounded-xl px-2.5 py-2 cursor-pointer focus:outline-none focus:ring-1 focus:ring-[#0057B8] text-right font-semibold text-gray-800"
-                >
-                  <option value="all">الكل (All)</option>
-                  {DSR_PRODUCT_TYPES.map(p => (
-                    <option key={p.id} value={p.id}>{p.nameAr}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label htmlFor="filter-dsr-support" className="block text-slate-500 mb-1.5">نوع الدعم:</label>
+                <label htmlFor="filter-dsr-support" className="block text-slate-500 mb-1.5 font-sans">نوع الدعم:</label>
                 <select
                   id="filter-dsr-support"
                   value={filterDsrSupport}
@@ -6081,7 +6062,7 @@ export default function AdminDashboard() {
               </div>
 
               <div>
-                <label htmlFor="filter-dsr-stage" className="block text-slate-500 mb-1.5">المرحلة:</label>
+                <label htmlFor="filter-dsr-stage" className="block text-slate-500 mb-1.5 font-sans">المرحلة:</label>
                 <select
                   id="filter-dsr-stage"
                   value={filterDsrStage}
@@ -6096,7 +6077,7 @@ export default function AdminDashboard() {
               </div>
 
               <div>
-                <label htmlFor="filter-dsr-status" className="block text-slate-500 mb-1.5">الدورة / الحالة:</label>
+                <label htmlFor="filter-dsr-status" className="block text-slate-500 mb-1.5 font-sans">الدورة / الحالة:</label>
                 <select
                   id="filter-dsr-status"
                   value={filterDsrStatus}
@@ -6116,21 +6097,20 @@ export default function AdminDashboard() {
                 <table className="min-w-full divide-y divide-gray-200 text-right">
                   <thead className="bg-[#F8FAFC] text-slate-500 font-bold text-xs font-sans">
                     <tr>
-                      <th scope="col" className="px-6 py-4 text-right">البنك</th>
-                      <th scope="col" className="px-6 py-4 text-right">نوع المنتج</th>
-                      <th scope="col" className="px-6 py-4 text-right">نوع الدعم</th>
-                      <th scope="col" className="px-6 py-4 text-right">مرحلة العميل</th>
-                      <th scope="col" className="px-6 py-4 text-center">نسبة الاستقطاع %</th>
-                      <th scope="col" className="px-6 py-4 text-center">خصم الالتزامات القائمة</th>
-                      <th scope="col" className="px-6 py-4 text-center">الحالة</th>
-                      <th scope="col" className="px-6 py-4 text-center">الإجراءات</th>
+                      <th scope="col" className="px-6 py-4 text-right font-sans">البنك</th>
+                      <th scope="col" className="px-6 py-4 text-right font-sans">نوع الدعم</th>
+                      <th scope="col" className="px-6 py-4 text-right font-sans">مرحلة العميل</th>
+                      <th scope="col" className="px-6 py-4 text-center font-sans">نسبة الاستقطاع %</th>
+                      <th scope="col" className="px-6 py-4 text-center font-sans">خصم الالتزامات القائمة</th>
+                      <th scope="col" className="px-6 py-4 text-center font-sans">الحالة</th>
+                      <th scope="col" className="px-6 py-4 text-center font-sans">الإجراءات</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 bg-white text-xs font-semibold text-gray-700">
                     {dsrRules
+                      .filter(rule => rule.productType !== 'personal_only')
                       .filter(rule => {
                         if (filterDsrBank !== 'all' && rule.bankId !== filterDsrBank) return false;
-                        if (filterDsrProduct !== 'all' && rule.productType !== filterDsrProduct) return false;
                         if (filterDsrSupport !== 'all' && rule.supportType !== filterDsrSupport) return false;
                         if (filterDsrStage !== 'all' && rule.customerStage !== filterDsrStage) return false;
                         if (filterDsrStatus !== 'all') {
@@ -6141,7 +6121,6 @@ export default function AdminDashboard() {
                       })
                       .map((rule) => {
                         const matchedBank = DSR_BANKS.find(b => b.id === rule.bankId);
-                        const matchedProduct = DSR_PRODUCT_TYPES.find(p => p.id === rule.productType);
                         const matchedSupport = DSR_SUPPORT_TYPES.find(s => s.id === rule.supportType);
                         const matchedStage = DSR_CUSTOMER_STAGES.find(st => st.id === rule.customerStage);
 
@@ -6149,9 +6128,6 @@ export default function AdminDashboard() {
                           <tr key={rule.id} className="hover:bg-slate-50/50 transition-colors">
                             <td className="px-6 py-4 whitespace-nowrap font-bold text-slate-900 font-sans">
                               {matchedBank ? matchedBank.nameAr : rule.bankId}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-slate-600 font-sans">
-                              {matchedProduct ? matchedProduct.nameAr : rule.productType}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold font-sans ${
@@ -6272,44 +6248,19 @@ export default function AdminDashboard() {
                           </select>
                         </div>
 
-                        {/* 2. Product Type Select */}
-                        <div className="space-y-1.5 text-right">
-                          <label htmlFor="form-dsr-product" className="block text-xs font-bold text-gray-600">نوع المنتج:</label>
-                          <select
-                            id="form-dsr-product"
-                            value={formDsrProductType}
-                            onChange={(e) => {
-                              const newProdType = e.target.value as any;
-                              setFormDsrProductType(newProdType);
-                              if (newProdType === 'personal_only') {
-                                setFormDsrSupportType('none');
-                              }
-                            }}
-                            className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          >
-                            {DSR_PRODUCT_TYPES.map(p => (
-                              <option key={p.id} value={p.id}>{p.nameAr}</option>
-                            ))}
-                          </select>
-                        </div>
-
-                        {/* 3. Support Type Select */}
-                        <div className="space-y-1.5 text-right">
+                        {/* 2. Support Type Select */}
+                        <div className="space-y-1.5 text-right font-sans">
                           <label htmlFor="form-dsr-support" className="block text-xs font-bold text-gray-600">نوع الدعم السكني:</label>
                           <select
                             id="form-dsr-support"
                             value={formDsrSupportType}
-                            disabled={formDsrProductType === 'personal_only'}
                             onChange={(e) => setFormDsrSupportType(e.target.value as any)}
-                            className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
+                            className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
                           >
                             {DSR_SUPPORT_TYPES.map(s => (
                               <option key={s.id} value={s.id}>{s.nameAr}</option>
                             ))}
                           </select>
-                          {formDsrProductType === 'personal_only' && (
-                            <p className="text-[10px] text-amber-600 font-semibold mt-1">الدعم يكون "غير مدعوم" فقط مع الشخصي.</p>
-                          )}
                         </div>
 
                         {/* 4. Customer Stage Select */}
@@ -6858,6 +6809,30 @@ export default function AdminDashboard() {
               </button>
             </div>
 
+            {/* Bank Navigation Tabs for Personal Finance */}
+            <div className="space-y-2">
+              <span className="text-xs font-bold text-slate-500 block mb-1 font-sans">اختر البنك لضبط عقود التمويل الشخصي:</span>
+              <div className="flex flex-nowrap md:flex-wrap overflow-x-auto pb-3 gap-2 border-b border-gray-100 font-sans scrollbar-none">
+                {banks.map((b) => {
+                  const isSelected = filterPfBank === b.id;
+                  return (
+                    <button
+                      key={b.id}
+                      type="button"
+                      onClick={() => setFilterPfBank(b.id)}
+                      className={`px-4 py-2.5 text-xs font-extrabold rounded-xl transition-all cursor-pointer shrink-0 ${
+                        isSelected 
+                          ? 'bg-[#0057B8] text-white shadow-md' 
+                          : 'bg-white hover:bg-slate-50 text-gray-700 border border-gray-250 hover:border-gray-300'
+                      }`}
+                    >
+                      {b.nameAr}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* Quick Actions Bar */}
             <div className="bg-slate-50 border border-slate-150 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 font-sans">
               <span className="text-xs font-bold text-slate-700">عمليات سريعة لتمويل شخصي:</span>
@@ -6865,7 +6840,7 @@ export default function AdminDashboard() {
                 <button
                   type="button"
                   onClick={() => {
-                    setCopyTargetBank('rajhi');
+                    setCopyTargetBank(filterPfBank);
                     setCopySourceBank('');
                     setCopySections(['personal']);
                     setShowCopyModal(true);
@@ -6877,7 +6852,7 @@ export default function AdminDashboard() {
                 <button
                   type="button"
                   onClick={() => {
-                    openHistory('personal_finance_rules', 'rajhi', 'سجل تغييرات قواعد التمويل الشخصي');
+                    openHistory('personal_finance_rules', filterPfBank, `سجل تغييرات قواعد التمويل الشخصي — ${formBanksList.find(b => b.id === filterPfBank)?.nameAr || filterPfBank}`);
                   }}
                   className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-100 text-[11px] font-bold text-slate-700 rounded-xl transition-all cursor-pointer flex items-center gap-1"
                 >
@@ -6972,8 +6947,8 @@ export default function AdminDashboard() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50 font-semibold">
-                    {personalRules && personalRules.length > 0 ? (
-                      personalRules.map((rule, idx) => {
+                    {personalRules && personalRules.filter(rule => rule.bankId === filterPfBank).length > 0 ? (
+                      personalRules.filter(rule => rule.bankId === filterPfBank).map((rule, idx) => {
                         const b = banks?.find(bk => bk.id === rule.bankId);
                         const bankName = rule.bankId === 'all' ? '💼 الافتراضي العام (Default)' : b?.nameAr || rule.bankId;
                         const pathLabel = rule.pathType === 'real_estate_with_new_personal' ? 'عقاري + شخصي جديد' : 'تمويل شخصي فقط';
