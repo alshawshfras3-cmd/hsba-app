@@ -501,7 +501,7 @@ export function calculateBanksFinancing(params: {
     // 7. Calculate interest margins using interpolation
     const marginResult = calculateMargin({
       bankId: bank.id,
-      productId: (productId === 'both' || productId === 'real_estate_with_new_personal' || productId === 'real_estate_with_personal_existing' || productId === 'real_estate_with_existing_personal') ? 'real_estate' : productId,
+      productId: productId,
       supportType,
       sectorId,
       termMonths: termResult.totalMonths,
@@ -1019,7 +1019,7 @@ export function calculateAll(params: {
   // Calculate Margin and Personal Loan if needed
   const marginResult = calculateMargin({
     bankId,
-    productId: (productId === 'both' || productId === 'real_estate_with_new_personal' || productId === 'real_estate_with_personal_existing' || productId === 'real_estate_with_existing_personal') ? 'real_estate' : productId,
+    productId: productId,
     supportType: 'none',
     sectorId,
     termMonths: termResult.totalMonths,

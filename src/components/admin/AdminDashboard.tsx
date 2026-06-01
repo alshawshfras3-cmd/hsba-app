@@ -4,7 +4,7 @@ import { UsersManagementPage } from '../../pages/UsersManagementPage';
 import { DiagnosticsPage } from './DiagnosticsPage';
 import { 
   Building2, Briefcase, Percent, Calendar, Hourglass, HelpCircle,
-  Coins, FileText, ToggleLeft, ToggleRight, Trash2, Plus, RefreshCw, 
+  Coins, ToggleLeft, ToggleRight, Trash2, Plus, RefreshCw, 
   Map, UserPlus, ListOrdered, CheckCircle2, ChevronRight, Calculator,
   Lock, Settings, ShieldAlert, Award, FileSpreadsheet, Users, Edit, Loader2
 } from 'lucide-react';
@@ -111,7 +111,6 @@ export default function AdminDashboard() {
     { id: 'personal', label: 'عقود التمويل الشخصي', icon: Coins },
     { id: 'advanced', label: 'صفحة القواعد المتقدمة', icon: ShieldAlert },
     { id: 'diagnostics', label: 'تشخيص الحساب التفصيلي', icon: HelpCircle },
-    { id: 'logs', label: 'التشخيص وسجل المعالجة', icon: FileText },
     { id: 'users', label: 'المستخدمون والاشتراكات', icon: UserPlus }
   ];
 
@@ -8036,6 +8035,14 @@ export default function AdminDashboard() {
               </div>
             </div>
           </div>
+        )}
+
+        {adminSubPage === 'diagnostics' && (
+          <DiagnosticsPage />
+        )}
+
+        {adminSubPage === 'users' && (
+          <UsersManagementPage />
         )}
 
         {/* Modal 1: Copy Settings Modal */}

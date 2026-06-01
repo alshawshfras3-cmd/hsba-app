@@ -310,3 +310,62 @@ values
 on conflict do nothing;
 
 
+-- =========================================================================
+-- 7. جدول بروفايلات المستخدمين والاشتراكات (user_profiles)
+-- =========================================================================
+
+create table if not exists user_profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  email text,
+  full_name text,
+  role text default 'user' check (role in ('admin', 'manager', 'user')),
+  subscription text default 'free' check (subscription in ('free', 'basic', 'premium', 'enterprise')),
+  subscription_expires_at timestamptz,
+  created_at timestamptz default now(),
+  last_login timestamptz,
+  is_active boolean default true
+);
+
+-- RLS: الأدمن يقرأ الكل، المستخدم يقرأ نفسه فقط
+alter table user_profiles enable row level security;
+
+drop policy if exists "admin_read_all" on user_profiles;
+create policy "admin_read_all" on user_profiles
+  for select using (
+    exists (select 1 from user_profiles up where up.id = auth.uid() and up.role = 'admin')
+  );
+
+drop policy if exists "user_read_own" on user_profiles;
+create policy "user_read_own" on user_profiles
+  for select using (id = auth.uid());
+
+drop policy if exists "admin_update_all" on user_profiles;
+create policy "admin_update_all" on user_profiles
+  for update using (
+    exists (select 1 from user_profiles up where up.id = auth.uid() and up.role = 'admin')
+  );
+
+-- إنشاء بروفايل تلقائي عند التسجيل
+create or replace function handle_new_user()
+returns trigger as $$
+begin
+  insert into public.user_profiles (id, email, role, subscription)
+  values (new.id, new.email, 'user', 'free');
+  return new;
+end;
+$$ language plpgsql security definer;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function handle_new_user();
+
+-- إضافة حسابك كأدمن تلقائي إذا كان الإيميل مطابقاً
+insert into user_profiles (id, email, role, subscription)
+select id, email, 'admin', 'free'
+from auth.users
+where email = 'alshawshfras3@gmail.com'
+on conflict (id) do update set role = 'admin';
+
+
+
