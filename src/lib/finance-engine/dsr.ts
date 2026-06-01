@@ -19,22 +19,22 @@ export function mapSupportType(supportType: string): 'none' | 'monthly' | 'down_
   return 'none';
 }
 
-export function mapCustomerStage(phase: string): 'before_retirement' | 'after_retirement' {
-  if (phase === 'after_retirement' || phase === 'retired') return 'after_retirement';
-  return 'before_retirement';
+export function mapCustomerStage(phase: string): 'active_before_retirement' | 'retired_after_retirement' {
+  if (phase === 'after_retirement' || phase === 'retired') return 'retired_after_retirement';
+  return 'active_before_retirement';
 }
 
 export function getDsrRule(params: {
   bankId: string;
   productType: 'real_estate_only' | 'real_estate_with_new_personal' | 'real_estate_with_existing_personal' | 'personal_only';
   supportType: 'none' | 'monthly' | 'down_payment';
-  customerStage: 'before_retirement' | 'after_retirement';
+  customerStage: 'active_before_retirement' | 'retired_after_retirement';
   dsrRules: DsrRule[];
 }): DsrRule {
   const { bankId, productType, supportType, customerStage, dsrRules } = params;
 
-  // 1. Search for a specific rule matching this bank
-  let rule = dsrRules.find(
+  // 1. Check for duplicate active rules matching the selected bank
+  const bankMatches = dsrRules.filter(
     r => r.bankId === bankId &&
          r.productType === productType &&
          r.supportType === supportType &&
@@ -42,21 +42,37 @@ export function getDsrRule(params: {
          r.active
   );
 
-  // 2. If not found, use the 'default' rule
+  if (bankMatches.length > 1) {
+    throw new Error(
+      `مفرط: هناك أكثر من قاعدة DSR نشطة للجهة التمويلية (${bankId}) لنفس التوليفة (${productType} — ${supportType} — ${customerStage}). يرجى تفعيل واحدة فقط.`
+    );
+  }
+
+  let rule = bankMatches[0];
+
+  // 2. If specific rule not found, search the 'default' rule
   if (!rule) {
-    rule = dsrRules.find(
+    const defaultMatches = dsrRules.filter(
       r => r.bankId === 'default' &&
            r.productType === productType &&
            r.supportType === supportType &&
            r.customerStage === customerStage &&
            r.active
     );
+
+    if (defaultMatches.length > 1) {
+      throw new Error(
+        `مفرط: هناك أكثر من قاعدة DSR افتراضية (default) نشطة لنفس التوليفة (${productType} — ${supportType} — ${customerStage}). يرجى تفعيل واحدة فقط.`
+      );
+    }
+
+    rule = defaultMatches[0];
   }
 
   // 3. If still not found, throw error
   if (!rule) {
     throw new Error(
-      `لم يتم العثور على قاعدة DSR مناسبة للمدخلات التالية: البنك (${bankId})، المنتج (${productType})، الدعم (${supportType})، المرحلة (${customerStage}).`
+      `مفقود: لم يتم العثور على قاعدة DSR مناسبة للمدخلات التالية: البنك (${bankId})، المنتج (${productType})، الدعم (${supportType})، المرحلة (${customerStage}). يرجى إضافة قاعدة DSR وتفعيلها للبنك أو قاعدة default.`
     );
   }
 
@@ -68,7 +84,7 @@ export function calculateDSR(params: {
   productId: any;
   sectorId: any;
   supportType: any;
-  phase: 'before_retirement' | 'after_retirement' | 'retired';
+  phase: 'active_before_retirement' | 'retired_after_retirement' | 'before_retirement' | 'after_retirement' | 'retired';
   netSalary: number;
   dsrRules: DsrRule[];
 }): DsrOutput {
@@ -93,14 +109,14 @@ export function calculateDSR(params: {
     return {
       dsrPercentage: dsrPercent,
       maxInstallment,
-      ruleUsed: `تم تطبيق قاعدة الاستقطاع (${matchedRule.bankId === 'default' ? 'الافتراضية العامة' : 'الخاصة بالجهة'}) ونسبة ${dsrPercent}% لمنتج ${productType === 'real_estate_only' ? 'عقاري فقط' : productType === 'real_estate_with_new_personal' ? 'عقاري وشخصي جديد' : productType === 'real_estate_with_existing_personal' ? 'عقاري وشخصي قائم' : 'شخصي فقط'} (${customerStage === 'before_retirement' ? 'موظف نشط' : 'بعد التقاعد'}).`
+      ruleUsed: `تم تطبيق قاعدة الاستقطاع (${matchedRule.bankId === 'default' ? 'الافتراضية العامة' : 'الخاصة بالجهة'}) ونسبة ${dsrPercent}% لمنتج ${productType === 'real_estate_only' ? 'عقاري فقط' : productType === 'real_estate_with_new_personal' ? 'عقاري وشخصي جديد' : productType === 'real_estate_with_existing_personal' ? 'عقاري وشخصي قائم' : 'شخصي فقط'} (${customerStage === 'active_before_retirement' ? 'موظف نشط' : 'بعد التقاعد'}).`
     };
   } catch (err: any) {
-    const defaultDsr = productType === 'personal_only' ? 33 : 55;
     return {
-      dsrPercentage: defaultDsr,
-      maxInstallment: Math.round(netSalary * (defaultDsr / 100)),
-      ruleUsed: `تنبيه: ${err.message || 'لم تتوفر قاعدة محددة'}. تم استخدام نسبة افتراضية مُؤَمَّنَة (${defaultDsr}%).`
+      dsrPercentage: 0,
+      maxInstallment: 0,
+      ruleUsed: `خطأ استقطاع: ${err.message || 'فشل جلب قاعدة DSR.'}`,
+      error: err.message || 'فشل جلب قاعدة DSR.'
     };
   }
 }

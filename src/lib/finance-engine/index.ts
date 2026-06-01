@@ -86,15 +86,32 @@ export { calculatePersonalFinance } from './personal-finance';
 export { calculateRealEstateFinance } from './real-estate-finance';
 export { runDiagnostics } from './diagnostics';
 
+export const BANK_DEFAULT_LIMITS: Record<string, {
+  maxTermMonths: number;
+  maxAgeAtEnd: number;
+  monthsAfterRetirement: number;
+  allowAfterRetirement: boolean;
+  calendarType: 'hijri' | 'gregorian';
+}> = {
+  alahli: { maxTermMonths: 360, maxAgeAtEnd: 75, monthsAfterRetirement: 180, allowAfterRetirement: true, calendarType: 'gregorian' },
+  rajhi: { maxTermMonths: 360, maxAgeAtEnd: 75, monthsAfterRetirement: 265, allowAfterRetirement: true, calendarType: 'hijri' },
+  alinma: { maxTermMonths: 360, maxAgeAtEnd: 70, monthsAfterRetirement: 0, allowAfterRetirement: false, calendarType: 'hijri' },
+  fransi: { maxTermMonths: 360, maxAgeAtEnd: 65, monthsAfterRetirement: 73, allowAfterRetirement: true, calendarType: 'gregorian' },
+  bidaya: { maxTermMonths: 240, maxAgeAtEnd: 65, monthsAfterRetirement: 0, allowAfterRetirement: false, calendarType: 'hijri' },
+  albilad: { maxTermMonths: 360, maxAgeAtEnd: 70, monthsAfterRetirement: 180, allowAfterRetirement: true, calendarType: 'hijri' },
+  alarabi: { maxTermMonths: 360, maxAgeAtEnd: 70, monthsAfterRetirement: 180, allowAfterRetirement: true, calendarType: 'gregorian' },
+};
+
 export function getMatchedTermRule(params: {
   bankId: string;
   sectorId: SectorId;
+  militarySubType?: string;
   rankId: string;
   productId: ProductId;
   supportType: 'all' | SupportType;
   termRules: TermRule[];
 }): TermRule | null {
-  const { bankId, sectorId, rankId = 'all', productId, supportType, termRules = [] } = params;
+  const { bankId, sectorId, rankId = 'all', productId, supportType, termRules = [], militarySubType } = params;
   
   const activeRules = termRules.filter(r => r.isActive);
   if (activeRules.length === 0) return null;
@@ -121,6 +138,24 @@ export function getMatchedTermRule(params: {
       score += 500;
     } else {
       continue;
+    }
+
+    // New militarySubType check
+    if (sectorId === 'military') {
+      const targetSubType = militarySubType === 'military_officer' || militarySubType === 'officer'
+        ? 'officer'
+        : (militarySubType === 'military_individual' || militarySubType === 'enlisted' ? 'enlisted' : null);
+
+      if (r.militarySubType && r.militarySubType !== 'all') {
+        if (targetSubType && r.militarySubType === targetSubType) {
+          score += 2000; // Prefer specific military subType match
+        } else {
+          continue; // Mismatch on specific militarySubType
+        }
+      } else {
+        // Rule doesn't specify or is 'all', so it's a general match
+        score += 100;
+      }
     }
 
     // 3. rankId match
@@ -389,6 +424,7 @@ export function calculateBanksFinancing(params: {
     const matchedTermRule = getMatchedTermRule({
       bankId: bank.id,
       sectorId,
+      militarySubType,
       rankId: rankId || 'all',
       productId,
       supportType,
@@ -398,11 +434,19 @@ export function calculateBanksFinancing(params: {
     const isRuleApplied = !!matchedTermRule;
     const ruleSource = isRuleApplied ? 'termRule' : 'bankFallback';
 
-    const maxTermMonths = isRuleApplied ? matchedTermRule.maxTermMonths : bank.maxTermMonths;
-    const maxAgeAtEnd = isRuleApplied ? matchedTermRule.maxAgeAtEnd : bank.maxAgeAtEnd;
-    const allowedMonthsAfterRetirement = isRuleApplied ? matchedTermRule.allowedMonthsAfterRetirement : bank.monthsAfterRetirement;
-    const allowAfterRetirement = isRuleApplied ? matchedTermRule.allowAfterRetirement : bank.allowAfterRetirement;
-    const calendarType = isRuleApplied ? matchedTermRule.calendarType : (bank.calendarType as any || 'gregorian');
+    const defaultLimits = BANK_DEFAULT_LIMITS[bank.id] || {
+      maxTermMonths: 360,
+      maxAgeAtEnd: 75,
+      monthsAfterRetirement: 120,
+      allowAfterRetirement: true,
+      calendarType: 'gregorian' as const
+    };
+
+    const maxTermMonths = isRuleApplied ? matchedTermRule.maxTermMonths : defaultLimits.maxTermMonths;
+    const maxAgeAtEnd = isRuleApplied ? matchedTermRule.maxAgeAtEnd : defaultLimits.maxAgeAtEnd;
+    const allowedMonthsAfterRetirement = isRuleApplied ? matchedTermRule.allowedMonthsAfterRetirement : defaultLimits.monthsAfterRetirement;
+    const allowAfterRetirement = isRuleApplied ? matchedTermRule.allowAfterRetirement : defaultLimits.allowAfterRetirement;
+    const calendarType = isRuleApplied ? matchedTermRule.calendarType : defaultLimits.calendarType;
     const minTermMonths = isRuleApplied ? matchedTermRule.minTermMonths : 12;
 
     const termResult = calculateFinanceTerm({
@@ -461,7 +505,8 @@ export function calculateBanksFinancing(params: {
       supportType,
       sectorId,
       termMonths: termResult.totalMonths,
-      marginRules
+      marginRules,
+      netSalary: solvedNetSalary
     });
 
     // 8. Personal loan calculation (if applicable)
@@ -630,6 +675,12 @@ export function calculateBanksFinancing(params: {
       pensionRatioReduced: correctedPensionSalary < solvedNetSalary && termResult.monthsAfterRetirement > 0
     });
 
+    const dsrError = dsrBeforeResult.error || dsrAfterResult.error;
+    if (dsrError) {
+      diag.status = 'rejected';
+      diag.messages.unshift(`[خطأ استقطاع DSR]: ${dsrError}`);
+    }
+
     const isEligible = diag.status !== 'rejected';
     const isPersonalOnly = productId === 'personal' || productId === 'personal_only';
 
@@ -726,6 +777,7 @@ export function calculateBanksFinancing(params: {
         `[أشهر الخدمة الحالية]: ${serviceMonthsCurrent} شهر.`,
         `[مدة التمويل]: المدة الكلية: ${termResult.totalMonths} شهر (${termResult.totalYears} سنة) منها ${termResult.monthsBeforeRetirement} شهر قبل التقاعد و ${termResult.monthsAfterRetirement} شخر بعد التقاعد.`,
         ...(termResult.reductionReason ? [`[سبب تقليص المدة]: ${termResult.reductionReason}`] : []),
+        `[هامش الفائدة المطبق]: ${marginResult.bankName || bank.nameAr} — ${marginResult.productName} — ${marginResult.supportName} — فئة الراتب المستخدمة: ${marginResult.salaryTier === 'below_25000' ? 'أقل من 25,000' : marginResult.salaryTier === 'above_or_equal_25000' ? '25,000 فأكثر' : 'لا ينطبق'} — سنة الهامش المستخدمة: سنة ${marginResult.selectedMarginYear} — الهامش السنوي المستخدم: ${marginResult.annualMargin}% — مصدر الهامش من الإعدادات: ${marginResult.ruleUsed}`,
         ...diag.calculationSteps
       ]
     });
@@ -902,18 +954,26 @@ export function calculateAll(params: {
   const matchedTermRule = getMatchedTermRule({
     bankId,
     sectorId,
+    militarySubType,
     rankId: rankId || 'all',
     productId,
     supportType: 'all',
     termRules
   });
 
-  const bRecord = banks.find(b => b.id === bankId) || { maxTermMonths: 300, maxAgeAtEnd: 75, monthsAfterRetirement: 180, allowAfterRetirement: true, calendarType: 'gregorian' };
-  const maxTermMonths = matchedTermRule ? matchedTermRule.maxTermMonths : bRecord.maxTermMonths;
-  const maxAgeAtEnd = matchedTermRule ? matchedTermRule.maxAgeAtEnd : bRecord.maxAgeAtEnd;
-  const allowedMonthsAfterRetirement = matchedTermRule ? matchedTermRule.allowedMonthsAfterRetirement : bRecord.monthsAfterRetirement;
-  const allowAfterRetirement = matchedTermRule ? matchedTermRule.allowAfterRetirement : bRecord.allowAfterRetirement;
-  const calendarType = matchedTermRule ? matchedTermRule.calendarType : (bRecord.calendarType as any || 'gregorian');
+  const defaultLimits = BANK_DEFAULT_LIMITS[bankId] || {
+    maxTermMonths: 300,
+    maxAgeAtEnd: 75,
+    monthsAfterRetirement: 180,
+    allowAfterRetirement: true,
+    calendarType: 'gregorian' as const
+  };
+
+  const maxTermMonths = matchedTermRule ? matchedTermRule.maxTermMonths : defaultLimits.maxTermMonths;
+  const maxAgeAtEnd = matchedTermRule ? matchedTermRule.maxAgeAtEnd : defaultLimits.maxAgeAtEnd;
+  const allowedMonthsAfterRetirement = matchedTermRule ? matchedTermRule.allowedMonthsAfterRetirement : defaultLimits.monthsAfterRetirement;
+  const allowAfterRetirement = matchedTermRule ? matchedTermRule.allowAfterRetirement : defaultLimits.allowAfterRetirement;
+  const calendarType = matchedTermRule ? matchedTermRule.calendarType : defaultLimits.calendarType;
   const minTermMonths = matchedTermRule ? matchedTermRule.minTermMonths : 12;
 
   const termResult = calculateFinanceTerm({
@@ -963,7 +1023,8 @@ export function calculateAll(params: {
     supportType: 'none',
     sectorId,
     termMonths: termResult.totalMonths,
-    marginRules
+    marginRules,
+    netSalary: solvedNetSalary
   });
   const annualMargin = marginResult.annualMargin;
 
@@ -1093,49 +1154,70 @@ export function calculateAll(params: {
     ]
   };
 
+  const manualDsrError = dsrBeforeResult.error || dsrAfterResult.error;
+
   const card4: { title: string; ruleId: string; mainValue: string; status: 'success' | 'warning' | 'error'; details: string[] } = {
     title: '📊 نسبة DSR والقسط المتاح',
     ruleId: 'dsr-rule-matched',
-    mainValue: `${installmentStage1.toLocaleString('ar-SA')} ريال/شهر`,
-    status: 'success' as 'success',
-    details: [
-      `حالة الاستعلام الحالية للعميل: ${sectorId === 'retired' ? 'متقاعد حالي' : 'موظف نشط'}`,
-      `الحد الأقصى للاستقطاع (DSR): قبل التقاعد ${dsrPercentBefore}% | بعد التقاعد ${dsrPercentAfter}%`,
-      `الدعم السكني الشهري المضمون: ${monthlySupport.toLocaleString('ar-SA')} ريال`,
-      `الراتب المعتمد مع الدعم السكني: ${(solvedNetSalary + monthlySupport).toLocaleString('ar-SA')} ريال`,
-      `القسط المتاح الأقصى قبل الخصومات العقارية والشخصية: ${Math.round((solvedNetSalary + monthlySupport) * (dsrPercentBefore / 100)).toLocaleString('ar-SA')} ريال`,
-      `✅ قسط التمويل العقاري الأقصى للمرحلة الأولى: ${installmentStage1.toLocaleString('ar-SA')} ريال Saudi`
-    ]
+    mainValue: manualDsrError ? '❌ فشل جلب قاعدة DSR' : `${installmentStage1.toLocaleString('ar-SA')} ريال/شهر`,
+    status: manualDsrError ? 'error' : ('success' as 'success'),
+    details: manualDsrError 
+      ? [
+          `⚠️ تفاصيل المشكلة:`,
+          `${manualDsrError}`,
+          `ملاحظة: لا يمكن استكمال الخطوات بأرقام افتراضية بناءً على التعليمات الصارمة المنظِّمة لقواعد الاحتساب.`
+        ]
+      : [
+          `حالة الاستعلام الحالية للعميل: ${sectorId === 'retired' ? 'متقاعد حالي' : 'موظف نشط'}`,
+          `الحد الأقصى للاستقطاع (DSR): قبل التقاعد ${dsrPercentBefore}% | بعد التقاعد ${dsrPercentAfter}%`,
+          `الدعم السكني الشهري المضمون: ${monthlySupport.toLocaleString('ar-SA')} ريال`,
+          `الراتب المعتمد مع الدعم السكني: ${(solvedNetSalary + monthlySupport).toLocaleString('ar-SA')} ريال`,
+          `القسط المتاح الأقصى قبل الخصومات العقارية والشخصية: ${Math.round((solvedNetSalary + monthlySupport) * (dsrPercentBefore / 100)).toLocaleString('ar-SA')} ريال`,
+          `✅ قسط التمويل العقاري الأقصى للمرحلة الأولى: ${installmentStage1.toLocaleString('ar-SA')} ريال Saudi`
+        ]
   };
 
   const card5: { title: string; ruleId: string; mainValue: string; status: 'success' | 'warning' | 'error'; details: string[] } = {
     title: '📅 تفصيل مراحل القسط المالي',
     ruleId: 'stages-engine',
-    mainValue: `${installmentStage1.toLocaleString('ar-SA')} ← ${installmentStage2.toLocaleString('ar-SA')} ← ${installmentStage3.toLocaleString('ar-SA')}`,
-    status: 'success' as 'success',
-    details: [
-      `المرحلة الأولى (أثناء القرض الشخصي): قسط عقاري ${installmentStage1.toLocaleString('ar-SA')} ريال لمدة ${stage1Months} شهر` + (personalInstallment > 0 ? ` (+ قسط شخصي ${personalInstallment.toLocaleString('ar-SA')} ريال)` : ''),
-      stage2Months > 0 ? `المرحلة الثانية (بعد القرض الشخصي وقبل التقاعد): قسط عقاري ${installmentStage2.toLocaleString('ar-SA')} ريال لمدة ${stage2Months} شهر` : `المرحلة الثانية: غير متطلبة لعدم وجود انقسام أو تجاوز`,
-      stage3Months > 0 ? `المرحلة الثالثة (بعد سن التقاعد المعتمد): قسط عقاري ${installmentStage3.toLocaleString('ar-SA')} ريال لمدة ${stage3Months} شهر` : `المرحلة الثالثة: لا توجد مدة سداد تمتد بعد التقاعد`
-    ]
+    mainValue: manualDsrError ? '❌ القسط غير محتسب' : `${installmentStage1.toLocaleString('ar-SA')} ← ${installmentStage2.toLocaleString('ar-SA')} ← ${installmentStage3.toLocaleString('ar-SA')}`,
+    status: manualDsrError ? 'error' : ('success' as 'success'),
+    details: manualDsrError
+      ? [`يرجى حل مشكلة قاعدة الاستقطاع DSR أولاً ليتم حساب جدول مراحل القسط.`]
+      : [
+          `المرحلة الأولى (أثناء القرض الشخصي): قسط عقاري ${installmentStage1.toLocaleString('ar-SA')} ريال لمدة ${stage1Months} month` + (personalInstallment > 0 ? ` (+ قسط شخصي ${personalInstallment.toLocaleString('ar-SA')} ريال)` : ''),
+          stage2Months > 0 ? `المرحلة الثانية (بعد القرض الشخصي وقبل التقاعد): قسط عقاري ${installmentStage2.toLocaleString('ar-SA')} ريال لمدة ${stage2Months} month` : `المرحلة الثانية: غير متطلبة لعدم وجود انقسام أو تجاوز`,
+          stage3Months > 0 ? `المرحلة الثالثة (بعد سن التقاعد المعتمد): قسط عقاري ${installmentStage3.toLocaleString('ar-SA')} ريال لمدة ${stage3Months} month` : `المرحلة الثالثة: لا توجد مدة سداد تمتد بعد التقاعد`
+        ]
   };
 
   const card6: { title: string; ruleId: string; mainValue: string; status: 'success' | 'warning' | 'error'; details: string[] } = {
     title: '🏠 احتساب حد التمويل العقاري',
     ruleId: 'margin-rule-matched',
-    mainValue: `${reLoanAmount.toLocaleString('ar-SA')} ريال`,
-    status: 'success' as 'success',
-    details: [
-      `مجموع التدفقات النقدية المتوقعة للأقساط: ${totalCashflow.toLocaleString('ar-SA')} ريال`,
-      `هامش المرابحة البنكي السنوي: ${annualMargin}%`,
-      `معامل المقام المعتمد بالضوابط: ${denominator.toFixed(4)}`,
-      `صيغة الاحتساب: التمويل العقاري = مجموع التدفقات / (1 + الهامش السنوي × المدة بالسنوات)`,
-      `المعادلة: ${totalCashflow.toLocaleString('ar-SA')} ÷ ${denominator.toFixed(4)}`,
-      `✅ الحد التقديري للتمويل العقاري: ${reLoanAmount.toLocaleString('ar-SA')} ريال`
-    ]
+    mainValue: manualDsrError ? '❌ حد التمويل مبني على خطأ' : `${reLoanAmount.toLocaleString('ar-SA')} ريال`,
+    status: manualDsrError ? 'error' : ('success' as 'success'),
+    details: manualDsrError
+      ? [`لا يمكن احتساب مبلغ التمويل لعدم توفر قاعدة DSR صحيحة للاسترشاد بها.`]
+      : [
+          `الجهة التمويلية: ${marginResult.bankName}`,
+          `المنتج: ${marginResult.productName}`,
+          `نوع الدعم: ${marginResult.supportName}`,
+          `فئة الراتب المستخدمة: ${marginResult.salaryTier === 'below_25000' ? 'أقل من 25,000' : marginResult.salaryTier === 'above_or_equal_25000' ? '25,000 فأكثر' : 'لا ينطبق'}`,
+          `سنة الهامش المستخدمة: سنة ${marginResult.selectedMarginYear}`,
+          `الهامش السنوي المستخدم: ${marginResult.annualMargin}%`,
+          `مصدر الهامش من الإعدادات: ${marginResult.ruleUsed}`,
+          `مجموع التدفقات النقدية المتوقعة للأقساط: ${totalCashflow.toLocaleString('ar-SA')} ريال`,
+          `معامل المقام المعتمد بالضوابط: ${denominator.toFixed(4)}`,
+          `صيغة الاحتساب: التمويل العقاري = مجموع التدفقات / (1 + الهامش السنوي × المدة بالسنوات)`,
+          `المعادلة: ${totalCashflow.toLocaleString('ar-SA')} ÷ ${denominator.toFixed(4)}`,
+          `✅ الحد التقديري للتمويل العقاري: ${reLoanAmount.toLocaleString('ar-SA')} ريال`
+        ]
   };
 
   const warningsList: string[] = [];
+  if (manualDsrError) {
+    warningsList.push(`❌ خطأ استقطاع DSR: ${manualDsrError}`);
+  }
   if (expectedPensionSalary < solvedNetSalary * 0.3) {
     warningsList.push('⚠️ الراتب التقاعدي المتوقع يقل عن 30% من الراتب الصافي الحالي للعميل — الرجاء مراجعة بيانات الخدمة والبدلات المسقطة.');
   }

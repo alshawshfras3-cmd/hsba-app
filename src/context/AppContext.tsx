@@ -123,6 +123,17 @@ interface AdminSettings {
   userSubscriptions?: UserSubscription[];
 }
 
+function upgradeMarginRules(rules: MarginRule[]): MarginRule[] {
+  if (!rules || rules.length === 0) return initialMarginRules;
+  const hasNewRajhiRules = rules.some(r => r.bankId === 'rajhi' && r.id && r.id.startsWith('rajhi_gen_'));
+  if (!hasNewRajhiRules) {
+    const nonRajhiRules = rules.filter(r => r.bankId !== 'rajhi');
+    const rajhiInitialRules = initialMarginRules.filter(r => r.bankId === 'rajhi');
+    return [...nonRajhiRules, ...rajhiInitialRules];
+  }
+  return rules;
+}
+
 const getInitialSettings = (): AdminSettings => {
   try {
     const saved = localStorage.getItem("hasba_admin_settings");
@@ -145,7 +156,7 @@ const getInitialSettings = (): AdminSettings => {
           salaryRules: parsed.salaryRules || initialSalaryRules,
           pensionRules: parsed.pensionRules || initialPensionRules,
           termRules: needsTermRulesUpgrade ? initialTermRules : savedTermRules,
-          marginRules: parsed.marginRules || initialMarginRules,
+          marginRules: upgradeMarginRules(parsed.marginRules || []),
           dsrRules: parsed.dsrRules || initialDsrRules,
           supportSettings: parsed.supportSettings || initialSupportSettings,
           housingSupportTiers: parsed.housingSupportTiers || DEFAULT_HOUSING_SUPPORT_TIERS,
@@ -266,7 +277,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           if (loaded.salary_rules) setSalaryRules(loaded.salary_rules);
           if (loaded.pension_rules) setPensionRules(loaded.pension_rules);
           if (loaded.term_rules) setTermRules(loaded.term_rules);
-          if (loaded.margin_rules) setMarginRules(loaded.margin_rules);
+          if (loaded.margin_rules) {
+            setMarginRules(upgradeMarginRules(loaded.margin_rules));
+          } else {
+            setMarginRules(initialMarginRules);
+          }
           if (loaded.dsr_rules) setDsrRules(loaded.dsr_rules);
           if (loaded.support_settings) setSupportSettings(loaded.support_settings);
           if (loaded.personal_finance_rules) setPersonalRules(loaded.personal_finance_rules);
@@ -285,7 +300,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
             salaryRules: loaded.salary_rules || initialSalaryRules,
             pensionRules: loaded.pension_rules || initialPensionRules,
             termRules: loaded.term_rules || initialTermRules,
-            marginRules: loaded.margin_rules || initialMarginRules,
+            marginRules: upgradeMarginRules(loaded.margin_rules || []),
             dsrRules: loaded.dsr_rules || initialDsrRules,
             supportSettings: loaded.support_settings || initialSupportSettings,
             housingSupportTiers: hSupport,

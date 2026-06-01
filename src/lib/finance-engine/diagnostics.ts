@@ -75,9 +75,6 @@ export function runDiagnostics(params: {
   if (currentAgeYears < acceptance.minAge) {
     status = 'rejected';
     messages.push(`تم رفض الطلب: عمر العميل (${currentAgeYears} سنة) أقل من الحد الأدنى المقبول لدى ${bankName} والبالغ ${acceptance.minAge} سنة.`);
-  } else if (currentAgeYears > acceptance.maxAge) {
-    status = 'rejected';
-    messages.push(`تم رفض الطلب: عمر العميل (${currentAgeYears} سنة) يتجاوز الحد الأقصى المقبول لدى ${bankName} والبالغ ${acceptance.maxAge} سنة.`);
   }
 
   // Step 5.5: Check support type eligibility

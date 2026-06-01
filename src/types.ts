@@ -33,7 +33,7 @@ export interface ProductAcceptance {
   productId: ProductId;
   allowedSectors: SectorId[];
   minAge: number;
-  maxAge: number;
+  maxAge?: number;
   minSalary: number;
   minServiceMonths: number;
   allowMonthlySupport: boolean;
@@ -116,6 +116,7 @@ export interface MarginRule {
   endMargin: number; // e.g. 3.5 represents 3.5%
   calcType: 'fixed' | 'linear';
   isActive: boolean;
+  salaryTier?: 'below_25000' | 'above_or_equal_25000' | 'not_applicable';
 }
 
 export interface DsrRule {
@@ -123,7 +124,7 @@ export interface DsrRule {
   bankId: string;
   productType: 'real_estate_only' | 'real_estate_with_new_personal' | 'real_estate_with_existing_personal' | 'personal_only';
   supportType: 'none' | 'monthly' | 'down_payment';
-  customerStage: 'before_retirement' | 'after_retirement';
+  customerStage: 'active_before_retirement' | 'retired_after_retirement';
   dsrPercent: number;
   deductExistingObligations: boolean;
   active: boolean;
@@ -242,6 +243,7 @@ export interface DsrOutput {
   dsrPercentage: number;
   maxInstallment: number;
   ruleUsed: string;
+  error?: string;
 }
 
 export interface MarginOutput {
@@ -249,6 +251,11 @@ export interface MarginOutput {
   marginType: 'fixed' | 'linear';
   ruleUsed: string;
   interpolationDetails?: string;
+  salaryTier?: 'below_25000' | 'above_or_equal_25000' | 'not_applicable';
+  selectedMarginYear?: number;
+  bankName?: string;
+  productName?: string;
+  supportName?: string;
 }
 
 export interface PersonalFinanceOutput {

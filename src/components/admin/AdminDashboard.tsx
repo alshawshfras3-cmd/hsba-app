@@ -488,6 +488,7 @@ export default function AdminDashboard() {
   const [termRuleFormAllowedMonthsAfterRetirement, setTermRuleFormAllowedMonthsAfterRetirement] = useState('204');
   const [termRuleFormMinTermMonths, setTermRuleFormMinTermMonths] = useState('60');
   const [termRuleFormIsActive, setTermRuleFormIsActive] = useState(true);
+  const [termRuleFormMilitarySubType, setTermRuleFormMilitarySubType] = useState<'officer' | 'enlisted' | 'all'>('all');
 
   // Dynamic institution management states
   const [isInstitutionModalOpen, setIsInstitutionModalOpen] = useState(false);
@@ -785,6 +786,16 @@ export default function AdminDashboard() {
   const [selectedMarginBank, setSelectedMarginBank] = useState<string>('alahli');
   const [selectedMarginProduct, setSelectedMarginProduct] = useState<ProductId>('real_estate_only');
   const [selectedMarginSupport, setSelectedMarginSupport] = useState<SupportType>('none');
+  const [selectedMarginSalaryTier, setSelectedMarginSalaryTier] = useState<'below_25000' | 'above_or_equal_25000' | 'not_applicable'>('not_applicable');
+
+  useEffect(() => {
+    if (selectedMarginSupport === 'none') {
+      setSelectedMarginSalaryTier('not_applicable');
+    } else if (selectedMarginSalaryTier === 'not_applicable') {
+      setSelectedMarginSalaryTier('below_25000');
+    }
+  }, [selectedMarginSupport]);
+
   const [localMargins, setLocalMargins] = useState<Record<number, string>>({
     5: '3.80',
     10: '3.98',
@@ -804,81 +815,56 @@ export default function AdminDashboard() {
     const relevantRules = marginRules.filter(r => 
       r.bankId === selectedMarginBank && 
       r.productId === selectedMarginProduct && 
-      (r.supportType === selectedMarginSupport || r.supportType === 'all')
+      (r.supportType === selectedMarginSupport || r.supportType === 'all') &&
+      (r.salaryTier === selectedMarginSalaryTier || (!r.salaryTier && selectedMarginSalaryTier === 'not_applicable'))
     );
 
-    let p5 = '3.80';
-    let p10 = '3.98';
-    let p15 = '4.25';
-    let p20 = '4.60';
-    let p25 = '4.95';
-    let p30 = '5.25';
-    let method: 'linear' | 'fixed' = 'linear';
+    const yearsList = [5, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30];
+    const initialMargins: Record<number, string> = {};
 
-    if (relevantRules.length > 0) {
-      const r60 = relevantRules.find(r => r.toTermMonths === 60);
-      const r120 = relevantRules.find(r => r.toTermMonths === 120);
-      const r180 = relevantRules.find(r => r.toTermMonths === 180);
-      const r240 = relevantRules.find(r => r.toTermMonths === 240);
-      const r300 = relevantRules.find(r => r.toTermMonths === 300);
-      const r360 = relevantRules.find(r => r.toTermMonths === 360);
+    const hasRules = relevantRules.length > 0;
 
-      if (r60) p5 = r60.endMargin.toString();
-      if (r120) {
-        p10 = r120.endMargin.toString();
-        method = r120.calcType;
+    yearsList.forEach(year => {
+      const rY = relevantRules.find(r => r.toTermMonths === year * 12);
+      if (rY) {
+        initialMargins[year] = rY.endMargin.toString();
+      } else {
+        const isStandardYear = [5, 10, 15, 20, 25, 30].includes(year);
+        if (!hasRules && isStandardYear) {
+          if (year === 5) initialMargins[year] = '3.80';
+          else if (year === 10) initialMargins[year] = '3.98';
+          else if (year === 15) initialMargins[year] = '4.25';
+          else if (year === 20) initialMargins[year] = '4.60';
+          else if (year === 25) initialMargins[year] = '4.95';
+          else if (year === 30) initialMargins[year] = '5.25';
+        } else {
+          initialMargins[year] = '';
+        }
       }
-      if (r180) p15 = r180.endMargin.toString();
-      if (r240) p20 = r240.endMargin.toString();
-      if (r300) p25 = r300.endMargin.toString();
-      if (r360) p30 = r360.endMargin.toString();
+    });
+
+    let method: 'linear' | 'fixed' = 'fixed'; // Default is FIXED as requested
+    const foundMethodRule = relevantRules.find(r => r.calcType);
+    if (foundMethodRule) {
+      method = foundMethodRule.calcType;
     } else {
-      // Fallback matching logic for legacy rule structure ('real_estate' rule format)
       const oldRules = marginRules.filter(r => 
         r.bankId === selectedMarginBank && 
         r.productId === 'real_estate' && 
         (r.supportType === selectedMarginSupport || r.supportType === 'all')
       );
-      if (oldRules.length > 0) {
-        const r60 = oldRules.find(r => r.toTermMonths === 60);
-        const r120 = oldRules.find(r => r.toTermMonths === 120);
-        const r180 = oldRules.find(r => r.toTermMonths === 180);
-        const r240 = oldRules.find(r => r.toTermMonths === 240);
-        const r300 = oldRules.find(r => r.toTermMonths === 300);
-        const r360 = oldRules.find(r => r.toTermMonths === 360);
-
-        if (r60) p5 = r60.endMargin.toString();
-        if (r120) {
-          p10 = r120.endMargin.toString();
-          method = r120.calcType;
-        }
-        if (r180) p15 = r180.endMargin.toString();
-        if (r240) p20 = r240.endMargin.toString();
-        if (r300) p25 = r300.endMargin.toString();
-        if (r360) p30 = r360.endMargin.toString();
+      const foundOldMethodRule = oldRules.find(r => r.calcType);
+      if (foundOldMethodRule) {
+        method = foundOldMethodRule.calcType;
       }
     }
 
-    setLocalMargins({
-      5: p5,
-      10: p10,
-      15: p15,
-      20: p20,
-      25: p25,
-      30: p30
-    });
+    setLocalMargins(initialMargins);
     setLocalCalcMethod(method);
-  }, [selectedMarginBank, selectedMarginProduct, selectedMarginSupport, marginRules]);
+  }, [selectedMarginBank, selectedMarginProduct, selectedMarginSupport, selectedMarginSalaryTier, marginRules]);
 
-  // General update helper to map 5-30 year points to standard ranges for the calculation engine
+  // General update helper to map year points to standard ranges for the calculation engine
   const updateGlobalRulesFromLocal = (marginsRecord: Record<number, string>, method: 'linear' | 'fixed') => {
-    const p5 = parseFloat(marginsRecord[5]) || 0;
-    const p10 = parseFloat(marginsRecord[10]) || 0;
-    const p15 = parseFloat(marginsRecord[15]) || 0;
-    const p20 = parseFloat(marginsRecord[20]) || 0;
-    const p25 = parseFloat(marginsRecord[25]) || 0;
-    const p30 = parseFloat(marginsRecord[30]) || 0;
-
     const productIdsToFilter = [selectedMarginProduct];
     if (selectedMarginProduct === 'real_estate_with_new_personal') {
       productIdsToFilter.push('real_estate');
@@ -895,7 +881,8 @@ export default function AdminDashboard() {
     const remainingRules = marginRules.filter(r => {
       const matchesTarget = r.bankId === selectedMarginBank &&
                             productIdsToFilter.includes(r.productId) &&
-                            (r.supportType === normSupport || r.supportType === 'all');
+                            (r.supportType === normSupport || r.supportType === 'all') &&
+                            (r.salaryTier === selectedMarginSalaryTier || (!r.salaryTier && selectedMarginSalaryTier === 'not_applicable'));
       return !matchesTarget;
     });
 
@@ -903,19 +890,69 @@ export default function AdminDashboard() {
     
     // Generate rules for each of the products we want to map for this selection
     productIdsToFilter.forEach(pId => {
-      const definitions = [
-        { from: 0, to: 60, start: p5, end: p5, calcType: 'fixed' as const },
-        { from: 61, to: 120, start: p5, end: p10, calcType: method },
-        { from: 121, to: 180, start: p10, end: p15, calcType: method },
-        { from: 181, to: 240, start: p15, end: p20, calcType: method },
-        { from: 241, to: 300, start: p20, end: p25, calcType: method },
-        { from: 301, to: 360, start: p25, end: p30, calcType: method },
-        { from: 361, to: 9999, start: p30, end: p30, calcType: 'fixed' as const }
-      ];
+      const yearsList = [5, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30];
+      
+      const filledYears = yearsList.filter(year => {
+        const val = marginsRecord[year];
+        return val !== undefined && val !== '' && !isNaN(parseFloat(val)) && parseFloat(val) > 0;
+      });
+
+      filledYears.sort((a, b) => a - b);
+
+      if (filledYears.length === 0) {
+        return; // Empty table option
+      }
+
+      const definitions: Array<{ from: number, to: number, start: number, end: number, calcType: 'fixed' | 'linear' }> = [];
+
+      for (let i = 0; i < filledYears.length; i++) {
+        const currentYear = filledYears[i];
+        const currentMarginStr = marginsRecord[currentYear];
+        const currentMarginVal = parseFloat(currentMarginStr) || 0;
+
+        if (i === 0) {
+          // For the first filled year
+          definitions.push({
+            from: 0,
+            to: currentYear * 12,
+            start: currentMarginVal,
+            end: currentMarginVal,
+            calcType: 'fixed' as const
+          });
+        } else {
+          // For subsequent filled years
+          const prevYear = filledYears[i - 1];
+          const prevMarginStr = marginsRecord[prevYear];
+          const prevMarginVal = parseFloat(prevMarginStr) || 0;
+
+          const fromMonths = prevYear * 12 + 1;
+          const toMonths = currentYear * 12;
+
+          definitions.push({
+            from: fromMonths,
+            to: toMonths,
+            start: method === 'fixed' ? currentMarginVal : prevMarginVal,
+            end: currentMarginVal,
+            calcType: method
+          });
+        }
+      }
+
+      // Add a final fallback for anything above the highest year (highestYear * 12 + 1 to 9999)
+      const lastYear = filledYears[filledYears.length - 1];
+      const lastMarginStr = marginsRecord[lastYear];
+      const lastMarginVal = parseFloat(lastMarginStr) || 0;
+      definitions.push({
+        from: lastYear * 12 + 1,
+        to: 9999,
+        start: lastMarginVal,
+        end: lastMarginVal,
+        calcType: 'fixed' as const
+      });
 
       definitions.forEach((def, index) => {
         newRulesForThisCombo.push({
-          id: `gen_margin_${selectedMarginBank}_${pId}_${normSupport}_t${def.from}_${def.to}_${index}`,
+          id: `gen_margin_${selectedMarginBank}_${pId}_${normSupport}_${selectedMarginSalaryTier}_t${def.from}_${def.to}_${index}`,
           bankId: selectedMarginBank,
           productId: pId as ProductId,
           supportType: normSupport as any,
@@ -925,7 +962,8 @@ export default function AdminDashboard() {
           startMargin: def.start,
           endMargin: def.end,
           calcType: def.calcType,
-          isActive: true
+          isActive: true,
+          salaryTier: selectedMarginSalaryTier
         });
       });
     });
@@ -1034,7 +1072,7 @@ export default function AdminDashboard() {
   const [formDsrBankId, setFormDsrBankId] = useState<string>('default');
   const [formDsrProductType, setFormDsrProductType] = useState<'real_estate_only' | 'real_estate_with_new_personal' | 'real_estate_with_existing_personal' | 'personal_only'>('real_estate_only');
   const [formDsrSupportType, setFormDsrSupportType] = useState<'none' | 'monthly' | 'down_payment'>('none');
-  const [formDsrCustomerStage, setFormDsrCustomerStage] = useState<'before_retirement' | 'after_retirement'>('before_retirement');
+  const [formDsrCustomerStage, setFormDsrCustomerStage] = useState<'active_before_retirement' | 'retired_after_retirement'>('active_before_retirement');
   const [formDsrPercentStr, setFormDsrPercentStr] = useState<string>('');
   const [formDsrDeductExisting, setFormDsrDeductExisting] = useState<boolean>(true);
   const [formDsrActive, setFormDsrActive] = useState<boolean>(true);
@@ -1059,8 +1097,8 @@ export default function AdminDashboard() {
   ];
 
   const DSR_CUSTOMER_STAGES = [
-    { id: 'before_retirement', nameAr: 'موظف نشط (قبل التقاعد)' },
-    { id: 'after_retirement', nameAr: 'متقاعد (بعد التقاعد)' }
+    { id: 'active_before_retirement', nameAr: 'موظف نشط (قبل التقاعد)' },
+    { id: 'retired_after_retirement', nameAr: 'متقاعد (بعد التقاعد)' }
   ];
 
   const handleOpenAddDsrModal = () => {
@@ -1068,7 +1106,7 @@ export default function AdminDashboard() {
     setFormDsrBankId('default');
     setFormDsrProductType('real_estate_only');
     setFormDsrSupportType('none');
-    setFormDsrCustomerStage('before_retirement');
+    setFormDsrCustomerStage('active_before_retirement');
     setFormDsrPercentStr('');
     setFormDsrDeductExisting(true);
     setFormDsrActive(true);
@@ -1097,6 +1135,22 @@ export default function AdminDashboard() {
   };
 
   const handleToggleDsrRuleActive = (id: string) => {
+    const targetRule = dsrRules.find(r => r.id === id);
+    if (targetRule && !targetRule.active) {
+      // Trying to activate, ensure no active duplicate exists
+      const duplicateExists = dsrRules.some(
+        r => r.id !== id &&
+             r.bankId === targetRule.bankId &&
+             r.productType === targetRule.productType &&
+             r.supportType === targetRule.supportType &&
+             r.customerStage === targetRule.customerStage &&
+             r.active
+      );
+      if (duplicateExists) {
+        showToast('خطأ: تكرار غير مسموح. توجد قاعدة أخرى نشطة بنفس المفتاح لهذه الجهة التمويلية.', 'refuse');
+        return;
+      }
+    }
     setDsrRules(prev => prev.map(r => r.id === id ? { ...r, active: !r.active } : r));
     showToast('تم تحديث حالة تفعيل القاعدة بنجاح!', 'success');
   };
@@ -1114,6 +1168,23 @@ export default function AdminDashboard() {
     }
 
     const ruleId = editingDsrRule ? editingDsrRule.id : `dsr_rule_${Date.now()}`;
+
+    // Validate that no active duplicate will exist
+    if (formDsrActive) {
+      const duplicateExists = dsrRules.some(
+        r => r.id !== ruleId &&
+             r.bankId === formDsrBankId &&
+             r.productType === formDsrProductType &&
+             r.supportType === formDsrSupportType &&
+             r.customerStage === formDsrCustomerStage &&
+             r.active
+      );
+      if (duplicateExists) {
+        setFormDsrError('خطأ تكرار: توجد بالفعل قاعدة أخرى مسجلة ونشطة لمزيج (البنك + المنتج + الدعم + المرحلة). لا يُسمح بأكثر من قاعدة نشطة للمفتاح نفسه.');
+        return;
+      }
+    }
+
     const newRule: DsrRule = {
       id: ruleId,
       bankId: formDsrBankId,
@@ -1144,7 +1215,6 @@ export default function AdminDashboard() {
   const [formProductId, setFormProductId] = useState<ProductId>('real_estate_only');
   const [formMinSalary, setFormMinSalary] = useState('');
   const [formMinAge, setFormMinAge] = useState('');
-  const [formMaxAge, setFormMaxAge] = useState('');
   const [formMinServiceMonths, setFormMinServiceMonths] = useState('');
   
   const [formAllowUnsupported, setFormAllowUnsupported] = useState(true);
@@ -1450,7 +1520,6 @@ export default function AdminDashboard() {
       setFormProductId('real_estate_only');
       setFormMinSalary('');
       setFormMinAge('');
-      setFormMaxAge('');
       setFormMinServiceMonths('');
       setFormAllowUnsupported(true);
       setFormAllowMonthlySupport(true);
@@ -1488,7 +1557,6 @@ export default function AdminDashboard() {
 
       const minSalaryVal = selectedRule.minSalary !== undefined && selectedRule.minSalary !== null ? String(selectedRule.minSalary) : "";
       const minAgeVal = selectedRule.minAge !== undefined && selectedRule.minAge !== null ? String(selectedRule.minAge) : "";
-      const maxAgeVal = selectedRule.maxAge !== undefined && selectedRule.maxAge !== null ? String(selectedRule.maxAge) : "";
       const minServiceVal = selectedRule.minServiceMonths !== undefined && selectedRule.minServiceMonths !== null ? String(selectedRule.minServiceMonths) : "";
 
       let allowedSectors: SectorId[] = [];
@@ -1506,7 +1574,6 @@ export default function AdminDashboard() {
       // Safe fallback definitions based on User Intent Checklist:
       const minSalary = parseArabicAndEnglishNumber(minSalaryVal);
       const minAge = parseArabicAndEnglishNumber(minAgeVal);
-      const maxAge = parseArabicAndEnglishNumber(maxAgeVal);
       const minServiceMonths = parseArabicAndEnglishNumber(minServiceVal);
       const rejectionMessage = selectedRule.defaultRejectionMessage || "";
       const active = selectedRule.isActive !== false;
@@ -1519,7 +1586,6 @@ export default function AdminDashboard() {
       setFormProductId(selectedRule.productId || 'real_estate_only');
       setFormMinSalary(minSalary);
       setFormMinAge(minAge);
-      setFormMaxAge(maxAge);
       setFormMinServiceMonths(minServiceMonths);
       setFormAllowUnsupported(selectedRule.allowUnsupported !== false);
       setFormAllowMonthlySupport(selectedRule.allowMonthlySupport !== false);
@@ -1566,7 +1632,6 @@ export default function AdminDashboard() {
       // Safe clean input reading - converting Arabic numbers and commas
       const cleanSalaryStr = parseArabicAndEnglishNumber(formMinSalary).replace(/,/g, '').trim();
       const cleanMinAgeStr = parseArabicAndEnglishNumber(formMinAge).replace(/,/g, '').trim();
-      const cleanMaxAgeStr = parseArabicAndEnglishNumber(formMaxAge).replace(/,/g, '').trim();
       const cleanServiceStr = parseArabicAndEnglishNumber(formMinServiceMonths).replace(/,/g, '').trim();
 
       if (cleanSalaryStr === '') {
@@ -1577,10 +1642,6 @@ export default function AdminDashboard() {
         setFormError('الحد الأدنى للعمر مطلوب.');
         return;
       }
-      if (cleanMaxAgeStr === '') {
-        setFormError('الحد الأقصى للعمر مطلوب.');
-        return;
-      }
       if (cleanServiceStr === '') {
         setFormError('الحد الأدنى لخدمة الأشهر مطلوب.');
         return;
@@ -1588,7 +1649,6 @@ export default function AdminDashboard() {
 
       const salaryNum = Number(cleanSalaryStr);
       const minAgeNum = Number(cleanMinAgeStr);
-      const maxAgeNum = Number(cleanMaxAgeStr);
       const serviceNum = Number(cleanServiceStr);
 
       if (isNaN(salaryNum) || salaryNum < 0) {
@@ -1597,10 +1657,6 @@ export default function AdminDashboard() {
       }
       if (isNaN(minAgeNum) || minAgeNum < 18) {
         setFormError('الحد الأدنى للعمر يجب ألا يقل عن 18 سنة.');
-        return;
-      }
-      if (isNaN(maxAgeNum) || maxAgeNum < minAgeNum) {
-        setFormError('الحد الأقصى للعمر يجب أن يكون أكبر من أو يساوي الحد الأدنى.');
         return;
       }
       if (isNaN(serviceNum) || serviceNum < 0) {
@@ -1624,7 +1680,6 @@ export default function AdminDashboard() {
         productId: formProductId,
         minSalary: salaryNum,
         minAge: minAgeNum,
-        maxAge: maxAgeNum,
         minServiceMonths: serviceNum,
         allowUnsupported: formAllowUnsupported,
         allowMonthlySupport: formAllowMonthlySupport,
@@ -1950,7 +2005,7 @@ export default function AdminDashboard() {
           bankId: cleanId,
           productType: 'real_estate_only',
           supportType: 'none',
-          customerStage: 'before_retirement',
+          customerStage: 'active_before_retirement',
           dsrPercent: 55,
           deductExistingObligations: true,
           active: true
@@ -1960,7 +2015,7 @@ export default function AdminDashboard() {
           bankId: cleanId,
           productType: 'real_estate_only',
           supportType: 'monthly',
-          customerStage: 'before_retirement',
+          customerStage: 'active_before_retirement',
           dsrPercent: instType === 'finance_company' ? 60 : 65,
           deductExistingObligations: true,
           active: true
@@ -1970,7 +2025,7 @@ export default function AdminDashboard() {
           bankId: cleanId,
           productType: 'real_estate_only',
           supportType: 'down_payment',
-          customerStage: 'before_retirement',
+          customerStage: 'active_before_retirement',
           dsrPercent: 55,
           deductExistingObligations: true,
           active: true
@@ -1980,7 +2035,7 @@ export default function AdminDashboard() {
           bankId: cleanId,
           productType: 'personal_only',
           supportType: 'none',
-          customerStage: 'before_retirement',
+          customerStage: 'active_before_retirement',
           dsrPercent: 33,
           deductExistingObligations: true,
           active: true
@@ -1994,7 +2049,7 @@ export default function AdminDashboard() {
             bankId: cleanId,
             productType: 'real_estate_only',
             supportType: 'none',
-            customerStage: 'after_retirement',
+            customerStage: 'retired_after_retirement',
             dsrPercent: 55,
             deductExistingObligations: true,
             active: true
@@ -2004,7 +2059,7 @@ export default function AdminDashboard() {
             bankId: cleanId,
             productType: 'real_estate_only',
             supportType: 'monthly',
-            customerStage: 'after_retirement',
+            customerStage: 'retired_after_retirement',
             dsrPercent: instType === 'finance_company' ? 60 : 65,
             deductExistingObligations: true,
             active: true
@@ -2014,7 +2069,7 @@ export default function AdminDashboard() {
             bankId: cleanId,
             productType: 'personal_only',
             supportType: 'none',
-            customerStage: 'after_retirement',
+            customerStage: 'retired_after_retirement',
             dsrPercent: 25,
             deductExistingObligations: true,
             active: true
@@ -2240,9 +2295,6 @@ export default function AdminDashboard() {
                     <th className="p-4">شعار واسم الجهة</th>
                     <th className="p-4">الترميز (ID)</th>
                     <th className="p-4">نوع الجهة</th>
-                    <th className="p-4">أقصى تمويل بالشهور</th>
-                    <th className="p-4">أقصى عمر للانتهاء</th>
-                    <th className="p-4 text-center">خدمة المتقاعدين</th>
                     <th className="p-4 text-center">حالة الجهة</th>
                     <th className="p-4 text-center">الإجراءات</th>
                   </tr>
@@ -2269,29 +2321,6 @@ export default function AdminDashboard() {
                             : 'bg-[#0057B8]/10 text-[#0057B8] border border-[#0057B8]/20'
                         }`}>
                           {bank.institutionType === 'finance_company' ? 'شركة تمويل' : 'بنك'}
-                        </span>
-                      </td>
-                      <td className="p-4">
-                        <NumericInput
-                          id={`bank-term-${bank.id}`}
-                          value={bank.maxTermMonths}
-                          onChange={(val) => setBanks(prev => prev.map(b => b.id === bank.id ? { ...b, maxTermMonths: val } : b))}
-                          allowDecimals={false}
-                          className="w-20 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-center font-semibold"
-                        />
-                      </td>
-                      <td className="p-4">
-                        <NumericInput
-                          id={`bank-age-${bank.id}`}
-                          value={bank.maxAgeAtEnd}
-                          onChange={(val) => setBanks(prev => prev.map(b => b.id === bank.id ? { ...b, maxAgeAtEnd: val } : b))}
-                          allowDecimals={false}
-                          className="w-16 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-center font-semibold"
-                        />
-                      </td>
-                      <td className="p-4 text-center">
-                        <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold ${bank.allowAfterRetirement ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
-                          {bank.allowAfterRetirement ? 'متاح' : 'غير متاح'}
                         </span>
                       </td>
                       <td className="p-4 text-center">
@@ -2460,80 +2489,6 @@ export default function AdminDashboard() {
                           </button>
                         ))}
                       </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-gray-100 pt-3">
-                      {/* Max Term */}
-                      <div>
-                        <label className="block text-xs font-bold text-gray-700 mb-1">أقصى مدة تمويل بالأشهر:</label>
-                        <input
-                          type="number"
-                          value={instMaxTermMonths}
-                          onChange={(e) => setInstMaxTermMonths(Number(e.target.value) || 0)}
-                          className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-xs text-center font-bold font-mono focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
-                        />
-                        <span className="text-[10px] text-gray-400 block mt-0.5 mt-1">يعادل {Math.floor(instMaxTermMonths / 12)} سنة و {instMaxTermMonths % 12} شهر</span>
-                      </div>
-
-                      {/* Max Age */}
-                      <div>
-                        <label className="block text-xs font-bold text-gray-700 mb-1">أقصى عمر لانتهاء التمويل:</label>
-                        <input
-                          type="number"
-                          value={instMaxAgeAtEnd}
-                          onChange={(e) => setInstMaxAgeAtEnd(Number(e.target.value) || 0)}
-                          className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-xs text-center font-bold font-mono focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Allow after retirement and months */}
-                    <div className="border-t border-gray-100 pt-3">
-                      <div className="flex items-center justify-between mb-2 pb-1">
-                        <span className="text-xs font-bold text-gray-700">هل تخدم المتقاعدين وتسمح بالتمويل لأصحاب الهوية المتقاعدة؟</span>
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setInstAllowAfterRetirement(true);
-                              if (instMonthsAfterRetirement === 0) setInstMonthsAfterRetirement(120);
-                            }}
-                            className={`px-3 py-1 text-xs font-bold rounded-lg cursor-pointer ${
-                              instAllowAfterRetirement 
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
-                                : 'bg-gray-50 text-gray-500 border border-gray-100'
-                            }`}
-                          >
-                            نعم
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setInstAllowAfterRetirement(false);
-                            }}
-                            className={`px-3 py-1 text-xs font-bold rounded-lg cursor-pointer ${
-                              !instAllowAfterRetirement 
-                                ? 'bg-rose-50 text-rose-700 border border-rose-200' 
-                                : 'bg-gray-50 text-gray-500 border border-gray-100'
-                            }`}
-                          >
-                            لا
-                          </button>
-                        </div>
-                      </div>
-
-                      {instAllowAfterRetirement && (
-                        <div className="bg-emerald-50/50 p-3 rounded-xl border border-emerald-100 animate-fade-in">
-                          <label className="block text-xs font-bold text-emerald-800 mb-1">أشهر السماح القابلة للتمديد بعد سن التقاعد المعتمد:</label>
-                          <input
-                            type="number"
-                            value={instMonthsAfterRetirement}
-                            onChange={(e) => setInstMonthsAfterRetirement(Number(e.target.value) || 0)}
-                            className="w-full max-w-[150px] bg-white border border-emerald-200 rounded-lg px-3 py-1.5 text-xs text-center font-bold font-mono text-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                          />
-                          <p className="text-[10px] text-emerald-600 mt-1">تؤخذ بعين الاعتبار في معالجة القسط التقاعدي والسن المقر بالتكامل مع القطاعات.</p>
-                        </div>
-                      )}
                     </div>
 
                     {/* isActive status */}
@@ -2710,7 +2665,6 @@ export default function AdminDashboard() {
                       <th className="p-4 font-bold">نوع المنتج</th>
                       <th className="p-4 font-bold text-center">أقل راتب مقبول</th>
                       <th className="p-4 font-bold text-center">أقل عمر</th>
-                      <th className="p-4 font-bold text-center">أعلى عمر</th>
                       <th className="p-4 font-bold text-center">أقل خدمة</th>
                       <th className="p-4 font-bold">الدعم المسموح</th>
                       <th className="p-4 font-bold">القطاعات المسموحة</th>
@@ -2734,7 +2688,7 @@ export default function AdminDashboard() {
                       if (filteredList.length === 0) {
                         return (
                           <tr>
-                            <td colSpan={10} className="p-8 text-center text-gray-400 font-medium">
+                            <td colSpan={9} className="p-8 text-center text-gray-400 font-medium">
                               لا توجد قواعد قبول مسجلة تطابق التصفية الحالية.
                             </td>
                           </tr>
@@ -2764,9 +2718,6 @@ export default function AdminDashboard() {
                             </td>
                             <td className="p-4 text-center font-semibold text-gray-700">
                               {prod.minAge} <span className="text-[10px] font-normal text-gray-400">سنة</span>
-                            </td>
-                            <td className="p-4 text-center font-semibold text-gray-700">
-                              {prod.maxAge} <span className="text-[10px] font-normal text-gray-400">سنة</span>
                             </td>
                             <td className="p-4 text-center font-semibold text-gray-700">
                               {prod.minServiceMonths} <span className="text-[10px] font-normal text-gray-400">شهر</span>
@@ -2953,20 +2904,6 @@ export default function AdminDashboard() {
                             value={formMinAge}
                             placeholder="مثال: 18"
                             onChange={(e) => setFormMinAge(e.target.value)}
-                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
-                          />
-                        </div>
-
-                        {/* Max Age Input */}
-                        <div className="space-y-1.5">
-                          <label className="block text-xs font-bold text-gray-700">أعلى عمر للعميل مقبول ومفعل *</label>
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            id="form-max-age-input"
-                            value={formMaxAge}
-                            placeholder="مثال: 70 أو 75"
-                            onChange={(e) => setFormMaxAge(e.target.value)}
                             className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
                           />
                         </div>
@@ -5329,12 +5266,18 @@ export default function AdminDashboard() {
                       const isMilitary = r.sectorId === 'military';
                       const isRetired = r.sectorId === 'retired';
 
+                      let sectorName = sectorLabels[r.sectorId] || r.sectorId;
+                      if (isMilitary) {
+                        const subLabel = r.militarySubType === 'officer' ? 'ضباط' : r.militarySubType === 'enlisted' ? 'أفراد' : 'الكل';
+                        sectorName = `عسكري (${subLabel})`;
+                      }
+
                       return (
                         <tr key={index} className="hover:bg-slate-50 transition-colors">
                           <td className="px-6 py-4 whitespace-nowrap font-bold text-slate-800">
                             <div className="flex items-center gap-2">
                               <span className="w-1.5 h-1.5 rounded-full bg-blue-600 shrink-0" />
-                              <span>{sectorLabels[r.sectorId] || r.sectorId}</span>
+                              <span>{sectorName}</span>
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap font-mono text-slate-700">{r.maxTermMonths} شهر</td>
@@ -5392,6 +5335,7 @@ export default function AdminDashboard() {
                                   setTermRuleFormAllowedMonthsAfterRetirement(r.allowedMonthsAfterRetirement.toString());
                                   setTermRuleFormMinTermMonths((r.minTermMonths || 60).toString());
                                   setTermRuleFormIsActive(r.isActive);
+                                  setTermRuleFormMilitarySubType(r.militarySubType || 'all');
                                 }}
                                 className="inline-flex items-center gap-1 px-3 py-1.5 border border-[#E5E7EB] hover:border-[#0057B8] text-[#0057B8] hover:bg-[#0057B8]/5 rounded-lg transition-all font-bold text-[11px] cursor-pointer"
                               >
@@ -5458,6 +5402,22 @@ export default function AdminDashboard() {
                         <option value="all">🌍 الكل / عام (احتياطي)</option>
                       </select>
                     </div>
+
+                    {/* Military SubType Select */}
+                    {termRuleFormSectorId === 'military' && (
+                      <div>
+                        <label className="block text-[11px] font-bold text-gray-700 mb-1.5">تصنيف العسكري:</label>
+                        <select
+                          value={termRuleFormMilitarySubType}
+                          onChange={(e) => setTermRuleFormMilitarySubType(e.target.value as 'officer' | 'enlisted' | 'all')}
+                          className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-right"
+                        >
+                          <option value="all">👨‍✈️ الكل</option>
+                          <option value="officer">👮‍♂️ ضباط</option>
+                          <option value="enlisted">💂‍♂️ أفراد</option>
+                        </select>
+                      </div>
+                    )}
 
                     {/* Max Term Months */}
                     <div>
@@ -5667,16 +5627,21 @@ export default function AdminDashboard() {
 
                         if (isAddingTermRule) {
                           // Check duplicate
-                          const duplicate = termRules.some(r => r.bankId === termActiveBankId && r.sectorId === termRuleFormSectorId);
+                          const duplicate = termRules.some(r => 
+                            r.bankId === termActiveBankId && 
+                            r.sectorId === termRuleFormSectorId &&
+                            (termRuleFormSectorId !== 'military' || (r.militarySubType || 'all') === termRuleFormMilitarySubType)
+                          );
                           if (duplicate) {
-                            alert("هناك قاعدة مسجلة بالفعل لهذا القطاع وتحت هذا البنك. يرجى تعديلها بدلاً من إضافة مكرر.");
+                            alert("هناك قاعدة مسجلة بالفعل لهذا القطاع والتصنيف وتحت هذا البنك. يرجى تعديلها بدلاً من إضافة مكرر.");
                             return;
                           }
 
                           const newRule: import("../../types").TermRule = {
                             bankId: termActiveBankId,
                             sectorId: termRuleFormSectorId as import("../../types").SectorId,
-                            rankId: 'all',
+                            militarySubType: termRuleFormSectorId === 'military' ? termRuleFormMilitarySubType : undefined,
+                            rankId: termRuleFormSectorId === 'military' && termRuleFormMilitarySubType !== 'all' ? termRuleFormMilitarySubType : 'all',
                             productId: 'real_estate',
                             supportType: 'all',
                             maxTermMonths: maxTermVal,
@@ -5697,6 +5662,8 @@ export default function AdminDashboard() {
                           updated[editingTermRuleIndex] = {
                             ...updated[editingTermRuleIndex],
                             sectorId: termRuleFormSectorId as import("../../types").SectorId,
+                            militarySubType: termRuleFormSectorId === 'military' ? termRuleFormMilitarySubType : undefined,
+                            rankId: termRuleFormSectorId === 'military' && termRuleFormMilitarySubType !== 'all' ? termRuleFormMilitarySubType : 'all',
                             maxTermMonths: maxTermVal,
                             maxAgeAtEnd: maxAgeVal,
                             minTermMonths: minTermVal,
@@ -5835,6 +5802,35 @@ export default function AdminDashboard() {
                   })}
                 </div>
               </div>
+
+              {/* 4. Selector Salary Tier (فئة الراتب) */}
+              {(selectedMarginSupport === 'monthly' || selectedMarginSupport === 'downpayment' || selectedMarginSupport === 'down_payment') && (
+                <div className="animate-fade-in border-t border-gray-150 pt-4">
+                  <span className="block text-xs font-bold text-gray-700 mb-3 font-sans font-extrabold text-[#0057B8]">ثالثاً: فئة الراتب</span>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { id: 'below_25000', nameAr: '💵 أقل من 25,000' },
+                      { id: 'above_or_equal_25000', nameAr: '💰 25,000 فأكثر' }
+                    ].map((t) => {
+                      const isSelected = selectedMarginSalaryTier === t.id;
+                      return (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => setSelectedMarginSalaryTier(t.id as any)}
+                          className={`px-4 py-2.5 rounded-xl border text-xs font-bold font-sans transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-[#0057B8] border-[#0057B8] text-white shadow-xs font-extrabold'
+                              : 'bg-white border-gray-200 text-gray-600 hover:bg-slate-50'
+                          }`}
+                        >
+                          {t.nameAr}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Active Margins Configuration Table */}
@@ -5846,6 +5842,7 @@ export default function AdminDashboard() {
                     {formBanksList.find(b => b.id === selectedMarginBank)?.nameAr || selectedMarginBank} — {' '}
                     {selectedMarginProduct === 'real_estate_only' ? 'عقاري فقط' : selectedMarginProduct === 'real_estate_with_new_personal' ? 'عقاري + شخصي جديد' : 'عقاري مع شخصي قائم'} — {' '}
                     {selectedMarginSupport === 'none' ? 'غير مدعوم' : selectedMarginSupport === 'monthly' ? 'دعم شهري' : 'دعم دفعة'}
+                    {(selectedMarginSupport !== 'none') && ` (${selectedMarginSalaryTier === 'below_25000' ? 'فئة راتب أقل من 25 ألف' : 'فئة راتب 25 ألف فأكثر'})`}
                   </h3>
                   <p className="text-[11px] text-[#6B7280] mt-0.5">جدول هوامش الفوائد والنسب السنوية المعتمدة.</p>
                 </div>
@@ -5859,7 +5856,7 @@ export default function AdminDashboard() {
                       onClick={() => handleCalcMethodChange('linear')}
                       className={`px-3 py-1.5 rounded-lg text-xs font-bold font-sans transition-all cursor-pointer ${
                         localCalcMethod === 'linear'
-                          ? 'bg-[#0057B8] text-white font-extrabold'
+                          ? 'bg-[#0057B8] text-white font-extrabold shadow-sm'
                           : 'bg-white text-gray-600 border border-gray-100 hover:bg-slate-50'
                       }`}
                     >
@@ -5870,7 +5867,7 @@ export default function AdminDashboard() {
                       onClick={() => handleCalcMethodChange('fixed')}
                       className={`px-3 py-1.5 rounded-lg text-xs font-bold font-sans transition-all cursor-pointer ${
                         localCalcMethod === 'fixed'
-                          ? 'bg-[#0057B8] text-white font-extrabold'
+                          ? 'bg-[#0057B8] text-white font-extrabold shadow-sm'
                           : 'bg-white text-gray-600 border border-gray-100 hover:bg-slate-50'
                       }`}
                     >
@@ -5899,10 +5896,10 @@ export default function AdminDashboard() {
                     {[
                       { year: 5, label: '5 سنوات' },
                       { year: 10, label: '10 سنوات' },
-                      { year: 15, label: '15 سنة' },
-                      { year: 20, label: '20 سنة' },
-                      { year: 25, label: '25 سنة' },
-                      { year: 30, label: '30 سنة' }
+                      ...Array.from({ length: 20 }, (_, i) => {
+                        const year = 11 + i;
+                        return { year, label: `${year} سنة` };
+                      })
                     ].map((row) => (
                       <tr key={row.year} className="hover:bg-slate-50 transition-colors">
                         <td className="px-6 py-4 whitespace-nowrap text-right font-bold text-slate-800 font-sans">
@@ -5913,7 +5910,13 @@ export default function AdminDashboard() {
                             type="text"
                             inputMode="decimal"
                             value={localMargins[row.year] ?? ''}
-                            onChange={(e) => handleMarginLocalChange(row.year, e.target.value)}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              // Allow digits, single decimal point, or empty string
+                              if (val === '' || /^[0-9]*\.?[0-9]*$/.test(val)) {
+                                handleMarginLocalChange(row.year, val);
+                              }
+                            }}
                             onBlur={(e) => handleMarginBlur(row.year, e.target.value)}
                             className="bg-white border border-gray-300 rounded-xl px-4 py-2 w-full max-w-[200px] text-xs font-bold font-mono focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-right"
                             placeholder="0.00"

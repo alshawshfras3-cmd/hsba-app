@@ -7,7 +7,7 @@ export const initialDsrRules: DsrRule[] = [
     bankId: 'default',
     productType: 'real_estate_only',
     supportType: 'none',
-    customerStage: 'before_retirement',
+    customerStage: 'active_before_retirement',
     dsrPercent: 55,
     deductExistingObligations: true,
     active: true
@@ -18,7 +18,7 @@ export const initialDsrRules: DsrRule[] = [
     bankId: 'default',
     productType: 'real_estate_only',
     supportType: 'monthly',
-    customerStage: 'before_retirement',
+    customerStage: 'active_before_retirement',
     dsrPercent: 65,
     deductExistingObligations: true,
     active: true
@@ -29,7 +29,7 @@ export const initialDsrRules: DsrRule[] = [
     bankId: 'default',
     productType: 'real_estate_only',
     supportType: 'down_payment',
-    customerStage: 'before_retirement',
+    customerStage: 'active_before_retirement',
     dsrPercent: 55,
     deductExistingObligations: true,
     active: true
@@ -40,7 +40,7 @@ export const initialDsrRules: DsrRule[] = [
     bankId: 'default',
     productType: 'real_estate_only',
     supportType: 'none',
-    customerStage: 'after_retirement',
+    customerStage: 'retired_after_retirement',
     dsrPercent: 55,
     deductExistingObligations: true,
     active: true
@@ -51,7 +51,7 @@ export const initialDsrRules: DsrRule[] = [
     bankId: 'default',
     productType: 'real_estate_only',
     supportType: 'monthly',
-    customerStage: 'after_retirement',
+    customerStage: 'retired_after_retirement',
     dsrPercent: 65,
     deductExistingObligations: true,
     active: true
@@ -62,7 +62,7 @@ export const initialDsrRules: DsrRule[] = [
     bankId: 'default',
     productType: 'real_estate_only',
     supportType: 'down_payment',
-    customerStage: 'after_retirement',
+    customerStage: 'retired_after_retirement',
     dsrPercent: 55,
     deductExistingObligations: true,
     active: true
@@ -73,7 +73,7 @@ export const initialDsrRules: DsrRule[] = [
     bankId: 'default',
     productType: 'real_estate_with_new_personal',
     supportType: 'none',
-    customerStage: 'before_retirement',
+    customerStage: 'active_before_retirement',
     dsrPercent: 55,
     deductExistingObligations: true,
     active: true
@@ -84,7 +84,7 @@ export const initialDsrRules: DsrRule[] = [
     bankId: 'default',
     productType: 'real_estate_with_new_personal',
     supportType: 'monthly',
-    customerStage: 'before_retirement',
+    customerStage: 'active_before_retirement',
     dsrPercent: 65,
     deductExistingObligations: true,
     active: true
@@ -95,7 +95,7 @@ export const initialDsrRules: DsrRule[] = [
     bankId: 'default',
     productType: 'real_estate_with_new_personal',
     supportType: 'down_payment',
-    customerStage: 'before_retirement',
+    customerStage: 'active_before_retirement',
     dsrPercent: 55,
     deductExistingObligations: true,
     active: true
@@ -106,7 +106,7 @@ export const initialDsrRules: DsrRule[] = [
     bankId: 'default',
     productType: 'real_estate_with_existing_personal',
     supportType: 'none',
-    customerStage: 'before_retirement',
+    customerStage: 'active_before_retirement',
     dsrPercent: 55,
     deductExistingObligations: true,
     active: true
@@ -117,7 +117,7 @@ export const initialDsrRules: DsrRule[] = [
     bankId: 'default',
     productType: 'real_estate_with_existing_personal',
     supportType: 'monthly',
-    customerStage: 'before_retirement',
+    customerStage: 'active_before_retirement',
     dsrPercent: 65,
     deductExistingObligations: true,
     active: true
@@ -128,7 +128,7 @@ export const initialDsrRules: DsrRule[] = [
     bankId: 'default',
     productType: 'real_estate_with_existing_personal',
     supportType: 'down_payment',
-    customerStage: 'before_retirement',
+    customerStage: 'active_before_retirement',
     dsrPercent: 55,
     deductExistingObligations: true,
     active: true
@@ -139,7 +139,7 @@ export const initialDsrRules: DsrRule[] = [
     bankId: 'default',
     productType: 'personal_only',
     supportType: 'none',
-    customerStage: 'before_retirement',
+    customerStage: 'active_before_retirement',
     dsrPercent: 33,
     deductExistingObligations: true,
     active: true
@@ -150,7 +150,7 @@ export const initialDsrRules: DsrRule[] = [
     bankId: 'default',
     productType: 'personal_only',
     supportType: 'none',
-    customerStage: 'after_retirement',
+    customerStage: 'retired_after_retirement',
     dsrPercent: 25,
     deductExistingObligations: true,
     active: true
@@ -162,7 +162,7 @@ export const initialDsrRules: DsrRule[] = [
     bankId: 'alahli',
     productType: 'real_estate_only',
     supportType: 'monthly',
-    customerStage: 'before_retirement',
+    customerStage: 'active_before_retirement',
     dsrPercent: 65,
     deductExistingObligations: true,
     active: true
@@ -172,7 +172,7 @@ export const initialDsrRules: DsrRule[] = [
     bankId: 'alahli',
     productType: 'personal_only',
     supportType: 'none',
-    customerStage: 'before_retirement',
+    customerStage: 'active_before_retirement',
     dsrPercent: 33,
     deductExistingObligations: true,
     active: true
