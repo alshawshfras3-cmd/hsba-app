@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useAppState } from "../context/AppContext";
 import { useAuth } from "../contexts/AuthContext";
 import { useLocation } from "../hooks/useLocation";
+import { useTheme } from "../contexts/ThemeContext";
 import { supabase, hasSupabaseKeys } from "../lib/supabase";
 import { 
   User, 
@@ -18,16 +19,36 @@ import {
   AlertCircle, 
   CheckCircle2, 
   ArrowRight,
-  Info
+  Info,
+  Trash2,
+  Lock,
+  Sun,
+  Moon,
+  Laptop
 } from "lucide-react";
 
 export function AccountPage() {
-  const { user, userRole, signOut, userSubscriptions } = useAppState();
+  const { user, userRole, signOut, userSubscriptions, refreshProfile } = useAppState();
   const { profile } = useAuth();
+  const { theme, setTheme } = useTheme();
   const location = useLocation();
 
-  const [resetLoading, setResetLoading] = useState(false);
-  const [resetMessage, setResetMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  // Profile states
+  const [fullNameInput, setFullNameInput] = useState(profile?.full_name || user?.user_metadata?.full_name || '');
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileMessage, setProfileMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+
+  // Password update states
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passwordMessage, setPasswordMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+
+  // Deletion states
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [confirmDeleteEmail, setConfirmDeleteEmail] = useState('');
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   const handleVibrate = () => {
     if (window.navigator && window.navigator.vibrate) {
@@ -35,50 +56,123 @@ export function AccountPage() {
     }
   };
 
-  const handleSignOut = () => {
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!fullNameInput.trim()) {
+      setProfileMessage({ type: 'error', text: 'يرجى إدخال اسم كامل صحيح.' });
+      return;
+    }
     handleVibrate();
-    signOut();
+    setProfileSaving(true);
+    setProfileMessage(null);
+
+    try {
+      if (hasSupabaseKeys && user) {
+        // Update user_profiles
+        const { error } = await supabase
+          .from('user_profiles')
+          .update({ full_name: fullNameInput.trim() })
+          .eq('id', user.id);
+
+        if (error) throw error;
+        
+        // Also update auth metadata
+        await supabase.auth.updateUser({
+          data: { full_name: fullNameInput.trim() }
+        });
+
+        if (refreshProfile) {
+          await refreshProfile();
+        }
+
+        setProfileMessage({ type: 'success', text: 'تم تحديث الاسم الكامل بنجاح ومزامنته سحابياً!' });
+      } else {
+        await new Promise(resolve => setTimeout(resolve, 600));
+        setProfileMessage({ type: 'success', text: 'محاكاة: تم تحديث اسم الملف الشخصي بنجاح (المعاينة بلا قاعدة بيانات)' });
+      }
+    } catch (err: any) {
+      console.error(err);
+      setProfileMessage({ type: 'error', text: err.message || 'حدث خطأ أثناء حفظ الاسم المكتوب.' });
+    } finally {
+      setProfileSaving(false);
+    }
   };
 
-  const handleResetPassword = async () => {
-    if (!user?.email) return;
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFullNameInput(profile?.full_name || user?.user_metadata?.full_name || '');
+    if (!newPassword) {
+      setPasswordMessage({ type: 'error', text: 'يرجى إدخال كلمة مرور جديدة.' });
+      return;
+    }
+    if (newPassword.length < 6) {
+      setPasswordMessage({ type: 'error', text: 'يجب ألا تقل كلمة المرور المحدثة عن 6 أحرف كمتطلب أمان.' });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordMessage({ type: 'error', text: 'كلمتا المرور غير متطابقتين، يرجى إعادة التحقق.' });
+      return;
+    }
+
     handleVibrate();
-    setResetLoading(true);
-    setResetMessage(null);
+    setPasswordLoading(true);
+    setPasswordMessage(null);
 
     try {
       if (hasSupabaseKeys) {
-        const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
-          redirectTo: `${window.location.origin}/`
-        });
+        const { error } = await supabase.auth.updateUser({ password: newPassword });
         if (error) throw error;
-        setResetMessage({
-          type: 'success',
-          text: 'تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني بنجاح. يرجى مراجعة صندوق الوارد (أو مجلد الرسائل غير المرغوب فيها).'
-        });
+        setPasswordMessage({ type: 'success', text: 'تم تحديث كلمة المرور الجديدة بنجاح فوري!' });
+        setNewPassword('');
+        setConfirmPassword('');
       } else {
-        // Mock success when Supabase is not connected
         await new Promise(resolve => setTimeout(resolve, 800));
-        setResetMessage({
-          type: 'success',
-          text: 'محاكاة: تم إرسال رابط مخصص لتغيير كلمة المرور إلى بريدك الإلكتروني بنجاح!'
-        });
+        setPasswordMessage({ type: 'success', text: 'محاكاة: تم تحديث الباسورد بنجاح في النسخة المحلية!' });
+        setNewPassword('');
+        setConfirmPassword('');
       }
     } catch (err: any) {
-      console.error("Error resetting password:", err);
-      setResetMessage({
-        type: 'error',
-        text: err.message || 'حدث خطأ أثناء محاولة إرسال رابط إعادة التعيين. يرجى المحاولة لاحقاً.'
-      });
+      console.error(err);
+      setPasswordMessage({ type: 'error', text: err.message || 'حدث خطأ أثناء محاولة تحديث الرقم السري.' });
     } finally {
-      setResetLoading(false);
+      setPasswordLoading(false);
+    }
+  };
+
+  const handleSelfDelete = async () => {
+    if (!user?.email) return;
+    if (confirmDeleteEmail.trim().toLowerCase() !== user.email.toLowerCase()) {
+      setDeleteError('البريد الإلكتروني الذي أدخلته غير متطابق مع بريدك المسجل.');
+      return;
+    }
+
+    handleVibrate();
+    setDeleteLoading(true);
+    setDeleteError('');
+
+    try {
+      if (hasSupabaseKeys) {
+        const { error } = await supabase.rpc('delete_current_user');
+        if (error) throw error;
+        
+        await signOut();
+        window.location.href = '/';
+      } else {
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        await signOut();
+        window.location.href = '/';
+      }
+    } catch (err: any) {
+      console.error(err);
+      setDeleteError(err.message || 'فشل حذف الحساب. يرجى التواصل مع الدعم الفني للمنصة.');
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
   const currentSub = userSubscriptions?.find(sub => sub.email === user?.email);
   const planName = currentSub?.plan === 'enterprise' ? 'مؤسسي متميز (Enterprise)' : (currentSub?.plan === 'premium' ? 'حساب ذهبي متكامل (Premium)' : 'اشتراك قياسي مجاني (Standard)');
 
-  // Format account creation date
   const getCreationDate = () => {
     if (!user?.created_at) return 'غير متوفر';
     try {
@@ -94,223 +188,343 @@ export function AccountPage() {
   };
 
   const hasAdminAccess = userRole === 'admin' || userRole === 'manager';
-  const fullName = profile?.full_name || user?.user_metadata?.full_name || user?.user_metadata?.username || 'مستشار حسبة';
+  const displayFullName = profile?.full_name || user?.user_metadata?.full_name || user?.user_metadata?.username || 'مستشار حسبة دائم';
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 text-right select-none animate-fade-in" dir="rtl">
+    <div className="max-w-6xl mx-auto px-4 py-8 text-right select-none animate-fade-in text-[#1E293B] dark:text-slate-100 min-h-screen transition-colors duration-200" dir="rtl">
       
-      {/* Header Banner */}
-      <div className="mb-8 space-y-2">
-        <h1 className="font-sans font-black text-2xl text-gray-950 tracking-tight flex items-center gap-2.5">
-          <User className="w-6 h-6 text-[#0057B8]" />
-          <span>إعدادات الملف الشخصي والحساب</span>
+      {/* Header Title */}
+      <div className="mb-8 space-y-2 border-b border-gray-100 dark:border-slate-800 pb-5">
+        <h1 className="font-sans font-black text-3xl text-gray-950 dark:text-white tracking-tight flex items-center gap-3">
+          <div className="w-10 h-10 bg-[#0057B8] dark:bg-[#0EA5A4] text-white rounded-2xl flex items-center justify-center">
+            <User className="w-5 h-5" />
+          </div>
+          <span>ملفي الشخصي وإعدادات العضوية</span>
         </h1>
-        <p className="text-xs text-gray-500 leading-relaxed font-medium">
-          إدارة الصلاحيات، تحديث الحماية، ومطابقة التراخيص المعتمدة لمنصة حسبة الذكية.
+        <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-semibold">
+          تحكم في بياناتك الشخصية، والمظهر الملائم لعينيك، والأمان الهيكلي وحذف العضوية لمنصة البنك المركزي المعتمدة.
         </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
         
-        {/* Right Area: Informations Column (2/3 width on desktop) */}
-        <div className="lg:col-span-2 space-y-6">
+        {/* Main Columns (2/3 Width) */}
+        <div className="lg:col-span-2 space-y-8">
           
-          {/* Main Info Card */}
-          <div className="bg-white border border-gray-100 rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
-            <h3 className="font-sans font-bold text-sm text-gray-900 border-b border-gray-100 pb-3 flex items-center gap-2">
+          {/* Edit Profile Info Panel */}
+          <div className="bg-white dark:bg-[#0F172A] border border-gray-150/70 dark:border-slate-800 rounded-3xl p-6 md:p-8 shadow-md space-y-6">
+            <h3 className="font-sans font-bold text-base text-gray-950 dark:text-white border-b border-gray-100 dark:border-slate-800 pb-3 flex items-center gap-2">
               <ShieldCheck className="w-5 h-5 text-emerald-500" />
-              <span>بطاقة بيانات العضوية والاشتراك</span>
+              <span>تفاصيل الهوية والاشتراك المالي</span>
             </h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              
-              {/* Profile Name */}
-              <div className="bg-slate-50 border border-slate-100 p-4 rounded-2xl space-y-1">
-                <span className="text-[10px] text-gray-400 font-bold block">الاسم الحالي في النظام:</span>
-                <span className="text-sm font-extrabold text-gray-800">{fullName}</span>
+            {/* Static Stats Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-2xl space-y-1">
+                <span className="text-[10px] text-gray-400 dark:text-slate-400 font-bold block">البريد الإلكتروني المعتمد:</span>
+                <span className="text-sm font-extrabold text-gray-800 dark:text-slate-200 font-mono" dir="ltr">{user?.email || 'guest@hesba.sa'}</span>
               </div>
 
-              {/* Email Address */}
-              <div className="bg-slate-50 border border-slate-100 p-4 rounded-2xl space-y-1">
-                <span className="text-[10px] text-gray-400 font-bold block">البريد الإلكتروني المالي:</span>
-                <span className="text-sm font-extrabold text-gray-800 font-mono" dir="ltr">{user?.email || 'guest@hesba.sa'}</span>
-              </div>
-
-              {/* Package Plan */}
-              <div className="bg-slate-50 border border-slate-100 p-4 rounded-2xl space-y-1">
-                <span className="text-[10px] text-gray-400 font-bold block">نوع الباقة والمزايا:</span>
-                <span className="text-sm font-extrabold text-[#0057B8] flex items-center gap-1.5">
-                  <Award className="w-4 h-4 text-[#0ea5a4]" />
+              <div className="bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-2xl space-y-1">
+                <span className="text-[10px] text-gray-400 dark:text-slate-400 font-bold block">باقة الترخيص الحالية:</span>
+                <span className="text-sm font-extrabold text-[#0057B8] dark:text-[#0EA5A4] flex items-center gap-1.5 font-sans">
+                  <Award className="w-4 h-4 text-amber-500" />
                   <span>{planName}</span>
                 </span>
               </div>
 
-              {/* Compliance / Connection status */}
-              <div className="bg-slate-50 border border-slate-100 p-4 rounded-2xl space-y-1">
-                <span className="text-[10px] text-gray-400 font-bold block">حالة الحساب المزامنة:</span>
-                <span className="text-sm font-extrabold text-emerald-600 flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                  <span>نشط ومتصل بالثريد الآمن</span>
+              <div className="bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-2xl space-y-1">
+                <span className="text-[10px] text-gray-400 dark:text-slate-400 font-bold block">مستوى الصلاحية في لوحة الإدارة:</span>
+                <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+                  <span>{userRole === 'admin' ? 'مسؤول ائمان أساسي' : userRole === 'manager' ? 'مدير عام مالي' : 'مستشار ووسيط عقاري مالي'}</span>
                 </span>
               </div>
 
-              {/* Date Created */}
-              <div className="bg-slate-50 border border-slate-100 p-4 rounded-2xl space-y-1 md:col-span-2">
-                <span className="text-[10px] text-gray-400 font-bold block flex items-center gap-1">
-                  <Clock className="w-3.5 h-3.5" />
-                  <span>تاريخ إنشاء الحساب وتوثيقه:</span>
-                </span>
-                <span className="text-sm font-extrabold text-gray-700">{getCreationDate()}</span>
+              <div className="bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-2xl space-y-1">
+                <span className="text-[10px] text-gray-400 dark:text-slate-400 font-bold block">تاريخ الانتساب السحابي:</span>
+                <span className="text-xs font-extrabold text-gray-700 dark:text-slate-300 font-mono">{getCreationDate()}</span>
               </div>
-
             </div>
+
+            {/* Editable Name Form */}
+            <form onSubmit={handleUpdateProfile} className="space-y-4 pt-2 border-t border-gray-100 dark:border-slate-800">
+              <div className="space-y-2">
+                <label className="text-xs font-extrabold text-slate-700 dark:text-slate-200 block">تعديل الاسم الكامل في الشهادات والتقارير</label>
+                <input
+                  type="text"
+                  required
+                  value={fullNameInput}
+                  onChange={e => setFullNameInput(e.target.value)}
+                  placeholder="أدخل الاسم الرباعي الرسمي"
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:border-[#0057B8] text-xs font-semibold rounded-xl text-gray-800 dark:text-slate-100 outline-none transition-all focus:ring-1 focus:ring-[#0057B8]"
+                />
+                <p className="text-[10px] text-gray-400 leading-normal">يجب كتابة الاسم الكامل مطابقاً لبطاقة الهوية الوطنية أو شهادة التمويل العقاري.</p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="submit"
+                  disabled={profileSaving}
+                  className="px-5 py-2.5 bg-[#0057B8] hover:bg-[#004bb0] text-white text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer disabled:opacity-50"
+                >
+                  {profileSaving ? 'جاري الحفظ والرفع...' : 'حفظ الاسم الكامل المحدث'}
+                </button>
+              </div>
+
+              {profileMessage && (
+                <div className={`p-4 rounded-xl text-xs font-semibold flex items-center gap-2 animate-fade-in ${
+                  profileMessage.type === 'success' ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-300' : 'bg-red-50 text-red-800 dark:bg-red-950/20 dark:text-red-300'
+                }`}>
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span>{profileMessage.text}</span>
+                </div>
+              )}
+            </form>
+
           </div>
 
-          {/* Security & Action Form details */}
-          <div className="bg-white border border-gray-100 rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
-            <div>
-              <h3 className="font-sans font-bold text-sm text-gray-900 flex items-center gap-2">
-                <KeyRound className="w-5 h-5 text-[#0057B8]" />
-                <span>أمان الحساب وتغيير البيانات</span>
-              </h3>
-              <p className="text-[11px] text-gray-400 font-medium mt-1 leading-relaxed">
-                يمكنك إعادة تعيين كلمة المرور أو تحديث تفاصيل الحساب بشكل آمن من هنا.
-              </p>
-            </div>
+          {/* Edit Password Panel */}
+          <div className="bg-white dark:bg-[#0F172A] border border-gray-150/70 dark:border-slate-800 rounded-3xl p-6 md:p-8 shadow-md space-y-6">
+            <h3 className="font-sans font-bold text-base text-gray-950 dark:text-white border-b border-gray-100 dark:border-slate-800 pb-3 flex items-center gap-2">
+              <KeyRound className="w-5 h-5 text-[#0057B8] dark:text-[#0EA5A4]" />
+              <span>تحديث وحماية كلمة المرور الفورية</span>
+            </h3>
 
-            {/* Change Password Interface */}
-            <div className="border border-slate-100 rounded-2xl p-4 md:p-5 space-y-4 bg-slate-50/50">
-              <div className="space-y-1">
-                <h4 className="text-xs font-extrabold text-slate-800">إجراء إعادة تعيين كلمة المرور</h4>
-                <p className="text-[10px] text-slate-500 leading-relaxed font-sans">
-                  عند النقر على الزر أدناه، سيقوم النظام بتوليد رابط مشفر وإرساله فورياً إلى بريدك الإلكتروني لتعيين كلمة مرور جديدة بكل أمان.
-                </p>
+            <form onSubmit={handleUpdatePassword} className="space-y-4">
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed font-sans">
+                لتحديث الباسورد الخاص بك، قم بكتابة الرمز الجديد مباشرة في المربعين المخصصين بالأسفل.
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] text-slate-500 dark:text-slate-400 font-bold">كلمة المرور الجديدة</label>
+                  <input
+                    type="password"
+                    required
+                    value={newPassword}
+                    onChange={e => setNewPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-semibold rounded-xl text-left"
+                    dir="ltr"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[11px] text-slate-500 dark:text-slate-400 font-bold">تكرار كلمة المرور للمطابقة</label>
+                  <input
+                    type="password"
+                    required
+                    value={confirmPassword}
+                    onChange={e => setConfirmPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-semibold rounded-xl text-left"
+                    dir="ltr"
+                  />
+                </div>
               </div>
 
               <button
-                onClick={handleResetPassword}
-                disabled={resetLoading}
-                className="inline-flex items-center gap-2 px-5 py-3 bg-[#0057B8] hover:bg-[#004bb0] text-white text-xs font-bold rounded-xl transition-all shadow-md hover:shadow-blue-200 cursor-pointer disabled:opacity-50 min-h-[44px]"
+                type="submit"
+                disabled={passwordLoading}
+                className="px-5 py-2.5 bg-[#0057B8] hover:bg-[#004bb0] text-white text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer disabled:opacity-50"
               >
-                {resetLoading ? (
-                  <>
-                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                    <span>جاري إرسال الطلب...</span>
-                  </>
-                ) : (
-                  <>
-                    <KeyRound className="w-4 h-4" />
-                    <span>إرسال رابط تغيير كلمة المرور</span>
-                  </>
-                )}
+                {passwordLoading ? 'جاري تعميد السيرفر...' : 'تحديث كلمة المرور آلياً'}
               </button>
 
-              {resetMessage && (
-                <div className={`p-4 rounded-xl text-xs font-medium leading-relaxed flex items-start gap-2.5 animate-fade-in ${
-                  resetMessage.type === 'success' 
-                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-100' 
-                    : 'bg-rose-50 text-rose-800 border border-rose-100'
+              {passwordMessage && (
+                <div className={`p-4 rounded-xl text-xs font-semibold flex items-center gap-2 animate-fade-in ${
+                  passwordMessage.type === 'success' ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-300' : 'bg-red-50 text-red-800 dark:bg-red-950/20 dark:text-red-300'
                 }`}>
-                  {resetMessage.type === 'success' ? (
-                    <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-                  ) : (
-                    <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
-                  )}
-                  <span>{resetMessage.text}</span>
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span>{passwordMessage.text}</span>
                 </div>
               )}
-            </div>
+            </form>
+          </div>
 
-            {/* Blocked Email Change Warning as requested */}
-            <div className="border border-slate-100 rounded-2xl p-4 md:p-5 space-y-3 bg-slate-50/50 opacity-90">
-              <div className="space-y-1">
-                <h4 className="text-xs font-extrabold text-slate-800 flex items-center gap-1.5">
-                  <Mail className="w-4 h-4 text-slate-400" />
-                  <span>تحديث البريد الإلكتروني الأساسي</span>
-                </h4>
-                <p className="text-[10px] text-slate-500 leading-relaxed font-sans">
-                  لا يمكن تعديل البريد الإلكتروني المرتبط بالاشتراك والتراخيص دون مراجعة مسبقة لضمان دقة العمليات وحيازة التراخيص.
-                </p>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                <button
-                  disabled
-                  className="px-5 py-2.5 bg-slate-200 border border-slate-300 text-slate-400 text-[11px] font-extrabold rounded-xl cursor-not-allowed select-none"
-                >
-                  تغيير البريد الإلكتروني
-                </button>
-                <span className="text-[10px] text-amber-600 font-bold bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-100/60">
-                  تغيير البريد الإلكتروني سيكون متاحًا قريبًا للتحكم الذاتي
-                </span>
-              </div>
-            </div>
+          {/* Secure Self-Deletion Card */}
+          <div className="bg-red-50/50 dark:bg-red-950/15 border border-red-200/50 dark:border-red-900/40 rounded-3xl p-6 md:p-8 space-y-4">
+            <h3 className="font-sans font-black text-rose-700 dark:text-rose-400 text-base flex items-center gap-2">
+              <Trash2 className="w-5 h-5" />
+              <span>منطقة الخطر: حذف الحساب نهائياً</span>
+            </h3>
+            
+            <p className="text-xs text-rose-900/80 dark:text-rose-300/80 leading-relaxed font-sans">
+              عند القيام بحذف حسابك، سيتم محو ملفك الشخصي بالكامل من خوادم حسبة، بما في ذلك عروضك وسجل تصفحك والاشتراك المسدد. هذا الإجراء نهائي ولا يمكن الرجوع عنه أبداً لمتطلبات الأمان وتلقين البيانات.
+            </p>
 
+            {!showDeleteConfirm ? (
+              <button
+                type="button"
+                onClick={() => { handleVibrate(); setShowDeleteConfirm(true); }}
+                className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer"
+              >
+                طلب حذف الحساب الدائم والنهائي
+              </button>
+            ) : (
+              <div className="bg-white dark:bg-slate-900 border border-red-250 p-5 rounded-2xl space-y-4 animate-fade-in">
+                <div className="space-y-1.5">
+                  <p className="text-xs font-extrabold text-red-700 dark:text-red-400">تحذير أخير للتحقق من هوية الشخص الأساسي:</p>
+                  <p className="text-[10px] text-gray-500 dark:text-slate-400 leading-normal">
+                    لتأكيد قرار الإلغاء، يرجى كتابة كامل بريدك الإلكتروني الحالي (<code className="font-mono font-bold text-gray-700 dark:text-white bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-[11px]">{user?.email}</code>) في الحقل أدناه:
+                  </p>
+                </div>
+
+                <input
+                  type="text"
+                  value={confirmDeleteEmail}
+                  onChange={e => setConfirmDeleteEmail(e.target.value)}
+                  placeholder="name@example.com"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-left"
+                  dir="ltr"
+                />
+
+                {deleteError && (
+                  <p className="text-[11px] text-red-600 font-bold select-text">{deleteError}</p>
+                )}
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleSelfDelete}
+                    disabled={deleteLoading}
+                    className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg cursor-pointer disabled:opacity-50"
+                  >
+                    {deleteLoading ? 'جاري شطب الحساب والخرائط...' : 'نعم، قم بشطب ملف بياناتي وحذفه نهائياً'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowDeleteConfirm(false); setConfirmDeleteEmail(''); setDeleteError(''); }}
+                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-white text-xs font-bold rounded-lg cursor-pointer"
+                  >
+                    تراجع وإلغاء القرار
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
         </div>
 
-        {/* Left Area: Desktop System Navigation Actions Menu */}
+        {/* Dashboard Right Column Action Panel */}
         <div className="space-y-6">
-          <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm space-y-4">
-            <h3 className="font-sans font-extrabold text-xs text-gray-400 uppercase tracking-wider mb-2">
-              لوحة التحكم والتنقل السريع:
+          
+          {/* Theme Preference Settings Selector (Direct Integration on Account) */}
+          <div className="bg-white dark:bg-[#0F172A] border border-gray-150/70 dark:border-slate-800 rounded-3xl p-6 shadow-md space-y-4 text-right">
+            <h3 className="font-sans font-bold text-xs text-gray-400 uppercase tracking-wider">
+              مظهر العرض والواجهة الداكنة:
             </h3>
 
-            {/* Go back to Calculator */}
+            <div className="grid grid-cols-1 gap-2.5">
+              {/* Light Theme Trigger */}
+              <button
+                onClick={() => setTheme('light')}
+                className={`p-3 rounded-2xl border text-right transition-all flex items-center justify-between cursor-pointer ${
+                  theme === 'light' 
+                    ? 'bg-[#0057B8]/5 border-[#0057B8] text-[#0057B8] dark:text-[#38BDF8]' 
+                    : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-[#1E293B] dark:border-slate-800 dark:text-slate-300'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <Sun className="w-4 h-4 text-amber-500 animate-spin-slow" />
+                  <span className="text-xs font-extrabold font-sans">المظهر النهاري الكلاسيكي</span>
+                </div>
+                {theme === 'light' && <span className="w-1.5 h-1.5 rounded-full bg-[#0057B8] dark:bg-sky-400"></span>}
+              </button>
+
+              {/* Dark Theme Trigger */}
+              <button
+                onClick={() => setTheme('dark')}
+                className={`p-3 rounded-2xl border text-right transition-all flex items-center justify-between cursor-pointer ${
+                  theme === 'dark' 
+                    ? 'bg-slate-800/80 border-[#0EA5A4] text-emerald-400' 
+                    : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-[#1E293B] dark:border-slate-800 dark:text-slate-300'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <Moon className="w-4 h-4 text-indigo-400" />
+                  <span className="text-xs font-extrabold font-sans">المظهر الليلي الهادئ للعين</span>
+                </div>
+                {theme === 'dark' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>}
+              </button>
+
+              {/* System Autodetect Trigger */}
+              <button
+                onClick={() => setTheme('system')}
+                className={`p-3 rounded-2xl border text-right transition-all flex items-center justify-between cursor-pointer ${
+                  theme === 'system' 
+                    ? 'bg-[#0EA5A4]/5 border-[#0EA5A4] text-[#0EA5A4]' 
+                    : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-[#1E293B] dark:border-slate-800 dark:text-slate-300'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <Laptop className="w-4 h-4 text-teal-500" />
+                  <span className="text-xs font-extrabold font-sans">تلقائي (مطابقة ثيم جهازك)</span>
+                </div>
+                {theme === 'system' && <span className="w-1.5 h-1.5 rounded-full bg-teal-500"></span>}
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-[#0F172A] border border-gray-150/70 dark:border-slate-800 rounded-3xl p-6 shadow-md space-y-4">
+            <h3 className="font-sans font-extrabold text-xs text-gray-400 uppercase tracking-wider">
+              التنقل المالي السريع:
+            </h3>
+
+            {/* Link back to Main Calculator */}
             <button
               onClick={() => { handleVibrate(); location.navigate('/'); }}
-              className="w-full p-4 hover:bg-slate-50 rounded-2xl border border-slate-100 transition-all flex items-center justify-between group cursor-pointer text-right"
+              className="w-full p-4 hover:bg-slate-50 dark:hover:bg-slate-900 rounded-2xl border border-slate-150 dark:border-slate-800 transition-all flex items-center justify-between group cursor-pointer text-right"
             >
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 bg-blue-50 text-[#0057B8] rounded-xl flex items-center justify-center">
+                <div className="w-9 h-9 bg-blue-50 dark:bg-slate-850 text-[#0057B8] dark:text-[#0EA5A4] rounded-xl flex items-center justify-center">
                   <Calculator className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="text-xs font-extrabold text-slate-800">حاسبة السكن والتمويل</h4>
-                  <p className="text-[10px] text-slate-400 leading-none mt-1">الرجوع لحساب التمويل العقاري</p>
+                  <h4 className="text-xs font-extrabold text-slate-800 dark:text-slate-200">شاشة حاسبة التمويل</h4>
+                  <p className="text-[10px] text-slate-400 leading-none mt-1">الرجوع لتلقي مدخلات العملاء</p>
                 </div>
               </div>
               <ArrowRight className="w-4 h-4 text-slate-400 transition-transform group-hover:-translate-x-1" />
             </button>
 
-            {/* Go to Admin Dashboard if permitted */}
+            {/* Admin Controls Link */}
             {hasAdminAccess ? (
               <button
                 onClick={() => { handleVibrate(); location.navigate('/admin'); }}
-                className="w-full p-4 hover:bg-indigo-50/50 rounded-2xl border border-slate-100 transition-all flex items-center justify-between group cursor-pointer text-right"
+                className="w-full p-4 hover:bg-indigo-50/50 dark:hover:bg-slate-900 rounded-2xl border border-slate-150 dark:border-slate-800 transition-all flex items-center justify-between group cursor-pointer text-right"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center">
+                  <div className="w-9 h-9 bg-indigo-50 dark:bg-[#1e1b4b] text-indigo-600 dark:text-indigo-400 rounded-xl flex items-center justify-center">
                     <Settings className="w-5 h-5" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-extrabold text-slate-800">لوحة الإشراف المالي</h4>
-                    <p className="text-[10px] text-slate-400 leading-none mt-1">إعداد المقاييس وهوامش البنوك</p>
+                    <h4 className="text-xs font-extrabold text-slate-800 dark:text-slate-200">التحكم بالإشراف المالي</h4>
+                    <p className="text-[10px] text-slate-400 leading-none mt-1">تعديل هوامش وقواعد الحسبة</p>
                   </div>
                 </div>
-                <ArrowRight className="w-4 h-4 text-slate-400 transition-transform group-hover:-translate-x-1" />
+                <ArrowRight className="w-4 h-4 text-slate-400 group-hover:-translate-x-1 transition-transform" />
               </button>
             ) : null}
 
-            {/* Informational guide */}
-            <div className="bg-blue-50/40 border border-blue-100/50 rounded-2xl p-4 space-y-1.5">
-              <span className="text-[10px] font-extrabold text-blue-900 flex items-center gap-1">
+            {/* Static informative compliance tip */}
+            <div className="bg-sky-50/50 dark:bg-slate-900 border border-sky-100 dark:border-slate-850 rounded-2xl p-4 space-y-1.5">
+              <span className="text-[10px] font-bold text-sky-900 dark:text-sky-400 flex items-center gap-1">
                 <Info className="w-3.5 h-3.5 shrink-0" />
-                <span>ملاحظة أمان ائتماني:</span>
+                <span>الامتثال لمعايير SAMA:</span>
               </span>
-              <p className="text-[10px] text-slate-600 leading-relaxed font-sans">
-                تطابق المنصة آلياً عمليات الحساب مع اشتراطات البنك المركزي (SAMA). يرجى الحفاظ على معلومات حسابك سرية بالكامل.
+              <p className="text-[10px] text-slate-600 dark:text-slate-400 leading-relaxed font-sans">
+                تحرص حسبة العقارية على مطابقة آخر تعاميم التمويل العقاري والرهن واللوائح الائتمانية المنظمة لرفع دقة النسب المعروضة.
               </p>
             </div>
 
-            {/* Sign Out Action Button */}
+            {/* Logout Trigger button */}
             <button
-              onClick={handleSignOut}
-              className="w-full py-3.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-100 text-xs font-bold rounded-2xl transition-all cursor-pointer flex items-center justify-center gap-2"
+              onClick={() => { handleVibrate(); signOut(); }}
+              className="w-full py-3 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 dark:bg-rose-950/20 dark:border-rose-900/30 dark:text-rose-400 text-xs font-bold rounded-2xl transition-all cursor-pointer flex items-center justify-center gap-2"
             >
-              <LogOut className="w-4.5 h-4.5" />
-              <span>تسجيل الخروج الآمن</span>
+              <LogOut className="w-4 h-4" />
+              <span>تسجيل خروج آمن</span>
             </button>
 
           </div>

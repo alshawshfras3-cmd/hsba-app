@@ -26,7 +26,7 @@ export default function BottomNavigation() {
 
   return (
     <div 
-      className="fixed bottom-0 left-0 right-0 z-45 bg-white border-t border-slate-200/90 sm:hidden block shadow-[0_-4px_16px_rgba(0,0,0,0.06)] h-16 select-none"
+      className="fixed bottom-0 left-0 right-0 z-45 bg-white dark:bg-[#0B0F19] border-t border-slate-200/90 dark:border-slate-800 sm:hidden block shadow-[0_-4px_16px_rgba(0,0,0,0.06)] h-16 select-none"
       dir="rtl"
     >
       <div className="flex h-full items-center justify-around px-2 pb-safe-padding">
@@ -35,7 +35,7 @@ export default function BottomNavigation() {
         <button
           onClick={() => handleNavigate('/')}
           className={`flex flex-col items-center justify-center w-16 h-full transition-all gap-1 cursor-pointer hover:opacity-80 active:scale-95 ${
-            isHomeActive ? 'text-[#0057B8]' : 'text-[#6B7280]'
+            isHomeActive ? 'text-[#0057B8] dark:text-[#38bdf8]' : 'text-[#6B7280] dark:text-slate-400'
           }`}
         >
           <Home className="w-5 h-5 shrink-0" />
@@ -46,7 +46,7 @@ export default function BottomNavigation() {
         <button
           onClick={() => handleNavigate('/results')}
           className={`flex flex-col items-center justify-center w-16 h-full transition-all gap-1 cursor-pointer hover:opacity-80 active:scale-95 relative ${
-            isResultsActive ? 'text-[#0057B8]' : 'text-[#6B7280]'
+            isResultsActive ? 'text-[#0057B8] dark:text-[#38bdf8]' : 'text-[#6B7280] dark:text-slate-400'
           }`}
         >
           <BarChart3 className="w-5 h-5 shrink-0" />
@@ -60,7 +60,7 @@ export default function BottomNavigation() {
         <button
           onClick={() => handleNavigate('/account')}
           className={`flex flex-col items-center justify-center w-16 h-full transition-all gap-1 cursor-pointer hover:opacity-80 active:scale-95 ${
-            isAccountActive ? 'text-[#0057B8]' : 'text-[#6B7280]'
+            isAccountActive ? 'text-[#0057B8] dark:text-[#38bdf8]' : 'text-[#6B7280] dark:text-slate-400'
           }`}
         >
           <User className="w-5 h-5 shrink-0" />
@@ -71,7 +71,7 @@ export default function BottomNavigation() {
         <button
           onClick={() => handleNavigate('/about')}
           className={`flex flex-col items-center justify-center w-16 h-full transition-all gap-1 cursor-pointer hover:opacity-80 active:scale-95 ${
-            isAboutActive ? 'text-[#0057B8]' : 'text-[#6B7280]'
+            isAboutActive ? 'text-[#0057B8] dark:text-[#38bdf8]' : 'text-[#6B7280] dark:text-slate-400'
           }`}
         >
           <HelpCircle className="w-5 h-5 shrink-0" />

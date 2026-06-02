@@ -1,6 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import "tailwindcss";
 
+@variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: 'IBM Plex Sans Arabic', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
@@ -8,7 +10,137 @@
 
 /* Custom polished transitions and micro-interactions */
 body {
-  background-color: #F5F7FA;
+  background-color: #F2F5F9;
+  color: #1E293B;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+body.dark {
+  background-color: #0B0F19;
+  color: #F1F5F9;
+}
+
+/* Base Dark Mode override styles for flawless 100% theme coverage */
+.dark {
+  color-scheme: dark;
+}
+
+/* Force standard White/Slate-50 containers to beautiful dark grays */
+.dark body {
+  background-color: #0B0F19 !important;
+  color: #F1F5F9 !important;
+}
+
+/* Convert all white cards and containers to high-contrast blue-dark Slate-900 */
+.dark .bg-white,
+.dark .bg-slate-50,
+.dark .bg-gray-50,
+.dark .bg-slate-100,
+.dark .bg-gray-100,
+.dark .bg-[#FAFBFD] {
+  background-color: #0F172A !important;
+}
+
+/* Light gray backgrounds map to deeper body/slate-950 blue-black tone */
+.dark .bg-slate-50\/50,
+.dark .bg-slate-50\/40,
+.dark .bg-slate-100\/50,
+.dark .bg-slate-100\/80 {
+  background-color: rgba(15, 23, 42, 0.6) !important;
+}
+
+/* Text overrides: force high contrast grey-white readable colors under dark theme */
+.dark .text-gray-950,
+.dark .text-[#111827],
+.dark .text-gray-900,
+.dark .text-slate-900,
+.dark .text-gray-800,
+.dark .text-slate-800,
+.dark .text-gray-700,
+.dark .text-slate-700,
+.dark .text-black {
+  color: #F8FAFC !important;
+}
+
+/* Medium grey text matches slate-300 elements for subheaders and captions */
+.dark .text-gray-600,
+.dark .text-slate-600,
+.dark .text-gray-500,
+.dark .text-slate-500 {
+  color: #CBD5E1 !important;
+}
+
+.dark .text-gray-400,
+.dark .text-slate-400 {
+  color: #94A3B8 !important;
+}
+
+/* System borders map to slate-800 divider color */
+.dark .border,
+.dark .border-slate-100,
+.dark .border-slate-200,
+.dark .border-slate-150,
+.dark .border-gray-100,
+.dark .border-gray-150,
+.dark .border-gray-200,
+.dark .border-\[\#E2E8F0\] {
+  border-color: #1E293B !important;
+}
+
+.dark .divide-y > * + * {
+  border-color: #1E293B !important;
+}
+
+/* Form Inputs, Dropdowns, Option Menus & Selector Selects */
+.dark input,
+.dark select,
+.dark textarea {
+  background-color: #1E293B !important;
+  border-color: #334155 !important;
+  color: #F8FAFC !important;
+}
+
+.dark input::placeholder {
+  color: #64748B !important;
+}
+
+.dark input:focus,
+.dark select:focus {
+  border-color: #38bdf8 !important;
+  box-shadow: 0 0 0 1px #38bdf8 !important;
+}
+
+/* Wizard active nodes and selected calculations cards */
+.dark .step-card-active {
+  border-color: #0ea5e9 !important;
+  background-color: rgba(14, 165, 233, 0.08) !important;
+}
+
+/* Custom interactive selections buttons & sliders */
+.dark .text-\[\#0057B8\],
+.dark .text-blue-600 {
+  color: #38bdf8 !important;
+}
+
+.dark .bg-\[\#0057B8\] {
+  background-color: #0284C7 !important;
+}
+
+.dark .bg-\[\#0057B8\]:hover {
+  background-color: #0369A1 !important;
+}
+
+.dark .border-\[\#0057B8\] {
+  border-color: #0ea5e9 !important;
+}
+
+/* Dialog boxes, modal panels, lists, select dropdown options, and shadow elements */
+.dark .shadow-xl, .dark .shadow-2xl, .dark .shadow-md {
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.4) !important;
+}
+
+.dark option {
+  background-color: #1E293B !important;
+  color: #F8FAFC !important;
 }
 
 ::-webkit-scrollbar {

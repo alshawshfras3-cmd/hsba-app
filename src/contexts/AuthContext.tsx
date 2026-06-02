@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase, hasSupabaseKeys } from '../lib/supabase';
 
-export type UserRole = 'admin' | 'manager' | 'user';
+export type UserRole = 'owner' | 'admin' | 'staff' | 'customer' | 'user' | 'manager';
 
 interface UserProfile {
   id: string;
@@ -17,7 +17,10 @@ interface AuthContextType {
   session: Session | null;
   profile: UserProfile | null;
   loading: boolean;
+  isOwner: boolean;
   isAdmin: boolean;
+  isStaff: boolean;
+  isCustomer: boolean;
   isManager: boolean;
   canAccessDashboard: boolean;
   signInWithGoogle: () => Promise<void>;
@@ -57,12 +60,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (err) {
       console.warn("Could not fetch profile, falling back to basic details", err);
+      const isOwnerEmail = (email || '').toLowerCase() === 'alshawshfras@gmail.com' || (email || '').toLowerCase() === 'alshawshfras3@gmail.com';
       setProfile({
         id: userId,
         email: email || '',
         full_name: userMetadata?.full_name || userMetadata?.username || null,
         avatar_url: userMetadata?.avatar_url || null,
-        role: (email?.toLowerCase() === 'alshawshfras3@gmail.com') ? 'admin' : 'user'
+        role: isOwnerEmail ? 'owner' : 'customer'
       });
     }
   }
@@ -118,26 +122,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const isAdmin = profile?.role === 'admin' || user?.email?.toLowerCase() === 'alshawshfras3@gmail.com';
-  const isManager = profile?.role === 'manager';
-  const canAccessDashboard = isAdmin || isManager;
+  const isOwnerEmail = (email?: string) => {
+    const e = email?.toLowerCase().trim();
+    return e === 'alshawshfras@gmail.com' || e === 'alshawshfras3@gmail.com';
+  };
+
+  const isOwner = profile?.role === 'owner' || isOwnerEmail(user?.email);
+  const isAdmin = profile?.role === 'admin';
+  const isStaff = profile?.role === 'staff' || profile?.role === 'manager';
+  const isCustomer = profile?.role === 'customer' || profile?.role === 'user' || (!isOwner && !isAdmin && !isStaff);
+
+  const canAccessDashboard = isOwner || isAdmin || isStaff;
+
+  // For compatibility with any legacy code that expects legacyIsAdmin or legacyIsManager checks
+  const legacyIsAdmin = isOwner || isAdmin;
+  const legacyIsManager = isStaff;
 
   async function signInWithGoogle() {
     if (!hasSupabaseKeys) {
       // Mock OAuth Flow for Preview
+      const mockEmail = 'alshawshfras3@gmail.com';
       setUser({
         id: 'mock_google_user',
-        email: 'alshawshfras3@gmail.com',
+        email: mockEmail,
         user_metadata: {
-          full_name: 'فراس الشاوش (مسؤول)',
+          full_name: 'فراس الشاوش (مالك المنصة)',
         }
       } as any);
       setProfile({
         id: 'mock_google_user',
-        email: 'alshawshfras3@gmail.com',
-        full_name: 'فراس الشاوش (مسؤول)',
+        email: mockEmail,
+        full_name: 'فراس الشاوش (مالك المنصة)',
         avatar_url: null,
-        role: 'admin'
+        role: 'owner'
       });
       return;
     }
@@ -151,20 +168,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!hasSupabaseKeys) {
       // Mock email password for Preview
       const emailLower = email.trim().toLowerCase();
-      const isOwner = emailLower === 'alshawshfras3@gmail.com';
+      const isOwner = emailLower === 'alshawshfras@gmail.com' || emailLower === 'alshawshfras3@gmail.com';
       setUser({
         id: 'mock_email_user',
         email: emailLower,
         user_metadata: {
-          full_name: isOwner ? 'فراس الشاوش (مسؤول)' : emailLower.split('@')[0],
+          full_name: isOwner ? 'فراس الشاوش (مالك المنصة)' : emailLower.split('@')[0],
         }
       } as any);
       setProfile({
         id: 'mock_email_user',
         email: emailLower,
-        full_name: isOwner ? 'فراس الشاوش (مسؤول)' : emailLower.split('@')[0],
+        full_name: isOwner ? 'فراس الشاوش (مالك المنصة)' : emailLower.split('@')[0],
         avatar_url: null,
-        role: isOwner ? 'admin' : 'user'
+        role: isOwner ? 'owner' : 'customer'
       });
       return;
     }
@@ -175,7 +192,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function signUpWithEmail(email: string, password: string, fullName: string) {
     if (!hasSupabaseKeys) {
       const emailLower = email.trim().toLowerCase();
-      const isOwner = emailLower === 'alshawshfras3@gmail.com';
+      const isOwner = emailLower === 'alshawshfras@gmail.com' || emailLower === 'alshawshfras3@gmail.com';
       setUser({
         id: 'mock_email_user',
         email: emailLower,
@@ -188,7 +205,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: emailLower,
         full_name: fullName,
         avatar_url: null,
-        role: isOwner ? 'admin' : 'user'
+        role: isOwner ? 'owner' : 'customer'
       });
       return;
     }
@@ -212,7 +229,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return (
     <AuthContext.Provider value={{
       user, session, profile, loading,
-      isAdmin, isManager, canAccessDashboard,
+      isOwner, isAdmin: legacyIsAdmin, isStaff, isCustomer, isManager: legacyIsManager,
+      canAccessDashboard,
       signInWithGoogle, signInWithEmail, signUpWithEmail, signOut,
       setUser, setProfile
     }}>

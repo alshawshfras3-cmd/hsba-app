@@ -1,6 +1,7 @@
 import React from 'react';
 import { AppStateProvider, useAppState } from './context/AppContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { LoginPage } from './pages/LoginPage';
 import { AboutPage } from './pages/AboutPage';
 import { AccountPage } from './pages/AccountPage';
@@ -160,9 +161,9 @@ function AppContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center space-y-4" dir="rtl">
-        <Loader2 className="w-10 h-10 animate-spin text-[#0057B8]" />
-        <span className="text-xs text-gray-400 font-bold select-none">جاري الاستعلام عن صلاحيات حسبة...</span>
+      <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] flex flex-col items-center justify-center space-y-4 transition-colors duration-200" dir="rtl">
+        <Loader2 className="w-10 h-10 animate-spin text-[#0057B8] dark:text-[#0EA5A4]" />
+        <span className="text-xs text-gray-400 dark:text-slate-400 font-bold select-none">جاري الاستعلام عن صلاحيات حسبة...</span>
       </div>
     );
   }
@@ -171,7 +172,7 @@ function AppContent() {
   if (!user) {
     if (location.pathname === '/about' || location.pathname === '/about-us') {
       return (
-        <div className="min-h-screen flex flex-col justify-between pb-16 sm:pb-0 relative">
+        <div className="min-h-screen flex flex-col justify-between pb-16 sm:pb-0 relative bg-slate-50 dark:bg-[#0B0F19] transition-colors duration-200">
           <Header />
           <main className="flex-grow">
             <AboutPage />
@@ -185,7 +186,7 @@ function AppContent() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col justify-between pb-16 sm:pb-0 relative">
+    <div className="min-h-screen flex flex-col justify-between pb-16 sm:pb-0 relative bg-slate-50 dark:bg-[#0B0F19] transition-colors duration-200">
       <Header />
       <DashboardOrWizard />
       <BottomNavigation />
@@ -196,9 +197,11 @@ function AppContent() {
 export default function App() {
   return (
     <AuthProvider>
-      <AppStateProvider>
-        <AppContent />
-      </AppStateProvider>
+      <ThemeProvider>
+        <AppStateProvider>
+          <AppContent />
+        </AppStateProvider>
+      </ThemeProvider>
     </AuthProvider>
   );
 }
