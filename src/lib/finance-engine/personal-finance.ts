@@ -128,10 +128,18 @@ export function calculatePersonalFinance(params: {
     };
   }
 
-  const dsrPercent = finalRule.dsrPercentage;
-  const ruleTermMonths = finalRule.termMonths;
-  const coeff = finalRule.financeCoefficient;
-  const calculationMethod = finalRule.calculationMethod || 'flat_rate';
+  let dsrPercent = finalRule.dsrPercentage;
+  let ruleTermMonths = finalRule.termMonths;
+  let coeff = finalRule.financeCoefficient;
+  let calculationMethod = finalRule.calculationMethod || 'flat_rate';
+  let annualMargin = finalRule.annualMargin;
+
+  if (finalRule.bankId === 'alahli' && calculationMethod === 'flat_rate') {
+    annualMargin = 5.00;
+    ruleTermMonths = 60;
+    dsrPercent = finalRule.customerStatus === 'retired' ? 25 : 33.33;
+    coeff = 0;
+  }
 
   // تحديد مدة التمويل الشخصي الفعلية
   let termMonths = ruleTermMonths;
@@ -160,7 +168,6 @@ export function calculatePersonalFinance(params: {
   let profitAmount = 0;
 
   if (calculationMethod === 'pmt') {
-    const annualMargin = finalRule.annualMargin;
     const monthlyRate = annualMargin / 100 / 12;
     if (monthlyRate > 0) {
       personalFinanceAmount = rawInstallment * (1 - Math.pow(1 + monthlyRate, -termMonths)) / monthlyRate;
@@ -175,7 +182,6 @@ export function calculatePersonalFinance(params: {
     profitAmount = totalRepayment - personalFinanceAmount;
   } else {
     // flat_rate or flat
-    const annualMargin = finalRule.annualMargin;
     const termYears = termMonths / 12;
     const denominator = 1 + (annualMargin / 100) * termYears;
     personalFinanceAmount = (rawInstallment * termMonths) / denominator;

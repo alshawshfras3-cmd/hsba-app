@@ -786,6 +786,7 @@ export default function AdminDashboard() {
   const [selectedMarginProduct, setSelectedMarginProduct] = useState<ProductId>('real_estate_only');
   const [selectedMarginSupport, setSelectedMarginSupport] = useState<SupportType>('none');
   const [selectedMarginSalaryTier, setSelectedMarginSalaryTier] = useState<'below_25000' | 'above_or_equal_25000' | 'not_applicable'>('not_applicable');
+  const [selectedMarginInputMode, setSelectedMarginInputMode] = useState<'yearly' | 'key_points'>('key_points');
 
   useEffect(() => {
     if (selectedMarginSupport === 'none') {
@@ -803,30 +804,36 @@ export default function AdminDashboard() {
     25: '4.95',
     30: '5.25'
   });
-  const [localCalcMethod, setLocalCalcMethod] = useState<'linear' | 'fixed'>('linear');
+  const [localCalcMethod, setLocalCalcMethod] = useState<'linear' | 'fixed'>('fixed');
 
-  // Copy-from states for Cloning inside the same bank
+  // Copy-from states for Cloning inside the same bank & cross-bank
+  const [cloningFromBank, setCloningFromBank] = useState<string>('alahli');
   const [cloningFromProduct, setCloningFromProduct] = useState<ProductId>('real_estate_only');
   const [cloningFromSupport, setCloningFromSupport] = useState<SupportType>('none');
+  const [cloningFromSalaryTier, setCloningFromSalaryTier] = useState<'below_25000' | 'above_or_equal_25000' | 'not_applicable'>('not_applicable');
+
+  useEffect(() => {
+    setCloningFromBank(selectedMarginBank);
+  }, [selectedMarginBank]);
 
   // Synchronize local states when selection changes or marginRules are canceled/refreshed
   useEffect(() => {
     const relevantRules = marginRules.filter(r => 
       r.bankId === selectedMarginBank && 
-      r.productId === selectedMarginProduct && 
+      (r.productType === selectedMarginProduct || r.productId === selectedMarginProduct || (selectedMarginProduct === 'real_estate_only' && r.productId === 'real_estate')) && 
       (r.supportType === selectedMarginSupport || r.supportType === 'all') &&
       (r.salaryTier === selectedMarginSalaryTier || (!r.salaryTier && selectedMarginSalaryTier === 'not_applicable'))
     );
 
-    const yearsList = [5, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30];
+    const yearsList = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30];
     const initialMargins: Record<number, string> = {};
 
     const hasRules = relevantRules.length > 0;
 
     yearsList.forEach(year => {
-      const rY = relevantRules.find(r => r.toTermMonths === year * 12);
+      const rY = relevantRules.find(r => r.year === year || r.toTermMonths === year * 12);
       if (rY) {
-        initialMargins[year] = rY.endMargin.toString();
+        initialMargins[year] = (rY.annualMargin !== undefined ? rY.annualMargin : rY.endMargin).toString();
       } else {
         const isStandardYear = [5, 10, 15, 20, 25, 30].includes(year);
         if (!hasRules && isStandardYear) {
@@ -842,28 +849,32 @@ export default function AdminDashboard() {
       }
     });
 
-    let method: 'linear' | 'fixed' = 'fixed'; // Default is FIXED as requested
-    const foundMethodRule = relevantRules.find(r => r.calcType);
+    let method: 'linear' | 'fixed' = 'fixed';
+    const foundMethodRule = relevantRules.find(r => r.calculationMethod || r.calcType);
     if (foundMethodRule) {
-      method = foundMethodRule.calcType;
+      method = (foundMethodRule.calculationMethod || foundMethodRule.calcType) as any;
+    }
+
+    let inputMode: 'yearly' | 'key_points' = 'key_points';
+    const foundInputModeRule = relevantRules.find(r => r.marginInputMode);
+    if (foundInputModeRule) {
+      inputMode = foundInputModeRule.marginInputMode;
     } else {
-      const oldRules = marginRules.filter(r => 
-        r.bankId === selectedMarginBank && 
-        r.productId === 'real_estate' && 
-        (r.supportType === selectedMarginSupport || r.supportType === 'all')
-      );
-      const foundOldMethodRule = oldRules.find(r => r.calcType);
-      if (foundOldMethodRule) {
-        method = foundOldMethodRule.calcType;
+      const hasIntermediate = relevantRules.some(r => {
+        const y = r.year || (r.toTermMonths / 12);
+        return y !== undefined && ![5, 10, 15, 20, 25, 30].includes(y);
+      });
+      if (hasIntermediate) {
+        inputMode = 'yearly';
       }
     }
 
     setLocalMargins(initialMargins);
     setLocalCalcMethod(method);
+    setSelectedMarginInputMode(inputMode);
   }, [selectedMarginBank, selectedMarginProduct, selectedMarginSupport, selectedMarginSalaryTier, marginRules]);
 
-  // General update helper to map year points to standard ranges for the calculation engine
-  const updateGlobalRulesFromLocal = (marginsRecord: Record<number, string>, method: 'linear' | 'fixed') => {
+  const updateGlobalRulesFromLocal = (marginsRecord: Record<number, string>, method: 'linear' | 'fixed', inputMode: 'yearly' | 'key_points') => {
     const productIdsToFilter = [selectedMarginProduct];
     if (selectedMarginProduct === 'real_estate_with_new_personal') {
       productIdsToFilter.push('real_estate');
@@ -876,7 +887,6 @@ export default function AdminDashboard() {
 
     const normSupport = selectedMarginSupport === 'down_payment' ? 'downpayment' : selectedMarginSupport;
 
-    // Filter out existing rules matching this combination to allow clean overwrite
     const remainingRules = marginRules.filter(r => {
       const matchesTarget = r.bankId === selectedMarginBank &&
                             productIdsToFilter.includes(r.productId) &&
@@ -887,22 +897,24 @@ export default function AdminDashboard() {
 
     const newRulesForThisCombo: MarginRule[] = [];
     
-    // Generate rules for each of the products we want to map for this selection
-    productIdsToFilter.forEach(pId => {
-      const yearsList = [5, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30];
+    const yearsToSave = inputMode === 'yearly'
+      ? Array.from({ length: 26 }, (_, i) => 5 + i)
+      : [5, 10, 15, 20, 25, 30];
       
-      const filledYears = yearsList.filter(year => {
-        const val = marginsRecord[year];
-        return val !== undefined && val !== '' && !isNaN(parseFloat(val)) && parseFloat(val) > 0;
-      });
+    const filledYears = yearsToSave.filter(year => {
+      const val = marginsRecord[year];
+      return val !== undefined && val !== '' && !isNaN(parseFloat(val)) && parseFloat(val) > 0;
+    });
 
-      filledYears.sort((a, b) => a - b);
+    filledYears.sort((a, b) => a - b);
 
-      if (filledYears.length === 0) {
-        return; // Empty table option
-      }
+    if (filledYears.length === 0) {
+      setMarginRules([...remainingRules]);
+      return;
+    }
 
-      const definitions: Array<{ from: number, to: number, start: number, end: number, calcType: 'fixed' | 'linear' }> = [];
+    productIdsToFilter.forEach(pId => {
+      const definitions: Array<{ from: number, to: number, start: number, end: number, calcType: 'fixed' | 'linear', yearPoint: number }> = [];
 
       for (let i = 0; i < filledYears.length; i++) {
         const currentYear = filledYears[i];
@@ -910,16 +922,15 @@ export default function AdminDashboard() {
         const currentMarginVal = parseFloat(currentMarginStr) || 0;
 
         if (i === 0) {
-          // For the first filled year
           definitions.push({
             from: 0,
             to: currentYear * 12,
             start: currentMarginVal,
             end: currentMarginVal,
-            calcType: 'fixed' as const
+            calcType: 'fixed' as const,
+            yearPoint: currentYear
           });
         } else {
-          // For subsequent filled years
           const prevYear = filledYears[i - 1];
           const prevMarginStr = marginsRecord[prevYear];
           const prevMarginVal = parseFloat(prevMarginStr) || 0;
@@ -932,12 +943,12 @@ export default function AdminDashboard() {
             to: toMonths,
             start: method === 'fixed' ? currentMarginVal : prevMarginVal,
             end: currentMarginVal,
-            calcType: method
+            calcType: method,
+            yearPoint: currentYear
           });
         }
       }
 
-      // Add a final fallback for anything above the highest year (highestYear * 12 + 1 to 9999)
       const lastYear = filledYears[filledYears.length - 1];
       const lastMarginStr = marginsRecord[lastYear];
       const lastMarginVal = parseFloat(lastMarginStr) || 0;
@@ -946,7 +957,8 @@ export default function AdminDashboard() {
         to: 9999,
         start: lastMarginVal,
         end: lastMarginVal,
-        calcType: 'fixed' as const
+        calcType: 'fixed' as const,
+        yearPoint: lastYear
       });
 
       definitions.forEach((def, index) => {
@@ -962,7 +974,14 @@ export default function AdminDashboard() {
           endMargin: def.end,
           calcType: def.calcType,
           isActive: true,
-          salaryTier: selectedMarginSalaryTier
+          salaryTier: selectedMarginSalaryTier,
+
+          productType: selectedMarginProduct,
+          marginInputMode: inputMode,
+          calculationMethod: method,
+          year: def.yearPoint,
+          termMonths: def.to === 9999 ? (def.yearPoint * 12) : def.to,
+          annualMargin: def.end
         });
       });
     });
@@ -974,87 +993,66 @@ export default function AdminDashboard() {
     setLocalMargins(prev => ({ ...prev, [year]: value }));
   };
 
-  const handleMarginBlur = (year: number, textValue: string) => {
-    updateGlobalRulesFromLocal({
-      ...localMargins,
-      [year]: textValue
-    }, localCalcMethod);
-  };
-
-  const handleCalcMethodChange = (method: 'linear' | 'fixed') => {
-    setLocalCalcMethod(method);
-    updateGlobalRulesFromLocal(localMargins, method);
+  const handleSaveMargins = () => {
+    updateGlobalRulesFromLocal(localMargins, localCalcMethod, selectedMarginInputMode);
+    showToast("تم حفظ وتطبيق إعدادات الهوامش على الحسبة", "success");
   };
 
   const handleCloneLocal = () => {
-    if (cloningFromProduct === selectedMarginProduct && cloningFromSupport === selectedMarginSupport) {
-      showToast("لا يمكن النسخ من وإلى نفس الحالة الحالية.", "refuse");
+    if (cloningFromBank === selectedMarginBank &&
+        cloningFromProduct === selectedMarginProduct &&
+        cloningFromSupport === selectedMarginSupport &&
+        cloningFromSalaryTier === selectedMarginSalaryTier) {
+      showToast("لا يمكن النسخ من وإلى نفس الحالة الحالية تماماً.", "refuse");
       return;
     }
 
-    const confirmCopy = window.confirm("سيتم استبدال قيم الجدول الحالي بقيم الجدول المصدر. هل أنت متأكد؟");
+    const confirmCopy = window.confirm("سيتم استبدال قيم الجدول الحالي بقيم الجدول المصدر المحدد الحفظ التلقائي سيطبق. هل أنت متأكد؟");
     if (!confirmCopy) return;
 
-    // map productId للتوافق مع الصيغة القديمة 'real_estate'
-    const legacyProductId = cloningFromProduct === 'real_estate_only' ? 'real_estate' : cloningFromProduct;
-
-    let sourceRules = marginRules.filter(r => 
-      r.bankId === selectedMarginBank && 
-      r.productId === cloningFromProduct && 
-      (r.supportType === cloningFromSupport || r.supportType === 'all')
+    const sourceRules = marginRules.filter(r => 
+      r.bankId === cloningFromBank && 
+      (r.productType === cloningFromProduct || r.productId === cloningFromProduct || (cloningFromProduct === 'real_estate_only' && r.productId === 'real_estate')) && 
+      (r.supportType === cloningFromSupport || r.supportType === 'all') &&
+      (r.salaryTier === cloningFromSalaryTier || (!r.salaryTier && cloningFromSalaryTier === 'not_applicable'))
     );
 
-    if (sourceRules.length === 0) {
-      sourceRules = marginRules.filter(r => 
-        r.bankId === selectedMarginBank && 
-        r.productId === legacyProductId && 
-        (r.supportType === cloningFromSupport || r.supportType === 'all')
-      );
-    }
-
-    let p5 = '3.80';
-    let p10 = '3.98';
-    let p15 = '4.25';
-    let p20 = '4.60';
-    let p25 = '4.95';
-    let p30 = '5.25';
-    let method: 'linear' | 'fixed' = 'linear';
-
+    let method: 'linear' | 'fixed' = 'fixed';
     if (sourceRules.length > 0) {
-      const r60 = sourceRules.find(r => r.toTermMonths === 60);
-      const r120 = sourceRules.find(r => r.toTermMonths === 120);
-      const r180 = sourceRules.find(r => r.toTermMonths === 180);
-      const r240 = sourceRules.find(r => r.toTermMonths === 240);
-      const r300 = sourceRules.find(r => r.toTermMonths === 300);
-      const r360 = sourceRules.find(r => r.toTermMonths === 360);
-
-      if (r60) p5 = r60.endMargin.toString();
-      if (r120) {
-        p10 = r120.endMargin.toString();
-        method = r120.calcType;
+      const match = sourceRules.find(r => r.calculationMethod || r.calcType);
+      if (match) {
+        method = (match.calculationMethod || match.calcType) as any;
       }
-      if (r180) p15 = r180.endMargin.toString();
-      if (r240) p20 = r240.endMargin.toString();
-      if (r300) p25 = r300.endMargin.toString();
-      if (r360) p30 = r360.endMargin.toString();
     }
 
-    const newCopiedMargins = {
-      5: p5,
-      10: p10,
-      15: p15,
-      20: p20,
-      25: p25,
-      30: p30
-    };
+    let inputMode: 'yearly' | 'key_points' = 'key_points';
+    const foundInputModeRule = sourceRules.find(r => r.marginInputMode);
+    if (foundInputModeRule) {
+      inputMode = foundInputModeRule.marginInputMode;
+    } else {
+      const hasIntermediate = sourceRules.some(r => {
+        const y = r.year || (r.toTermMonths / 12);
+        return y !== undefined && ![5, 10, 15, 20, 25, 30].includes(y);
+      });
+      if (hasIntermediate) {
+        inputMode = 'yearly';
+      }
+    }
+
+    const yearsList = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30];
+    const newCopiedMargins: Record<number, string> = {};
+
+    yearsList.forEach(year => {
+      const rY = sourceRules.find(r => r.year === year || r.toTermMonths === year * 12);
+      newCopiedMargins[year] = rY ? (rY.annualMargin !== undefined ? rY.annualMargin : rY.endMargin).toString() : '';
+    });
 
     setLocalMargins(newCopiedMargins);
     setLocalCalcMethod(method);
+    setSelectedMarginInputMode(inputMode);
 
-    // Apply instantly to the global rules of the current selected state to cause reactive save state
-    updateGlobalRulesFromLocal(newCopiedMargins, method);
-
-    showToast("تم استنساخ الجدول بنجاح", "success");
+    updateGlobalRulesFromLocal(newCopiedMargins, method, inputMode);
+    showToast("تم استنساخ الجدول بنجاح وتحديث المسودة الحالية.", "success");
   };
 
   // --- DSR Rules States & Management ---
@@ -1266,12 +1264,19 @@ export default function AdminDashboard() {
     // 1. Clean input
     const cleanDsrStr = parseArabicAndEnglishNumber(formPfDsr).replace(/,/g, '').trim();
     const cleanTermStr = parseArabicAndEnglishNumber(formPfTerm).replace(/,/g, '').trim();
-    const cleanCoeffStr = parseArabicAndEnglishNumber(formPfCoeff).replace(/,/g, '').trim();
-    const cleanMarginStr = parseArabicAndEnglishNumber(formPfMargin).replace(/,/g, '').trim();
     const cleanSalaryStr = parseArabicAndEnglishNumber(formPfMinSalary).replace(/,/g, '').trim();
 
-    if (!cleanDsrStr || !cleanTermStr || !cleanCoeffStr || !cleanMarginStr || !cleanSalaryStr) {
-      setPfError('جميع الحقول الرقمية مطلوبة.');
+    // Conditional cleaning of coefficient and margin based on selected calculationMethod
+    const cleanCoeffStr = formPfCalcMethod === 'multiplier'
+      ? parseArabicAndEnglishNumber(formPfCoeff).replace(/,/g, '').trim()
+      : '0';
+
+    const cleanMarginStr = (formPfCalcMethod === 'flat_rate' || formPfCalcMethod === 'pmt')
+      ? parseArabicAndEnglishNumber(formPfMargin).replace(/,/g, '').trim()
+      : '0';
+
+    if (!cleanDsrStr || !cleanTermStr || !cleanSalaryStr || (formPfCalcMethod === 'multiplier' && !cleanCoeffStr) || ((formPfCalcMethod === 'flat_rate' || formPfCalcMethod === 'pmt') && !cleanMarginStr)) {
+      setPfError('جميع الحقول المطلوبة لطريقة الحساب المحددة يجب ملؤها.');
       return;
     }
 
@@ -5716,28 +5721,44 @@ export default function AdminDashboard() {
               </div>
             </div>
 
+            {/* Bank Selection Tabs (Horizontal Row) */}
+            <div className="space-y-2">
+              <span className="text-xs font-bold text-gray-500 block mb-1 font-sans">اختر البنك التمويلي:</span>
+              <div className="flex flex-wrap gap-2 border-b border-gray-100 pb-4 font-sans">
+                {[
+                  { id: 'alahli', nameAr: 'البنك الأهلي السعودي' },
+                  { id: 'rajhi', nameAr: 'مصرف الراجحي' },
+                  { id: 'alinma', nameAr: 'مصرف الإنماء' },
+                  { id: 'fransi', nameAr: 'البنك السعودي الفرنسي' },
+                  { id: 'bidaya', nameAr: 'بداية لتمويل المنازل' },
+                  { id: 'albilad', nameAr: 'بنك البلاد' },
+                  { id: 'alarabi', nameAr: 'البنك العربي الوطني' }
+                ].map((b) => {
+                  const isSelected = selectedMarginBank === b.id;
+                  return (
+                    <button
+                      key={b.id}
+                      type="button"
+                      onClick={() => setSelectedMarginBank(b.id)}
+                      className={`px-4 py-2.5 text-xs font-extrabold rounded-xl transition-all cursor-pointer ${
+                        isSelected 
+                          ? 'bg-[#0057B8] text-white shadow-[#0057B8]/20 shadow-md scale-[1.02]' 
+                          : 'bg-white hover:bg-slate-50 text-gray-700 border border-gray-250 hover:border-gray-300'
+                      }`}
+                    >
+                      {b.nameAr}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* Selection Grid */}
             <div className="bg-white border border-[#E5E7EB] rounded-2xl p-6 shadow-xs space-y-6">
-              {/* 1. Selector dropdown of bank */}
-              <div>
-                <label htmlFor="margin-bank-select" className="block text-xs font-bold text-gray-700 mb-2">اختر البنك:</label>
-                <div className="relative">
-                  <select
-                    id="margin-bank-select"
-                    value={selectedMarginBank}
-                    onChange={(e) => setSelectedMarginBank(e.target.value)}
-                    className="w-full md:max-w-md bg-white border border-gray-300 rounded-xl px-4 py-3 text-xs font-bold font-sans text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-right cursor-pointer"
-                  >
-                    {formBanksList.map(b => (
-                      <option key={b.id} value={b.id}>{b.nameAr}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* 2. Selector Product (المنتج) */}
-              <div>
-                <span className="block text-xs font-bold text-gray-700 mb-3 font-sans">أولاً: المنتج</span>
+              
+              {/* أولاً: المنتج */}
+              <div className="space-y-2">
+                <span className="block text-xs font-extrabold text-[#0057B8] font-sans">أولاً: المنتج</span>
                 <div className="flex flex-wrap gap-2">
                   {[
                     { id: 'real_estate_only', nameAr: 'عقاري فقط' },
@@ -5763,9 +5784,9 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* 3. Selector Support (نوع الدعم) */}
-              <div>
-                <span className="block text-xs font-bold text-gray-700 mb-3 font-sans">ثانياً: نوع الدعم</span>
+              {/* ثانياً: نوع الدعم */}
+              <div className="space-y-2">
+                <span className="block text-xs font-extrabold text-[#0057B8] font-sans">ثانياً: نوع الدعم</span>
                 <div className="flex flex-wrap gap-2">
                   {[
                     { id: 'none', nameAr: 'غير مدعوم' },
@@ -5791,10 +5812,14 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* 4. Selector Salary Tier (فئة الراتب) */}
-              {(selectedMarginSupport === 'monthly' || selectedMarginSupport === 'downpayment' || selectedMarginSupport === 'down_payment') && (
-                <div className="animate-fade-in border-t border-gray-150 pt-4">
-                  <span className="block text-xs font-bold text-gray-700 mb-3 font-sans font-extrabold text-[#0057B8]">ثالثاً: فئة الراتب</span>
+              {/* ثالثاً: فئة الراتب */}
+              <div className="space-y-2">
+                <span className="block text-xs font-extrabold text-[#0057B8] font-sans">ثالثاً: فئة الراتب</span>
+                {selectedMarginSupport === 'none' ? (
+                  <div className="bg-slate-50 border border-slate-250 text-slate-500 rounded-xl px-4 py-3 text-xs font-semibold max-w-md font-sans">
+                    🔒 فئة الراتب غير مطبقة لغير المدعوم ويتم تطبيق جدول عام لكافة الرواتب.
+                  </div>
+                ) : (
                   <div className="flex flex-wrap gap-2">
                     {[
                       { id: 'below_25000', nameAr: '💵 أقل من 25,000' },
@@ -5817,8 +5842,78 @@ export default function AdminDashboard() {
                       );
                     })}
                   </div>
+                )}
+              </div>
+
+            </div>
+
+            {/* Input & Calculation Controls Row */}
+            <div className="bg-[#F8FAFC] border border-[#E5E7EB] rounded-2xl p-5 grid grid-cols-1 md:grid-cols-2 gap-6">
+              
+              {/* طريقة إدخال الهوامش */}
+              <div className="space-y-2">
+                <span className="text-xs font-extrabold text-gray-700 font-sans block">طريقة إدارة السنوات المعروضة:</span>
+                <div className="flex gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMarginInputMode('key_points')}
+                    className={`flex-1 px-3 py-2 rounded-xl text-xs font-bold font-sans transition-all cursor-pointer border text-center ${
+                      selectedMarginInputMode === 'key_points'
+                        ? 'bg-[#0057B8] text-white border-[#0057B8] font-extrabold shadow-sm'
+                        : 'bg-white text-gray-600 border-gray-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    نقاط رئيسية فقط (5/10/15/20/25/30)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMarginInputMode('yearly')}
+                    className={`flex-1 px-3 py-2 rounded-xl text-xs font-bold font-sans transition-all cursor-pointer border text-center ${
+                      selectedMarginInputMode === 'yearly'
+                        ? 'bg-[#0057B8] text-white border-[#0057B8] font-extrabold shadow-sm'
+                        : 'bg-white text-gray-600 border-gray-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    كل سنة مستقلة (5 إلى 30 سنة كاملة)
+                  </button>
                 </div>
-              )}
+                <p className="text-[10px] text-[#6B7280] font-sans">
+                  * اختيار {selectedMarginInputMode === 'key_points' ? 'نقاط رئيسية' : 'كل سنة مستقلة'} يتم حفظه كطريقة إدخال لهذا الجدول بشكل مستقل.
+                </p>
+              </div>
+
+              {/* طريقة الحساب السنوية */}
+              <div className="space-y-2">
+                <span className="text-xs font-extrabold text-gray-700 font-sans block">طريقة الحساب (النسب البينية):</span>
+                <div className="flex gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setLocalCalcMethod('fixed')}
+                    className={`flex-1 px-3 py-2 rounded-xl text-xs font-bold font-sans transition-all cursor-pointer border text-center ${
+                      localCalcMethod === 'fixed'
+                        ? 'bg-[#0057B8] text-white border-[#0057B8] font-extrabold shadow-sm'
+                        : 'bg-white text-gray-600 border-gray-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    ثابتة Fixed (بدون تدرج)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLocalCalcMethod('linear')}
+                    className={`flex-1 px-3 py-2 rounded-xl text-xs font-bold font-sans transition-all cursor-pointer border text-center ${
+                      localCalcMethod === 'linear'
+                        ? 'bg-[#0057B8] text-white border-[#0057B8] font-extrabold shadow-sm'
+                        : 'bg-white text-gray-600 border-gray-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    تدرج خطي Linear (انسيابي)
+                  </button>
+                </div>
+                <p className="text-[10px] text-[#6B7280] font-sans">
+                  * {localCalcMethod === 'linear' ? 'سيقوم النظام بتركيب خط متدرج بين النقاط المدخلة لجميع الشهور البينية.' : 'سيثبت النظام النسبة المدخلة للمدة حتى النقطة التالية دون خط متدرج.'}
+                </p>
+              </div>
+
             </div>
 
             {/* Active Margins Configuration Table */}
@@ -5834,102 +5929,106 @@ export default function AdminDashboard() {
                   </h3>
                   <p className="text-[11px] text-[#6B7280] mt-0.5">جدول هوامش الفوائد والنسب السنوية المعتمدة.</p>
                 </div>
-
-                {/* Calculation method */}
-                <div className="bg-[#F8FAFC] border border-[#E5E7EB] rounded-xl p-2 flex items-center gap-4">
-                  <span className="text-xs font-bold text-gray-600 font-sans">طريقة الحساب:</span>
-                  <div className="flex gap-1">
-                    <button
-                      type="button"
-                      onClick={() => handleCalcMethodChange('linear')}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold font-sans transition-all cursor-pointer ${
-                        localCalcMethod === 'linear'
-                          ? 'bg-[#0057B8] text-white font-extrabold shadow-sm'
-                          : 'bg-white text-gray-600 border border-gray-100 hover:bg-slate-50'
-                      }`}
-                    >
-                      تدرج خطي Linear
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleCalcMethodChange('fixed')}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold font-sans transition-all cursor-pointer ${
-                        localCalcMethod === 'fixed'
-                          ? 'bg-[#0057B8] text-white font-extrabold shadow-sm'
-                          : 'bg-white text-gray-600 border border-gray-100 hover:bg-slate-50'
-                      }`}
-                    >
-                      ثابت Fixed
-                    </button>
-                  </div>
-                </div>
               </div>
 
               {localCalcMethod === 'linear' && (
-                <div className="bg-emerald-50/50 text-emerald-800 text-[11px] font-semibold font-sans border border-emerald-100/60 rounded-xl p-3 leading-relaxed">
-                  * عند اختيار التدرج الخطي، يتم احتساب الهامش بين السنوات تلقائيًا.
+                <div className="bg-emerald-50 text-emerald-800 text-[11px] font-semibold font-sans border border-emerald-100 rounded-xl p-3 leading-relaxed">
+                  * يتم احتساب الهامش للشهور البينية بالتدرج الخطي Linear Interpolation بناءً على أقرب قيمتين مدخلتين.
                 </div>
               )}
 
-              {/* Core 5-30 Margin rates inputs */}
+              {/* Input Grid Table */}
               <div className="overflow-x-auto border border-gray-200 rounded-xl">
                 <table className="min-w-full divide-y divide-gray-200 text-right">
                   <thead className="bg-[#F8FAFC] text-slate-500 font-bold text-xs font-sans">
                     <tr>
-                      <th scope="col" className="px-6 py-3.5 text-right">مدة التمويل</th>
-                      <th scope="col" className="px-6 py-3.5 text-right">الهامش السنوي %</th>
+                      <th scope="col" className="px-6 py-3.5 text-right w-1/2">مدة التمويل بالسنوات</th>
+                      <th scope="col" className="px-6 py-3.5 text-right w-1/2 font-extrabold text-[#0057B8]">الهامش السنوي المدخل %</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 bg-white text-xs font-semibold text-gray-700">
-                    {[
-                      { year: 5, label: '5 سنوات' },
-                      { year: 10, label: '10 سنوات' },
-                      ...Array.from({ length: 20 }, (_, i) => {
-                        const year = 11 + i;
-                        return { year, label: `${year} سنة` };
-                      })
-                    ].map((row) => (
-                      <tr key={row.year} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-6 py-4 whitespace-nowrap text-right font-bold text-slate-800 font-sans">
-                          {row.label}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right">
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            value={localMargins[row.year] ?? ''}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              // Allow digits, single decimal point, or empty string
-                              if (val === '' || /^[0-9]*\.?[0-9]*$/.test(val)) {
-                                handleMarginLocalChange(row.year, val);
-                              }
-                            }}
-                            onBlur={(e) => handleMarginBlur(row.year, e.target.value)}
-                            className="bg-white border border-gray-300 rounded-xl px-4 py-2 w-full max-w-[200px] text-xs font-bold font-mono focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-right"
-                            placeholder="0.00"
-                          />
-                        </td>
-                      </tr>
-                    ))}
+                    {(selectedMarginInputMode === 'yearly'
+                      ? Array.from({ length: 26 }, (_, i) => 5 + i)
+                      : [5, 10, 15, 20, 25, 30]
+                    ).map((year) => {
+                      const label = year <= 10 ? `${year} سنوات` : `${year} سنة`;
+                      return (
+                        <tr key={year} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-6 py-4 whitespace-nowrap text-right font-bold text-slate-800 font-sans">
+                            {label}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right">
+                            <div className="relative max-w-[240px] inline-block w-full">
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                value={localMargins[year] ?? ''}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  if (val === '' || /^[0-9]*\.?[0-9]*$/.test(val)) {
+                                    handleMarginLocalChange(year, val);
+                                  }
+                                }}
+                                className="bg-white border border-gray-300 rounded-xl pl-8 pr-4 py-2 w-full text-xs font-bold font-mono focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-left"
+                                placeholder="0.00"
+                              />
+                              <span className="absolute left-3 top-2 text-xs text-gray-400 font-bold font-sans">%</span>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
+
+              {/* Save Button Action */}
+              <div className="flex justify-end pt-4 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={handleSaveMargins}
+                  className="px-8 py-3 bg-[#0057B8] hover:bg-[#004bb0] text-white rounded-xl font-extrabold text-xs transition-all shadow-md cursor-pointer flex items-center gap-2"
+                >
+                  💾 حفظ وتطبيق الإعدادات
+                </button>
+              </div>
+
             </div>
 
-            {/* Clone panel within the SAME bank */}
+            {/* Advanced Clone panel */}
             <div className="bg-[#F8FAFC] border border-[#E5E7EB] rounded-2xl p-6 shadow-xs space-y-4">
-              <h4 className="font-extrabold text-[#111827] text-xs font-sans">استنساخ من جدول آخر</h4>
-              <p className="text-[11px] text-[#6B7280] font-sans">استنساخ هوامش حالة إلى الحالة المروّسة الحالية داخل نفس البنك ({formBanksList.find(b => b.id === selectedMarginBank)?.nameAr}).</p>
+              <h4 className="font-extrabold text-[#111827] text-sm font-sans flex items-center gap-1.5">
+                📋 استنساخ من جدول آخر (نسخ الإعدادات)
+              </h4>
+              <p className="text-[11px] text-[#6B7280] font-sans">
+                يتيح لك نسخ الهوامش وطرق الحساب والمدد المعتمدة من أي جدول أو بنك آخر وتطبيقها فورياً على المسودة الحالية.
+              </p>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end text-xs font-bold text-gray-700 font-sans">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 items-end text-xs font-bold text-gray-700 font-sans">
+                
+                {/* 1. Bank */}
                 <div>
-                  <label htmlFor="clone-from-product" className="block text-slate-500 mb-1.5 font-sans">اختر المنتج المصدر:</label>
+                  <label htmlFor="clone-from-bank" className="block text-slate-500 mb-1.5 font-sans">البنك المصدر:</label>
+                  <select
+                    id="clone-from-bank"
+                    value={cloningFromBank}
+                    onChange={(e) => setCloningFromBank(e.target.value)}
+                    className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-800 cursor-pointer text-right mb-1"
+                  >
+                    {formBanksList.map(b => (
+                      <option key={b.id} value={b.id}>{b.nameAr}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 2. Product */}
+                <div>
+                  <label htmlFor="clone-from-product" className="block text-slate-500 mb-1.5 font-sans">المنتج المصدر:</label>
                   <select
                     id="clone-from-product"
                     value={cloningFromProduct}
                     onChange={(e) => setCloningFromProduct(e.target.value as ProductId)}
-                    className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-800 cursor-pointer text-right"
+                    className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-800 cursor-pointer text-right mb-1"
                   >
                     {[
                       { id: 'real_estate_only', nameAr: 'عقاري فقط' },
@@ -5941,13 +6040,14 @@ export default function AdminDashboard() {
                   </select>
                 </div>
 
+                {/* 3. Support */}
                 <div>
-                  <label htmlFor="clone-from-support" className="block text-slate-500 mb-1.5 font-sans">اختر نوع الدعم المصدر:</label>
+                  <label htmlFor="clone-from-support" className="block text-slate-500 mb-1.5 font-sans">نوع الدعم المصدر:</label>
                   <select
                     id="clone-from-support"
                     value={cloningFromSupport}
                     onChange={(e) => setCloningFromSupport(e.target.value as SupportType)}
-                    className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-800 cursor-pointer text-right"
+                    className="w-full bg-white border border-[#D1D5DB] rounded-xl px-3 py-2.5 text-xs font-bold text-gray-800 cursor-pointer text-right mb-1"
                   >
                     {[
                       { id: 'none', nameAr: 'غير مدعوم' },
@@ -5959,16 +6059,39 @@ export default function AdminDashboard() {
                   </select>
                 </div>
 
+                {/* 4. Salary Tier */}
                 <div>
-                  <button
-                    type="button"
-                    onClick={handleCloneLocal}
-                    className="w-full py-2.5 bg-[#0057B8] hover:bg-[#004bb0] text-white rounded-xl font-extrabold text-xs transition-all shadow-xs cursor-pointer"
+                  <label htmlFor="clone-from-salary" className="block text-slate-500 mb-1.5 font-sans">فئة الراتب المصدر:</label>
+                  <select
+                    id="clone-from-salary"
+                    value={cloningFromSalaryTier}
+                    onChange={(e) => setCloningFromSalaryTier(e.target.value as any)}
+                    className="w-full bg-white border border-[#D1D5DB] rounded-xl px-3 py-2.5 text-xs font-bold text-gray-800 cursor-pointer text-right mb-1 disabled:opacity-50"
+                    disabled={cloningFromSupport === 'none'}
                   >
-                    استنساخ إلى الجدول الحالي
-                  </button>
+                    {cloningFromSupport === 'none' ? (
+                      <option value="not_applicable">غير مطبق</option>
+                    ) : (
+                      <>
+                        <option value="below_25000">أقل من 25,000</option>
+                        <option value="above_or_equal_25000">25,000 فأكثر</option>
+                      </>
+                    )}
+                  </select>
                 </div>
+
               </div>
+
+              <div className="flex justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={handleCloneLocal}
+                  className="px-6 py-2.5 bg-[#0057B8] hover:bg-[#004bb0] text-white rounded-xl font-extrabold text-xs transition-all shadow-md cursor-pointer flex items-center gap-1.5"
+                >
+                  📋 تنفيذ عملية الاستنساخ المصدرية
+                </button>
+              </div>
+
             </div>
           </div>
         )}
@@ -6945,7 +7068,7 @@ export default function AdminDashboard() {
                       <th className="p-4 font-bold text-center">الإجراءات</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-50 font-semibold">
+                      <tbody className="divide-y divide-gray-50 font-semibold">
                     {personalRules && personalRules.filter(rule => rule.bankId === filterPfBank).length > 0 ? (
                       personalRules.filter(rule => rule.bankId === filterPfBank).map((rule, idx) => {
                         const b = banks?.find(bk => bk.id === rule.bankId);
@@ -6953,6 +7076,16 @@ export default function AdminDashboard() {
                         const pathLabel = rule.pathType === 'real_estate_with_new_personal' ? 'عقاري + شخصي جديد' : 'تمويل شخصي فقط';
                         const statusLabel = rule.customerStatus === 'retired' ? 'متقاعد' : 'موظف نشط';
                         const ruleId = rule.id || `rule-${rule.bankId}-${idx}`;
+                        
+                        let displayDsr = rule.dsrPercentage ?? 0;
+                        let displayTerm = rule.termMonths ?? 0;
+                        let displayMargin = rule.annualMargin ?? 0;
+                        if (rule.bankId === 'alahli' && rule.calculationMethod === 'flat_rate') {
+                          displayDsr = rule.customerStatus === 'retired' ? 25 : 33.33;
+                          displayTerm = 60;
+                          displayMargin = 5;
+                        }
+
                         return (
                           <tr key={ruleId} className="hover:bg-slate-50 transition-colors">
                             <td className="p-4 text-xs font-bold text-slate-800">{bankName}</td>
@@ -6966,15 +7099,25 @@ export default function AdminDashboard() {
                                 {statusLabel}
                               </span>
                             </td>
-                            <td className="p-4 text-center font-sans">{(rule.dsrPercentage ?? 0)}%</td>
-                            <td className="p-4 text-center font-sans">{(rule.termMonths ?? 0)} شهراً</td>
-                            <td className="p-4 text-center font-sans">{(rule.financeCoefficient ?? 0)}</td>
+                            <td className="p-4 text-center font-sans">{displayDsr}%</td>
+                            <td className="p-4 text-center font-sans">{displayTerm} شهراً</td>
+                            <td className="p-4 text-center font-sans">
+                              {rule.calculationMethod === 'multiplier' ? (rule.financeCoefficient ?? 0) : '-'}
+                            </td>
                             <td className="p-4 text-xs">
                               <span className="text-gray-500 font-sans">
-                                {rule.calculationMethod === 'pmt' ? 'PMT' : 'Multiplier'}
+                                {rule.calculationMethod === 'pmt' ? 'PMT' : rule.calculationMethod === 'multiplier' ? 'Multiplier' : 'Flat Rate'}
                               </span>
                             </td>
-                            <td className="p-4 text-center font-sans">{(rule.annualMargin ?? 0)}%</td>
+                            <td className="p-4 text-center font-sans">
+                              {rule.calculationMethod === 'multiplier' ? (
+                                <span className="text-gray-400 text-[10px] font-normal">للعرض فقط</span>
+                              ) : rule.calculationMethod === 'pmt' ? (
+                                <span className="text-blue-700">{displayMargin}% (الفائدة)</span>
+                              ) : (
+                                <span>{displayMargin}%</span>
+                              )}
+                            </td>
                             <td className="p-4 text-center font-sans">{(rule.minSalary ?? 0).toLocaleString('ar-SA')} ريال</td>
                             <td className="p-4 text-center">
                               <button
@@ -7060,7 +7203,15 @@ export default function AdminDashboard() {
                           <select
                             id="pf-form-bank"
                             value={formPfBankId}
-                            onChange={(e) => setFormPfBankId(e.target.value)}
+                            onChange={(e) => {
+                              const bId = e.target.value;
+                              setFormPfBankId(bId);
+                              if (bId === 'alahli' && formPfCalcMethod === 'flat_rate') {
+                                setFormPfMargin('5');
+                                setFormPfTerm('60');
+                                setFormPfDsr(formPfCustomerStatus === 'retired' ? '25' : '33.33');
+                              }
+                            }}
                             disabled={!!editingPfRule}
                             className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
                           >
@@ -7092,7 +7243,13 @@ export default function AdminDashboard() {
                           <select
                             id="pf-form-customerstatus"
                             value={formPfCustomerStatus}
-                            onChange={(e) => setFormPfCustomerStatus(e.target.value as any)}
+                            onChange={(e) => {
+                              const st = e.target.value as any;
+                              setFormPfCustomerStatus(st);
+                              if (formPfBankId === 'alahli' && formPfCalcMethod === 'flat_rate') {
+                                setFormPfDsr(st === 'retired' ? '25' : '33.33');
+                              }
+                            }}
                             disabled={!!editingPfRule}
                             className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
                           >
@@ -7135,7 +7292,15 @@ export default function AdminDashboard() {
                           <select
                             id="pf-form-calcmethod"
                             value={formPfCalcMethod}
-                            onChange={(e) => setFormPfCalcMethod(e.target.value as any)}
+                            onChange={(e) => {
+                              const val = e.target.value as any;
+                              setFormPfCalcMethod(val);
+                              if (formPfBankId === 'alahli' && val === 'flat_rate') {
+                                setFormPfMargin('5');
+                                setFormPfTerm('60');
+                                setFormPfDsr(formPfCustomerStatus === 'retired' ? '25' : '33.33');
+                              }
+                            }}
                             className="w-full bg-blue-50 border border-blue-200 rounded-xl px-3 py-2 text-xs font-bold text-[#0057B8] focus:outline-none focus:ring-1 focus:ring-blue-500"
                           >
                             <option value="flat_rate">نسبة الفائدة المسطحة (Flat Rate)</option>
@@ -7145,51 +7310,45 @@ export default function AdminDashboard() {
                         </div>
 
                         {/* 6. Multiplier coeff */}
-                        <div className="space-y-1.5">
-                          <label className="block text-xs font-bold text-gray-600">
-                            معامل التمويل (Multiplier):{' '}
-                            {formPfCalcMethod === 'multiplier' ? (
+                        {formPfCalcMethod === 'multiplier' && (
+                          <div className="space-y-1.5 col-span-1 md:col-span-2">
+                            <label className="block text-xs font-bold text-gray-600">
+                              معامل التمويل (Multiplier):{' '}
                               <span className="text-red-500 text-[10px] font-bold">(أساسي للحساب)</span>
-                            ) : (
-                              <span className="text-gray-400 text-[10px] font-normal">(للعرض/اختياري فقط)</span>
-                            )}
-                          </label>
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            id="pf-form-coeff"
-                            value={formPfCoeff}
-                            onChange={(e) => setFormPfCoeff(e.target.value)}
-                            className={`w-full border rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                              formPfCalcMethod === 'multiplier' ? 'bg-amber-50 border-amber-300' : 'bg-slate-50 border-gray-200'
-                            }`}
-                            placeholder="مثال: 50.42"
-                          />
-                        </div>
+                            </label>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              id="pf-form-coeff"
+                              value={formPfCoeff}
+                              onChange={(e) => setFormPfCoeff(e.target.value)}
+                              className="w-full border bg-amber-50 border-amber-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              placeholder="مثال: 50.42"
+                            />
+                          </div>
+                        )}
 
                         {/* 8. Margin percentage */}
-                        <div className="space-y-1.5">
-                          <label className="block text-xs font-bold text-gray-600">
-                            {formPfCalcMethod === 'pmt' ? (
-                              <>معدل الفائدة السنوي (APR / Annual Rate):{' '}<span className="text-red-500 text-[10px] font-bold">(أساسي لـ PMT)</span></>
-                            ) : formPfCalcMethod === 'flat_rate' ? (
-                              <>هامش الربح السنوي (Flat Rate):{' '}<span className="text-red-500 text-[10px] font-bold">(أساسي للحساب)</span></>
-                            ) : (
-                              <>هامش الربح للعرض والتقريب (%):{' '}<span className="text-gray-400 text-[10px] font-normal">(لعرض/تقريب فقط)</span></>
-                            )}
-                          </label>
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            id="pf-form-margin"
-                            value={formPfMargin}
-                            onChange={(e) => setFormPfMargin(e.target.value)}
-                            className={`w-full border rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                              formPfCalcMethod !== 'multiplier' ? 'bg-amber-50 border-amber-300' : 'bg-slate-50 border-gray-200'
-                            }`}
-                            placeholder="مثال: 4.80"
-                          />
-                        </div>
+                        {(formPfCalcMethod === 'flat_rate' || formPfCalcMethod === 'pmt') && (
+                          <div className="space-y-1.5 col-span-1 md:col-span-2">
+                            <label className="block text-xs font-bold text-gray-600">
+                              {formPfCalcMethod === 'pmt' ? (
+                                <>نسبة الفائدة السنوية % (APR):</>
+                              ) : (
+                                <>نسبة الفائدة / الهامش % (Flat Rate):</>
+                              )}
+                            </label>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              id="pf-form-margin"
+                              value={formPfMargin}
+                              onChange={(e) => setFormPfMargin(e.target.value)}
+                              className="w-full border bg-amber-50 border-amber-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              placeholder="مثال: 4.80"
+                            />
+                          </div>
+                        )}
 
                         {/* 9. Minimum Salary */}
                         <div className="space-y-1.5">

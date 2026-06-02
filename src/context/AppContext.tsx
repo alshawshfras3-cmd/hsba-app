@@ -125,13 +125,31 @@ interface AdminSettings {
 
 function upgradeMarginRules(rules: MarginRule[]): MarginRule[] {
   if (!rules || rules.length === 0) return initialMarginRules;
+  let currentRules = rules;
   const hasNewRajhiRules = rules.some(r => r.bankId === 'rajhi' && r.id && r.id.startsWith('rajhi_gen_'));
   if (!hasNewRajhiRules) {
     const nonRajhiRules = rules.filter(r => r.bankId !== 'rajhi');
     const rajhiInitialRules = initialMarginRules.filter(r => r.bankId === 'rajhi');
-    return [...nonRajhiRules, ...rajhiInitialRules];
+    currentRules = [...nonRajhiRules, ...rajhiInitialRules];
   }
-  return rules;
+
+  const seenKeys = new Set<string>();
+  const finalRules: MarginRule[] = [];
+
+  for (const r of currentRules) {
+    const rCopy = { ...r };
+    if ('offerProfile' in rCopy) {
+      delete (rCopy as any).offerProfile;
+    }
+
+    const key = `${rCopy.bankId}_${rCopy.productId}_${rCopy.supportType}_${rCopy.salaryTier || 'none'}_${rCopy.fromTermMonths}_${rCopy.toTermMonths}`;
+    if (!seenKeys.has(key)) {
+      seenKeys.add(key);
+      finalRules.push(rCopy);
+    }
+  }
+
+  return finalRules;
 }
 
 const getInitialSettings = (): AdminSettings => {

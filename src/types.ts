@@ -117,6 +117,14 @@ export interface MarginRule {
   calcType: 'fixed' | 'linear';
   isActive: boolean;
   salaryTier?: 'below_25000' | 'above_or_equal_25000' | 'not_applicable';
+
+  // NEW internal keys/metadata fields
+  productType?: 'real_estate_only' | 'real_estate_with_new_personal' | 'real_estate_with_existing_personal';
+  marginInputMode?: 'yearly' | 'key_points';
+  calculationMethod?: 'fixed' | 'linear';
+  year?: number;
+  termMonths?: number;
+  annualMargin?: number;
 }
 
 export interface DsrRule {
