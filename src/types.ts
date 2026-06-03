@@ -166,6 +166,7 @@ export interface PersonalFinanceRules {
   financeCoefficient: number; // e.g. 50.4
   annualMargin: number; // e.g. 1.99
   minSalary: number;
+  maxSalary?: number;
   minAge: number;
   maxAge: number;
   retireeDsrPercentage: number; // e.g. 25

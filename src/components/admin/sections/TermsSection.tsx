@@ -285,13 +285,14 @@ export default function TermsSection({
                 <input
                   type="text"
                   inputMode="numeric"
+                  dir="ltr"
                   value={termRuleFormMaxTermMonths}
                   onChange={(e) => {
-                    const val = e.target.value.replace(/[^0-9.,]/g, '');
+                    const val = normalizeNumberInput(e.target.value);
                     setTermRuleFormMaxTermMonths(val);
                   }}
                   placeholder="مثال: 360"
-                  className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-right font-mono"
+                  className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-right font-mono"
                 />
               </div>
 
@@ -301,13 +302,14 @@ export default function TermsSection({
                 <input
                   type="text"
                   inputMode="numeric"
+                  dir="ltr"
                   value={termRuleFormMaxAgeAtEnd}
                   onChange={(e) => {
-                    const val = e.target.value.replace(/[^0-9.,]/g, '');
+                    const val = normalizeNumberInput(e.target.value);
                     setTermRuleFormMaxAgeAtEnd(val);
                   }}
                   placeholder="مثال: 77"
-                  className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-right font-mono"
+                  className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-right font-mono"
                 />
               </div>
 
@@ -385,17 +387,18 @@ export default function TermsSection({
                       <input
                         type="text"
                         inputMode="numeric"
+                        dir="ltr"
                         disabled={!termRuleFormAllowAfterRetirement}
                         value={termRuleFormAllowedMonthsAfterRetirement}
                         onChange={(e) => {
                           if (!termRuleFormAllowAfterRetirement) return;
-                          const val = e.target.value.replace(/[^0-9.,]/g, '');
+                          const val = normalizeNumberInput(e.target.value);
                           setTermRuleFormAllowedMonthsAfterRetirement(val);
                         }}
                         placeholder="مثال: 204"
-                        className={`w-full border rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none text-right font-mono ${
+                        className={`w-full border rounded-xl px-4 py-2.5 text-xs font-bold focus:outline-none text-right font-mono ${
                           termRuleFormAllowAfterRetirement 
-                            ? 'bg-white border-gray-200 focus:ring-2 focus:ring-[#0057B8]' 
+                            ? 'bg-white border-gray-200 focus:ring-2 focus:ring-[#0057B8] text-gray-800' 
                             : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
                         }`}
                       />
@@ -410,13 +413,14 @@ export default function TermsSection({
                 <input
                   type="text"
                   inputMode="numeric"
+                  dir="ltr"
                   value={termRuleFormMinTermMonths}
                   onChange={(e) => {
-                    const val = e.target.value.replace(/[^0-9.,]/g, '');
+                    const val = normalizeNumberInput(e.target.value);
                     setTermRuleFormMinTermMonths(val);
                   }}
                   placeholder="مثال: 60"
-                  className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-right font-mono"
+                  className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-right font-mono"
                 />
               </div>
 

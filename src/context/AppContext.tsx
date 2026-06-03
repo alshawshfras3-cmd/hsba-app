@@ -152,47 +152,29 @@ function upgradeMarginRules(rules: MarginRule[]): MarginRule[] {
   return finalRules;
 }
 
+function getDsrRuleKey(rule: DsrRule): string {
+  return [
+    rule.bankId,
+    rule.productType,
+    rule.supportType,
+    rule.customerStage
+  ].join('|');
+}
+
+function mergeDsrRulesWithSeeds(existingRules: DsrRule[], seedRules: DsrRule[]) {
+  const existingArray = Array.isArray(existingRules) ? existingRules : [];
+  const seedArray = Array.isArray(seedRules) ? seedRules : [];
+
+  const existingKeys = new Set(existingArray.map(getDsrRuleKey));
+  const missingSeedRules = seedArray.filter(rule => !existingKeys.has(getDsrRuleKey(rule)));
+
+  return {
+    mergedRules: [...existingArray, ...missingSeedRules],
+    addedCount: missingSeedRules.length
+  };
+}
+
 const getInitialSettings = (): AdminSettings => {
-  try {
-    const saved = localStorage.getItem("hasba_admin_settings");
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (parsed && typeof parsed === 'object') {
-        const savedMilitaryRanks = parsed.militaryRanks || [];
-        const needsRanksUpgrade = savedMilitaryRanks.length === 0 || 
-          savedMilitaryRanks.some((r: any) => !r.hasOwnProperty('sectorScope') || !r.sectorScope || r.sectorScope === 'military_officer' || r.sectorScope === 'military_enlisted');
-
-        const savedTermRules = parsed.termRules || [];
-        const needsTermRulesUpgrade = savedTermRules.length === 0 || 
-          savedTermRules.length < 5 || 
-          savedTermRules.some((r: any) => r.bankId === 'rajhi' && r.sectorId === 'gov_civil' && r.maxTermMonths === 300);
-
-        const savedDsrRules = parsed.dsrRules || [];
-        const needsDsrRulesUpgrade = savedDsrRules.length === 0 ||
-          savedDsrRules.length < 20 ||
-          savedDsrRules.some((r: any) => r.bankId === 'default');
-
-        return {
-          banks: parsed.banks || initialBanks,
-          products: parsed.products || initialProductAcceptance,
-          militaryRanks: needsRanksUpgrade ? initialMilitaryRanks : savedMilitaryRanks,
-          salaryRules: parsed.salaryRules || initialSalaryRules,
-          pensionRules: parsed.pensionRules || initialPensionRules,
-          termRules: needsTermRulesUpgrade ? initialTermRules : savedTermRules,
-          marginRules: upgradeMarginRules(parsed.marginRules || []),
-          dsrRules: needsDsrRulesUpgrade ? initialDsrRules : savedDsrRules,
-          supportSettings: parsed.supportSettings || initialSupportSettings,
-          housingSupportTiers: parsed.housingSupportTiers || DEFAULT_HOUSING_SUPPORT_TIERS,
-          advancePaymentTiers: parsed.advancePaymentTiers || DEFAULT_ADVANCE_PAYMENT_TIERS,
-          personalRules: parsed.personalRules || initialPersonalFinanceRules,
-          advancedRules: parsed.advancedRules || initialAdvancedRules,
-          userSubscriptions: parsed.userSubscriptions || initialUserSubscriptions,
-        };
-      }
-    }
-  } catch (e) {
-    console.error("Error reading hasba_admin_settings from localStorage:", e);
-  }
   return {
     banks: initialBanks,
     products: initialProductAcceptance,
@@ -240,6 +222,44 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   const [savedSettings, setSavedSettings] = useState<AdminSettings>(initialData);
 
+  // Helper helper to correctly apply partial or full settings update to state and savedSettings
+  const applySettingsState = (data: Partial<AdminSettings>) => {
+    if (data.banks) setBanks(data.banks);
+    if (data.products) setProducts(data.products);
+    if (data.militaryRanks) setMilitaryRanks(data.militaryRanks);
+    if (data.salaryRules) setSalaryRules(data.salaryRules);
+    if (data.pensionRules) setPensionRules(data.pensionRules);
+    if (data.termRules) setTermRules(data.termRules);
+    if (data.marginRules) {
+      setMarginRules(upgradeMarginRules(data.marginRules));
+    }
+    if (data.dsrRules) setDsrRules(data.dsrRules);
+    if (data.supportSettings) setSupportSettings(data.supportSettings);
+    if (data.housingSupportTiers) setHousingSupportTiers(data.housingSupportTiers);
+    if (data.advancePaymentTiers) setAdvancePaymentTiers(data.advancePaymentTiers);
+    if (data.personalRules) setPersonalRules(data.personalRules);
+    if (data.advancedRules) setAdvancedRules(data.advancedRules);
+    if (data.userSubscriptions) setUserSubscriptions(data.userSubscriptions);
+
+    const merged: AdminSettings = {
+      banks: data.banks || initialData.banks,
+      products: data.products || initialData.products,
+      militaryRanks: data.militaryRanks || initialData.militaryRanks,
+      salaryRules: data.salaryRules || initialData.salaryRules,
+      pensionRules: data.pensionRules || initialData.pensionRules,
+      termRules: data.termRules || initialData.termRules,
+      marginRules: data.marginRules ? upgradeMarginRules(data.marginRules) : initialData.marginRules,
+      dsrRules: data.dsrRules || initialData.dsrRules,
+      supportSettings: data.supportSettings || initialData.supportSettings,
+      housingSupportTiers: data.housingSupportTiers || initialData.housingSupportTiers,
+      advancePaymentTiers: data.advancePaymentTiers || initialData.advancePaymentTiers,
+      personalRules: data.personalRules || initialData.personalRules,
+      advancedRules: data.advancedRules || initialData.advancedRules,
+      userSubscriptions: data.userSubscriptions || initialData.userSubscriptions,
+    };
+    setSavedSettings(merged);
+  };
+
   // Consume from custom AuthProvider
   const { user, setUser, profile, isOwner, isAdmin, isStaff, canAccessDashboard, signOut, loading: authLoading } = useAuth();
   
@@ -259,6 +279,20 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     async function loadConfig() {
       if (!hasSupabaseKeys) {
         console.warn("Supabase configuration keys missing. Running with local browser persistent cache.");
+        let fallbackLoaded = false;
+        try {
+          const cachedJson = localStorage.getItem("hasba_settings_cache") || localStorage.getItem("hasba_admin_settings");
+          if (cachedJson) {
+            const parsed = JSON.parse(cachedJson);
+            applySettingsState(parsed);
+            fallbackLoaded = true;
+          }
+        } catch (e) {
+          console.error("Failed to parse cached settings:", e);
+        }
+        if (!fallbackLoaded) {
+          applySettingsState(initialData);
+        }
         setIsSettingsLoading(false);
         return;
       }
@@ -303,9 +337,32 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         };
 
         const finalSettings: Record<string, any> = {};
+        const DSR_RULES_VERSION = 2;
 
         for (const key of Object.keys(DEFAULTS_MAP)) {
           const existing = presentRecords.get(key);
+          
+          if (key === 'dsr_rules') {
+            const supabaseRules = existing?.value as DsrRule[];
+            const seedRules = DEFAULTS_MAP.dsr_rules as DsrRule[];
+
+            const { mergedRules, addedCount } = mergeDsrRulesWithSeeds(supabaseRules, seedRules);
+
+            finalSettings[key] = mergedRules;
+
+            if (addedCount > 0) {
+              try {
+                await supabase.from('system_settings').upsert({
+                  key: 'dsr_rules',
+                  value: mergedRules,
+                  source: existing?.source || 'seed',
+                  updated_at: new Date().toISOString()
+                } as any);
+              } catch (_) {}
+            }
+            continue;
+          }
+
           if (!existing) {
             finalSettings[key] = DEFAULTS_MAP[key];
             try {
@@ -324,62 +381,53 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           loadedMilitaryRanks = initialMilitaryRanks;
         }
 
-        if (finalSettings.banks) setBanks(finalSettings.banks);
-        if (finalSettings.product_acceptance) setProducts(finalSettings.product_acceptance);
-        setMilitaryRanks(loadedMilitaryRanks);
-        if (finalSettings.salary_rules) setSalaryRules(finalSettings.salary_rules);
-        if (finalSettings.pension_rules) setPensionRules(finalSettings.pension_rules);
-        if (finalSettings.term_rules) setTermRules(finalSettings.term_rules);
-        if (finalSettings.margin_rules) {
-          setMarginRules(upgradeMarginRules(finalSettings.margin_rules));
-        } else {
-          setMarginRules(initialMarginRules);
-        }
-        if (finalSettings.dsr_rules) setDsrRules(finalSettings.dsr_rules);
-        if (finalSettings.support_settings) setSupportSettings(finalSettings.support_settings);
-        if (finalSettings.personal_finance_rules) setPersonalRules(finalSettings.personal_finance_rules);
-        if (finalSettings.advanced_rules) setAdvancedRules(finalSettings.advanced_rules);
-        if (finalSettings.user_subscriptions) setUserSubscriptions(finalSettings.user_subscriptions);
-
         const hSupport = await fetchHousingSupportTiers();
         const aPayment = await fetchAdvancePaymentTiers();
-        setHousingSupportTiers(hSupport);
-        setAdvancePaymentTiers(aPayment);
 
-        setSavedSettings({
-          banks: finalSettings.banks || initialBanks,
-          products: finalSettings.product_acceptance || initialProductAcceptance,
+        const loadedSettings: AdminSettings = {
+          banks: finalSettings.banks || initialData.banks,
+          products: finalSettings.product_acceptance || initialData.products,
           militaryRanks: loadedMilitaryRanks,
-          salaryRules: finalSettings.salary_rules || initialSalaryRules,
-          pensionRules: finalSettings.pension_rules || initialPensionRules,
-          termRules: finalSettings.term_rules || initialTermRules,
+          salaryRules: finalSettings.salary_rules || initialData.salaryRules,
+          pensionRules: finalSettings.pension_rules || initialData.pensionRules,
+          termRules: finalSettings.term_rules || initialData.termRules,
           marginRules: upgradeMarginRules(finalSettings.margin_rules || []),
-          dsrRules: finalSettings.dsr_rules || initialDsrRules,
-          supportSettings: finalSettings.support_settings || initialSupportSettings,
+          dsrRules: finalSettings.dsr_rules || initialData.dsrRules,
+          supportSettings: finalSettings.support_settings || initialData.supportSettings,
           housingSupportTiers: hSupport,
           advancePaymentTiers: aPayment,
-          personalRules: finalSettings.personal_finance_rules || initialPersonalFinanceRules,
-          advancedRules: finalSettings.advanced_rules || initialAdvancedRules,
-          userSubscriptions: finalSettings.user_subscriptions || initialUserSubscriptions,
-        });
+          personalRules: finalSettings.personal_finance_rules || initialData.personalRules,
+          advancedRules: finalSettings.advanced_rules || initialData.advancedRules,
+          userSubscriptions: finalSettings.user_subscriptions || initialData.userSubscriptions,
+        };
+
+        applySettingsState(loadedSettings);
+
+        // Success loads from Supabase delete old cache forms and populate consolidated cache
+        try {
+          localStorage.removeItem("hasba_admin_settings");
+          for (const key of Object.keys(DEFAULTS_MAP)) {
+            localStorage.removeItem(`hasba_sett_${key}`);
+          }
+          localStorage.setItem("hasba_settings_cache", JSON.stringify(loadedSettings));
+        } catch (_) {}
 
       } catch (err) {
-        console.warn("Supabase granular system_settings load failed. Using local storage or seed defaults gracefully.", err);
-        setBanks(initialData.banks);
-        setProducts(initialData.products);
-        setMilitaryRanks(initialData.militaryRanks);
-        setSalaryRules(initialData.salaryRules);
-        setPensionRules(initialData.pensionRules);
-        setTermRules(initialData.termRules);
-        setMarginRules(initialData.marginRules);
-        setDsrRules(initialData.dsrRules);
-        setSupportSettings(initialData.supportSettings);
-        setHousingSupportTiers(initialData.housingSupportTiers);
-        setAdvancePaymentTiers(initialData.advancePaymentTiers);
-        setPersonalRules(initialData.personalRules);
-        setAdvancedRules(initialData.advancedRules);
-        setUserSubscriptions(initialData.userSubscriptions || initialUserSubscriptions);
-        setSavedSettings(initialData);
+        console.warn("Supabase granular system_settings load failed. Gracefully loading cache fallback.", err);
+        let fallbackLoaded = false;
+        try {
+          const cachedJson = localStorage.getItem("hasba_settings_cache") || localStorage.getItem("hasba_admin_settings");
+          if (cachedJson) {
+            const parsed = JSON.parse(cachedJson);
+            applySettingsState(parsed);
+            fallbackLoaded = true;
+          }
+        } catch (e) {
+          console.error("Failed to parse cached settings on load error:", e);
+        }
+        if (!fallbackLoaded) {
+          applySettingsState(initialData);
+        }
       } finally {
         setIsSettingsLoading(false);
       }
@@ -417,14 +465,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const hasUnsavedChanges = JSON.stringify(currentSettings) !== JSON.stringify(savedSettings);
 
   const saveChanges = async () => {
-    setSavedSettings(currentSettings);
-    // Save locally
-    try {
-      localStorage.setItem("hasba_admin_settings", JSON.stringify(currentSettings));
-    } catch (e) {
-      console.error("Error saving hasba_admin_settings to localStorage:", e);
-    }
-
     // Save dynamically to granular Supabase keys in system_settings table
     if (hasSupabaseKeys) {
       try {
@@ -460,29 +500,51 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           await supabase.from('system_settings').upsert(payload);
         }
         console.log("All settings successfully synced to granular keys in system_settings database");
+
+        // ONLY save to unified cache on SUCCESSFUL Supabase write
+        setSavedSettings(currentSettings);
+        try {
+          localStorage.setItem("hasba_settings_cache", JSON.stringify(currentSettings));
+          localStorage.removeItem("hasba_admin_settings");
+          const DEFAULTS_MAP: Record<string, any> = {
+            banks: initialBanks,
+            margin_rules: initialMarginRules,
+            dsr_rules: initialDsrRules,
+            personal_finance_rules: initialPersonalFinanceRules,
+            product_acceptance: initialProductAcceptance,
+            military_ranks: initialMilitaryRanks,
+            pension_rules: initialPensionRules,
+            support_settings: initialSupportSettings,
+            salary_rules: initialSalaryRules,
+            term_rules: initialTermRules,
+            advanced_rules: initialAdvancedRules,
+            user_subscriptions: initialUserSubscriptions,
+          };
+          for (const key of Object.keys(DEFAULTS_MAP)) {
+            localStorage.removeItem(`hasba_sett_${key}`);
+          }
+        } catch (e) {
+          console.error("Error saving cached settings:", e);
+        }
       } catch (err) {
         console.error("Failed to save granular settings to Supabase:", err);
+        // Throw the error and DO NOT save locally as official settings truth
+        throw err;
+      }
+    } else {
+      // Local fallbacks
+      setSavedSettings(currentSettings);
+      try {
+        localStorage.setItem("hasba_settings_cache", JSON.stringify(currentSettings));
+        localStorage.removeItem("hasba_admin_settings");
+      } catch (e) {
+        console.error("Error saving local settings:", e);
       }
     }
   };
 
   const cancelChanges = () => {
-    setBanks(savedSettings.banks);
-    setProducts(savedSettings.products);
-    setMilitaryRanks(savedSettings.militaryRanks);
-    setSalaryRules(savedSettings.salaryRules);
-    setPensionRules(savedSettings.pensionRules);
-    setTermRules(savedSettings.termRules);
-    setMarginRules(savedSettings.marginRules);
-    setDsrRules(savedSettings.dsrRules);
-    setSupportSettings(savedSettings.supportSettings);
-    setHousingSupportTiers(savedSettings.housingSupportTiers);
-    setAdvancePaymentTiers(savedSettings.advancePaymentTiers);
-    setPersonalRules(savedSettings.personalRules);
-    setAdvancedRules(savedSettings.advancedRules);
-    if (savedSettings.userSubscriptions) {
-      setUserSubscriptions(savedSettings.userSubscriptions);
-    }
+    applySettingsState(savedSettings);
   };
 
   return (

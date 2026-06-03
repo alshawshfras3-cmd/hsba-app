@@ -552,46 +552,49 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Min Salary Input */}
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 flex flex-col justify-end">
                   <label className="block text-xs font-bold text-gray-700">أقل راتب مقبول (ريال سـعودي) *</label>
                   <input
                     type="text"
                     inputMode="decimal"
+                    dir="ltr"
                     id="form-min-salary-input"
                     value={formMinSalary}
                     placeholder="مثال: 5000 أو 4,500"
-                    onChange={(e) => setFormMinSalary(e.target.value.replace(/[^0-9.,]/g, ''))}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-right"
+                    onChange={(e) => setFormMinSalary(normalizeNumberInput(e.target.value))}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-[#0057B8]"
                   />
                 </div>
 
                 {/* Min Service Months Input */}
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 flex flex-col justify-end">
                   <label className="block text-xs font-bold text-gray-700">أقل مدة خدمه للعملاء بالأشهر *</label>
                   <input
                     type="text"
                     inputMode="decimal"
+                    dir="ltr"
                     id="form-min-service-input"
                     value={formMinServiceMonths}
                     placeholder="مثال: 3 أو 6"
-                    onChange={(e) => setFormMinServiceMonths(e.target.value.replace(/[^0-9.,]/g, ''))}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-right"
+                    onChange={(e) => setFormMinServiceMonths(normalizeNumberInput(e.target.value))}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-[#0057B8]"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Min Age Input */}
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 flex flex-col justify-end">
                   <label className="block text-xs font-bold text-gray-700">أقل عمر للعميل مقبول ومفعل *</label>
                   <input
                     type="text"
                     inputMode="decimal"
+                    dir="ltr"
                     id="form-min-age-input"
                     value={formMinAge}
                     placeholder="مثال: 18"
-                    onChange={(e) => setFormMinAge(e.target.value.replace(/[^0-9.,]/g, ''))}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-right"
+                    onChange={(e) => setFormMinAge(normalizeNumberInput(e.target.value))}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-[#0057B8]"
                   />
                 </div>
               </div>

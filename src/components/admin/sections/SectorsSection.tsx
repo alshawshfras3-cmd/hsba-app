@@ -374,9 +374,10 @@ export const SectorsSection: React.FC<SectorsSectionProps> = ({
                   <input
                     type="text"
                     inputMode="numeric"
+                    dir="ltr"
                     value={formSectorRetirementAge}
-                    onChange={(e) => setFormSectorRetirementAge(e.target.value.replace(/[^0-9.,]/g, ''))}
-                    className="text-right w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500 font-sans"
+                    onChange={(e) => setFormSectorRetirementAge(normalizeNumberInput(e.target.value))}
+                    className="text-right w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-blue-200 font-sans"
                     placeholder="مثال: 60"
                   />
                 </div>
@@ -491,9 +492,10 @@ export const SectorsSection: React.FC<SectorsSectionProps> = ({
                 <input
                   type="text"
                   inputMode="numeric"
+                  dir="ltr"
                   value={formRankRetirementAge}
-                  onChange={(e) => setFormRankRetirementAge(e.target.value.replace(/[^0-9.,]/g, ''))}
-                  className="text-right w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500 font-sans"
+                  onChange={(e) => setFormRankRetirementAge(normalizeNumberInput(e.target.value))}
+                  className="text-right w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-blue-200 font-sans"
                   placeholder="مثال: 44"
                 />
               </div>
@@ -503,9 +505,10 @@ export const SectorsSection: React.FC<SectorsSectionProps> = ({
                 <input
                   type="text"
                   inputMode="numeric"
+                  dir="ltr"
                   value={formRankDisplayOrder}
-                  onChange={(e) => setFormRankDisplayOrder(e.target.value.replace(/[^0-9.,]/g, ''))}
-                  className="text-right w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500 font-sans"
+                  onChange={(e) => setFormRankDisplayOrder(normalizeNumberInput(e.target.value))}
+                  className="text-right w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-blue-200 font-sans"
                   placeholder="مثال: 1"
                 />
               </div>

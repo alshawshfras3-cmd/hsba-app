@@ -86,6 +86,128 @@ banksList.forEach((bankId) => {
       dsrPercent: 25,
       deductExistingObligations: true,
       active: true
+    },
+    // عقاري مع شخصي جديد
+    {
+      id: `${bankId}_re_new_pers_none_active`,
+      bankId,
+      productType: 'real_estate_with_new_personal',
+      supportType: 'none',
+      customerStage: 'active_before_retirement',
+      dsrPercent: 55,
+      deductExistingObligations: true,
+      active: true
+    },
+    {
+      id: `${bankId}_re_new_pers_none_retired`,
+      bankId,
+      productType: 'real_estate_with_new_personal',
+      supportType: 'none',
+      customerStage: 'retired_after_retirement',
+      dsrPercent: 55,
+      deductExistingObligations: true,
+      active: true
+    },
+    {
+      id: `${bankId}_re_new_pers_monthly_active`,
+      bankId,
+      productType: 'real_estate_with_new_personal',
+      supportType: 'monthly',
+      customerStage: 'active_before_retirement',
+      dsrPercent: 65,
+      deductExistingObligations: true,
+      active: true
+    },
+    {
+      id: `${bankId}_re_new_pers_monthly_retired`,
+      bankId,
+      productType: 'real_estate_with_new_personal',
+      supportType: 'monthly',
+      customerStage: 'retired_after_retirement',
+      dsrPercent: 65,
+      deductExistingObligations: true,
+      active: true
+    },
+    {
+      id: `${bankId}_re_new_pers_down_active`,
+      bankId,
+      productType: 'real_estate_with_new_personal',
+      supportType: 'down_payment',
+      customerStage: 'active_before_retirement',
+      dsrPercent: 55,
+      deductExistingObligations: true,
+      active: true
+    },
+    {
+      id: `${bankId}_re_new_pers_down_retired`,
+      bankId,
+      productType: 'real_estate_with_new_personal',
+      supportType: 'down_payment',
+      customerStage: 'retired_after_retirement',
+      dsrPercent: 55,
+      deductExistingObligations: true,
+      active: true
+    },
+    // عقاري مع شخصي قائم (نفس النسب)
+    {
+      id: `${bankId}_re_exist_pers_none_active`,
+      bankId,
+      productType: 'real_estate_with_existing_personal',
+      supportType: 'none',
+      customerStage: 'active_before_retirement',
+      dsrPercent: 55,
+      deductExistingObligations: true,
+      active: true
+    },
+    {
+      id: `${bankId}_re_exist_pers_none_retired`,
+      bankId,
+      productType: 'real_estate_with_existing_personal',
+      supportType: 'none',
+      customerStage: 'retired_after_retirement',
+      dsrPercent: 55,
+      deductExistingObligations: true,
+      active: true
+    },
+    {
+      id: `${bankId}_re_exist_pers_monthly_active`,
+      bankId,
+      productType: 'real_estate_with_existing_personal',
+      supportType: 'monthly',
+      customerStage: 'active_before_retirement',
+      dsrPercent: 65,
+      deductExistingObligations: true,
+      active: true
+    },
+    {
+      id: `${bankId}_re_exist_pers_monthly_retired`,
+      bankId,
+      productType: 'real_estate_with_existing_personal',
+      supportType: 'monthly',
+      customerStage: 'retired_after_retirement',
+      dsrPercent: 65,
+      deductExistingObligations: true,
+      active: true
+    },
+    {
+      id: `${bankId}_re_exist_pers_down_active`,
+      bankId,
+      productType: 'real_estate_with_existing_personal',
+      supportType: 'down_payment',
+      customerStage: 'active_before_retirement',
+      dsrPercent: 55,
+      deductExistingObligations: true,
+      active: true
+    },
+    {
+      id: `${bankId}_re_exist_pers_down_retired`,
+      bankId,
+      productType: 'real_estate_with_existing_personal',
+      supportType: 'down_payment',
+      customerStage: 'retired_after_retirement',
+      dsrPercent: 55,
+      deductExistingObligations: true,
+      active: true
     }
   );
 });

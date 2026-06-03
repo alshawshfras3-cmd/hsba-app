@@ -184,12 +184,9 @@ export default function StepWizard() {
     | 'salary'
     | 'finance_options';
 
-  const flow: StepId[] = [
-    'main_type',
-    'personal_info',
-    'salary',
-    'finance_options'
-  ];
+  const flow: StepId[] = mainFinanceType === 'personal_only'
+    ? ['main_type', 'personal_info', 'salary']
+    : ['main_type', 'personal_info', 'salary', 'finance_options'];
 
   const activeStepId = flow[currentStep - 1] || 'main_type';
 
@@ -1091,6 +1088,30 @@ export default function StepWizard() {
                   <div className="col-span-1 md:col-span-3 bg-emerald-50 rounded-2xl p-4 border border-emerald-100 flex justify-between items-center text-xs">
                     <span className="text-emerald-800 font-bold">صافي الراتب المتوقع بعد خصم المعاشات:</span>
                     <span className="font-extrabold text-emerald-700 text-sm">{(localCalculatedNet).toLocaleString('ar-SA')} ريال سعودي</span>
+                  </div>
+                </div>
+              )}
+
+              {mainFinanceType === 'personal_only' && (
+                <div className="mt-8 pt-6 border-t border-dashed border-gray-200 space-y-6">
+                  <div className="flex items-center gap-2 pb-2 text-slate-800">
+                    <Coins className="w-5 h-5 text-amber-500" />
+                    <h4 className="text-sm font-bold">خيارات الحسبة والجهات المفضلة</h4>
+                  </div>
+                  
+                  <div className="border border-gray-200 bg-white rounded-2xl p-5 text-right space-y-3">
+                    <label className="block text-xs font-bold text-gray-700">جهة التمويل المفضلة للتمويل الشخصي:</label>
+                    <select
+                      id="personal-bank-filter-select"
+                      value={selectedBankId}
+                      onChange={(e) => setSelectedBankId(e.target.value)}
+                      className="w-full bg-slate-50 border border-gray-200 rounded-xl px-4 py-3.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-[#0057B8] focus:border-transparent cursor-pointer font-sans text-gray-800"
+                    >
+                      <option value="all">جميع جهات التمويل النشطة المتاحة (مقارنة العروض)</option>
+                      {banks.filter(b => b.isActive).map(bank => (
+                        <option key={bank.id} value={bank.id}>{bank.nameAr}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               )}

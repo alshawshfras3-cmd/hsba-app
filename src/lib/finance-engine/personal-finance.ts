@@ -90,17 +90,29 @@ export function calculatePersonalFinance(params: {
         sectorId: 'all',
         dsrPercentage: 33.33,
         termMonths: 60,
-        financeCoefficient: 0,
+        financeCoefficient: 50.42,
         annualMargin: 4.80,
         minSalary: 4000,
         minAge: 18,
         maxAge: 65,
         retireeDsrPercentage: 25,
         isActive: true,
-        calculationMethod: 'flat_rate',
+        calculationMethod: 'multiplier',
         pathType: pathType === 'real_estate_with_existing_personal' ? 'personal_only' : pathType,
         customerStatus: 'active_employee'
       };
+    }
+  }
+
+  // Validate salary limits if rule is available and no previous error
+  if (finalRule && !matchError) {
+    const minSal = Number(finalRule.minSalary) || 0;
+    const maxSal = finalRule.maxSalary !== undefined ? Number(finalRule.maxSalary) : undefined;
+
+    if (netSalary < minSal) {
+      matchError = `صافي الراتب (${netSalary.toLocaleString('ar-SA')} ريال) أقل من الحد الأدنى المقبول للتمويل الشخصي لدى هذا البنك والمقدر بـ ${minSal.toLocaleString('ar-SA')} ريال.`;
+    } else if (maxSal !== undefined && maxSal > 0 && netSalary > maxSal) {
+      matchError = `صافي الراتب (${netSalary.toLocaleString('ar-SA')} ريال) أعلى من الحد الأقصى المقبول للتمويل الشخصي لدى هذا البنك والمقدر بـ ${maxSal.toLocaleString('ar-SA')} ريال.`;
     }
   }
 
@@ -137,10 +149,11 @@ export function calculatePersonalFinance(params: {
   let calculationMethod = finalRule.calculationMethod || 'flat_rate';
   let annualMargin = Number(finalRule.annualMargin) || 0;
 
-  if (finalRule.bankId === 'alahli' && calculationMethod === 'flat_rate') {
+  // Only apply strict hardcoded defaults if it is a fallback rule from the calculator
+  if (source === 'fallback' && finalRule.bankId === 'alahli') {
     annualMargin = 5.00;
     ruleTermMonths = 60;
-    dsrPercent = finalRule.customerStatus === 'retired' ? 25 : 33.33;
+    dsrPercent = customerStatus === 'retired' ? 25 : 33.33;
     coeff = 0;
   }
 

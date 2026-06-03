@@ -13,7 +13,7 @@ import StepWizard from './components/calculator/StepWizard';
 import AdminDashboard from './components/admin/AdminDashboard';
 import AdminAuth from './components/admin/AdminAuth';
 import { Calculator, ShieldCheck, Mail, Phone, ExternalLink, ShieldAlert, Loader2 } from 'lucide-react';
-import { supabase, hasSupabaseKeys } from './lib/supabase';
+import { supabase, hasSupabaseKeys, cleanStaleSupabaseSession } from './lib/supabase';
 
 function AdminViewGuard() {
   const { signOut } = useAuth();
@@ -127,6 +127,13 @@ function AdminViewGuard() {
         }
       } catch (err: any) {
         console.error("Error verifying admin role:", err);
+        const errMsg = String(err?.message || '').toLowerCase();
+        const isAuthTokenErr = errMsg.includes('refresh token') || errMsg.includes('refresh_token') || errMsg.includes('not found') || errMsg.includes('invalid');
+        
+        if (isAuthTokenErr) {
+          cleanStaleSupabaseSession();
+        }
+
         // If it is owner email, we bypass the error and set owner as role!
         try {
           const { data: { user } } = await supabase.auth.getUser();

@@ -684,8 +684,13 @@ export function calculateBanksFinancing(params: {
       diag.messages.unshift(`[خطأ استقطاع DSR]: ${dsrError}`);
     }
 
-    const isEligible = diag.status !== 'rejected';
     const isPersonalOnly = productId === 'personal' || productId === 'personal_only';
+    if (isPersonalOnly && personalCalcResult?.diagnostics?.error) {
+      diag.status = 'rejected';
+      diag.messages.unshift(personalCalcResult.diagnostics.error);
+    }
+
+    const isEligible = diag.status !== 'rejected';
 
     if (productId !== 'both' && productId !== 'real_estate_with_new_personal' && productId !== 'real_estate_with_personal_existing' && productId !== 'real_estate_with_existing_personal') {
       totalInstallmentStage1 = isEligible ? (isPersonalOnly ? personalInstallment : installmentBefore) : 0;

@@ -66,10 +66,11 @@ export default function SupportSection({
             <input
               type="text"
               id="test-salary-input"
+              dir="ltr"
               className="w-32 bg-white border border-indigo-200 rounded-xl px-3 py-1.5 focus:outline-none font-mono text-center text-xs"
               placeholder="مثال: 8,500"
               value={supportTestSalary}
-              onChange={(e) => setSupportTestSalary(e.target.value.replace(/[^0-9.,]/g, ''))}
+              onChange={(e) => setSupportTestSalary(normalizeNumberInput(e.target.value))}
             />
             <span className="text-gray-400">ريال</span>
           </div>
@@ -124,9 +125,10 @@ export default function SupportSection({
                   <input
                     type="text"
                     inputMode="decimal"
-                    className="w-full bg-white border border-gray-200 rounded-xl px-2 py-1 text-xs font-semibold text-center outline-none"
+                    dir="ltr"
+                    className="w-full bg-white border border-gray-200 rounded-xl px-2 py-1 text-xs font-bold text-center outline-none"
                     value={hMinSalary}
-                    onChange={(e) => setHMinSalary(e.target.value.replace(/[^0-9.,]/g, ''))}
+                    onChange={(e) => setHMinSalary(normalizeNumberInput(e.target.value))}
                   />
                 </div>
                 <div>
@@ -134,9 +136,10 @@ export default function SupportSection({
                   <input
                     type="text"
                     inputMode="decimal"
-                    className="w-full bg-white border border-gray-200 rounded-xl px-2 py-1 text-xs font-semibold text-center outline-none"
+                    dir="ltr"
+                    className="w-full bg-white border border-gray-200 rounded-xl px-2 py-1 text-xs font-bold text-center outline-none"
                     value={hMaxSalary}
-                    onChange={(e) => setHMaxSalary(e.target.value.replace(/[^0-9.,]/g, ''))}
+                    onChange={(e) => setHMaxSalary(normalizeNumberInput(e.target.value))}
                   />
                 </div>
                 <div>
@@ -144,9 +147,10 @@ export default function SupportSection({
                   <input
                     type="text"
                     inputMode="decimal"
-                    className="w-full bg-white border border-gray-200 rounded-xl px-2 py-1 text-xs font-semibold text-center outline-none"
+                    dir="ltr"
+                    className="w-full bg-white border border-gray-200 rounded-xl px-2 py-1 text-xs font-bold text-center outline-none"
                     value={hAmountMin}
-                    onChange={(e) => setHAmountMin(e.target.value.replace(/[^0-9.,]/g, ''))}
+                    onChange={(e) => setHAmountMin(normalizeNumberInput(e.target.value))}
                   />
                 </div>
                 <div>
@@ -154,9 +158,10 @@ export default function SupportSection({
                   <input
                     type="text"
                     inputMode="decimal"
-                    className="w-full bg-white border border-gray-200 rounded-xl px-2 py-1 text-xs font-semibold text-center outline-none"
+                    dir="ltr"
+                    className="w-full bg-white border border-gray-200 rounded-xl px-2 py-1 text-xs font-bold text-center outline-none"
                     value={hAmountMax}
-                    onChange={(e) => setHAmountMax(e.target.value.replace(/[^0-9.,]/g, ''))}
+                    onChange={(e) => setHAmountMax(normalizeNumberInput(e.target.value))}
                   />
                 </div>
               </div>
@@ -164,10 +169,15 @@ export default function SupportSection({
                 <button
                   type="button"
                   onClick={() => {
-                    const min_val = parseNumberInput(hMinSalary, 0);
-                    const max_val = parseNumberInput(hMaxSalary, 0);
-                    const amount_min_val = parseNumberInput(hAmountMin, 0);
-                    const amount_max_val = parseNumberInput(hAmountMax, 0);
+                    const min_val = parseNumberInput(hMinSalary, NaN);
+                    const max_val = parseNumberInput(hMaxSalary, NaN);
+                    const amount_min_val = parseNumberInput(hAmountMin, NaN);
+                    const amount_max_val = parseNumberInput(hAmountMax, NaN);
+
+                    if (isNaN(min_val) || isNaN(max_val) || isNaN(amount_min_val) || isNaN(amount_max_val)) {
+                      showToast('الرجاء التأكد من إدخال جميع الحقول بشكل رقمي صحيح وبدون تركها فارغة.', 'refuse');
+                      return;
+                    }
 
                     const newTier: HousingSupportTier = {
                       id: `h_tier_${Date.now()}`,
@@ -209,9 +219,10 @@ export default function SupportSection({
                           <input
                             type="text"
                             inputMode="decimal"
-                            className="w-full bg-white border rounded-xl px-1.5 py-0.5 text-xs font-semibold text-center outline-none"
+                            dir="ltr"
+                            className="w-full bg-white border rounded-xl px-1.5 py-0.5 text-xs font-bold text-center outline-none"
                             value={hMinSalary}
-                            onChange={(e) => setHMinSalary(e.target.value.replace(/[^0-9.,]/g, ''))}
+                            onChange={(e) => setHMinSalary(normalizeNumberInput(e.target.value))}
                           />
                         </div>
                         <div>
@@ -219,9 +230,10 @@ export default function SupportSection({
                           <input
                             type="text"
                             inputMode="decimal"
-                            className="w-full bg-white border rounded-xl px-1.5 py-0.5 text-xs font-semibold text-center outline-none"
+                            dir="ltr"
+                            className="w-full bg-white border rounded-xl px-1.5 py-0.5 text-xs font-bold text-center outline-none"
                             value={hMaxSalary}
-                            onChange={(e) => setHMaxSalary(e.target.value.replace(/[^0-9.,]/g, ''))}
+                            onChange={(e) => setHMaxSalary(normalizeNumberInput(e.target.value))}
                           />
                         </div>
                         <div>
@@ -229,9 +241,10 @@ export default function SupportSection({
                           <input
                             type="text"
                             inputMode="decimal"
-                            className="w-full bg-white border rounded-xl px-1.5 py-0.5 text-xs font-semibold text-center outline-none"
+                            dir="ltr"
+                            className="w-full bg-white border rounded-xl px-1.5 py-0.5 text-xs font-bold text-center outline-none"
                             value={hAmountMin}
-                            onChange={(e) => setHAmountMin(e.target.value.replace(/[^0-9.,]/g, ''))}
+                            onChange={(e) => setHAmountMin(normalizeNumberInput(e.target.value))}
                           />
                         </div>
                         <div>
@@ -239,9 +252,10 @@ export default function SupportSection({
                           <input
                             type="text"
                             inputMode="decimal"
-                            className="w-full bg-white border rounded-xl px-1.5 py-0.5 text-xs font-semibold text-center outline-none"
+                            dir="ltr"
+                            className="w-full bg-white border rounded-xl px-1.5 py-0.5 text-xs font-bold text-center outline-none"
                             value={hAmountMax}
-                            onChange={(e) => setHAmountMax(e.target.value.replace(/[^0-9.,]/g, ''))}
+                            onChange={(e) => setHAmountMax(normalizeNumberInput(e.target.value))}
                           />
                         </div>
                       </div>
@@ -249,10 +263,15 @@ export default function SupportSection({
                         <button
                           type="button"
                           onClick={() => {
-                            const min_val = parseNumberInput(hMinSalary, 0);
-                            const max_val = parseNumberInput(hMaxSalary, 0);
-                            const amount_min_val = parseNumberInput(hAmountMin, 0);
-                            const amount_max_val = parseNumberInput(hAmountMax, 0);
+                            const min_val = parseNumberInput(hMinSalary, NaN);
+                            const max_val = parseNumberInput(hMaxSalary, NaN);
+                            const amount_min_val = parseNumberInput(hAmountMin, NaN);
+                            const amount_max_val = parseNumberInput(hAmountMax, NaN);
+
+                            if (isNaN(min_val) || isNaN(max_val) || isNaN(amount_min_val) || isNaN(amount_max_val)) {
+                              showToast('الرجاء التأكد من إدخال جميع قيم الشريحة بشكل رقمي صحيح وبدون تركها فارغة.', 'refuse');
+                              return;
+                            }
 
                             setHousingSupportTiers(
                               housingSupportTiers.map(t => 
@@ -360,9 +379,10 @@ export default function SupportSection({
                   <input
                     type="text"
                     inputMode="decimal"
-                    className="w-full bg-white border border-gray-200 rounded-xl px-2 py-1 text-xs font-semibold text-center outline-none"
+                    dir="ltr"
+                    className="w-full bg-white border border-gray-200 rounded-xl px-2 py-1 text-xs font-bold text-center outline-none"
                     value={aSalaryThreshold}
-                    onChange={(e) => setASalaryThreshold(e.target.value.replace(/[^0-9.,]/g, ''))}
+                    onChange={(e) => setASalaryThreshold(normalizeNumberInput(e.target.value))}
                   />
                 </div>
                 <div>
@@ -370,9 +390,10 @@ export default function SupportSection({
                   <input
                     type="text"
                     inputMode="decimal"
-                    className="w-full bg-white border border-gray-200 rounded-xl px-2 py-1 text-xs font-semibold text-center outline-none"
+                    dir="ltr"
+                    className="w-full bg-white border border-gray-200 rounded-xl px-2 py-1 text-xs font-bold text-center outline-none"
                     value={aAmount}
-                    onChange={(e) => setAAmount(e.target.value.replace(/[^0-9.,]/g, ''))}
+                    onChange={(e) => setAAmount(normalizeNumberInput(e.target.value))}
                   />
                 </div>
               </div>
@@ -380,8 +401,13 @@ export default function SupportSection({
                 <button
                   type="button"
                   onClick={() => {
-                    const threshold_val = parseNumberInput(aSalaryThreshold, 0);
-                    const amt_val = parseNumberInput(aAmount, 0);
+                    const threshold_val = parseNumberInput(aSalaryThreshold, NaN);
+                    const amt_val = parseNumberInput(aAmount, NaN);
+
+                    if (isNaN(threshold_val) || isNaN(amt_val)) {
+                      showToast('الرجاء التأكد من إدخال قيم الشريحة بشكل رقمي صحيح وبدون تركها فارغة.', 'refuse');
+                      return;
+                    }
 
                     const newTier: AdvancePaymentTier = {
                       id: `a_tier_${Date.now()}`,
@@ -418,24 +444,31 @@ export default function SupportSection({
                         <input
                           type="text"
                           inputMode="decimal"
-                          className="bg-white border rounded-xl px-1.5 py-0.5 text-xs font-semibold text-center outline-none"
+                          dir="ltr"
+                          className="bg-white border rounded-xl px-1.5 py-0.5 text-xs font-bold text-center outline-none"
                           value={aSalaryThreshold}
-                          onChange={(e) => setASalaryThreshold(e.target.value.replace(/[^0-9.,]/g, ''))}
+                          onChange={(e) => setASalaryThreshold(normalizeNumberInput(e.target.value))}
                         />
                         <input
                           type="text"
                           inputMode="decimal"
-                          className="bg-white border rounded-xl px-1.5 py-0.5 text-xs font-semibold text-center outline-none"
+                          dir="ltr"
+                          className="bg-white border rounded-xl px-1.5 py-0.5 text-xs font-bold text-center outline-none"
                           value={aAmount}
-                          onChange={(e) => setAAmount(e.target.value.replace(/[^0-9.,]/g, ''))}
+                          onChange={(e) => setAAmount(normalizeNumberInput(e.target.value))}
                         />
                       </div>
                       <div className="flex gap-1 shrink-0">
                         <button
                           type="button"
                           onClick={() => {
-                            const threshold_val = parseNumberInput(aSalaryThreshold, 0);
-                            const amt_val = parseNumberInput(aAmount, 0);
+                            const threshold_val = parseNumberInput(aSalaryThreshold, NaN);
+                            const amt_val = parseNumberInput(aAmount, NaN);
+
+                            if (isNaN(threshold_val) || isNaN(amt_val)) {
+                              showToast('الرجاء التأكد من إدخال قيم الشريحة بشكل رقمي صحيح وبدون تركها فارغة.', 'refuse');
+                              return;
+                            }
 
                             setAdvancePaymentTiers(advancePaymentTiers.map(t => t.id === br.id ? { ...t, salary_threshold: threshold_val, amount: amt_val } : t).sort((a,b) => a.salary_threshold - b.salary_threshold));
                             setEditAdvanceTierId(null);

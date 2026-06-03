@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
-import { supabase, hasSupabaseKeys, SUPABASE_TIMEOUT_MS } from '../lib/supabase';
+import { supabase, hasSupabaseKeys, SUPABASE_TIMEOUT_MS, cleanStaleSupabaseSession } from '../lib/supabase';
 
 export type UserRole = 'owner' | 'manager' | 'employee' | 'user';
 
@@ -119,9 +119,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data, error }) => {
+      if (error) {
+        throw error;
+      }
+      const session = data?.session;
       if (!active) return;
-      setSession(session);
+      setSession(session ?? null);
       setUser(session?.user ?? null);
       if (session?.user) {
         await fetchProfile(session.user.id, session.user.email, session.user.user_metadata);
@@ -129,6 +133,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (active) setLoading(false);
     }).catch(err => {
       console.error("Error getting session on mount:", err);
+      const errMsg = String(err?.message || '').toLowerCase();
+      if (errMsg.includes('refresh token') || errMsg.includes('refresh_token') || errMsg.includes('not found') || errMsg.includes('invalid')) {
+        cleanStaleSupabaseSession();
+        if (active) {
+          setSession(null);
+          setUser(null);
+          setProfile(null);
+        }
+      }
       if (active) setLoading(false);
     });
 

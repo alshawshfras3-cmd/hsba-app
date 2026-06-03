@@ -255,27 +255,33 @@ export default function RuleTestTab({
             <div>
               <label className="block text-xs font-bold text-gray-700 mb-1.5">الراتب الأساسي الحالي:</label>
               <input
-                type="number"
-                value={sandboxBasic}
-                onChange={(e) => setSandboxBasic(Number(e.target.value))}
+                type="text"
+                inputMode="decimal"
+                dir="ltr"
+                value={sandboxBasic || ''}
+                onChange={(e) => setSandboxBasic(parseFloat(e.target.value.replace(/[^0-9.]/g, '')) || 0)}
                 className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-blue-200 font-bold"
               />
             </div>
             <div>
               <label className="block text-xs font-bold text-gray-700 mb-1.5 font-sans">بدل السكن الحالي:</label>
               <input
-                type="number"
-                value={sandboxHousing}
-                onChange={(e) => setSandboxHousing(Number(e.target.value))}
+                type="text"
+                inputMode="decimal"
+                dir="ltr"
+                value={sandboxHousing || ''}
+                onChange={(e) => setSandboxHousing(parseFloat(e.target.value.replace(/[^0-9.]/g, '')) || 0)}
                 className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-blue-200 font-bold"
               />
             </div>
             <div>
               <label className="block text-xs font-bold text-gray-700 mb-1.5 font-sans">البدلات الأخرى والمكافآت:</label>
               <input
-                type="number"
-                value={sandboxOther}
-                onChange={(e) => setSandboxOther(Number(e.target.value))}
+                type="text"
+                inputMode="decimal"
+                dir="ltr"
+                value={sandboxOther || ''}
+                onChange={(e) => setSandboxOther(parseFloat(e.target.value.replace(/[^0-9.]/g, '')) || 0)}
                 className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-blue-200 font-bold"
               />
             </div>
@@ -285,9 +291,11 @@ export default function RuleTestTab({
             <div>
               <label className="block text-xs font-bold text-gray-700 mb-1.5">صافي الراتب الفوري المدخل:</label>
               <input
-                type="number"
-                value={sandboxDirectNet}
-                onChange={(e) => setSandboxDirectNet(Number(e.target.value))}
+                type="text"
+                inputMode="decimal"
+                dir="ltr"
+                value={sandboxDirectNet || ''}
+                onChange={(e) => setSandboxDirectNet(parseFloat(e.target.value.replace(/[^0-9.]/g, '')) || 0)}
                 className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-blue-200 font-bold"
               />
             </div>
@@ -295,9 +303,11 @@ export default function RuleTestTab({
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1.5">الراتب التقاعدي الحالي المدخل:</label>
                 <input
-                  type="number"
-                  value={sandboxDirectPension}
-                  onChange={(e) => setSandboxDirectPension(Number(e.target.value))}
+                  type="text"
+                  inputMode="decimal"
+                  dir="ltr"
+                  value={sandboxDirectPension || ''}
+                  onChange={(e) => setSandboxDirectPension(parseFloat(e.target.value.replace(/[^0-9.]/g, '')) || 0)}
                   className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-blue-200 font-bold"
                 />
               </div>
@@ -334,9 +344,11 @@ export default function RuleTestTab({
                 <label className="block text-xs font-bold text-gray-700 mb-1.5">أشهر الخدمة عند التقاعد (مثال: 240 شهر تعادل 20 سنة):</label>
                 <div className="flex gap-2">
                   <input
-                    type="number"
-                    value={sandboxServiceMonths}
-                    onChange={(e) => setSandboxServiceMonths(Number(e.target.value))}
+                    type="text"
+                    inputMode="decimal"
+                    dir="ltr"
+                    value={sandboxServiceMonths || ''}
+                    onChange={(e) => setSandboxServiceMonths(parseFloat(e.target.value.replace(/[^0-9.]/g, '')) || 0)}
                     className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold outline-none"
                   />
                   <span className="bg-slate-200 px-3 py-2 rounded-xl text-[10px] font-bold text-slate-600 self-center whitespace-nowrap">
@@ -347,9 +359,11 @@ export default function RuleTestTab({
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1.5">السنوات المتبقية على التقاعد الفعلي للعميل:</label>
                 <input
-                  type="number"
-                  value={sandboxYearsToRetire}
-                  onChange={(e) => setSandboxYearsToRetire(Number(e.target.value))}
+                  type="text"
+                  inputMode="decimal"
+                  dir="ltr"
+                  value={sandboxYearsToRetire || ''}
+                  onChange={(e) => setSandboxYearsToRetire(parseFloat(e.target.value.replace(/[^0-9.]/g, '')) || 0)}
                   className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold outline-none"
                 />
               </div>

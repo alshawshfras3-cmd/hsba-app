@@ -38,6 +38,7 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
   const [formPfCoeff, setFormPfCoeff] = useState('0');
   const [formPfMargin, setFormPfMargin] = useState('4.80');
   const [formPfMinSalary, setFormPfMinSalary] = useState('4000');
+  const [formPfMaxSalary, setFormPfMaxSalary] = useState('');
   const [formPfCalcMethod, setFormPfCalcMethod] = useState<'multiplier' | 'pmt' | 'flat_rate'>('flat_rate');
   const [formPfActive, setFormPfActive] = useState(true);
   const [pfError, setPfError] = useState('');
@@ -68,6 +69,7 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
     setFormPfCoeff('0');
     setFormPfMargin('4.80');
     setFormPfMinSalary('4000');
+    setFormPfMaxSalary('');
     setFormPfCalcMethod('flat_rate');
     setFormPfActive(true);
     setPfError('');
@@ -84,6 +86,7 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
     setFormPfCoeff(String(rule.financeCoefficient ?? ''));
     setFormPfMargin(String(rule.annualMargin ?? ''));
     setFormPfMinSalary(String(rule.minSalary ?? ''));
+    setFormPfMaxSalary(rule.maxSalary !== undefined ? String(rule.maxSalary) : '');
     setFormPfCalcMethod(rule.calculationMethod || 'multiplier');
     setFormPfActive(rule.isActive !== false);
     setPfError('');
@@ -94,6 +97,7 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
     const cleanDsrStr = normalizeNumberInput(parseArabicAndEnglishNumber(formPfDsr));
     const cleanTermStr = normalizeNumberInput(parseArabicAndEnglishNumber(formPfTerm));
     const cleanSalaryStr = normalizeNumberInput(parseArabicAndEnglishNumber(formPfMinSalary));
+    const cleanMaxSalaryStr = normalizeNumberInput(parseArabicAndEnglishNumber(formPfMaxSalary));
 
     const cleanCoeffStr = normalizeNumberInput(parseArabicAndEnglishNumber(formPfCoeff)) || '0';
     const cleanMarginStr = normalizeNumberInput(parseArabicAndEnglishNumber(formPfMargin)) || '4.80';
@@ -108,8 +112,9 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
     const coeffNum = Number(cleanCoeffStr);
     const marginNum = Number(cleanMarginStr);
     const salaryNum = Number(cleanSalaryStr);
+    const maxSalaryNum = cleanMaxSalaryStr ? Number(cleanMaxSalaryStr) : undefined;
 
-    if (isNaN(dsrNum) || isNaN(termNum) || isNaN(coeffNum) || isNaN(marginNum) || isNaN(salaryNum)) {
+    if (isNaN(dsrNum) || isNaN(termNum) || isNaN(coeffNum) || isNaN(marginNum) || isNaN(salaryNum) || (maxSalaryNum !== undefined && isNaN(maxSalaryNum))) {
       setPfError('الرجاء التأكد من إدخال قيم رقمية صحيحة.');
       return;
     }
@@ -123,6 +128,7 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
       financeCoefficient: coeffNum,
       annualMargin: marginNum,
       minSalary: salaryNum,
+      maxSalary: maxSalaryNum,
       minAge: editingPfRule?.minAge ?? 18,
       maxAge: editingPfRule?.maxAge ?? 65,
       retireeDsrPercentage: formPfCustomerStatus === 'retired' ? dsrNum : 25,
@@ -299,13 +305,14 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
                 <th className="p-4 font-bold">البنك</th>
                 <th className="p-4 font-bold">نوع المسار</th>
                 <th className="p-4 font-bold">حالة العميل</th>
-                <th className="p-4 font-bold text-center">DSR الشخصي</th>
-                <th className="p-4 font-bold text-center">مدة التمويل (بالشهور)</th>
+                <th className="p-4 font-bold text-center">طريقة الحساب</th>
+                <th className="p-4 font-bold text-center">DSR</th>
+                <th className="p-4 font-bold text-center">مدة التمويل</th>
                 <th className="p-4 font-bold text-center">معامل التمويل</th>
-                <th className="p-4 font-bold">طريقة الحساب</th>
-                <th className="p-4 font-bold text-center">الهامش للعرض</th>
+                <th className="p-4 font-bold text-center">الهامش/النسبة</th>
                 <th className="p-4 font-bold text-center">أقل راتب</th>
-                <th className="p-4 font-bold text-center">مفعل</th>
+                <th className="p-4 font-bold text-center">أعلى راتب</th>
+                <th className="p-4 font-bold text-center">الحالة</th>
                 <th className="p-4 font-bold text-center">الإجراءات</th>
               </tr>
             </thead>
@@ -321,7 +328,7 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
                   let displayDsr = rule.dsrPercentage ?? 0;
                   let displayTerm = rule.termMonths ?? 0;
                   let displayMargin = rule.annualMargin ?? 0;
-                  if (rule.bankId === 'alahli' && rule.calculationMethod === 'flat_rate') {
+                  if (rule.bankId === 'alahli' && rule.calculationMethod === 'flat_rate' && !rule.id?.startsWith('rule-alahli-')) {
                     displayDsr = rule.customerStatus === 'retired' ? 25 : 33.33;
                     displayTerm = 60;
                     displayMargin = 5;
@@ -340,26 +347,25 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
                           {statusLabel}
                         </span>
                       </td>
+                      <td className="p-4 text-center text-xs">
+                        <span className="font-sans px-2 py-1 rounded-md bg-slate-100 text-slate-700">
+                          {rule.calculationMethod === 'pmt' ? 'PMT' : rule.calculationMethod === 'multiplier' ? 'معامل التمويل' : 'النسبة المبسطة'}
+                        </span>
+                      </td>
                       <td className="p-4 text-center font-sans">{displayDsr}%</td>
                       <td className="p-4 text-center font-sans">{displayTerm} شهراً</td>
                       <td className="p-4 text-center font-sans">
                         {rule.calculationMethod === 'multiplier' ? (rule.financeCoefficient ?? 0) : '-'}
                       </td>
-                      <td className="p-4 text-xs">
-                        <span className="text-gray-500 font-sans">
-                          {rule.calculationMethod === 'pmt' ? 'PMT' : rule.calculationMethod === 'multiplier' ? 'Multiplier' : 'Flat Rate'}
-                        </span>
-                      </td>
                       <td className="p-4 text-center font-sans">
                         {rule.calculationMethod === 'multiplier' ? (
-                          <span className="text-gray-400 text-[10px] font-normal">للعرض فقط</span>
-                        ) : rule.calculationMethod === 'pmt' ? (
-                          <span className="text-blue-700">{displayMargin}% (الفائدة)</span>
+                          <span className="text-gray-400 text-[10px] font-normal">للعرض فقط ({displayMargin}%)</span>
                         ) : (
-                          <span>{displayMargin}%</span>
+                          <span className="text-blue-700 font-bold">{displayMargin}%</span>
                         )}
                       </td>
                       <td className="p-4 text-center font-sans">{(rule.minSalary ?? 0).toLocaleString('ar-SA')} ريال</td>
+                      <td className="p-4 text-center font-sans">{rule.maxSalary ? `${rule.maxSalary.toLocaleString('ar-SA')} ريال` : 'غير محدد'}</td>
                       <td className="p-4 text-center">
                         <button
                           onClick={() => setPersonalRules(prev => prev.map(r => r.id === rule.id ? { ...r, isActive: !r.isActive } : r))}
@@ -374,7 +380,7 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
                           />
                         </button>
                       </td>
-                      <td className="p-4 text-center">
+                      <td className="p-4 text-center font-sans">
                         <div className="flex items-center justify-center gap-2">
                           <button
                             type="button"
@@ -400,7 +406,7 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
                 })
               ) : (
                 <tr>
-                  <td colSpan={11} className="p-8 text-center text-gray-400">لا توجد قواعد سارية حالياً.</td>
+                  <td colSpan={12} className="p-8 text-center text-gray-400">لا توجد قواعد سارية حالياً.</td>
                 </tr>
               )}
             </tbody>
@@ -500,29 +506,31 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
                   </div>
 
                   {/* 4. Dsr percentage */}
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-gray-600">DSR التمويل الشخصي (%):</label>
+                  <div className="space-y-1.5 flex flex-col justify-end">
+                    <label className="block text-xs font-bold text-gray-700 mb-1">DSR التمويل الشخصي (%):</label>
                     <input
                       type="text"
                       inputMode="decimal"
+                      dir="ltr"
                       id="pf-form-dsr"
                       value={formPfDsr}
-                      onChange={(e) => setFormPfDsr(e.target.value.replace(/[^0-9.,]/g, ''))}
-                      className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      onChange={(e) => setFormPfDsr(normalizeNumberInput(e.target.value))}
+                      className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-blue-200"
                       placeholder="مثال: 33"
                     />
                   </div>
 
                   {/* 5. Term Months */}
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-gray-600">مدة التمويل (بالشهور):</label>
+                  <div className="space-y-1.5 flex flex-col justify-end">
+                    <label className="block text-xs font-bold text-gray-700 mb-1">مدة التمويل (بالشهور):</label>
                     <input
                       type="text"
                       inputMode="decimal"
+                      dir="ltr"
                       id="pf-form-term"
                       value={formPfTerm}
-                      onChange={(e) => setFormPfTerm(e.target.value.replace(/[^0-9.,]/g, ''))}
-                      className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      onChange={(e) => setFormPfTerm(normalizeNumberInput(e.target.value))}
+                      className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-blue-200"
                       placeholder="مثال: 60"
                     />
                   </div>
@@ -544,68 +552,97 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
                       }}
                       className="w-full bg-blue-50 border border-blue-200 rounded-xl px-3 py-2 text-xs font-bold text-[#0057B8] focus:outline-none focus:ring-1 focus:ring-blue-500"
                     >
-                      <option value="flat_rate">نسبة الفائدة المسطحة (Flat Rate)</option>
                       <option value="multiplier">معامل التمويل (Multiplier)</option>
+                      <option value="flat_rate">نسبة الفائدة المسطحة (Flat Rate)</option>
                       <option value="pmt">معادلة PMT</option>
                     </select>
                   </div>
 
                   {/* 6. Multiplier coeff */}
                   {formPfCalcMethod === 'multiplier' && (
-                    <div className="space-y-1.5 col-span-1 md:col-span-2">
-                      <label className="block text-xs font-bold text-gray-600">
-                        معامل التمويل (Multiplier):{' '}
-                        <span className="text-red-500 text-[10px] font-bold">(أساسي للحساب)</span>
+                    <div className="space-y-1.5 flex flex-col justify-end">
+                      <label className="block text-xs font-bold text-gray-700 mb-1">
+                        معامل التمويل (Multiplier):
                       </label>
                       <input
                         type="text"
                         inputMode="decimal"
+                        dir="ltr"
                         id="pf-form-coeff"
                         value={formPfCoeff}
-                        onChange={(e) => setFormPfCoeff(e.target.value.replace(/[^0-9.,]/g, ''))}
-                        className="w-full border bg-amber-50 border-amber-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        onChange={(e) => setFormPfCoeff(normalizeNumberInput(e.target.value))}
+                        className="w-full border bg-amber-50 border-amber-300 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-blue-200"
                         placeholder="مثال: 50.42"
                       />
                     </div>
                   )}
 
                   {/* 8. Margin percentage */}
-                  {(formPfCalcMethod === 'flat_rate' || formPfCalcMethod === 'pmt') && (
-                    <div className="space-y-1.5 col-span-1 md:col-span-2">
-                      <label className="block text-xs font-bold text-gray-600">
-                        {formPfCalcMethod === 'pmt' ? (
-                          <>نسبة الفائدة السنوية % (APR):</>
-                        ) : (
-                          <>نسبة الفائدة / الهامش % (Flat Rate):</>
-                        )}
+                  {formPfCalcMethod === 'multiplier' ? (
+                    <div className="space-y-1.5 flex flex-col justify-end">
+                      <label className="block text-xs font-bold text-gray-600 mb-1">
+                        النسبة للعرض فقط (اختياري):
                       </label>
                       <input
                         type="text"
                         inputMode="decimal"
+                        dir="ltr"
                         id="pf-form-margin"
                         value={formPfMargin}
-                        onChange={(e) => setFormPfMargin(e.target.value.replace(/[^0-9.,]/g, ''))}
-                        className="w-full border bg-amber-50 border-amber-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        onChange={(e) => setFormPfMargin(normalizeNumberInput(e.target.value))}
+                        className="w-full border bg-slate-50 border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-blue-200"
+                        placeholder="مثال: 4.80"
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5 flex flex-col justify-end">
+                      <label className="block text-xs font-bold text-gray-700 mb-1">
+                        النسبة / الهامش الأنيوبي %:
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        dir="ltr"
+                        id="pf-form-margin"
+                        value={formPfMargin}
+                        onChange={(e) => setFormPfMargin(normalizeNumberInput(e.target.value))}
+                        className="w-full border bg-amber-50 border-amber-300 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-blue-200"
                         placeholder="مثال: 4.80"
                       />
                     </div>
                   )}
 
                   {/* 9. Minimum Salary */}
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-gray-600">الحد الأدنى للراتب:</label>
+                  <div className="space-y-1.5 flex flex-col justify-end">
+                    <label className="block text-xs font-bold text-gray-700 mb-1">أقل راتب:</label>
                     <input
                       type="text"
                       inputMode="decimal"
+                      dir="ltr"
                       id="pf-form-minsalary"
                       value={formPfMinSalary}
-                      onChange={(e) => setFormPfMinSalary(e.target.value.replace(/[^0-9.,]/g, ''))}
-                      className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      onChange={(e) => setFormPfMinSalary(normalizeNumberInput(e.target.value))}
+                      className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-blue-200"
                       placeholder="مثال: 4000"
                     />
                   </div>
 
-                  {/* 10. Active */}
+                  {/* 10. Maximum Salary */}
+                  <div className="space-y-1.5 flex flex-col justify-end">
+                    <label className="block text-xs font-bold text-gray-700 mb-1">أعلى راتب (اختياري):</label>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      dir="ltr"
+                      id="pf-form-maxsalary"
+                      value={formPfMaxSalary}
+                      onChange={(e) => setFormPfMaxSalary(normalizeNumberInput(e.target.value))}
+                      className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-blue-200"
+                      placeholder="مثال: 25000"
+                    />
+                  </div>
+
+                  {/* 11. Active */}
                   <div className="flex items-center gap-3 pt-6">
                     <span className="text-xs font-bold text-gray-600">حالة التفعيل:</span>
                     <button

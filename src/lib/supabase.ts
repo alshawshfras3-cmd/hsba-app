@@ -64,18 +64,46 @@ const safeKey = hasSupabaseKeys ? supabaseAnonKey : 'eyJhbGciOiJIUzI1NiIsInR5cCI
 export const supabase = createClient(safeUrl, safeKey);
 
 // 2. Perform a silent ping on load to verify connectivity and catch connection errors before any other fetches
+export function cleanStaleSupabaseSession() {
+  try {
+    if (typeof window !== 'undefined') {
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        if (key && (key.includes('supabase') || key.startsWith('sb-') || key.includes('auth'))) {
+          localStorage.removeItem(key);
+        }
+      }
+      for (let i = sessionStorage.length - 1; i >= 0; i--) {
+        const key = sessionStorage.key(i);
+        if (key && (key.includes('supabase') || key.startsWith('sb-') || key.includes('auth'))) {
+          sessionStorage.removeItem(key);
+        }
+      }
+    }
+  } catch (_) {}
+}
+
 if (hasSupabaseKeys && typeof window !== 'undefined') {
   Promise.race([
     supabase.auth.getSession(),
     new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), SUPABASE_TIMEOUT_MS))
   ])
-    .then(({ error }: any) => {
-      if (error) {
-        console.warn("Supabase returned an auth error on ping. NOT disabling Supabase.", error);
+    .then(({ data, error }: any) => {
+      const actualError = error || (data ? null : new Error("No data"));
+      if (actualError) {
+        console.warn("Supabase returned an auth error on ping. NOT disabling Supabase.", actualError);
+        const errMsg = String(actualError?.message || '').toLowerCase();
+        if (errMsg.includes('refresh token') || errMsg.includes('refresh_token') || errMsg.includes('not found') || errMsg.includes('invalid')) {
+          cleanStaleSupabaseSession();
+        }
       }
     })
     .catch((err) => {
       console.warn("Supabase ping failed or timed out. Storing fallback flag.", err);
+      const errMsg = String(err?.message || '').toLowerCase();
+      if (errMsg.includes('refresh token') || errMsg.includes('refresh_token') || errMsg.includes('not found') || errMsg.includes('invalid')) {
+        cleanStaleSupabaseSession();
+      }
       markSupabaseUnreachable();
     });
 }

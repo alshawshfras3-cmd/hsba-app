@@ -320,21 +320,30 @@ export default function ResultsGrid({
                         {mainFinanceType === 'personal_only' ? (
                           <>
                             <div className="border border-[#E5E7EB] rounded-xl p-3">
-                              <span className="text-xs text-[#6B7280] block mb-0.5">هامش الربح (للعرض)</span>
-                              <span className="font-bold text-[#111827]">{offer.annualMargin}%</span>
-                            </div>
-                            <div className="border border-[#E5E7EB] rounded-xl p-3">
                               <span className="text-xs text-[#6B7280] block mb-0.5">طريقة الحساب</span>
-                              <span className="font-bold text-[#111827]">{offer.personalCalculationMethod === 'pmt' ? 'PMT' : 'معامل التمويل'}</span>
+                              <span className="font-bold text-indigo-700">
+                                {offer.personalCalculationMethod === 'pmt' 
+                                  ? 'PMT' 
+                                  : offer.personalCalculationMethod === 'flat_rate' 
+                                  ? 'نسبة الفائدة المبسطة (Flat Rate)' 
+                                  : 'معامل التمويل (Multiplier)'}
+                              </span>
                             </div>
                             <div className="border border-[#E5E7EB] rounded-xl p-3">
                               <span className="text-xs text-[#6B7280] block mb-0.5">نسبة الاستقطاع المعتمدة</span>
                               <span className="font-bold text-[#111827]">{offer.dsrUsed}%</span>
                             </div>
-                            <div className="border border-[#E5E7EB] rounded-xl p-3">
-                              <span className="text-xs text-[#6B7280] block mb-0.5">معامل التمويل المستخدم</span>
-                              <span className="font-bold text-[#111827]">{offer.personalCoefficient || 50.4}</span>
-                            </div>
+                            {offer.personalCalculationMethod === 'multiplier' ? (
+                              <div className="border border-[#E5E7EB] rounded-xl p-3">
+                                <span className="text-xs text-[#6B7280] block mb-0.5">معامل التمويل المستخدم</span>
+                                <span className="font-bold text-[#111827]">{offer.personalCoefficient || 50.42}</span>
+                              </div>
+                            ) : (
+                              <div className="border border-[#E5E7EB] rounded-xl p-3">
+                                <span className="text-xs text-[#6B7280] block mb-0.5">الهامش/النسبة المستخدمة</span>
+                                <span className="font-bold text-[#0057B8]">{offer.annualMargin}%</span>
+                              </div>
+                            )}
                             <div className="border border-[#E5E7EB] rounded-xl p-3 border-dashed">
                               <span className="text-xs text-[#6B7280] block mb-0.5">مدة التمويل</span>
                               <span className="font-bold text-[#111827]">{offer.termMonths} شهراً</span>
@@ -638,24 +647,33 @@ export default function ResultsGrid({
                 </div>
 
                 <div className="grid grid-cols-2 select-none md:grid-cols-3 gap-4 pt-4 border-t border-[#F1F5F9]">
-                  {mainFinanceType === 'personal_only' ? (
+                   {mainFinanceType === 'personal_only' ? (
                     <>
                       <div>
-                        <span className="text-xs text-[#6B7280] block mb-1">هامش ربح الشخصي (للعرض)</span>
-                        <span className="font-bold text-indigo-700">{selectedOffer.annualMargin}%</span>
-                      </div>
-                      <div>
                         <span className="text-xs text-[#6B7280] block mb-1">طريقة الحساب</span>
-                        <span className="font-bold text-indigo-700">{selectedOffer.personalCalculationMethod === 'pmt' ? 'PMT' : 'معامل التمويل'}</span>
+                        <span className="font-bold text-indigo-700">
+                          {selectedOffer.personalCalculationMethod === 'pmt' 
+                            ? 'PMT' 
+                            : selectedOffer.personalCalculationMethod === 'flat_rate' 
+                            ? 'نسبة الفائدة المبسطة (Flat Rate)' 
+                            : 'معامل التمويل (Multiplier)'}
+                        </span>
                       </div>
                       <div>
                         <span className="text-xs text-[#6B7280] block mb-1">نسبة الاستقطاع المعتمدة</span>
                         <span className="font-bold text-[#111827]">{selectedOffer.dsrUsed}%</span>
                       </div>
-                      <div>
-                        <span className="text-xs text-[#6B7280] block mb-1">معامل التمويل المستخدم</span>
-                        <span className="font-bold text-[#111827]">{selectedOffer.personalCoefficient || 50.4}</span>
-                      </div>
+                      {selectedOffer.personalCalculationMethod === 'multiplier' ? (
+                        <div>
+                          <span className="text-xs text-[#6B7280] block mb-1">معامل التمويل المستخدم</span>
+                          <span className="font-bold text-[#111827]">{selectedOffer.personalCoefficient || 50.42}</span>
+                        </div>
+                      ) : (
+                        <div>
+                          <span className="text-xs text-[#6B7280] block mb-1">الهامش/النسبة المستخدمة</span>
+                          <span className="font-bold text-[#0057B8]">{selectedOffer.annualMargin}%</span>
+                        </div>
+                      )}
                       <div>
                         <span className="text-xs text-[#6B7280] block mb-1">مدة التمويل بالشهور</span>
                         <span className="font-bold text-[#111827]">{selectedOffer.termMonths} شهراً</span>

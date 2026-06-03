@@ -117,9 +117,18 @@ export function UsersManagementPage() {
       // Ensure subscription is typed correctly and has fallback, normalize roles as well
       let typedData = (data ?? []).map((item: any) => {
         let r = item.role || 'user';
-        if (r === 'admin') r = 'owner';
-        if (r === 'staff') r = 'employee';
-        if (r === 'customer') r = 'user';
+        const em = (item.email || '').toLowerCase().trim();
+        if (r === 'admin') {
+          if (em === 'alshawshfras3@gmail.com' || em === 'alshawshfras@gmail.com') {
+            r = 'owner';
+          } else {
+            r = 'user';
+          }
+        } else if (r === 'staff') {
+          r = 'employee';
+        } else if (r === 'customer') {
+          r = 'user';
+        }
         return {
           ...item,
           role: r,
@@ -137,11 +146,24 @@ export function UsersManagementPage() {
       console.error("Error fetching user profiles:", err);
       // Fallback gracefully in case the public.user_profiles table doesn't exist yet
       if (user) {
+        let r = isOwner ? 'owner' : (isAdmin ? 'manager' : 'user');
+        const em = (user.email || '').toLowerCase().trim();
+        if (r === 'admin') {
+          if (em === 'alshawshfras3@gmail.com' || em === 'alshawshfras@gmail.com') {
+            r = 'owner';
+          } else {
+            r = 'user';
+          }
+        } else if (r === 'staff') {
+          r = 'employee';
+        } else if (r === 'customer') {
+          r = 'user';
+        }
         const fallbackProfile: Profile = {
           id: user.id,
           email: user.email || '',
           full_name: authProfile?.full_name || user.user_metadata?.full_name || user.user_metadata?.username || 'مستشار عقاري',
-          role: isOwner ? 'owner' : (isAdmin ? 'manager' : 'user'),
+          role: r as any,
           subscription: 'free',
           created_at: user.created_at || new Date().toISOString(),
           last_login: new Date().toISOString()
@@ -564,17 +586,22 @@ export function UsersManagementPage() {
                           <div className="flex items-center justify-center gap-3">
                             <div className="flex flex-col gap-0.5 text-[9px] text-gray-400">
                               <span className="text-right">الدور:</span>
-                              <select
-                                 value={userItem.role}
-                                 onChange={e => updateRole(userItem.id, e.target.value as any)}
-                                 disabled={!canModifyRole}
-                                 className="px-2 py-1 bg-gray-50 border border-gray-200 text-[11px] font-bold rounded-lg outline-none focus:border-[#0057B8] cursor-pointer disabled:opacity-50"
-                              >
-                                {isOwner && <option value="owner">مالك المنصة (Owner)</option>}
-                                {(isOwner || userItem.role === 'manager') && <option value="manager">مدير عمليات (Manager)</option>}
-                                <option value="employee">موظف (Employee)</option>
-                                <option value="user">مستشار عقاري (User)</option>
-                              </select>
+                              {userItem.role === 'owner' ? (
+                                <span className="px-2.5 py-1 bg-purple-50 text-purple-700 border border-purple-100 rounded-lg text-[11px] font-bold inline-block select-none whitespace-nowrap">
+                                  مالك المنصة (Owner)
+                                </span>
+                              ) : (
+                                <select
+                                   value={userItem.role}
+                                   onChange={e => updateRole(userItem.id, e.target.value as any)}
+                                   disabled={!canModifyRole}
+                                   className="px-2 py-1 bg-gray-50 border border-gray-200 text-[11px] font-bold rounded-lg outline-none focus:border-[#0057B8] cursor-pointer disabled:opacity-50"
+                                >
+                                  <option value="manager">مدير عمليات (Manager)</option>
+                                  <option value="employee">موظف (Employee)</option>
+                                  <option value="user">مستشار عقاري (User)</option>
+                                </select>
+                              )}
                             </div>
 
                             <div className="flex flex-col gap-0.5 text-[9px] text-gray-400">

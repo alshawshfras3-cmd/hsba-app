@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase, hasSupabaseKeys } from '../lib/supabase';
+import { DsrRule } from '../types';
 
 // Import all safe initial seed configurations
 import {
@@ -32,6 +33,43 @@ const DEFAULTS: Record<string, any> = {
   user_subscriptions: initialUserSubscriptions,
 };
 
+const DB_TO_CACHE_KEY: Record<string, string> = {
+  banks: 'banks',
+  margin_rules: 'marginRules',
+  dsr_rules: 'dsrRules',
+  personal_finance_rules: 'personalRules',
+  product_acceptance: 'products',
+  military_ranks: 'militaryRanks',
+  pension_rules: 'pensionRules',
+  support_settings: 'supportSettings',
+  salary_rules: 'salaryRules',
+  term_rules: 'termRules',
+  advanced_rules: 'advancedRules',
+  user_subscriptions: 'userSubscriptions',
+};
+
+function getDsrRuleKey(rule: DsrRule): string {
+  return [
+    rule.bankId,
+    rule.productType,
+    rule.supportType,
+    rule.customerStage
+  ].join('|');
+}
+
+function mergeDsrRulesWithSeeds(existingRules: DsrRule[], seedRules: DsrRule[]) {
+  const existingArray = Array.isArray(existingRules) ? existingRules : [];
+  const seedArray = Array.isArray(seedRules) ? seedRules : [];
+
+  const existingKeys = new Set(existingArray.map(getDsrRuleKey));
+  const missingSeedRules = seedArray.filter(rule => !existingKeys.has(getDsrRuleKey(rule)));
+
+  return {
+    mergedRules: [...existingArray, ...missingSeedRules],
+    addedCount: missingSeedRules.length
+  };
+}
+
 export function useSettings() {
   const [settings, setSettings] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
@@ -44,11 +82,23 @@ export function useSettings() {
     if (!hasSupabaseKeys) {
       // Local fallback
       const loaded: Record<string, any> = {};
+      let fallbackParsed: any = null;
+      try {
+        const cachedUnified = localStorage.getItem("hasba_settings_cache") || localStorage.getItem("hasba_admin_settings");
+        if (cachedUnified) {
+          fallbackParsed = JSON.parse(cachedUnified);
+        }
+      } catch (_) {}
+
       for (const key of Object.keys(DEFAULTS)) {
         try {
-          const cached = localStorage.getItem(`hasba_sett_${key}`);
-          let parsed = cached ? JSON.parse(cached) : DEFAULTS[key];
-          loaded[key] = parsed;
+          const cacheField = DB_TO_CACHE_KEY[key];
+          if (fallbackParsed && fallbackParsed[cacheField] !== undefined) {
+            loaded[key] = fallbackParsed[cacheField];
+          } else {
+            const cachedOld = localStorage.getItem(`hasba_sett_${key}`);
+            loaded[key] = cachedOld ? JSON.parse(cachedOld) : DEFAULTS[key];
+          }
         } catch (_) {
           loaded[key] = DEFAULTS[key];
         }
@@ -87,6 +137,28 @@ export function useSettings() {
       // 1. Process all defaults
       for (const key of Object.keys(DEFAULTS)) {
         const existing = presentRecords.get(key);
+        
+        if (key === 'dsr_rules') {
+          const supabaseRules = existing?.value as DsrRule[];
+          const seedRules = DEFAULTS.dsr_rules as DsrRule[];
+
+          const { mergedRules, addedCount } = mergeDsrRulesWithSeeds(supabaseRules, seedRules);
+
+          loaded[key] = mergedRules;
+
+          if (addedCount > 0) {
+            try {
+              await supabase.from('system_settings').upsert({
+                key: 'dsr_rules',
+                value: mergedRules,
+                source: existing?.source || 'seed',
+                updated_at: new Date().toISOString()
+              } as any);
+            } catch (_) {}
+          }
+          continue;
+        }
+
         if (!existing) {
           loaded[key] = DEFAULTS[key];
           // Create the missing row dynamically as native seed
@@ -103,12 +175,46 @@ export function useSettings() {
 
       setSettings(loaded);
       setInitialized(true);
+
+      // Cache the loaded data in unified cache and remove individual old settings
+      try {
+        localStorage.removeItem("hasba_admin_settings");
+        for (const k of Object.keys(DEFAULTS)) {
+          localStorage.removeItem(`hasba_sett_${k}`);
+        }
+        // Save the currently loaded settings to "hasba_settings_cache"
+        const cacheToSave: Record<string, any> = {};
+        for (const dbKey of Object.keys(DEFAULTS)) {
+          const cacheField = DB_TO_CACHE_KEY[dbKey];
+          cacheToSave[cacheField] = loaded[dbKey];
+        }
+        localStorage.setItem("hasba_settings_cache", JSON.stringify(cacheToSave));
+      } catch (_) {}
+
     } catch (err) {
       console.warn('Fallback settings on fetch failure:', err);
       // fallback
       const loaded: Record<string, any> = {};
+      let fallbackParsed: any = null;
+      try {
+        const cachedUnified = localStorage.getItem("hasba_settings_cache") || localStorage.getItem("hasba_admin_settings");
+        if (cachedUnified) {
+          fallbackParsed = JSON.parse(cachedUnified);
+        }
+      } catch (_) {}
+
       for (const key of Object.keys(DEFAULTS)) {
-        loaded[key] = DEFAULTS[key];
+        try {
+          const cacheField = DB_TO_CACHE_KEY[key];
+          if (fallbackParsed && fallbackParsed[cacheField] !== undefined) {
+            loaded[key] = fallbackParsed[cacheField];
+          } else {
+            const cachedOld = localStorage.getItem(`hasba_sett_${key}`);
+            loaded[key] = cachedOld ? JSON.parse(cachedOld) : DEFAULTS[key];
+          }
+        } catch (_) {
+          loaded[key] = DEFAULTS[key];
+        }
       }
       setSettings(loaded);
     } finally {
@@ -122,15 +228,23 @@ export function useSettings() {
 
   // Save specific settings to Supabase
   const saveSetting = useCallback(async (key: string, value: any) => {
-    // Save locally to cache first
-    try {
-      localStorage.setItem(`hasba_sett_${key}`, JSON.stringify(value));
-    } catch (_) {}
-
-    // Update state memory
-    setSettings(prev => ({ ...prev, [key]: value }));
-
     if (!hasSupabaseKeys) {
+      // Local setup only
+      setSettings(prev => ({ ...prev, [key]: value }));
+      try {
+        const cachedUnified = localStorage.getItem("hasba_settings_cache");
+        let fallbackParsed: Record<string, any> = {};
+        if (cachedUnified) {
+          fallbackParsed = JSON.parse(cachedUnified);
+        }
+        const cacheField = DB_TO_CACHE_KEY[key];
+        if (cacheField) {
+          fallbackParsed[cacheField] = value;
+        }
+        localStorage.setItem("hasba_settings_cache", JSON.stringify(fallbackParsed));
+        localStorage.removeItem("hasba_admin_settings");
+        localStorage.removeItem(`hasba_sett_${key}`);
+      } catch (_) {}
       return;
     }
 
@@ -160,6 +274,26 @@ export function useSettings() {
     if (error) {
       throw error;
     }
+
+    // Update state memory ON SUCCESS
+    setSettings(prev => ({ ...prev, [key]: value }));
+
+    // Update unified cache ON SUCCESS
+    try {
+      const cachedUnified = localStorage.getItem("hasba_settings_cache");
+      let fallbackParsed: Record<string, any> = {};
+      if (cachedUnified) {
+        fallbackParsed = JSON.parse(cachedUnified);
+      }
+      const cacheField = DB_TO_CACHE_KEY[key];
+      if (cacheField) {
+        fallbackParsed[cacheField] = value;
+      }
+      localStorage.setItem("hasba_settings_cache", JSON.stringify(fallbackParsed));
+      
+      localStorage.removeItem("hasba_admin_settings");
+      localStorage.removeItem(`hasba_sett_${key}`);
+    } catch (_) {}
   }, []);
 
   return {

@@ -544,9 +544,10 @@ export default function MarginsSection({
                         <input
                           type="text"
                           inputMode="decimal"
+                          dir="ltr"
                           value={localMargins[year] ?? ''}
                           onChange={(e) => {
-                            const val = e.target.value.replace(/[^0-9.,]/g, '');
+                            const val = normalizeNumberInput(e.target.value);
                             handleMarginLocalChange(year, val);
                           }}
                           className="bg-white border border-gray-300 rounded-xl pl-8 pr-4 py-2 w-full text-xs font-bold font-mono focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-left"

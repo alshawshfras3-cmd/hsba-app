@@ -452,9 +452,10 @@ export default function DsrSection({
                   <input
                     type="text"
                     inputMode="decimal"
+                    dir="ltr"
                     value={formDsrPercentStr}
-                    onChange={(e) => setFormDsrPercentStr(e.target.value.replace(/[^0-9.,]/g, ''))}
-                    className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 focus:outline-none font-mono text-left"
+                    onChange={(e) => setFormDsrPercentStr(normalizeNumberInput(e.target.value))}
+                    className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-blue-200 text-left font-mono"
                     placeholder="مثال: 55 أو 33.33"
                   />
                 </div>
