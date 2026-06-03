@@ -98,7 +98,7 @@ interface AppContextType {
   // Supabase Auth and Roles state
   user: any;
   setUser: React.Dispatch<React.SetStateAction<any>>;
-  userRole: 'admin' | 'manager' | 'user' | null;
+  userRole: 'owner' | 'manager' | 'employee' | 'user' | null;
   authLoading: boolean;
   isSettingsLoading: boolean;
   signOut: () => Promise<void>;
@@ -241,8 +241,16 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [savedSettings, setSavedSettings] = useState<AdminSettings>(initialData);
 
   // Consume from custom AuthProvider
-  const { user, setUser, profile, isAdmin, isManager, canAccessDashboard, signOut, loading: authLoading } = useAuth();
-  const userRole = isAdmin ? 'admin' : (isManager ? 'manager' : 'user');
+  const { user, setUser, profile, isOwner, isAdmin, isStaff, canAccessDashboard, signOut, loading: authLoading } = useAuth();
+  
+  const getNormalizedRole = () => {
+    let r = profile?.role || (isOwner ? 'owner' : (isAdmin ? 'manager' : (isStaff ? 'employee' : 'user')));
+    if (r === 'admin') return 'owner';
+    if (r === 'staff') return 'employee';
+    if (r === 'customer') return 'user';
+    return r;
+  };
+  const userRole = getNormalizedRole();
 
   const [isSettingsLoading, setIsSettingsLoading] = useState(true);
 
@@ -256,106 +264,122 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       }
       setIsSettingsLoading(true);
       try {
-        const { data, error } = await supabase
+        let rows: any[] = [];
+        const fetchRes = await supabase
           .from('system_settings')
-          .select('key, value');
+          .select('key, value, source');
 
-        if (error) {
-          console.error("Error reading from system_settings table:", error);
-          throw error;
-        }
-
-        if (data && data.length > 0) {
-          const loaded: Record<string, any> = {};
-          for (const row of data) {
-            let val = row.value;
-            if (row.key === 'personal_finance_rules' && Array.isArray(val)) {
-              val = val.map((rule: any) => {
-                const bankId = rule.bankId || 'all';
-                const margin = bankId === 'rajhi' ? 4.59 : (bankId === 'alahli' ? 5.00 : 4.80);
-                if (rule.calculationMethod === 'multiplier' || rule.financeCoefficient > 0 || rule.annualMargin === 2.50) {
-                  return {
-                    ...rule,
-                    calculationMethod: 'flat_rate',
-                    financeCoefficient: 0,
-                    annualMargin: rule.annualMargin || margin
-                  };
-                }
-                return rule;
-              });
-            }
-            loaded[row.key] = val;
+        if (fetchRes.error) {
+          const fbResult = await supabase
+            .from('system_settings')
+            .select('key, value');
+          if (fbResult.error) {
+            console.error("Error reading from system_settings table:", fbResult.error);
+            throw fbResult.error;
           }
-
-          let loadedMilitaryRanks = loaded.military_ranks || [];
-          const needsRanksUpgrade = loadedMilitaryRanks.length === 0 || 
-            loadedMilitaryRanks.some((r: any) => !r.hasOwnProperty('sectorScope') || !r.sectorScope || r.sectorScope === 'military_officer' || r.sectorScope === 'military_enlisted');
-          if (needsRanksUpgrade) {
-            loadedMilitaryRanks = initialMilitaryRanks;
-          }
-
-          if (loaded.banks) setBanks(loaded.banks);
-          if (loaded.product_acceptance) setProducts(loaded.product_acceptance);
-          setMilitaryRanks(loadedMilitaryRanks);
-          if (loaded.salary_rules) setSalaryRules(loaded.salary_rules);
-          if (loaded.pension_rules) setPensionRules(loaded.pension_rules);
-          if (loaded.term_rules) setTermRules(loaded.term_rules);
-          if (loaded.margin_rules) {
-            setMarginRules(upgradeMarginRules(loaded.margin_rules));
-          } else {
-            setMarginRules(initialMarginRules);
-          }
-          if (loaded.dsr_rules) setDsrRules(loaded.dsr_rules);
-          if (loaded.support_settings) setSupportSettings(loaded.support_settings);
-          if (loaded.personal_finance_rules) setPersonalRules(loaded.personal_finance_rules);
-          if (loaded.advanced_rules) setAdvancedRules(loaded.advanced_rules);
-          if (loaded.user_subscriptions) setUserSubscriptions(loaded.user_subscriptions);
-
-          const hSupport = await fetchHousingSupportTiers();
-          const aPayment = await fetchAdvancePaymentTiers();
-          setHousingSupportTiers(hSupport);
-          setAdvancePaymentTiers(aPayment);
-
-          setSavedSettings({
-            banks: loaded.banks || initialBanks,
-            products: loaded.product_acceptance || initialProductAcceptance,
-            militaryRanks: loadedMilitaryRanks,
-            salaryRules: loaded.salary_rules || initialSalaryRules,
-            pensionRules: loaded.pension_rules || initialPensionRules,
-            termRules: loaded.term_rules || initialTermRules,
-            marginRules: upgradeMarginRules(loaded.margin_rules || []),
-            dsrRules: loaded.dsr_rules || initialDsrRules,
-            supportSettings: loaded.support_settings || initialSupportSettings,
-            housingSupportTiers: hSupport,
-            advancePaymentTiers: aPayment,
-            personalRules: loaded.personal_finance_rules || initialPersonalFinanceRules,
-            advancedRules: loaded.advanced_rules || initialAdvancedRules,
-            userSubscriptions: loaded.user_subscriptions || initialUserSubscriptions,
-          });
+          rows = fbResult.data || [];
         } else {
-          // Table exists but is completely empty? Warm up the system_settings table
-          console.log("No dynamic system_settings keys found in Supabase. Creating default configuration roles...");
-          const defaultsToSeed = [
-            { key: 'banks', value: initialBanks },
-            { key: 'product_acceptance', value: initialProductAcceptance },
-            { key: 'military_ranks', value: initialMilitaryRanks },
-            { key: 'salary_rules', value: initialSalaryRules },
-            { key: 'pension_rules', value: initialPensionRules },
-            { key: 'term_rules', value: initialTermRules },
-            { key: 'margin_rules', value: initialMarginRules },
-            { key: 'dsr_rules', value: initialDsrRules },
-            { key: 'support_settings', value: initialSupportSettings },
-            { key: 'personal_finance_rules', value: initialPersonalFinanceRules },
-            { key: 'advanced_rules', value: initialAdvancedRules },
-            { key: 'user_subscriptions', value: initialUserSubscriptions }
-          ];
+          rows = fetchRes.data || [];
+        }
 
-          for (const item of defaultsToSeed) {
-            await supabase.from('system_settings').upsert({ key: item.key, value: item.value });
+        const presentRecords = new Map<string, { value: any, source?: string }>();
+        for (const row of rows) {
+          presentRecords.set(row.key, { value: row.value, source: row.source });
+        }
+
+        const DEFAULTS_MAP: Record<string, any> = {
+          banks: initialBanks,
+          margin_rules: initialMarginRules,
+          dsr_rules: initialDsrRules,
+          personal_finance_rules: initialPersonalFinanceRules,
+          product_acceptance: initialProductAcceptance,
+          military_ranks: initialMilitaryRanks,
+          pension_rules: initialPensionRules,
+          support_settings: initialSupportSettings,
+          salary_rules: initialSalaryRules,
+          term_rules: initialTermRules,
+          advanced_rules: initialAdvancedRules,
+          user_subscriptions: initialUserSubscriptions,
+        };
+
+        const finalSettings: Record<string, any> = {};
+
+        for (const key of Object.keys(DEFAULTS_MAP)) {
+          const existing = presentRecords.get(key);
+          if (!existing) {
+            finalSettings[key] = DEFAULTS_MAP[key];
+            try {
+              await supabase.from('system_settings').upsert({ key: key, value: DEFAULTS_MAP[key], source: 'seed' });
+            } catch (_) {}
+          } else {
+            // If the key already exists in system_settings, always use the existing value regardless of source
+            finalSettings[key] = existing.value;
           }
         }
+
+        let loadedMilitaryRanks = finalSettings.military_ranks || [];
+        const needsRanksUpgrade = loadedMilitaryRanks.length === 0 || 
+          loadedMilitaryRanks.some((r: any) => !r.hasOwnProperty('sectorScope') || !r.sectorScope || r.sectorScope === 'military_officer' || r.sectorScope === 'military_enlisted');
+        if (needsRanksUpgrade) {
+          loadedMilitaryRanks = initialMilitaryRanks;
+        }
+
+        if (finalSettings.banks) setBanks(finalSettings.banks);
+        if (finalSettings.product_acceptance) setProducts(finalSettings.product_acceptance);
+        setMilitaryRanks(loadedMilitaryRanks);
+        if (finalSettings.salary_rules) setSalaryRules(finalSettings.salary_rules);
+        if (finalSettings.pension_rules) setPensionRules(finalSettings.pension_rules);
+        if (finalSettings.term_rules) setTermRules(finalSettings.term_rules);
+        if (finalSettings.margin_rules) {
+          setMarginRules(upgradeMarginRules(finalSettings.margin_rules));
+        } else {
+          setMarginRules(initialMarginRules);
+        }
+        if (finalSettings.dsr_rules) setDsrRules(finalSettings.dsr_rules);
+        if (finalSettings.support_settings) setSupportSettings(finalSettings.support_settings);
+        if (finalSettings.personal_finance_rules) setPersonalRules(finalSettings.personal_finance_rules);
+        if (finalSettings.advanced_rules) setAdvancedRules(finalSettings.advanced_rules);
+        if (finalSettings.user_subscriptions) setUserSubscriptions(finalSettings.user_subscriptions);
+
+        const hSupport = await fetchHousingSupportTiers();
+        const aPayment = await fetchAdvancePaymentTiers();
+        setHousingSupportTiers(hSupport);
+        setAdvancePaymentTiers(aPayment);
+
+        setSavedSettings({
+          banks: finalSettings.banks || initialBanks,
+          products: finalSettings.product_acceptance || initialProductAcceptance,
+          militaryRanks: loadedMilitaryRanks,
+          salaryRules: finalSettings.salary_rules || initialSalaryRules,
+          pensionRules: finalSettings.pension_rules || initialPensionRules,
+          termRules: finalSettings.term_rules || initialTermRules,
+          marginRules: upgradeMarginRules(finalSettings.margin_rules || []),
+          dsrRules: finalSettings.dsr_rules || initialDsrRules,
+          supportSettings: finalSettings.support_settings || initialSupportSettings,
+          housingSupportTiers: hSupport,
+          advancePaymentTiers: aPayment,
+          personalRules: finalSettings.personal_finance_rules || initialPersonalFinanceRules,
+          advancedRules: finalSettings.advanced_rules || initialAdvancedRules,
+          userSubscriptions: finalSettings.user_subscriptions || initialUserSubscriptions,
+        });
+
       } catch (err) {
         console.warn("Supabase granular system_settings load failed. Using local storage or seed defaults gracefully.", err);
+        setBanks(initialData.banks);
+        setProducts(initialData.products);
+        setMilitaryRanks(initialData.militaryRanks);
+        setSalaryRules(initialData.salaryRules);
+        setPensionRules(initialData.pensionRules);
+        setTermRules(initialData.termRules);
+        setMarginRules(initialData.marginRules);
+        setDsrRules(initialData.dsrRules);
+        setSupportSettings(initialData.supportSettings);
+        setHousingSupportTiers(initialData.housingSupportTiers);
+        setAdvancePaymentTiers(initialData.advancePaymentTiers);
+        setPersonalRules(initialData.personalRules);
+        setAdvancedRules(initialData.advancedRules);
+        setUserSubscriptions(initialData.userSubscriptions || initialUserSubscriptions);
+        setSavedSettings(initialData);
       } finally {
         setIsSettingsLoading(false);
       }
@@ -422,12 +446,18 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           { key: 'user_subscriptions', value: userSubscriptions }
         ];
 
+        const updated_by_user = user?.email || user?.id || null;
         for (const item of itemsToSave) {
-          await supabase.from('system_settings').upsert({
+          const payload: any = {
             key: item.key,
             value: item.value,
+            source: 'admin',
             updated_at: new Date().toISOString()
-          });
+          };
+          if (updated_by_user) {
+            payload.updated_by = updated_by_user;
+          }
+          await supabase.from('system_settings').upsert(payload);
         }
         console.log("All settings successfully synced to granular keys in system_settings database");
       } catch (err) {

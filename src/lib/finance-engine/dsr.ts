@@ -34,9 +34,10 @@ export function getDsrRule(params: {
 }): DsrRule {
   const { bankId, productType, supportType, customerStage, dsrRules } = params;
 
-  // 1. Check for duplicate active rules matching the selected bank by bankId + supportType + customerStage
+  // 1. Check for duplicate active rules matching the selected bank by bankId + productType + supportType + customerStage
   const bankMatches = dsrRules.filter(
     r => r.bankId === bankId &&
+         r.productType === productType &&
          r.supportType === supportType &&
          r.customerStage === customerStage &&
          r.active
@@ -44,7 +45,7 @@ export function getDsrRule(params: {
 
   if (bankMatches.length > 1) {
     throw new Error(
-      `مفرط: هناك أكثر من قاعدة DSR نشطة للجهة التمويلية (${bankId}) لنفس التوليفة (${supportType} — ${customerStage}). يرجى تفعيل واحدة فقط.`
+      `مفرط: هناك أكثر من قاعدة DSR نشطة للجهة التمويلية (${bankId}) لنفس التوليفة (${productType} — ${supportType} — ${customerStage}). يرجى تفعيل واحدة فقط.`
     );
   }
 
@@ -54,6 +55,7 @@ export function getDsrRule(params: {
   if (!rule) {
     const defaultMatches = dsrRules.filter(
       r => r.bankId === 'default' &&
+           r.productType === productType &&
            r.supportType === supportType &&
            r.customerStage === customerStage &&
            r.active
@@ -61,7 +63,7 @@ export function getDsrRule(params: {
 
     if (defaultMatches.length > 1) {
       throw new Error(
-        `مفرط: هناك أكثر من قاعدة DSR افتراضية (default) نشطة لنفس التوليفة (${supportType} — ${customerStage}). يرجى تفعيل واحدة فقط.`
+        `مفرط: هناك أكثر من قاعدة DSR افتراضية (default) نشطة لنفس التوليفة (${productType} — ${supportType} — ${customerStage}). يرجى تفعيل واحدة فقط.`
       );
     }
 

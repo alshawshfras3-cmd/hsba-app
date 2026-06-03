@@ -48,21 +48,6 @@ export function useSettings() {
         try {
           const cached = localStorage.getItem(`hasba_sett_${key}`);
           let parsed = cached ? JSON.parse(cached) : DEFAULTS[key];
-          if (key === 'personal_finance_rules' && Array.isArray(parsed)) {
-            parsed = parsed.map((rule: any) => {
-              const bankId = rule.bankId || 'all';
-              const margin = bankId === 'rajhi' ? 4.59 : (bankId === 'alahli' ? 5.00 : 4.80);
-              if (rule.calculationMethod === 'multiplier' || rule.financeCoefficient > 0 || rule.annualMargin === 2.50) {
-                return {
-                  ...rule,
-                  calculationMethod: 'flat_rate',
-                  financeCoefficient: 0,
-                  annualMargin: rule.annualMargin || margin
-                };
-              }
-              return rule;
-            });
-          }
           loaded[key] = parsed;
         } catch (_) {
           loaded[key] = DEFAULTS[key];
@@ -75,58 +60,44 @@ export function useSettings() {
     }
 
     try {
-      const { data, error } = await supabase
+      let rows: any[] = [];
+      const fetchRes = await supabase
         .from('system_settings')
-        .select('key, value');
+        .select('key, value, source');
 
-      if (error && error.code !== 'PGRST116') {
-        console.warn('Failed to fetch system_settings from database, code/error info:', error);
+      if (fetchRes.error) {
+        if (fetchRes.error.code !== 'PGRST116') {
+          console.warn('Failed to fetch system_settings with source column from database, retrying with key, value only...', fetchRes.error);
+        }
+        const fbResult = await supabase
+          .from('system_settings')
+          .select('key, value');
+        rows = fbResult.data || [];
+      } else {
+        rows = fetchRes.data || [];
       }
 
       const loaded: Record<string, any> = {};
-      const presentKeys = new Set((data || []).map(r => r.key));
+      const presentRecords = new Map<string, { value: any, source?: string }>();
 
-      // 1. Map existing table records
-      if (data && data.length > 0) {
-        for (const row of data) {
-          if (
-            row.value === null ||
-            (Array.isArray(row.value) && row.value.length === 0 && row.key !== 'banks' && row.key !== 'margin_rules' && row.key !== 'dsr_rules') ||
-            (typeof row.value === 'object' && Object.keys(row.value).length === 0 && row.key !== 'support_settings')
-          ) {
-            loaded[row.key] = DEFAULTS[row.key] ?? row.value;
-          } else {
-            let val = row.value;
-            if (row.key === 'personal_finance_rules' && Array.isArray(val)) {
-              val = val.map((rule: any) => {
-                const bankId = rule.bankId || 'all';
-                const margin = bankId === 'rajhi' ? 4.59 : (bankId === 'alahli' ? 5.00 : 4.80);
-                if (rule.calculationMethod === 'multiplier' || rule.financeCoefficient > 0 || rule.annualMargin === 2.50) {
-                  return {
-                    ...rule,
-                    calculationMethod: 'flat_rate',
-                    financeCoefficient: 0,
-                    annualMargin: rule.annualMargin || margin
-                  };
-                }
-                return rule;
-              });
-            }
-            loaded[row.key] = val;
-          }
-        }
+      for (const row of rows) {
+        presentRecords.set(row.key, { value: row.value, source: row.source });
       }
 
-      // 2. Add missing key defaults
+      // 1. Process all defaults
       for (const key of Object.keys(DEFAULTS)) {
-        if (!presentKeys.has(key)) {
+        const existing = presentRecords.get(key);
+        if (!existing) {
           loaded[key] = DEFAULTS[key];
-          // Try to create the missing row dynamically
+          // Create the missing row dynamically as native seed
           try {
-            await supabase.from('system_settings').upsert({ key, value: DEFAULTS[key] });
+            await supabase.from('system_settings').upsert({ key, value: DEFAULTS[key], source: 'seed' });
           } catch (_) {
             // fail-silent
           }
+        } else {
+          // If key exists, utilize its database value, preventing any overwrites with defaults
+          loaded[key] = existing.value;
         }
       }
 
@@ -163,9 +134,28 @@ export function useSettings() {
       return;
     }
 
+    const userEmailOrId = await (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        return user?.email || user?.id || null;
+      } catch (_) {
+        return null;
+      }
+    })();
+
+    const payload: any = {
+      key,
+      value,
+      source: 'admin',
+      updated_at: new Date().toISOString()
+    };
+    if (userEmailOrId) {
+      payload.updated_by = userEmailOrId;
+    }
+
     const { error } = await supabase
       .from('system_settings')
-      .upsert({ key, value, updated_at: new Date().toISOString() });
+      .upsert(payload);
 
     if (error) {
       throw error;

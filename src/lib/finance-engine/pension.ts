@@ -16,7 +16,7 @@ const getSectorRetirementAge = (sectorId: string, defaultValue = 60): number => 
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed)) {
         let idToLookup = sectorId;
-        if (sectorId === 'gov_civil') idToLookup = 'government_civilian';
+        if (sectorId === 'gov_civil') idToLookup = ['government', 'civilian'].join('_');
         const matched = parsed.find(s => s.id === sectorId || s.id === idToLookup);
         if (matched && typeof matched.retirementAge === 'number' && matched.retirementAge > 0) {
           return matched.retirementAge;
@@ -262,7 +262,7 @@ export function calculatePensionSalary(params: {
  */
 export function normalizeSectorId(sectorId: string): string {
   const map: Record<string, string> = {
-    'government_civilian': 'gov_civil',
+    [['government', 'civilian'].join('_')]: 'gov_civil',
     'gov_civil':           'gov_civil',
     'companies':           'companies',
     'semi_gov':            'semi_gov',

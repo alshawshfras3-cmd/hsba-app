@@ -13,6 +13,207 @@ import StepWizard from './components/calculator/StepWizard';
 import AdminDashboard from './components/admin/AdminDashboard';
 import AdminAuth from './components/admin/AdminAuth';
 import { Calculator, ShieldCheck, Mail, Phone, ExternalLink, ShieldAlert, Loader2 } from 'lucide-react';
+import { supabase, hasSupabaseKeys } from './lib/supabase';
+
+function AdminViewGuard() {
+  const { signOut } = useAuth();
+  const [loading, setLoading] = React.useState(true);
+  const [role, setRole] = React.useState<string | null>(null);
+  const [currentUser, setCurrentUser] = React.useState<any | null>(null);
+  const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    let active = true;
+    async function verifyAndLoadAdmin() {
+      if (!hasSupabaseKeys) {
+        setRole('owner');
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setErrorMsg(null);
+
+        // 1. Get the current user from auth.users (strictly bypassing any cached sessions)
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (authError || !user) {
+          throw new Error(authError?.message || "لم يتم العثور على مستخدم نشط.");
+        }
+        
+        if (active) {
+          setCurrentUser(user);
+        }
+
+        const lowercaseEmail = (user.email || '').toLowerCase().trim();
+        const isOwnerEmail = lowercaseEmail === 'alshawshfras@gmail.com' || lowercaseEmail === 'alshawshfras3@gmail.com';
+
+        // 2. Fetch the user_profiles row
+        let { data: profile, error: dbError } = await supabase
+          .from('user_profiles')
+          .select('role')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        // If no row exists or there was an error, try to create or update profile
+        if (!profile) {
+          console.log("No profile row found, attempting to create user profile row...");
+          const fullName = user.user_metadata?.full_name || user.user_metadata?.username || 'مستشار عقاري';
+          const { error: upsertError } = await supabase
+            .from('user_profiles')
+            .upsert({
+              id: user.id,
+              email: user.email,
+              full_name: fullName,
+              role: isOwnerEmail ? 'owner' : 'user',
+              subscription: 'free'
+            });
+
+          if (upsertError) {
+            console.error("Failed to upsert profile, checking email fallback:", upsertError);
+            if (isOwnerEmail) {
+              if (active) {
+                setRole('owner');
+                setLoading(false);
+              }
+              return;
+            } else {
+              throw new Error("فشل إنشاء ملف معرّف الصلاحيات وتوثيق رتبتك العقارية.");
+            }
+          }
+
+          // Re-fetch role
+          const { data: reProfile, error: reError } = await supabase
+            .from('user_profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single();
+          
+          if (reError && !isOwnerEmail) {
+            throw new Error(reError.message || "فشل جلب ملف معرّف الصلاحيات بعد الإنشاء.");
+          }
+          profile = reProfile;
+        }
+
+        let userRole = profile?.role || (isOwnerEmail ? 'owner' : 'user');
+
+        // Normalize roles
+        if (userRole === 'admin') userRole = 'owner';
+        if (userRole === 'staff') userRole = 'employee';
+        if (userRole === 'customer') userRole = 'user';
+
+        if (isOwnerEmail && userRole !== 'owner') {
+          userRole = 'owner';
+          // Update database profile if role in DB is not owner yet
+          try {
+            await supabase
+              .from('user_profiles')
+              .update({ role: 'owner' })
+              .eq('id', user.id);
+          } catch (e) {
+            console.warn("Could not auto-update profile role in database to owner:", e);
+          }
+        }
+
+        // 8. Add Diagnostic logs
+        console.log("=== تشخيصات لوحة الإدارة ===");
+        console.log("currentUser.id:", user.id);
+        console.log("currentUser.email:", user.email);
+        console.log("profile.role:", userRole);
+        console.log("============================");
+
+        if (active) {
+          setRole(userRole);
+        }
+      } catch (err: any) {
+        console.error("Error verifying admin role:", err);
+        // If it is owner email, we bypass the error and set owner as role!
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          const lowercaseEmail = (user?.email || '').toLowerCase().trim();
+          const isOwnerEmail = lowercaseEmail === 'alshawshfras@gmail.com' || lowercaseEmail === 'alshawshfras3@gmail.com';
+          if (isOwnerEmail) {
+            if (active) {
+              setRole('owner');
+            }
+            return;
+          }
+        } catch (_) {}
+
+        if (active) {
+          setErrorMsg(err.message || "حدث خطأ أثناء الاتصال بقاعدة البيانات لتوثيق الصلاحيات.");
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    verifyAndLoadAdmin();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 space-y-4">
+        <Loader2 className="w-8 h-8 animate-spin text-[#0057B8]" />
+        <p className="text-xs text-gray-500 font-bold">جاري الاستعلام المباشر عن الرتبة والصلاحيات العقارية...</p>
+      </div>
+    );
+  }
+
+  if (errorMsg) {
+    return (
+      <div className="max-w-md mx-auto my-12 px-4" dir="rtl">
+        <div className="bg-white border border-red-100 rounded-2xl shadow-xl p-8 text-center space-y-4">
+          <div className="w-12 h-12 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto">
+            <ShieldAlert className="w-6 h-6" />
+          </div>
+          <h3 className="font-bold text-gray-900 text-sm">فشل التحقق الأمني</h3>
+          <p className="text-xs text-gray-500 leading-relaxed">{errorMsg}</p>
+          <button
+            onClick={signOut}
+            className="w-full py-2.5 bg-[#0057B8] text-white text-xs font-semibold rounded-xl"
+          >
+            تسجيل الخروج والمحاولة مرة أخرى
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const isAllowed = role === 'owner' || role === 'manager' || role === 'employee';
+
+  if (!isAllowed) {
+    return (
+      <div className="max-w-md mx-auto my-12 px-4">
+        <div className="bg-white border border-gray-100 rounded-2xl shadow-xl p-8 text-center space-y-6" dir="rtl">
+          <div className="w-14 h-14 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+          <div>
+            <h3 className="font-sans font-bold text-lg text-gray-900">عذراً، الوصول غير مصرح به</h3>
+            <p className="text-xs text-gray-500 mt-2 leading-relaxed font-sans">
+              حسابك الحالي (<span className="font-mono text-gray-700 font-semibold">{currentUser?.email}</span>) لا يملك صلاحية (مالك أو مدير أو موظف). رتبتك الحالية الموثقة في قاعدة البيانات هي: (<span className="font-bold text-red-600 font-mono">{role || 'غير معرّف'}</span>). يرجى التواصل مع المدير العام المالي لتعديل رتبتك.
+            </p>
+          </div>
+          <button
+            onClick={signOut}
+            className="w-full py-3 bg-[#0057B8] hover:bg-[#004bb0] text-white text-xs font-bold rounded-xl transition-all shadow-md cursor-pointer"
+          >
+            تسجيل الخروج والدخول بحساب مسؤول
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return <AdminDashboard />;
+}
 
 function MarketingFooter() {
   return (
@@ -69,49 +270,8 @@ function MarketingFooter() {
 }
 
 function DashboardOrWizard() {
-  const { user, userRole, authLoading, signOut } = useAppState();
+  const { user } = useAuth();
   const location = useLocation();
-
-  const renderAdminView = () => {
-    if (authLoading) {
-      return (
-        <div className="flex flex-col items-center justify-center py-24 space-y-4">
-          <Loader2 className="w-8 h-8 animate-spin text-[#0057B8]" />
-          <p className="text-xs text-gray-500 font-bold">جاري التحقق من الهوية والصلاحيات...</p>
-        </div>
-      );
-    }
-
-    if (!user) {
-      return <AdminAuth />;
-    }
-
-    if (userRole !== 'admin' && userRole !== 'manager') {
-      return (
-        <div className="max-w-md mx-auto my-12 px-4">
-          <div className="bg-white border border-gray-100 rounded-2xl shadow-xl p-8 text-center space-y-6" dir="rtl">
-            <div className="w-14 h-14 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto">
-              <ShieldAlert className="w-8 h-8" />
-            </div>
-            <div>
-              <h3 className="font-sans font-bold text-lg text-gray-900">عذراً، الوصول غير مصرح به</h3>
-              <p className="text-xs text-gray-500 mt-2 leading-relaxed">
-                حسابك الحالي (<span className="font-mono text-gray-700 font-semibold">{user.email}</span>) لا يملك صلاحية (مسؤول أو مدير). يرجى التواصل مع المسؤول المالي للمنصة لتعديل صلاحياتك.
-              </p>
-            </div>
-            <button
-              onClick={signOut}
-              className="w-full py-3 bg-[#0057B8] hover:bg-[#004bb0] text-white text-xs font-bold rounded-xl transition-all shadow-md cursor-pointer"
-            >
-              تسجيل الخروج والدخول بحساب مسؤول
-            </button>
-          </div>
-        </div>
-      );
-    }
-
-    return <AdminDashboard />;
-  };
 
   const footerAllowedPaths = [
     "/login",
@@ -136,14 +296,17 @@ function DashboardOrWizard() {
       case '/about-us':
         return <AboutPage />;
       case '/admin':
-        return renderAdminView();
+        if (!user) {
+          return <AdminAuth />;
+        }
+        return <AdminViewGuard />;
       default:
         return <StepWizard />;
     }
   };
 
   return (
-    <div className="flex-1 flex flex-col justify-between">
+    <div className="flex-1 flex flex-col justify-between font-sans">
       {/* Content Area */}
       <main className="flex-grow">
         {renderContent()}

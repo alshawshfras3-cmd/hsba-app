@@ -96,7 +96,7 @@ export default function Header() {
             </button>
           )}
 
-          {(userRole === 'admin' || userRole === 'manager') && (
+          {(userRole === 'owner' || userRole === 'manager' || userRole === 'employee') && (
             <button
               id="nav-admin-btn"
               onClick={() => handleNavChange('admin')}
@@ -133,11 +133,12 @@ export default function Header() {
                   {user.email}
                 </span>
                 <span className={`inline-block text-[9px] font-bold px-1.5 py-0.5 mt-1 rounded leading-none ${
-                  userRole === 'admin' ? 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300' :
-                  userRole === 'manager' ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300' :
+                  userRole === 'owner' ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white dark:from-purple-950 dark:to-indigo-950/40 dark:text-purple-350' :
+                  userRole === 'manager' ? 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300' :
+                  userRole === 'employee' ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300' :
                   'bg-slate-100 text-[#475569] dark:bg-slate-700 dark:text-slate-300'
                 }`}>
-                  {userRole === 'admin' ? 'مسؤول رئيسي' : userRole === 'manager' ? 'مدير منصة' : 'مستشار'}
+                  {userRole === 'owner' ? 'مالك رئيسي' : userRole === 'manager' ? 'مدير عام مسبق' : userRole === 'employee' ? 'موظف مالي' : 'مستشار'}
                 </span>
               </div>
               <button
@@ -218,7 +219,7 @@ export default function Header() {
                 </div>
                 <div className="flex justify-between text-xs font-bold text-slate-500 dark:text-slate-400">
                   <span>صلاحية الحساب:</span>
-                  <span className="text-emerald-600 dark:text-emerald-400">{userRole === 'admin' ? 'مسؤول رئيسي مالي' : (userRole === 'manager' ? 'مدير نظام حسبة' : 'مستشار مالي معتمد')}</span>
+                  <span className="text-emerald-600 dark:text-emerald-400">{userRole === 'owner' ? 'مالك رئيسي للسيستم' : (userRole === 'manager' ? 'مدير عمليات معتمد' : (userRole === 'employee' ? 'موظف مالي داخلي' : 'مستشار مالي معتمد'))}</span>
                 </div>
                 <div className="flex justify-between text-xs font-bold text-slate-500 dark:text-slate-400">
                   <span>باقة الاشتراك مفعّلة:</span>
@@ -227,7 +228,7 @@ export default function Header() {
               </div>
  
               {/* Navigation toggles if Admin / Manager */}
-              {(userRole === 'admin' || userRole === 'manager') && (
+              {(userRole === 'owner' || userRole === 'manager' || userRole === 'employee') && (
                 <div className="grid grid-cols-2 gap-3 pt-2">
                   <button
                     onClick={() => {

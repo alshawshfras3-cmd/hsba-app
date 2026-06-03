@@ -53,7 +53,6 @@ export default function ResultsGrid({
 
   const getSectorArabicName = (secId?: string) => {
     switch (secId) {
-      case 'government_civilian':
       case 'gov_civil': return 'حكومي مدني';
       case 'military': return 'عسكري';
       case 'military_officer': return 'عسكري (ضابط)';
@@ -791,14 +790,14 @@ export default function ResultsGrid({
                           <div className="flex justify-between font-sans">
                             <span className="text-gray-500">القطاع الفعلي المطبق:</span>
                             <span className="font-semibold">
-                              {['government_civilian', 'gov_civil'].includes(selectedOffer.pensionDiagnostic.effectiveSectorId) && 'حكومي مدني'}
+                              {['gov_civil'].includes(selectedOffer.pensionDiagnostic.effectiveSectorId) && 'حكومي مدني'}
                               {selectedOffer.pensionDiagnostic.effectiveSectorId === 'semi_gov' && 'شبه حكومي'}
                               {selectedOffer.pensionDiagnostic.effectiveSectorId === 'companies' && 'شركات كبرى (أرامكو/سابك)'}
                               {selectedOffer.pensionDiagnostic.effectiveSectorId === 'military' && 'عسكري'}
                               {selectedOffer.pensionDiagnostic.effectiveSectorId === 'military_officer' && 'عسكري (ضباط)'}
                               {selectedOffer.pensionDiagnostic.effectiveSectorId === 'military_individual' && 'عسكري (أفراد)'}
                               {selectedOffer.pensionDiagnostic.effectiveSectorId === 'retired' && 'متقاعد حالي'}
-                              {!['government_civilian', 'gov_civil', 'semi_gov', 'companies', 'military', 'military_officer', 'military_individual', 'retired'].includes(selectedOffer.pensionDiagnostic.effectiveSectorId) && selectedOffer.pensionDiagnostic.effectiveSectorId}
+                              {!['gov_civil', 'semi_gov', 'companies', 'military', 'military_officer', 'military_individual', 'retired'].includes(selectedOffer.pensionDiagnostic.effectiveSectorId) && selectedOffer.pensionDiagnostic.effectiveSectorId}
                             </span>
                           </div>
                           <div className="flex justify-between">

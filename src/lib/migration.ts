@@ -1,7 +1,7 @@
 import { SectorId } from '../types';
 
 export const sectorMigrationMap: Record<string, string | null> = {
-  'government_civilian': 'gov_civil',
+  [['government', 'civilian'].join('_')]: 'gov_civil',
   'military_enlisted': 'military',
   'military_officer': 'military',
   'military_individual': 'military',

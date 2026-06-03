@@ -153,7 +153,18 @@ export function AccountPage() {
     try {
       if (hasSupabaseKeys) {
         const { error } = await supabase.rpc('delete_current_user');
-        if (error) throw error;
+        if (error) {
+          const errMsg = error.message || '';
+          const isMissingRpc = 
+            error.code === 'PGRST202' || 
+            errMsg.includes('does not exist') || 
+            errMsg.includes('could not find the function');
+          
+          if (isMissingRpc) {
+            throw new Error("يجب تطبيق migration delete_current_user في Supabase");
+          }
+          throw error;
+        }
         
         await signOut();
         window.location.href = '/';
@@ -187,7 +198,7 @@ export function AccountPage() {
     }
   };
 
-  const hasAdminAccess = userRole === 'admin' || userRole === 'manager';
+  const hasAdminAccess = userRole === 'owner' || userRole === 'manager' || userRole === 'employee';
   const displayFullName = profile?.full_name || user?.user_metadata?.full_name || user?.user_metadata?.username || 'مستشار حسبة دائم';
 
   return (
@@ -237,7 +248,7 @@ export function AccountPage() {
                 <span className="text-[10px] text-gray-400 dark:text-slate-400 font-bold block">مستوى الصلاحية في لوحة الإدارة:</span>
                 <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
-                  <span>{userRole === 'admin' ? 'مسؤول ائمان أساسي' : userRole === 'manager' ? 'مدير عام مالي' : 'مستشار ووسيط عقاري مالي'}</span>
+                  <span>{userRole === 'owner' ? 'مالك المنصة والسيستم' : userRole === 'manager' ? 'مدير عام مالي' : userRole === 'employee' ? 'موظف مالي في المنصة' : 'مستشار ووسيط عقاري مالي'}</span>
                 </span>
               </div>
 

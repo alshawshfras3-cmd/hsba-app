@@ -128,11 +128,14 @@ export function calculatePersonalFinance(params: {
     };
   }
 
-  let dsrPercent = finalRule.dsrPercentage;
-  let ruleTermMonths = finalRule.termMonths;
-  let coeff = finalRule.financeCoefficient;
+  const safeSalary = Number(netSalary) || 0;
+  const safeObligations = Number(obligations) || 0;
+
+  let dsrPercent = Number(finalRule.dsrPercentage) || 0;
+  let ruleTermMonths = Number(finalRule.termMonths) || 0;
+  let coeff = Number(finalRule.financeCoefficient) || 0;
   let calculationMethod = finalRule.calculationMethod || 'flat_rate';
-  let annualMargin = finalRule.annualMargin;
+  let annualMargin = Number(finalRule.annualMargin) || 0;
 
   if (finalRule.bankId === 'alahli' && calculationMethod === 'flat_rate') {
     annualMargin = 5.00;
@@ -155,13 +158,11 @@ export function calculatePersonalFinance(params: {
   if (termMonths < 1) termMonths = 1;
 
   // Max personal installment allowed
-  const maxDsrInstallment = netSalary * (dsrPercent / 100);
+  const maxDsrInstallment = safeSalary * (dsrPercent / 100);
 
   // Installment available after subtracting other debts/obligations
-  let rawInstallment = maxDsrInstallment - obligations;
-  if (rawInstallment < 0) {
-    rawInstallment = 0;
-  }
+  const personalInstallmentRaw = Math.max(0, maxDsrInstallment - safeObligations);
+  let rawInstallment = personalInstallmentRaw;
 
   let personalFinanceAmount = 0;
   let totalRepayment = 0;

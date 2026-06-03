@@ -137,7 +137,7 @@ export default function StepWizard() {
   const [retirementAge, setRetirementAge] = useState<number>(60);
   const [ahliGroup, setAhliGroup] = useState<'A' | 'B' | ''>('');
 
-  const effectiveSectorId = sectorId === 'government_civilian' || (sectorId as string) === 'gov_civil'
+  const effectiveSectorId = (sectorId as string) === 'gov_civil'
     ? 'gov_civil' as SectorId
     : ((sectorId as string) === 'military'
         ? 'military' as SectorId
@@ -180,64 +180,31 @@ export default function StepWizard() {
   // Dynamic step structure definition
   type StepId = 
     | 'main_type'
-    | 're_sub_type'
-    | 'customer_status'
-    | 'sector'
     | 'personal_info'
     | 'salary'
-    | 'finance_options'
-    | 'results';
+    | 'finance_options';
 
-  const realEstateFlow: StepId[] = [
+  const flow: StepId[] = [
     'main_type',
-    're_sub_type',
-    'sector',
     'personal_info',
     'salary',
-    'finance_options',
-    'results'
+    'finance_options'
   ];
 
-  const personalOnlyFlow: StepId[] = [
-    'main_type',
-    'customer_status',
-    'salary',
-    'results'
-  ];
-
-  const existingPersonalFlow: StepId[] = [
-    'main_type',
-    'sector',
-    'personal_info',
-    'salary',
-    'finance_options',
-    'results'
-  ];
-
-  const getActiveFlow = (): StepId[] => {
-    if (mainFinanceType === 'real_estate') return realEstateFlow;
-    if (mainFinanceType === 'personal_only') return personalOnlyFlow;
-    return existingPersonalFlow;
-  };
-
-  const flow = getActiveFlow();
   const activeStepId = flow[currentStep - 1] || 'main_type';
 
   // Synchronize state with mobile header central text
   React.useEffect(() => {
     if (setActiveStepLabel) {
-      if (currentStep === flow.length && results) {
-        setActiveStepLabel('النتائج والتقارير');
+      if (results) {
+        setActiveStepLabel('النتائج والتقرير');
       } else {
         const stepId = flow[currentStep - 1] || 'main_type';
         let stepLabel = '';
         if (stepId === 'main_type') stepLabel = 'نوع الحسبة';
-        else if (stepId === 're_sub_type') stepLabel = 'نوع التمويل العقاري';
-        else if (stepId === 'sector') stepLabel = 'جهة العمل للعميل';
-        else if (stepId === 'customer_status') stepLabel = 'الحالة الوظيفية';
-        else if (stepId === 'personal_info') stepLabel = 'السن والمعلومات';
-        else if (stepId === 'salary') stepLabel = 'الدخل والرواتب';
-        else if (stepId === 'finance_options') stepLabel = 'خيارات الحسبة والدعم';
+        else if (stepId === 'personal_info') stepLabel = 'بيانات العميل';
+        else if (stepId === 'salary') stepLabel = 'الراتب والدخل';
+        else if (stepId === 'finance_options') stepLabel = 'خيارات الحسبة';
         else stepLabel = 'الحاسبة الذكية';
         setActiveStepLabel(stepLabel);
       }
@@ -328,9 +295,13 @@ export default function StepWizard() {
   useEffect(() => {
     if (mainFinanceType === 'personal_only') {
       setProductId('personal_only');
+      setExistingMonthlyObligations(0);
+      setObligationRemainingMonths(0);
     } else if (mainFinanceType === 'real_estate_with_existing_personal') {
       setProductId('real_estate_with_existing_personal');
     } else {
+      setExistingMonthlyObligations(0);
+      setObligationRemainingMonths(0);
       if (realEstateSubType === 'real_estate_only') {
         setProductId('real_estate');
       } else {
@@ -373,16 +344,13 @@ export default function StepWizard() {
   // Handle Step validations
   const validateStep = (stepNumber: number): boolean => {
     const stepErrors: string[] = [];
-    const flow = getActiveFlow();
     const stepId = flow[stepNumber - 1];
 
-    if (stepId === 'sector') {
+    if (stepId === 'personal_info') {
       if (sectorId === 'military' && !militaryType) {
         stepErrors.push('حدد نوع العسكري لأن بعض البنوك تختلف بين الضباط والأفراد.');
       }
-    }
 
-    if (stepId === 'personal_info') {
       const today = new Date();
       const currentYear = today.getFullYear();
 
@@ -404,7 +372,7 @@ export default function StepWizard() {
         }
       }
 
-      if (effectiveSectorId !== 'retired') {
+      if (mainFinanceType !== 'personal_only' && effectiveSectorId !== 'retired') {
         if (!appointmentMonth || appointmentMonth < 1 || appointmentMonth > 12) {
           stepErrors.push('يرجى إدخال شهر تعيين صحيح بين 1 و 12.');
         }
@@ -426,9 +394,6 @@ export default function StepWizard() {
     }
 
     if (stepId === 'salary') {
-      if (mainFinanceType === 'personal_only' && customerStatus === 'active_employee' && sectorId === 'military' && !militaryType) {
-        stepErrors.push('حدد نوع العسكري لأن بعض البنوك تختلف بين الضباط والأفراد.');
-      }
       if (salaryMode === 'direct' || effectiveSectorId === 'retired') {
         if (effectiveSectorId === 'retired' && directPensionSalary <= 0) {
           stepErrors.push('يرجى إدخال الراتب التقاعدي الصافي المستلم صحيح أكبر من الصفر.');
@@ -491,9 +456,9 @@ export default function StepWizard() {
       otherAllowances,
       directNetSalary,
       directPensionSalary,
-      obligations: productId === 'personal_only' ? 0 : existingMonthlyObligations,
-      existingMonthlyObligations: productId === 'personal_only' ? 0 : existingMonthlyObligations,
-      obligationRemainingMonths: productId === 'personal_only' ? 0 : obligationRemainingMonths,
+      obligations: existingMonthlyObligations,
+      existingMonthlyObligations: existingMonthlyObligations,
+      obligationRemainingMonths: obligationRemainingMonths,
       supportType,
       selectedBankId,
       termMode,
@@ -559,61 +524,56 @@ export default function StepWizard() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
         {/* Step Wizard visual Progress stepper indicators */}
-        {currentStep < flow.length && (
-          <div className="mb-6 md:mb-8 select-none">
-            {/* Desktop circles (hidden on mobile) */}
-            <div className="hidden sm:flex items-center justify-between">
-              {flow.slice(0, -1).map((stepId, index) => {
-                const s = index + 1;
-                const isActive = s === currentStep;
-                const isCompleted = s < currentStep;
+        <div className="mb-6 md:mb-8 select-none">
+          {/* Desktop circles (hidden on mobile) */}
+          <div className="hidden sm:flex items-center justify-between">
+            {flow.map((stepId, index) => {
+              const s = index + 1;
+              const isActive = s === currentStep;
+              const isCompleted = s < currentStep;
 
-                let stepLabel = '';
-                if (stepId === 'main_type') stepLabel = 'نوع الحسبة';
-                else if (stepId === 're_sub_type') stepLabel = 'نوع العقاري';
-                else if (stepId === 'sector') stepLabel = 'جهة العمل';
-                else if (stepId === 'customer_status') stepLabel = 'حالة العميل';
-                else if (stepId === 'personal_info') stepLabel = 'البيانات الشخصية';
-                else if (stepId === 'salary') stepLabel = 'الراتب والدخل';
-                else if (stepId === 'finance_options') stepLabel = 'خيارات الحسبة';
+              let stepLabel = '';
+              if (stepId === 'main_type') stepLabel = 'نوع الحسبة';
+              else if (stepId === 'personal_info') stepLabel = 'بيانات العميل';
+              else if (stepId === 'salary') stepLabel = 'الراتب والدخل';
+              else if (stepId === 'finance_options') stepLabel = 'خيارات الحسبة';
 
-                return (
-                  <div key={stepId} className="flex flex-col items-center flex-1 relative font-sans">
-                    <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center font-bold text-xs md:text-sm border-2 transition-all ${
-                      isActive
-                        ? 'bg-[#0057B8] text-white border-[#0057B8] shadow-md scale-110'
-                        : isCompleted
-                        ? 'bg-emerald-500 text-white border-emerald-500'
-                        : 'bg-white text-gray-400 border-gray-200'
-                    }`}>
-                      {isCompleted ? '✓' : s}
-                    </div>
-                    <span className={`text-[9px] sm:text-xs font-semibold mt-2 text-center leading-tight truncate max-w-[64px] sm:max-w-none ${isActive ? 'text-[#0057B8] font-bold block' : 'text-[#6B7280] hidden sm:block'}`}>
-                      {stepLabel}
-                    </span>
-                    {index < flow.length - 2 && (
-                      <div className={`absolute top-4 md:top-5 -left-1/2 w-full h-[2px] -z-10 ${isCompleted ? 'bg-emerald-400' : 'bg-gray-200'}`} />
-                    )}
+              return (
+                <div key={stepId} className="flex flex-col items-center flex-1 relative font-sans">
+                  <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center font-bold text-xs md:text-sm border-2 transition-all ${
+                    isActive
+                      ? 'bg-[#0057B8] text-white border-[#0057B8] shadow-md scale-110'
+                      : isCompleted
+                      ? 'bg-emerald-500 text-white border-emerald-500'
+                      : 'bg-white text-gray-400 border-gray-200'
+                  }`}>
+                    {isCompleted ? '✓' : s}
                   </div>
-                );
-              })}
-            </div>
+                  <span className={`text-[9px] sm:text-xs font-semibold mt-2 text-center leading-tight truncate max-w-[64px] sm:max-w-none ${isActive ? 'text-[#0057B8] font-bold block' : 'text-[#6B7280] hidden sm:block'}`}>
+                    {stepLabel}
+                  </span>
+                  {index < flow.length - 1 && (
+                    <div className={`absolute top-4 md:top-5 -left-1/2 w-full h-[2px] -z-10 ${isCompleted ? 'bg-emerald-400' : 'bg-gray-200'}`} />
+                  )}
+                </div>
+              );
+            })}
+          </div>
 
-            {/* Mobile Progress Bar (hidden on desktop) */}
-            <div className="block sm:hidden space-y-2 px-1">
-              <div className="flex justify-between items-center text-xs font-bold text-slate-700">
-                <span>التقدم في خطوات الحاسبة:</span>
-                <span className="text-[#0057B8] font-mono">الخطوة {currentStep} من {flow.length - 1}</span>
-              </div>
-              <div className="w-full h-2.5 bg-slate-150 rounded-full overflow-hidden border border-slate-200/40">
-                <div 
-                  className="h-full bg-gradient-to-r from-[#0057B8] to-[#0ea5a4] rounded-full transition-all duration-300" 
-                  style={{ width: `${Math.min(100, (currentStep / (flow.length - 1)) * 100)}%` }}
-                />
-              </div>
+          {/* Mobile Progress Bar (hidden on desktop) */}
+          <div className="block sm:hidden space-y-2 px-1">
+            <div className="flex justify-between items-center text-xs font-bold text-slate-700">
+              <span>التقدم في خطوات الحاسبة:</span>
+              <span className="text-[#0057B8] font-mono">الخطوة {currentStep} من {flow.length}</span>
+            </div>
+            <div className="w-full h-2.5 bg-slate-150 rounded-full overflow-hidden border border-slate-200/40">
+              <div 
+                className="h-full bg-gradient-to-r from-[#0057B8] to-[#0ea5a4] rounded-full transition-all duration-300" 
+                style={{ width: `${Math.min(100, (currentStep / flow.length) * 100)}%` }}
+              />
             </div>
           </div>
-        )}
+        </div>
 
         {/* Validation Alert */}
         {errors.length > 0 && (
@@ -633,69 +593,55 @@ export default function StepWizard() {
           
           {/* STEP 1: Main Type Selection */}
           {activeStepId === 'main_type' && (
-            <div className="space-y-6 animate-fade-in">
+            <div className="space-y-6 animate-fade-in text-right">
               <div className="text-center max-w-lg mx-auto mb-8">
-                <h3 className="text-xl font-bold text-[#111827]">اختر التمويل المراد احتسابه</h3>
-                <p className="text-sm text-[#6B7280] mt-1">نوفر نماذج حسابات دقيقة للمرونة العقارية أو التمويل الشخصي القصير أو الاستحقاقات المدمجة.</p>
+                <h3 className="text-xl font-bold text-[#111827]">ما الذي تريد حسابه أولاً؟</h3>
+                <p className="text-sm text-[#6B7280] mt-1 font-sans">اختر مسار الحسبة المناسب للبدء في توجيه التمويل بدقة.</p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
                 <div
                   id="re-type-card"
-                  onClick={() => setMainFinanceType('real_estate')}
-                  className={`flex items-center gap-4 text-right p-4 cursor-pointer transition-all border-y border-r border-l-4 rounded-xl shadow-xs md:flex-col md:text-center md:items-center md:p-6 md:rounded-2xl md:border-l ${
-                    mainFinanceType === 'real_estate' 
-                      ? 'border-l-[#0057B8] border-y-[#0057B8]/10 border-r-[#0057B8]/10 bg-[#0057B8]/5 md:border-[#0057B8]' 
-                      : 'border-l-slate-200 border-y-slate-200 border-r-slate-200 bg-white hover:bg-slate-50 md:border-gray-200'
+                  onClick={() => {
+                    setMainFinanceType('real_estate');
+                    setCurrentStep(2);
+                  }}
+                  className={`flex flex-col items-center justify-between text-center p-6 cursor-pointer transition-all border-2 rounded-2xl ${
+                    mainFinanceType === 'real_estate' && productId !== 'personal_only'
+                      ? 'border-[#0057B8] bg-[#0057B8]/5 shadow-sm scale-[1.02]' 
+                      : 'border-slate-200 bg-white hover:bg-slate-50'
                   }`}
                 >
-                  <div className="flex items-center gap-3 md:flex-col md:items-center w-full">
-                    <div className="w-10 h-10 md:w-12 md:h-12 bg-[#0057B8]/10 text-[#0057B8] rounded-xl flex items-center justify-center shrink-0 md:mx-auto md:mb-2">
-                      <Home className="w-5 h-5 md:w-6 md:h-6" />
+                  <div className="flex flex-col items-center w-full">
+                    <div className="w-14 h-14 bg-[#0057B8]/10 text-[#0057B8] rounded-2xl flex items-center justify-center shrink-0 mb-4">
+                      <Home className="w-7 h-7" />
                     </div>
-                    <div className="text-right md:text-center flex-1">
-                      <h4 className="font-extrabold text-[#111827] text-xs md:text-sm">تمويل عقاري</h4>
-                      <p className="text-[10px] sm:text-xs text-gray-500 mt-1 leading-relaxed hidden sm:block">لحساب التمويل العقاري، مع اختيار عقاري بلس أو عقاري فقط في خطوتك التالية.</p>
+                    <div className="text-center">
+                      <h4 className="font-extrabold text-[#111827] text-base">تمويل عقاري</h4>
+                      <p className="text-xs text-gray-500 mt-2 leading-relaxed font-sans">لحساب الحلول العقارية المتكاملة (عقاري فقط، عقاري بلس مع شخصي جديد، أو عقاري مع شخصي قائم).</p>
                     </div>
                   </div>
                 </div>
 
                 <div
                   id="pf-type-card"
-                  onClick={() => setMainFinanceType('personal_only')}
-                  className={`flex items-center gap-4 text-right p-4 cursor-pointer transition-all border-y border-r border-l-4 rounded-xl shadow-xs md:flex-col md:text-center md:items-center md:p-6 md:rounded-2xl md:border-l ${
+                  onClick={() => {
+                    setMainFinanceType('personal_only');
+                    setCurrentStep(2);
+                  }}
+                  className={`flex flex-col items-center justify-between text-center p-6 cursor-pointer transition-all border-2 rounded-2xl ${
                     mainFinanceType === 'personal_only' 
-                      ? 'border-l-amber-500 border-y-amber-500/10 border-r-amber-500/10 bg-amber-50/20 md:border-amber-500' 
-                      : 'border-l-slate-200 border-y-slate-200 border-r-slate-200 bg-white hover:bg-slate-50 md:border-gray-200'
+                      ? 'border-amber-500 bg-amber-50/10 shadow-sm scale-[1.02]' 
+                      : 'border-slate-200 bg-white hover:bg-slate-50'
                   }`}
                 >
-                  <div className="flex items-center gap-3 md:flex-col md:items-center w-full">
-                    <div className="w-10 h-10 md:w-12 md:h-12 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center shrink-0 md:mx-auto md:mb-2">
-                      <Coins className="w-5 h-5 md:w-6 md:h-6" />
+                  <div className="flex flex-col items-center w-full">
+                    <div className="w-14 h-14 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center shrink-0 mb-4">
+                      <Coins className="w-7 h-7" />
                     </div>
-                    <div className="text-right md:text-center flex-1">
-                      <h4 className="font-extrabold text-[#111827] text-xs md:text-sm">تمويل شخصي فقط</h4>
-                      <p className="text-[10px] sm:text-xs text-gray-500 mt-1 leading-relaxed hidden sm:block">لحساب التمويل الشخصي المستقل القصير.</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div
-                  id="both-type-card"
-                  onClick={() => setMainFinanceType('real_estate_with_existing_personal')}
-                  className={`flex items-center gap-4 text-right p-4 cursor-pointer transition-all border-y border-r border-l-4 rounded-xl shadow-xs md:flex-col md:text-center md:items-center md:p-6 md:rounded-2xl md:border-l ${
-                    mainFinanceType === 'real_estate_with_existing_personal' 
-                      ? 'border-l-teal-500 border-y-teal-500/10 border-r-teal-500/10 bg-teal-50/20 md:border-teal-500' 
-                      : 'border-l-slate-200 border-y-slate-200 border-r-slate-200 bg-white hover:bg-slate-50 md:border-gray-200'
-                  }`}
-                >
-                  <div className="flex items-center gap-3 md:flex-col md:items-center w-full">
-                    <div className="w-10 h-10 md:w-12 md:h-12 bg-teal-50 text-[#0EA5A4] rounded-xl flex items-center justify-center shrink-0 md:mx-auto md:mb-2">
-                      <Scale className="w-5 h-5 md:w-6 md:h-6" />
-                    </div>
-                    <div className="text-right md:text-center flex-1">
-                      <h4 className="font-extrabold text-[#111827] text-xs md:text-sm">عقاري مع شخصي قائم</h4>
-                      <p className="text-[10px] sm:text-xs text-gray-500 mt-1 leading-relaxed hidden sm:block">تمويل عقاري بوجود أقساط قديمة قائمة تستهلك من الاستقطاع.</p>
+                    <div className="text-center">
+                      <h4 className="font-extrabold text-[#111827] text-base">تمويل شخصي فقط</h4>
+                      <p className="text-xs text-gray-500 mt-2 leading-relaxed font-sans">لحساب التمويل الشخصي الاستهلاكي القصير المستقل بنسب استقطاع مخصصة.</p>
                     </div>
                   </div>
                 </div>
@@ -703,293 +649,174 @@ export default function StepWizard() {
             </div>
           )}
 
-          {/* STEP: Customer Status Selection for Personal Only */}
-          {activeStepId === 'customer_status' && (
-            <div className="space-y-6 animate-fade-in">
+          {/* STEP 2: Customer Data (بيانات العميل) */}
+          {activeStepId === 'personal_info' && (
+            <div className="space-y-8 animate-fade-in text-right">
               <div className="text-center max-w-lg mx-auto mb-8">
-                <h3 className="text-xl font-bold text-[#111827]">ما هي حالة العميل الوظيفية؟</h3>
-                <p className="text-sm text-[#6B7280] mt-1">يرجى اختيار حالة العميل الوظيفية للبدء في توجيه الاحتساب الرياضي.</p>
+                <h3 className="text-xl font-bold text-[#111827]">أدخل بيانات العميل المهنية والشخصية</h3>
+                <p className="text-sm text-[#6B7280] mt-1 font-sans">تساعد جهة العمل وتفاصيل السن والخدمة في ترجيح معايير الاستحقاق وهوامش التسعير.</p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
-                <div
-                  id="cs-active-card"
-                  onClick={() => {
-                    setCustomerStatus('active_employee');
-                    if (sectorId === 'retired') {
-                      setSectorId('gov_civil');
-                    }
-                  }}
-                  className={`flex items-center gap-4 text-right p-4 cursor-pointer transition-all border-y border-r border-l-4 rounded-xl shadow-xs md:flex-col md:text-center md:items-center md:p-6 md:rounded-2xl md:border-l ${
-                    customerStatus === 'active_employee' 
-                      ? 'border-l-[#0057B8] border-y-[#0057B8]/10 border-r-[#0057B8]/10 bg-[#0057B8]/5 md:border-[#0057B8]' 
-                      : 'border-l-slate-200 border-y-slate-200 border-r-slate-200 bg-white hover:bg-slate-50 md:border-gray-200'
-                  }`}
-                >
-                  <div className="flex items-center gap-3 md:flex-col md:items-center w-full">
-                    <div className="w-10 h-10 md:w-12 md:h-12 bg-blue-50 text-[#0057B8] rounded-xl flex items-center justify-center shrink-0 md:mx-auto md:mb-2">
-                      <User className="w-5 h-5 md:w-6 md:h-6" />
-                    </div>
-                    <div className="text-right md:text-center flex-1">
-                      <h4 className="font-extrabold text-[#111827] text-xs md:text-sm">موظف نشط</h4>
-                      <p className="text-[10px] sm:text-xs text-gray-500 mt-1 leading-relaxed hidden sm:block">موظف على رأس العمل في القطاع العام أو الشركات.</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div
-                  id="cs-retired-card"
-                  onClick={() => {
-                    setCustomerStatus('retired');
-                    setSectorId('retired');
-                    setSalaryMode('direct');
-                  }}
-                  className={`flex items-center gap-4 text-right p-4 cursor-pointer transition-all border-y border-r border-l-4 rounded-xl shadow-xs md:flex-col md:text-center md:items-center md:p-6 md:rounded-2xl md:border-l ${
-                    customerStatus === 'retired' 
-                      ? 'border-l-amber-500 border-y-amber-500/10 border-r-amber-500/10 bg-amber-50/20 md:border-amber-500' 
-                      : 'border-l-slate-200 border-y-slate-200 border-r-slate-200 bg-white hover:bg-slate-50 md:border-gray-200'
-                  }`}
-                >
-                  <div className="flex items-center gap-3 md:flex-col md:items-center w-full">
-                    <div className="w-10 h-10 md:w-12 md:h-12 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center shrink-0 md:mx-auto md:mb-2">
-                      <Coins className="w-5 h-5 md:w-6 md:h-6" />
-                    </div>
-                    <div className="text-right md:text-center flex-1">
-                      <h4 className="font-extrabold text-[#111827] text-xs md:text-sm">متقاعد</h4>
-                      <p className="text-[10px] sm:text-xs text-gray-500 mt-1 leading-relaxed hidden sm:block">يعتمد الحساب على الراتب التقاعدي الشهري الحالي.</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 1.5: Real Estate Subtype Selection */}
-          {activeStepId === 're_sub_type' && (
-            <div className="space-y-6 animate-fade-in">
-              <div className="text-center max-w-lg mx-auto mb-8">
-                <h3 className="text-xl font-bold text-[#111827]">نوع التمويل العقاري</h3>
-                <p className="text-sm text-[#6B7280] mt-1">يرجى تحديد نمط التثبيت العقاري (فردي خالص أو متداخل مع برنامج تمويل شخصي استهلاكي إضافي).</p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
-                <div
-                  id="re-sub-only-card"
-                  onClick={() => setRealEstateSubType('real_estate_only')}
-                  className={`flex items-center gap-4 text-right p-4 cursor-pointer transition-all border-y border-r border-l-4 rounded-xl shadow-xs md:flex-col md:text-center md:items-center md:p-6 md:rounded-2xl md:border-l ${
-                    realEstateSubType === 'real_estate_only' 
-                      ? 'border-l-emerald-500 border-y-emerald-500/10 border-r-emerald-500/10 bg-emerald-50/20 md:border-emerald-500' 
-                      : 'border-l-slate-200 border-y-slate-200 border-r-slate-200 bg-white hover:bg-slate-50 md:border-gray-200'
-                  }`}
-                >
-                  <div className="flex items-center gap-3 md:flex-col md:items-center w-full">
-                    <div className="w-10 h-10 md:w-12 md:h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center shrink-0 md:mx-auto md:mb-2">
-                      <Home className="w-5 h-5 md:w-6 md:h-6" />
-                    </div>
-                    <div className="text-right md:text-center flex-1">
-                      <h4 className="font-extrabold text-[#111827] text-xs md:text-sm">عقاري فقط</h4>
-                      <p className="text-[10px] sm:text-xs text-gray-500 mt-1 leading-relaxed hidden sm:block">حساب التمويل العقاري بدون تمويل شخصي استهلاكي إضافي.</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div
-                  id="re-sub-plus-personal-card"
-                  onClick={() => setRealEstateSubType('real_estate_with_new_personal')}
-                  className={`flex items-center gap-4 text-right p-4 cursor-pointer transition-all border-y border-r border-l-4 rounded-xl shadow-xs md:flex-col md:text-center md:items-center md:p-6 md:rounded-2xl md:border-l ${
-                    realEstateSubType === 'real_estate_with_new_personal' 
-                      ? 'border-l-[#0057B8] border-y-[#0057B8]/10 border-r-[#0057B8]/10 bg-[#0057B8]/5 md:border-[#0057B8]' 
-                      : 'border-l-slate-200 border-y-slate-200 border-r-slate-200 bg-white hover:bg-slate-50 md:border-gray-200'
-                  }`}
-                >
-                  <div className="flex items-center gap-3 md:flex-col md:items-center w-full">
-                    <div className="w-10 h-10 md:w-12 md:h-12 bg-indigo-50 text-[#0057B8] rounded-xl flex items-center justify-center shrink-0 md:mx-auto md:mb-2">
-                      <Scale className="w-5 h-5 md:w-6 md:h-6" />
-                    </div>
-                    <div className="text-right md:text-center flex-1">
-                      <h4 className="font-extrabold text-[#111827] text-xs md:text-sm">عقاري + شخصي جديد</h4>
-                      <p className="text-[10px] sm:text-xs text-gray-500 mt-1 leading-relaxed hidden sm:block">حساب التمويل العقاري مع تمويل شخصي جديد ضمن الحسبة المشتركة.</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 2: Employment Sector & Ranks */}
-          {activeStepId === 'sector' && (
-            <div className="space-y-6 animate-fade-in">
-              <div className="text-center max-w-lg mx-auto mb-8">
-                <h3 className="text-xl font-bold text-[#111827]">ما هو القطاع المهني لجهة العمل؟</h3>
-                <p className="text-sm text-[#6B7280] mt-1">يحدد القطاع قواعد التقاعد والاستقطاع حسب أنظمة البنوك المختلفة.</p>
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {[
-                  { id: 'gov_civil', label: 'حكومي مدني', icon: Briefcase },
-                  { id: 'military', label: 'عسكري', icon: User },
-                  { id: 'semi_gov', label: 'شبه حكومي', icon: Scale },
-                  { id: 'companies', label: 'موظف شركات', icon: Briefcase },
-                  { id: 'retired', label: 'متقاعد حالي', icon: Coins }
-                ].map((sec) => (
-                  <div
-                    key={sec.id}
-                    id={`sector-card-${sec.id}`}
-                    onClick={() => {
-                      setSectorId(sec.id as SectorId);
-                      setSector(sec.id);
-                      
-                      if (sec.id === 'retired') {
-                        setSalaryMode('direct');
-                        setRetirementAge(getSectorRetirementAge('retired', 60));
-                        setAhliGroup('');
-                        setMilitarySubtype('');
-                        setMilitaryRank('');
-                        setMilitaryType('');
-                      } else if (sec.id === 'gov_civil') {
-                        setRetirementAge(getSectorRetirementAge('gov_civil', 60));
-                        setAhliGroup('A');
-                        setMilitarySubtype('');
-                        setMilitaryRank('');
-                        setMilitaryType('');
-                      } else if (sec.id === 'semi_gov') {
-                        setRetirementAge(getSectorRetirementAge('semi_gov', 60));
-                        setAhliGroup('A');
-                        setMilitarySubtype('');
-                        setMilitaryRank('');
-                        setMilitaryType('');
-                      } else if (sec.id === 'companies') {
-                        setRetirementAge(getSectorRetirementAge('companies', 60));
-                        setAhliGroup('A');
-                        setMilitarySubtype('');
-                        setMilitaryRank('');
-                        setMilitaryType('');
-                      } else if (sec.id === 'military') {
-                        setMilitarySubtype('enlisted');
-                        setMilitaryType('individual');
-                        const enlistedRanks = militaryRanks.filter(r => r.sectorScope === 'enlisted' && r.isActive);
-                        const sorted = [...enlistedRanks].sort((a,b) => a.displayOrder - b.displayOrder);
-                        const firstEnRank = sorted[0];
-                        if (firstEnRank) {
-                          setRankId(firstEnRank.id);
-                          setMilitaryRank(firstEnRank.nameAr);
-                          setRetirementAge(firstEnRank.retirementAge);
-                          setAhliGroup(firstEnRank.ahliGroup || 'B');
-                        } else {
-                          setRankId('jundi');
-                          setMilitaryRank('جندي / جندي أول');
-                          setRetirementAge(44);
-                          setAhliGroup('B');
-                        }
-                      }
-                    }}
-                    className={`flex items-center gap-3 text-right p-4 cursor-pointer transition-all border-y border-r border-l-4 rounded-xl shadow-xs md:flex-col md:text-center md:items-center md:justify-center md:p-5 md:rounded-2xl md:border-l ${
-                      sectorId === sec.id
-                        ? 'border-l-[#0057B8] border-y-[#0057B8]/10 border-r-[#0057B8]/10 bg-[#0057B8]/5 ring-2 ring-[#0057B8]/15 md:border-[#0057B8]'
-                        : 'border-l-slate-200 border-y-slate-200 border-r-slate-200 bg-white hover:bg-slate-50 md:border-gray-200'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3.5 md:flex-col md:items-center w-full">
-                      <sec.icon className={`w-5 h-5 md:w-6 md:h-6 shrink-0 ${sectorId === sec.id ? 'text-[#0057B8]' : 'text-gray-500'}`} />
-                      <span className="text-xs font-bold text-[#111827] block text-right md:text-center flex-1">{sec.label}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Dynamic Rank selector shown for military sectors */}
-              {(sectorId === 'military') && (
-                <div id="military-rank-selector-wrapper" className="bg-gray-50 rounded-2xl p-6 border border-gray-200 mt-6 animate-fade-in text-right space-y-4">
-                  {/* Category subclass selector */}
-                  <div className="space-y-2">
-                    <label className="block text-xs font-bold text-gray-700">تصنيف الخدمة العسكرية:</label>
-                    <div className="grid grid-cols-2 gap-3">
-                      {[
-                        { id: 'enlisted', type: 'individual', scope: 'enlisted', label: 'عسكري أفراد' },
-                        { id: 'officer', type: 'officer', scope: 'officer', label: 'عسكري ضباط' }
-                      ].map((sub) => {
-                        const isSelected = militarySubtype === sub.id;
-                        return (
-                          <button
-                            key={sub.id}
-                            type="button"
-                            onClick={() => {
-                              setMilitarySubtype(sub.id as 'enlisted' | 'officer');
-                              setMilitaryType(sub.type as 'officer' | 'individual');
-                              const targetScope = sub.scope;
-                              const filteredRanks = militaryRanks.filter(r => r.sectorScope === targetScope && r.isActive);
-                              const sorted = [...filteredRanks].sort((a, b) => a.displayOrder - b.displayOrder);
-                              const firstRank = sorted[0];
-                              if (firstRank) {
-                                setRankId(firstRank.id);
-                                setMilitaryRank(firstRank.nameAr);
-                                setRetirementAge(firstRank.retirementAge);
-                                setAhliGroup(firstRank.ahliGroup || (sub.id === 'officer' ? 'A' : 'B'));
-                              }
-                            }}
-                            className={`py-2.5 px-4 rounded-xl text-xs font-bold transition-all border text-center ${
-                              isSelected
-                                ? 'bg-[#0057B8] text-white border-[#0057B8] shadow-xs'
-                                : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
-                            }`}
-                          >
-                            {sub.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-2 font-sans">الرتبة العسكرية:</label>
-                    <select
-                      id="rank-select"
-                      value={rankId}
-                      onChange={(e) => {
-                        const selectedId = e.target.value;
-                        setRankId(selectedId);
+              {/* 1. Sector Picker */}
+              <div className="space-y-3">
+                <label className="block text-xs font-bold text-gray-700">ما هو القطاع المهني لجهة العمل؟</label>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                  {[
+                    { id: 'gov_civil', label: 'حكومي مدني', icon: Briefcase },
+                    { id: 'military', label: 'عسكري', icon: User },
+                    { id: 'semi_gov', label: 'شبه حكومي', icon: Scale },
+                    { id: 'companies', label: 'موظف شركات', icon: Briefcase },
+                    { id: 'retired', label: 'متقاعد حالي', icon: Coins }
+                  ].map((sec) => (
+                    <div
+                      key={sec.id}
+                      id={`sector-card-${sec.id}`}
+                      onClick={() => {
+                        setSectorId(sec.id as SectorId);
+                        setSector(sec.id);
                         
-                        const matched = militaryRanks.find(r => r.id === selectedId);
-                        if (matched) {
-                          setMilitaryRank(matched.nameAr);
-                          setRetirementAge(matched.retirementAge);
-                          setAhliGroup(matched.ahliGroup || (militarySubtype === 'officer' ? 'A' : 'B'));
+                        if (sec.id === 'retired') {
+                          setSalaryMode('direct');
+                          setRetirementAge(getSectorRetirementAge('retired', 60));
+                          setAhliGroup('');
+                          setMilitarySubtype('');
+                          setMilitaryRank('');
+                          setMilitaryType('');
+                        } else if (sec.id === 'gov_civil') {
+                          setRetirementAge(getSectorRetirementAge('gov_civil', 60));
+                          setAhliGroup('A');
+                          setMilitarySubtype('');
+                          setMilitaryRank('');
+                          setMilitaryType('');
+                        } else if (sec.id === 'semi_gov') {
+                          setRetirementAge(getSectorRetirementAge('semi_gov', 60));
+                          setAhliGroup('A');
+                          setMilitarySubtype('');
+                          setMilitaryRank('');
+                          setMilitaryType('');
+                        } else if (sec.id === 'companies') {
+                          setRetirementAge(getSectorRetirementAge('companies', 60));
+                          setAhliGroup('A');
+                          setMilitarySubtype('');
+                          setMilitaryRank('');
+                          setMilitaryType('');
+                        } else if (sec.id === 'military') {
+                          setMilitarySubtype('enlisted');
+                          setMilitaryType('individual');
+                          const enlistedRanks = militaryRanks.filter(r => r.sectorScope === 'enlisted' && r.isActive);
+                          const sorted = [...enlistedRanks].sort((a,b) => a.displayOrder - b.displayOrder);
+                          const firstEnRank = sorted[0];
+                          if (firstEnRank) {
+                            setRankId(firstEnRank.id);
+                            setMilitaryRank(firstEnRank.nameAr);
+                            setRetirementAge(firstEnRank.retirementAge);
+                            setAhliGroup(firstEnRank.ahliGroup || 'B');
+                          } else {
+                            setRankId('jundi');
+                            setMilitaryRank('جندي / جندي أول');
+                            setRetirementAge(44);
+                            setAhliGroup('B');
+                          }
                         }
                       }}
-                      className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] focus:border-transparent cursor-pointer"
+                      className={`flex flex-col items-center justify-center p-4 cursor-pointer transition-all border rounded-2xl text-center ${
+                        sectorId === sec.id
+                          ? 'border-[#0057B8] bg-[#0057B8]/5 ring-2 ring-[#0057B8]/15 font-bold'
+                          : 'border-slate-200 bg-white hover:bg-slate-50'
+                      }`}
                     >
-                      {militaryRanks
-                        .filter(rank => rank.sectorScope === (militarySubtype === 'officer' ? 'officer' : 'enlisted') && rank.isActive)
-                        .sort((a, b) => a.displayOrder - b.displayOrder)
-                        .map((rank) => (
-                          <option key={rank.id} value={rank.id}>
-                            {rank.nameAr}
-                          </option>
-                        ))}
-                    </select>
+                      <sec.icon className={`w-5 h-5 mb-2 shrink-0 ${sectorId === sec.id ? 'text-[#0057B8]' : 'text-gray-500'}`} />
+                      <span className="text-xs text-[#111827]">{sec.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 2. Military Selector details (only if Sector is Military) */}
+              {sectorId === 'military' && (
+                <div id="military-rank-selector-wrapper" className="bg-gray-50 rounded-2xl p-6 border border-gray-200 animate-fade-in text-right space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Category subclass selector */}
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-gray-700">تصنيف الخدمة العسكرية:</label>
+                      <div className="grid grid-cols-2 gap-3">
+                        {[
+                          { id: 'enlisted', type: 'individual', scope: 'enlisted', label: 'عسكري أفراد' },
+                          { id: 'officer', type: 'officer', scope: 'officer', label: 'عسكري ضباط' }
+                        ].map((sub) => {
+                          const isSelected = militarySubtype === sub.id;
+                          return (
+                            <button
+                              key={sub.id}
+                              type="button"
+                              onClick={() => {
+                                setMilitarySubtype(sub.id as 'enlisted' | 'officer');
+                                setMilitaryType(sub.type as 'officer' | 'individual');
+                                const targetScope = sub.scope;
+                                const filteredRanks = militaryRanks.filter(r => r.sectorScope === targetScope && r.isActive);
+                                const sorted = [...filteredRanks].sort((a, b) => a.displayOrder - b.displayOrder);
+                                const firstRank = sorted[0];
+                                if (firstRank) {
+                                  setRankId(firstRank.id);
+                                  setMilitaryRank(firstRank.nameAr);
+                                  setRetirementAge(firstRank.retirementAge);
+                                  setAhliGroup(firstRank.ahliGroup || (sub.id === 'officer' ? 'A' : 'B'));
+                                }
+                              }}
+                              className={`py-2 px-4 rounded-xl text-xs font-bold transition-all border text-center ${
+                                isSelected
+                                  ? 'bg-[#0057B8] text-white border-[#0057B8] shadow-xs'
+                                  : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                              }`}
+                            >
+                              {sub.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Rank dropdown */}
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-gray-700">الرتبة العسكرية للعميل:</label>
+                      <select
+                        id="rank-select-step2"
+                        value={rankId}
+                        onChange={(e) => {
+                          const selectedId = e.target.value;
+                          setRankId(selectedId);
+                          
+                          const matched = militaryRanks.find(r => r.id === selectedId);
+                          if (matched) {
+                            setMilitaryRank(matched.nameAr);
+                            setRetirementAge(matched.retirementAge);
+                            setAhliGroup(matched.ahliGroup || (militarySubtype === 'officer' ? 'A' : 'B'));
+                          }
+                        }}
+                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] focus:border-transparent cursor-pointer"
+                      >
+                        {militaryRanks
+                          .filter(rank => rank.sectorScope === (militarySubtype === 'officer' ? 'officer' : 'enlisted') && rank.isActive)
+                          .sort((a, b) => a.displayOrder - b.displayOrder)
+                          .map((rank) => (
+                            <option key={rank.id} value={rank.id}>
+                              {rank.nameAr}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
                   </div>
 
-                  <div className="bg-white p-3.5 rounded-xl border border-gray-100 text-xs font-semibold text-gray-600 text-center animate-fade-in">
-                    <div>
-                      <span className="text-gray-400">سن التقاعد للرتبة: </span>
-                      <strong className="text-gray-900">{retirementAge} سنة</strong>
-                    </div>
+                  <div className="bg-white p-3 rounded-xl border border-gray-100 text-xs font-bold text-gray-600 text-center animate-fade-in max-w-xs mx-auto">
+                    <span>سن التقاعد للرتبة: </span>
+                    <strong className="text-[#0057B8]">{retirementAge} سنة</strong>
                   </div>
                 </div>
               )}
-            </div>
-          )}
 
-          {/* STEP 3: Dates and Age Details */}
-          {activeStepId === 'personal_info' && (
-            <div className="space-y-6 animate-fade-in">
-              <div className="text-center max-w-lg mx-auto mb-8">
-                <h3 className="text-xl font-bold text-[#111827]">تاريخ الميلاد وتاريخ مباشرة العمل</h3>
-                <p className="text-sm text-[#6B7280] mt-1">تستخدم تواريخك دقيقة لحساب السن بالشهور وأشهر الخدمة النشطة لتأسيس السقف الائتماني العقاري.</p>
-              </div>
-
+              {/* 3. Dates Selector Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Dob Card */}
+                {/* DOB Card */}
                 <div className="border border-gray-200 rounded-2xl p-6 bg-white space-y-4">
                   <div className="flex justify-between items-center border-b border-gray-100 pb-3">
                     <span className="text-xs font-bold text-[#111827] flex items-center gap-1.5">
@@ -1044,9 +871,9 @@ export default function StepWizard() {
                   </div>
                 </div>
 
-                {/* Appointment date Card (except retiree) */}
-                {sectorId !== 'retired' ? (
-                  <div className="border border-gray-200 rounded-2xl p-6 bg-white space-y-4">
+                {/* Appointment date Card (only for Real Estate AND not retired!) */}
+                {mainFinanceType !== 'personal_only' && sectorId !== 'retired' ? (
+                  <div className="border border-gray-200 rounded-2xl p-6 bg-white space-y-4 animate-fade-in shadow-xs">
                     <div className="flex justify-between items-center border-b border-gray-100 pb-3">
                       <span className="text-xs font-bold text-[#111827] flex items-center gap-1.5">
                         <Briefcase className="w-4 h-4 text-emerald-600" />
@@ -1099,176 +926,28 @@ export default function StepWizard() {
                       </div>
                     </div>
                   </div>
-                ) : (
-                  <div className="bg-amber-50 rounded-2xl p-6 border border-amber-200 flex flex-col justify-center animate-fade-in">
-                    <p className="text-xs text-amber-800 leading-relaxed font-sans">
+                ) : mainFinanceType !== 'personal_only' && sectorId === 'retired' ? (
+                  <div className="bg-amber-50 rounded-2xl p-6 border border-amber-200 flex flex-col justify-center animate-fade-in shadow-xs">
+                    <p className="text-xs text-amber-800 leading-relaxed font-sans font-medium">
                       بما أن القطاع المهني المختار هو <strong>"متقاعد حالي"</strong>، فلن نطلب تاريخ مباشرة العمل ويتم الاعتماد القياسي المطلق على السن لدورة الحياة التمويلية.
                     </p>
                   </div>
-                )}
+                ) : null}
               </div>
             </div>
           )}
 
-          {/* STEP 4: Salary & Income */}
+          {/* STEP 3: Salary & Income */}
           {activeStepId === 'salary' && (
-            <div className="space-y-6 animate-fade-in">
+            <div className="space-y-6 animate-fade-in text-right">
               <div className="text-center max-w-lg mx-auto mb-8">
                 <h3 className="text-xl font-bold text-[#111827]">الرواتب والمستحقات والبدلات</h3>
-                <p className="text-sm text-[#6B7280] mt-1">يُشترط الإدخال الصحيح للراتب لتقرير عوامل الاستقطاع ونسب الملاءمة ائتمانياً لدى كافة البنوك.</p>
+                <p className="text-sm text-[#6B7280] mt-1 font-sans">يُشترط الإدخال الصحيح للراتب لتقرير عوامل الاستقطاع ونسب الملاءمة ائتمانياً لدى كافة البنوك.</p>
               </div>
 
-              {/* Small Sector Picker for Active Employee in Personal Only Flow */}
-              {mainFinanceType === 'personal_only' && customerStatus === 'active_employee' && (
-                <div className="bg-gray-50 p-5 rounded-2xl border border-gray-200">
-                  <span className="block text-xs font-bold text-gray-700 mb-3 text-right">القطاع المهني لجهة العمل التابع لها:</span>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    {[
-                      { id: 'gov_civil', label: 'حكومي مدني' },
-                      { id: 'military', label: 'عسكري' },
-                      { id: 'semi_gov', label: 'شبه حكومي' },
-                      { id: 'companies', label: 'موظف شركات' }
-                    ].map((sec) => (
-                      <button
-                        key={sec.id}
-                        type="button"
-                        onClick={() => {
-                          setSectorId(sec.id as SectorId);
-                          setSector(sec.id);
-                          if (sec.id === 'gov_civil') {
-                            setRetirementAge(getSectorRetirementAge('gov_civil', 60));
-                            setAhliGroup('A');
-                            setMilitarySubtype('');
-                            setMilitaryRank('');
-                            setMilitaryType('');
-                          } else if (sec.id === 'semi_gov') {
-                            setRetirementAge(getSectorRetirementAge('semi_gov', 60));
-                            setAhliGroup('A');
-                            setMilitarySubtype('');
-                            setMilitaryRank('');
-                            setMilitaryType('');
-                          } else if (sec.id === 'companies') {
-                            setRetirementAge(getSectorRetirementAge('companies', 60));
-                            setAhliGroup('A');
-                            setMilitarySubtype('');
-                            setMilitaryRank('');
-                            setMilitaryType('');
-                          } else if (sec.id === 'military') {
-                            setMilitarySubtype('enlisted');
-                            setMilitaryType('individual');
-                            const enlistedRanks = militaryRanks.filter(r => r.sectorScope === 'enlisted' && r.isActive);
-                            const sorted = [...enlistedRanks].sort((a,b) => a.displayOrder - b.displayOrder);
-                            const firstEnRank = sorted[0];
-                            if (firstEnRank) {
-                              setRankId(firstEnRank.id);
-                              setMilitaryRank(firstEnRank.nameAr);
-                              setRetirementAge(firstEnRank.retirementAge);
-                              setAhliGroup(firstEnRank.ahliGroup || 'B');
-                            } else {
-                              setRankId('jundi');
-                              setMilitaryRank('جندي / جندي أول');
-                              setRetirementAge(44);
-                              setAhliGroup('B');
-                            }
-                          }
-                        }}
-                        className={`py-2 px-3 rounded-xl text-xs font-bold transition-all border ${
-                          sectorId === sec.id
-                            ? 'bg-[#0057B8] text-white border-[#0057B8] shadow-xs'
-                            : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-                        }`}
-                      >
-                        {sec.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Optional Rank Select for Military in Personal Only flow */}
-                  {(sectorId === 'military') && (
-                    <div className="mt-4 animate-fade-in text-right space-y-4">
-                      {/* Sub-class buttons */}
-                      <div className="space-y-1.5">
-                        <label className="block text-[11px] font-bold text-gray-600">فئة القطاع العسكري:</label>
-                        <div className="grid grid-cols-2 gap-3">
-                          {[
-                            { id: 'enlisted', type: 'individual', scope: 'enlisted', label: 'عسكري أفراد' },
-                            { id: 'officer', type: 'officer', scope: 'officer', label: 'عسكري ضباط' }
-                          ].map((sub) => {
-                            const isSelected = militarySubtype === sub.id;
-                            return (
-                              <button
-                                key={sub.id}
-                                type="button"
-                                onClick={() => {
-                                  setMilitarySubtype(sub.id as 'enlisted' | 'officer');
-                                  setMilitaryType(sub.type as 'officer' | 'individual');
-                                  const targetScope = sub.scope;
-                                  const filteredRanks = militaryRanks.filter(r => r.sectorScope === targetScope && r.isActive);
-                                  const sorted = [...filteredRanks].sort((a, b) => a.displayOrder - b.displayOrder);
-                                  const firstRank = sorted[0];
-                                  if (firstRank) {
-                                    setRankId(firstRank.id);
-                                    setMilitaryRank(firstRank.nameAr);
-                                    setRetirementAge(firstRank.retirementAge);
-                                    setAhliGroup(firstRank.ahliGroup || (sub.id === 'officer' ? 'A' : 'B'));
-                                  }
-                                }}
-                                className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all border text-center ${
-                                  isSelected
-                                    ? 'bg-[#0057B8] text-white border-[#0057B8] shadow-xs'
-                                    : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
-                                }`}
-                              >
-                                {sub.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-bold text-gray-600 mb-2 font-sans">الرتبة العسكرية:</label>
-                        <select
-                          id="rank-select-salary"
-                          value={rankId}
-                          onChange={(e) => {
-                            const selectedId = e.target.value;
-                            setRankId(selectedId);
-                            
-                            const matched = militaryRanks.find(r => r.id === selectedId);
-                            if (matched) {
-                              setMilitaryRank(matched.nameAr);
-                              setRetirementAge(matched.retirementAge);
-                              setAhliGroup(matched.ahliGroup || (militarySubtype === 'officer' ? 'A' : 'B'));
-                            }
-                          }}
-                          className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] focus:border-transparent cursor-pointer"
-                        >
-                          {militaryRanks
-                            .filter(rank => rank.sectorScope === (militarySubtype === 'officer' ? 'officer' : 'enlisted') && rank.isActive)
-                            .sort((a, b) => a.displayOrder - b.displayOrder)
-                            .map((rank) => (
-                              <option key={rank.id} value={rank.id}>
-                                {rank.nameAr} (سن تقاعد الرتبة: {rank.retirementAge} سنة)
-                              </option>
-                            ))}
-                        </select>
-                      </div>
-
-                      <div className="bg-white p-3.5 rounded-xl border border-gray-200/50 text-xs font-semibold text-gray-600 text-center animate-fade-in">
-                        <div>
-                          <span className="text-gray-400">سن التقاعد للرتبة: </span>
-                          <strong className="text-gray-950">{retirementAge} سنة</strong>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Sub tabs: manual net vs detailed */}
+              {/* Sub tabs: manual net vs detailed (only if sector is NOT retired) */}
               {sectorId !== 'retired' && (
-                <div className="flex bg-gray-100 p-1.5 rounded-xl mb-6 border border-gray-200 gap-1">
+                <div className="flex bg-gray-100 p-1.5 rounded-xl mb-6 border border-gray-200 gap-1 font-semibold">
                   <button
                     type="button"
                     id="salary-details-tab"
@@ -1299,88 +978,113 @@ export default function StepWizard() {
 
               {/* Form elements */}
               {salaryMode === 'direct' || sectorId === 'retired' ? (
-                <div className="space-y-4 animate-fade-in">
-                  {sectorId === 'retired' ? (
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-2">الراتب التقاعدي الصافي المستلم شهريًا:</label>
-                      <div className="relative">
-                        <NumericInput
-                          id="retired-salary-input"
-                          min={0}
-                          allowDecimals={true}
-                          value={directPensionSalary}
-                          onChange={setDirectPensionSalary}
-                          placeholder="مثال: 8000"
-                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
-                        />
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-500">ريال سعودي</span>
+                <div className="space-y-6 animate-fade-in">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {sectorId === 'retired' ? (
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-gray-700">الراتب التقاعدي الصافي المستلم شهريًا:</label>
+                        <div className="relative">
+                          <NumericInput
+                            id="retired-salary-input"
+                            min={0}
+                            allowDecimals={true}
+                            value={directPensionSalary}
+                            onChange={setDirectPensionSalary}
+                            placeholder="مثال: 8000"
+                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                          />
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">ريال سعودي</span>
+                        </div>
                       </div>
-                    </div>
-                  ) : (
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-2">مبلغ الراتب الصافي الكلي (المحول للبنك):</label>
-                      <div className="relative">
-                        <NumericInput
-                          id="direct-salary-input"
-                          min={0}
-                          allowDecimals={true}
-                          value={directNetSalary}
-                          onChange={setDirectNetSalary}
-                          placeholder="مثال: 12500"
-                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
-                        />
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-500">ريال سعودي</span>
-                      </div>
-                    </div>
-                  )}
+                    ) : (
+                      <>
+                        <div className="space-y-2">
+                          <label className="block text-xs font-bold text-gray-700">مبلغ الراتب الصافي الكلي (المحول للبنك):</label>
+                          <div className="relative">
+                            <NumericInput
+                              id="direct-salary-input"
+                              min={0}
+                              allowDecimals={true}
+                              value={directNetSalary}
+                              onChange={setDirectNetSalary}
+                              placeholder="مثال: 12500"
+                              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                            />
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">ريال سعودي</span>
+                          </div>
+                        </div>
+
+                        {/* If chosen Direct Net Salary AND real_estate path, ask for Basic Salary (for pension selection) */}
+                        {mainFinanceType !== 'personal_only' && (
+                          <div className="space-y-2 animate-fade-in">
+                            <label className="block text-xs font-bold text-gray-700">الراتب الأساسي (لأغراض احتساب التقاعد فقط):</label>
+                            <div className="relative">
+                              <NumericInput
+                                id="basic-pension-salary-input"
+                                min={0}
+                                allowDecimals={true}
+                                value={basicSalary}
+                                onChange={setBasicSalary}
+                                placeholder="مثال: 9000"
+                                className="w-full bg-slate-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                              />
+                              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">ريال سعودي</span>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-fade-in">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-2">الراتب الأساسي:</label>
-                    <div className="relative">
-                      <NumericInput
-                        id="basic-salary-input"
-                        min={0}
-                        allowDecimals={true}
-                        value={basicSalary}
-                        onChange={setBasicSalary}
-                        placeholder="مثال: 9000"
-                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
-                      />
-                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-500 font-bold">ريال</span>
+                <div className="space-y-6 animate-fade-in">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-gray-700">الراتب الأساسي:</label>
+                      <div className="relative">
+                        <NumericInput
+                          id="basic-salary-input"
+                          min={0}
+                          allowDecimals={true}
+                          value={basicSalary}
+                          onChange={setBasicSalary}
+                          placeholder="مثال: 9000"
+                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                        />
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">ريال</span>
+                      </div>
                     </div>
-                  </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-2">بدل السكن:</label>
-                    <div className="relative">
-                      <NumericInput
-                        id="housing-salary-input"
-                        min={0}
-                        allowDecimals={true}
-                        value={housingAllowance}
-                        onChange={setHousingAllowance}
-                        placeholder="مثال: 2250"
-                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
-                      />
-                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-500 font-bold">ريال</span>
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-gray-700">بدل السكن:</label>
+                      <div className="relative">
+                        <NumericInput
+                          id="housing-salary-input"
+                          min={0}
+                          allowDecimals={true}
+                          value={housingAllowance}
+                          onChange={setHousingAllowance}
+                          placeholder="مثال: 2250"
+                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                        />
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">ريال</span>
+                      </div>
                     </div>
-                  </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-2">بدلات أخرى:</label>
-                    <div className="relative">
-                      <NumericInput
-                        id="other-salary-input"
-                        min={0}
-                        allowDecimals={true}
-                        value={otherAllowances}
-                        onChange={setOtherAllowances}
-                        placeholder="مثال: 1500"
-                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
-                      />
-                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-500 font-bold">ريال</span>
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-gray-700">بدلات أخرى:</label>
+                      <div className="relative">
+                        <NumericInput
+                          id="other-salary-input"
+                          min={0}
+                          allowDecimals={true}
+                          value={otherAllowances}
+                          onChange={setOtherAllowances}
+                          placeholder="مثال: 1500"
+                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                        />
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">ريال</span>
+                      </div>
                     </div>
                   </div>
 
@@ -1390,81 +1094,104 @@ export default function StepWizard() {
                   </div>
                 </div>
               )}
-
-              {/* تفاصيل التقاعد المحسوبة */}
-              {mainFinanceType !== 'personal_only' && (
-                <div className="bg-gradient-to-br from-indigo-50 to-blue-50/50 rounded-2xl p-6 border border-indigo-100/80 mt-6 space-y-4 animate-fade-in shadow-xs">
-                  <div className="flex border-b border-indigo-100/50 pb-3 items-center justify-between">
-                    <h4 className="font-bold text-[#111827] text-xs sm:text-sm flex items-center gap-2">
-                      <Coins className="w-5 h-5 text-[#0057B8]" />
-                      <span>محاكاة احتساب راتب التقاعد وتفاصيل الخدمة</span>
-                    </h4>
-                    <span className="text-[10px] bg-indigo-100 text-[#0057B8] font-extrabold px-2.5 py-1 rounded-full font-sans shadow-xs">
-                      عملية افتراضية للعميل
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                    {sectorId !== 'retired' && (
-                      <>
-                        <div className="bg-white rounded-xl p-3 border border-indigo-50">
-                          <span className="block text-[10px] font-bold text-gray-500 mb-1">سن التقاعد النظامي المقدر:</span>
-                          <span className="text-sm font-extrabold text-indigo-700">
-                            {liveRetirementAge} سنة
-                          </span>
-                        </div>
-
-                        <div className="bg-white rounded-xl p-3 border border-indigo-50">
-                          <span className="block text-[10px] font-bold text-gray-500 mb-1">شهور الخدمة عند التقاعد:</span>
-                          <span className="text-sm font-extrabold text-[#111827]">
-                            {pensionCalcObj.serviceMonthsAtRetirement} شهر 
-                            <span className="text-[10px] text-gray-500 font-semibold block sm:inline-block sm:mr-1 font-sans">
-                              (أي {(pensionCalcObj.serviceMonthsAtRetirement / 12).toFixed(1)} سنة)
-                            </span>
-                          </span>
-                        </div>
-
-                        <div className="bg-white rounded-xl p-3 border border-indigo-50">
-                          <span className="block text-[10px] font-bold text-gray-500 mb-1">المدة المتبقية للتقاعد:</span>
-                          <span className="text-sm font-extrabold text-amber-600">
-                            {pensionCalcObj.monthsUntilRetirement} شهر
-                            <span className="text-[10px] text-gray-500 font-semibold block sm:inline-block sm:mr-1 font-sans">
-                              (أي {(pensionCalcObj.monthsUntilRetirement / 12).toFixed(1)} سنة)
-                            </span>
-                          </span>
-                        </div>
-                      </>
-                    )}
-
-                    {sectorId === 'retired' && (
-                      <div className="col-span-3 bg-white/70 rounded-xl p-3 border border-dashed border-indigo-100 flex items-center">
-                        <p className="text-xs text-indigo-800 leading-relaxed font-sans">
-                          تم احتساب المعاش بناءً على الراتب التقاعدي الصافي المدخل يدويًا حيث يعتبر العميل في حالة تقاعد حالية قائمة.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
           )}
-
-          {/* STEP 5: Finance Options & Obligations */}
+                      {/* STEP 4: Finance Options & Obligations */}
           {activeStepId === 'finance_options' && (
-            <div className="space-y-6 animate-fade-in">
+            <div className="space-y-6 animate-fade-in text-right">
               <div className="text-center max-w-lg mx-auto mb-8">
-                <h3 className="text-xl font-bold text-[#111827]">تخصيص مدة التمويل والالتزامات</h3>
-                <p className="text-sm text-[#6B7280] mt-1">تتحكم مدة السداد وتفصيل الدعم والالتزامات بجدول الفائدة التراكمية وهوامش أرباح البنوك.</p>
+                <h3 className="text-xl font-bold text-[#111827]">تخصيص منتج التمويل والالتزامات</h3>
+                <p className="text-sm text-[#6B7280] mt-1 font-sans">تتحكم مدة السداد وتفصيل الدعم والالتزامات بجدول الفائدة التراكمية وهوامش أرباح البنوك.</p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 
-                {/* Sakani Program (Mortgage support) - HELD FOR MORTGAGES ONLY */}
+                {/* 1. Real Estate Product Options Cards (Mortgage Flow Only) */}
                 {mainFinanceType !== 'personal_only' && (
-                  <div className="border border-gray-200 bg-white rounded-2xl p-5">
-                    <label className="block text-xs font-bold text-gray-700 mb-3 flex items-center justify-between">
+                  <div className="col-span-1 md:col-span-2 space-y-3">
+                    <label className="block text-xs font-bold text-gray-700">نوع منتج التمويل العقاري المطلوب:</label>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      {[
+                        { id: 'real_estate', label: 'عقاري فقط', desc: 'للحصول على تمويل شراء المسكن أو العقار السكني المستقل.' },
+                        { id: 'real_estate_with_new_personal', label: 'عقاري + شخصي جديد', desc: 'لدمج تمويل شخصي جديد مع العقاري لتكبير قوة الملاءمة والشراء.' },
+                        { id: 'real_estate_with_existing_personal', label: 'عقاري + شخصي قائم', desc: 'إذا كان لديك تمويل شخصي مستمر حالياً وتريد قياسه كالتزام قائم.' }
+                      ].map((prod) => {
+                        const isSelected = productId === prod.id;
+                        return (
+                          <button
+                            key={prod.id}
+                            type="button"
+                            onClick={() => {
+                              setProductId(prod.id as ProductId);
+                              if (prod.id === 'real_estate_with_existing_personal') {
+                                setMainFinanceType('real_estate_with_existing_personal');
+                              } else {
+                                setMainFinanceType('real_estate');
+                              }
+                            }}
+                            className={`p-4 rounded-xl border-2 text-right transition-all flex flex-col justify-between cursor-pointer min-h-[110px] ${
+                              isSelected
+                                ? 'border-[#0057B8] bg-[#0057B8]/5 text-[#111827]'
+                                : 'border-gray-200 hover:border-gray-300 text-gray-600 bg-white'
+                            }`}
+                          >
+                            <span className="font-extrabold text-xs">{prod.label}</span>
+                            <span className="text-[10px] text-gray-400 mt-1.5 leading-relaxed font-sans">{prod.desc}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* 2. Direct Obligations Fields (Shown Inline if Real Estate + Existing Personal is chosen) */}
+                {productId === 'real_estate_with_existing_personal' && (
+                  <div className="col-span-1 md:col-span-2 border border-blue-100 bg-blue-50/20 rounded-2xl p-5 space-y-4 animate-fade-in shadow-xs">
+                    <h4 className="text-xs font-bold text-blue-900 flex items-center gap-1.5">
+                      <Coins className="w-4 h-4 text-[#0057B8]" />
+                      <span>تفاصيل الالتزام المالي القائم:</span>
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-bold text-gray-700">القسط الشهري الحالي للالتزام الشخصي:</label>
+                        <div className="relative">
+                          <NumericInput
+                            id="existing-monthly-obligations-input-direct"
+                            min={0}
+                            allowDecimals={true}
+                            value={existingMonthlyObligations}
+                            onChange={setExistingMonthlyObligations}
+                            placeholder="مثال: 1500"
+                            className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                          />
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400">ريال/شهرياً</span>
+                        </div>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-bold text-gray-700">الشهور المتبقية للالتزام الحالي:</label>
+                        <div className="relative">
+                          <NumericInput
+                            id="obligation-remaining-months-input-direct"
+                            min={0}
+                            allowDecimals={false}
+                            value={obligationRemainingMonths}
+                            onChange={setObligationRemainingMonths}
+                            placeholder="مثال: 36"
+                            className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                          />
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400">شهر متبقي</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Sakani Program (Mortgage support) - ONLY FOR MORTGAGES */}
+                {mainFinanceType !== 'personal_only' && (
+                  <div className="border border-gray-200 bg-white rounded-2xl p-5 text-right space-y-3">
+                    <label className="block text-xs font-bold text-gray-700 flex items-center justify-between">
                       <span>برنامج الدعم السكني (سكني):</span>
-                      <HelpCircle className="w-4 h-4 text-gray-400 cursor-pointer" />
+                      <HelpCircle className="w-4.5 h-4.5 text-gray-400" />
                     </label>
                     <div className="grid grid-cols-3 gap-2">
                       {[
@@ -1489,11 +1216,11 @@ export default function StepWizard() {
                   </div>
                 )}
 
-                {/* Term Option Mode - HELD FOR MORTGAGES ONLY */}
+                {/* Term Option Mode - ONLY FOR MORTGAGES */}
                 {mainFinanceType !== 'personal_only' && (
-                  <div className="border border-[#E5E7EB] bg-white rounded-2xl p-5">
-                    <label className="block text-xs font-bold text-gray-700 mb-3">المدة المستهدفة للتمويل العقاري:</label>
-                    <div className="grid grid-cols-3 gap-2 mb-2">
+                  <div className="border border-[#E5E7EB] bg-white rounded-2xl p-5 text-right space-y-3">
+                    <label className="block text-xs font-bold text-gray-700">المدة المستهدفة للتمويل العقاري:</label>
+                    <div className="grid grid-cols-3 gap-2">
                       {[
                         { id: 'max', label: 'المدة الأقصى' },
                         { id: 'until_retirement', label: 'حتى التقاعد' },
@@ -1535,14 +1262,14 @@ export default function StepWizard() {
                   </div>
                 )}
 
-                {/* Selected Bank Filter */}
-                <div className="border border-gray-200 bg-white rounded-2xl p-5">
-                  <label className="block text-xs font-bold text-gray-700 mb-2">جهة التمويل المفضلة:</label>
+                {/* Preferred Bank Filter - FOR BOTH PATHS */}
+                <div className="border border-gray-200 bg-white rounded-2xl p-5 text-right space-y-3 col-span-1 md:col-span-2">
+                  <label className="block text-xs font-bold text-gray-700">جهة التمويل المفضلة:</label>
                   <select
                     id="bank-filter-select"
                     value={selectedBankId}
                     onChange={(e) => setSelectedBankId(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] focus:border-transparent cursor-pointer font-sans"
                   >
                     <option value="all">جميع جهات التمويل النشطة المتاحة (مقارنة العروض)</option>
                     {banks.filter(b => b.isActive).map(bank => (
@@ -1551,107 +1278,45 @@ export default function StepWizard() {
                   </select>
                 </div>
 
-                {/* Obligations obligations */}
-                {productId !== 'real_estate' && (
-                  <div className="border border-gray-200 bg-white rounded-2xl p-5">
-                    {mainFinanceType === 'real_estate_with_existing_personal' ? (
-                      <div className="space-y-4 animate-fade-in">
-                        <div>
-                          <label className="block text-xs font-bold text-gray-700 mb-1">إجمالي الالتزامات الشهرية القائمة:</label>
-                          <p className="text-[10px] text-gray-400 mb-2">يشمل قسط التمويل الشخصي القائم وأي أقساط أو التزامات شهرية أخرى.</p>
-                          <div className="relative">
-                            <NumericInput
-                              id="existing-monthly-obligations-input"
-                              min={0}
-                              allowDecimals={true}
-                              value={existingMonthlyObligations}
-                              onChange={setExistingMonthlyObligations}
-                              placeholder="مثال: 1200"
-                              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
-                            />
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-500">ريال سعودي</span>
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-bold text-gray-700 mb-1">المدة المتبقية للالتزام:</label>
-                          <p className="text-[10px] text-gray-400 mb-2">كم شهراً تبقى على انتهاء هذا الالتزام؟</p>
-                          <div className="relative">
-                            <NumericInput
-                              id="obligation-remaining-months-input"
-                              min={0}
-                              allowDecimals={false}
-                              value={obligationRemainingMonths}
-                              onChange={setObligationRemainingMonths}
-                              placeholder="مثال: 36"
-                              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
-                            />
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-500">شهر</span>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="animate-fade-in">
-                        <label className="block text-xs font-bold text-gray-700 mb-2">
-                          إجمالي الالتزامات الشهرية القائمة حالياً:
-                        </label>
-                        <div className="relative">
-                          <NumericInput
-                            id="obligations-input"
-                            min={0}
-                            allowDecimals={true}
-                            value={existingMonthlyObligations}
-                            onChange={setExistingMonthlyObligations}
-                            placeholder="مثال: 1500"
-                            className="w-full bg-gray-50 border border-[#E5E7EB] rounded-2xl px-4 py-3.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
-                          />
-                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">ريال شهرياً</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
               </div>
             </div>
           )}
 
           {/* Stepper Buttons */}
-          {currentStep < flow.length && (
-            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-8 border-t border-gray-100 mt-8">
-              <button
-                id="prev-step-btn"
-                type="button"
-                onClick={handleBack}
-                disabled={currentStep === 1}
-                className="w-full sm:w-auto min-h-[44px] justify-center px-6 py-3 rounded-xl border border-gray-200 text-gray-500 font-semibold text-xs leading-none hover:bg-gray-50 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed flex items-center gap-1.5 transition-all"
-              >
-                <ChevronRight className="w-3.5 h-3.5" />
-                <span>رجوع</span>
-              </button>
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-8 border-t border-gray-100 mt-8 font-sans">
+            <button
+              id="prev-step-btn"
+              type="button"
+              onClick={handleBack}
+              disabled={currentStep === 1}
+              className="w-full sm:w-auto min-h-[44px] justify-center px-6 py-3 rounded-xl border border-gray-200 text-gray-500 font-semibold text-xs leading-none hover:bg-gray-50 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed flex items-center gap-1.5 transition-all"
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+              <span>رجوع</span>
+            </button>
 
-              {currentStep < flow.length - 1 ? (
-                <button
-                  id="next-step-btn"
-                  type="button"
-                  onClick={handleNext}
-                  className="w-full sm:w-auto min-h-[44px] justify-center px-6 py-3 rounded-xl bg-[#0057B8] text-white font-semibold text-xs leading-none hover:bg-[#004494] cursor-pointer flex items-center gap-1.5 transition-all shadow-md shadow-blue-100"
-                >
-                  <span>التالي</span>
-                  <ChevronLeft className="w-3.5 h-3.5" />
-                </button>
-              ) : (
-                <button
-                  id="calc-submit-btn"
-                  type="button"
-                  onClick={triggerCalculations}
-                  className="w-full sm:w-auto min-h-[44px] justify-center px-8 py-3.5 rounded-xl bg-[#0057B8] text-white font-bold text-sm leading-none hover:bg-[#004494] transition-all cursor-pointer flex items-center gap-2 shadow-lg shadow-blue-200"
-                >
-                  <Calculator className="w-4 h-4" />
-                  <span>احسب النتائج ومقارنة العروض</span>
-                </button>
-              )}
-            </div>
-          )}
+            {currentStep < flow.length ? (
+              <button
+                id="next-step-btn"
+                type="button"
+                onClick={handleNext}
+                className="w-full sm:w-auto min-h-[44px] justify-center px-6 py-3 rounded-xl bg-[#0057B8] text-white font-semibold text-xs leading-none hover:bg-[#004494] cursor-pointer flex items-center gap-1.5 transition-all shadow-md shadow-blue-100"
+              >
+                <span>التالي</span>
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+            ) : (
+              <button
+                id="calc-submit-btn"
+                type="button"
+                onClick={triggerCalculations}
+                className="w-full sm:w-auto min-h-[44px] justify-center px-8 py-3.5 rounded-xl bg-[#0057B8] text-white font-bold text-sm leading-none hover:bg-[#004494] transition-all cursor-pointer flex items-center gap-2 shadow-lg shadow-blue-200"
+              >
+                <Calculator className="w-4 h-4" />
+                <span>{results ? 'تحديث وإعادة الحساب' : 'احسب النتائج ومقارنة العروض'}</span>
+              </button>
+            )}
+          </div>
 
           {/* RESULTS DISPLAY PAGE */}
           {currentStep === flow.length && results && (

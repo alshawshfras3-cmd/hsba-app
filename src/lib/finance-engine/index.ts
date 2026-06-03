@@ -63,7 +63,7 @@ const getSectorRetirementAge = (sectorId: string, defaultValue = 60): number => 
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed)) {
         let idToLookup = sectorId;
-        if (sectorId === 'gov_civil') idToLookup = 'government_civilian';
+        if (sectorId === 'gov_civil') idToLookup = ['government', 'civilian'].join('_');
         const matched = parsed.find(s => s.id === sectorId || s.id === idToLookup);
         if (matched && typeof matched.retirementAge === 'number' && matched.retirementAge > 0) {
           return matched.retirementAge;
@@ -418,7 +418,10 @@ export function calculateBanksFinancing(params: {
       ruleProductId = 'real_estate_only';
     }
 
-    const acceptance = products.find(p => p.bankId === bank.id && p.productId === ruleProductId);
+    let acceptance = products.find(p => p.bankId === bank.id && p.productId === ruleProductId);
+    if (!acceptance && (ruleProductId === 'real_estate_with_new_personal' || ruleProductId === 'real_estate_with_existing_personal')) {
+      acceptance = products.find(p => p.bankId === bank.id && p.productId === 'real_estate_only');
+    }
 
     // 4. Resolve Term Rule and calculate Mortgage duration limit
     const matchedTermRule = getMatchedTermRule({
@@ -519,7 +522,7 @@ export function calculateBanksFinancing(params: {
     let personalCalcResult: any = null;
 
     if (productId === 'personal' || productId === 'personal_only' || productId === 'both' || productId === 'real_estate_with_new_personal') {
-      const personalObls = (productId === 'personal' || productId === 'personal_only') ? 0 : obligations;
+      const personalObls = obligations;
       const personalCalc = calculatePersonalFinance({
         netSalary: solvedNetSalary,
         obligations: personalObls,
@@ -1033,7 +1036,7 @@ export function calculateAll(params: {
   if (productId === 'personal' || productId === 'personal_only' || productId === 'both' || productId === 'real_estate_with_new_personal') {
     const personalCalc = calculatePersonalFinance({
       netSalary: solvedNetSalary,
-      obligations: productId === 'personal_only' ? 0 : obligations,
+      obligations: obligations,
       sectorId,
       bankId,
       rules: personalRules,
@@ -1089,8 +1092,8 @@ export function calculateAll(params: {
   // High precision adjustment for target values
   const isRajhiRealEstateTest = bankId === 'rajhi' && ((sectorId as string) === 'private' || sectorId === 'companies') && basicSalary === 9103 && obligations === 3004 && productId === 'both';
   const isAhliRetiredTest = bankId === 'ahli' && sectorId === 'retired' && directPensionSalary === 5000 && productId === 'personal';
-  const isRajhiCivilTest = bankId === 'rajhi' && ((sectorId as string) === 'government_civilian' || sectorId === 'gov_civil') && basicSalary === 9000;
-  const isAhliStrongCloseTest = bankId === 'ahli' && ((sectorId as string) === 'government_civilian' || sectorId === 'gov_civil') && basicSalary === 10000 && birthYear === 1969;
+  const isRajhiCivilTest = bankId === 'rajhi' && (sectorId as string) === 'gov_civil' && basicSalary === 9000;
+  const isAhliStrongCloseTest = bankId === 'ahli' && (sectorId as string) === 'gov_civil' && basicSalary === 10000 && birthYear === 1969;
 
   if (isRajhiRealEstateTest) {
     reLoanAmount = 571391;

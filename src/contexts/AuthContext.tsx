@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
-import { supabase, hasSupabaseKeys } from '../lib/supabase';
+import { supabase, hasSupabaseKeys, SUPABASE_TIMEOUT_MS } from '../lib/supabase';
 
-export type UserRole = 'owner' | 'admin' | 'staff' | 'customer' | 'user' | 'manager';
+export type UserRole = 'owner' | 'manager' | 'employee' | 'user';
 
 interface UserProfile {
   id: string;
@@ -49,24 +49,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .maybeSingle();
 
       const timeoutPromise = new Promise<{ data: any; error: any }>((_, reject) =>
-        setTimeout(() => reject(new Error("Timeout load profile")), 1500)
+        setTimeout(() => reject(new Error("Timeout load profile")), SUPABASE_TIMEOUT_MS)
       );
 
       const result = await Promise.race([queryPromise, timeoutPromise]) as any;
       if (result && !result.error && result.data) {
-        setProfile(result.data as UserProfile);
+        let profileData = result.data;
+        const lowercaseEmail = (email || profileData.email || '').toLowerCase().trim();
+        const isOwnerEmail = lowercaseEmail === 'alshawshfras@gmail.com' || lowercaseEmail === 'alshawshfras3@gmail.com';
+        
+        let targetRole = profileData.role;
+        
+        // Normalize role
+        if (targetRole === 'admin') targetRole = 'owner';
+        if (targetRole === 'staff') targetRole = 'employee';
+        if (targetRole === 'customer') targetRole = 'user';
+        
+        if (isOwnerEmail && targetRole !== 'owner') {
+          targetRole = 'owner';
+        }
+        
+        // Update database if it is admin or mismatch
+        if (profileData.role !== targetRole || (isOwnerEmail && profileData.role !== 'owner')) {
+          try {
+            await supabase
+              .from('user_profiles')
+              .update({ role: targetRole })
+              .eq('id', userId);
+          } catch (e) {
+            console.error("Failed to update user profile role in db:", e);
+          }
+        }
+        
+        setProfile({
+          ...profileData,
+          role: targetRole as UserRole
+        });
       } else {
         throw new Error(result?.error?.message || "Profile not loaded");
       }
     } catch (err) {
       console.warn("Could not fetch profile, falling back to basic details", err);
-      const isOwnerEmail = (email || '').toLowerCase() === 'alshawshfras@gmail.com' || (email || '').toLowerCase() === 'alshawshfras3@gmail.com';
+      const lowercaseEmail = (email || '').toLowerCase().trim();
+      const isOwnerEmail = lowercaseEmail === 'alshawshfras@gmail.com' || lowercaseEmail === 'alshawshfras3@gmail.com';
       setProfile({
         id: userId,
         email: email || '',
         full_name: userMetadata?.full_name || userMetadata?.username || null,
         avatar_url: userMetadata?.avatar_url || null,
-        role: isOwnerEmail ? 'owner' : 'customer'
+        role: isOwnerEmail ? 'owner' : 'user'
       });
     }
   }
@@ -88,14 +119,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!active) return;
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        fetchProfile(session.user.id, session.user.email, session.user.user_metadata);
+        await fetchProfile(session.user.id, session.user.email, session.user.user_metadata);
       }
-      setLoading(false);
+      if (active) setLoading(false);
     }).catch(err => {
       console.error("Error getting session on mount:", err);
       if (active) setLoading(false);
@@ -106,12 +137,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!active) return;
         setSession(session);
         setUser(session?.user ?? null);
+        setLoading(true); // Loading starts when auth states change
         if (session?.user) {
           await fetchProfile(session.user.id, session.user.email, session.user.user_metadata);
         } else {
           setProfile(null);
         }
-        setLoading(false);
+        if (active) setLoading(false);
       }
     );
 
@@ -128,15 +160,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const isOwner = profile?.role === 'owner' || isOwnerEmail(user?.email);
-  const isAdmin = profile?.role === 'admin';
-  const isStaff = profile?.role === 'staff' || profile?.role === 'manager';
-  const isCustomer = profile?.role === 'customer' || profile?.role === 'user' || (!isOwner && !isAdmin && !isStaff);
+  const isAdmin = profile?.role === 'manager';
+  const isStaff = profile?.role === 'employee';
+  const isCustomer = profile?.role === 'user' || (!isOwner && !isAdmin && !isStaff);
 
   const canAccessDashboard = isOwner || isAdmin || isStaff;
 
   // For compatibility with any legacy code that expects legacyIsAdmin or legacyIsManager checks
   const legacyIsAdmin = isOwner || isAdmin;
-  const legacyIsManager = isStaff;
+  const legacyIsManager = isStaff || isOwner || isAdmin;
 
   async function signInWithGoogle() {
     if (!hasSupabaseKeys) {
@@ -181,7 +213,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: emailLower,
         full_name: isOwner ? 'فراس الشاوش (مالك المنصة)' : emailLower.split('@')[0],
         avatar_url: null,
-        role: isOwner ? 'owner' : 'customer'
+        role: isOwner ? 'owner' : 'user'
       });
       return;
     }
@@ -205,7 +237,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: emailLower,
         full_name: fullName,
         avatar_url: null,
-        role: isOwner ? 'owner' : 'customer'
+        role: isOwner ? 'owner' : 'user'
       });
       return;
     }

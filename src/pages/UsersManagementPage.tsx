@@ -3,11 +3,13 @@ import { supabase, hasSupabaseKeys } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Shield, Sparkles, User, Mail, Calendar, Settings, AlertCircle, Loader2 } from 'lucide-react';
 
+import { devUsers } from '../seeds/dev-users';
+
 type Profile = {
   id: string;
   email: string;
   full_name: string | null;
-  role: 'owner' | 'admin' | 'staff' | 'customer' | 'user' | 'manager';
+  role: 'owner' | 'manager' | 'employee' | 'user';
   subscription: 'free' | 'basic' | 'premium' | 'enterprise';
   subscription_expires_at?: string | null;
   created_at: string;
@@ -16,18 +18,14 @@ type Profile = {
 
 const roleLabel = { 
   owner: 'مالك المنصة والسيستم الرئيسي',
-  admin: 'مدير (Admin)', 
-  staff: 'موظف (Staff)', 
-  customer: 'عميل (Customer)',
   manager: 'مدير عمليات (Manager)',
+  employee: 'موظف (Employee)',
   user: 'مستشار عقاري (User)'
 };
 const roleColor = {
   owner: 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white border border-purple-700 font-extrabold',
-  admin: 'bg-red-50 text-red-700 border border-red-100',
-  staff: 'bg-indigo-50 text-indigo-700 border border-indigo-100',
-  customer: 'bg-emerald-50 text-emerald-700 border border-emerald-100',
-  manager: 'bg-amber-50 text-amber-700 border border-amber-100',
+  manager: 'bg-rose-50 text-rose-700 border border-rose-100',
+  employee: 'bg-indigo-50 text-indigo-700 border border-indigo-100',
   user: 'bg-slate-100 text-slate-700 border border-slate-200'
 };
 
@@ -65,52 +63,33 @@ export function UsersManagementPage() {
     setErrorMsg('');
 
     // Determine current user role
-    const currentUserRole = authProfile?.role || (isOwner ? 'owner' : (isAdmin ? 'admin' : 'customer'));
+    const currentUserRole = authProfile?.role || (isOwner ? 'owner' : (isAdmin ? 'manager' : 'user'));
 
     if (!hasSupabaseKeys) {
       // Return beautiful mock user list for local view
-      const mockUsers: Profile[] = [
-        {
-          id: 'owner_id',
-          email: 'alshawshfras@gmail.com',
-          full_name: 'فراس الشاوش (مالك المنصة)',
-          role: 'owner',
-          subscription: 'enterprise',
-          created_at: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString(),
-          last_login: new Date().toISOString(),
-        },
-        {
-          id: 'admin_id_1',
-          email: 'admin@hasba.com',
-          full_name: 'مدير الصلاحيات المساعد',
-          role: 'admin',
-          subscription: 'premium',
-          created_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-          last_login: new Date().toISOString(),
-        },
-        {
-          id: 'staff_id_1',
-          email: 'staff@hasba.com',
-          full_name: 'الموظف الداخلي المالي',
-          role: 'staff',
-          subscription: 'basic',
-          created_at: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
-          last_login: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-        },
-        {
-          id: 'customer_id_1',
-          email: 'customer@hasba.com',
-          full_name: 'العميل المالي المعتمد',
-          role: 'customer',
-          subscription: 'free',
-          created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-          last_login: null,
-        }
-      ];
+      let mockUsers: Profile[] = [];
+      const isDevMode = (import.meta as any).env?.DEV === true;
+      const showDevUsers = isDevMode && !hasSupabaseKeys && !user;
+
+      if (showDevUsers) {
+        mockUsers = devUsers as Profile[];
+      } else if (user) {
+        mockUsers = [
+          {
+            id: user.id,
+            email: user.email || '',
+            full_name: authProfile?.full_name || user.user_metadata?.full_name || user.user_metadata?.username || 'مستشار عقاري',
+            role: (authProfile?.role || (isOwner ? 'owner' : (isAdmin ? 'manager' : (isStaff ? 'employee' : 'user')))) as any,
+            subscription: 'free',
+            created_at: user.created_at || new Date().toISOString(),
+            last_login: new Date().toISOString()
+          }
+        ];
+      }
 
       // Safe filtering on mock list
       let filtered = mockUsers;
-      if (currentUserRole === 'admin') {
+      if (currentUserRole === 'manager') {
         filtered = filtered.filter(u => u.role !== 'owner');
       } else if (currentUserRole !== 'owner' && user) {
         filtered = filtered.filter(u => u.id === user.id);
@@ -125,7 +104,7 @@ export function UsersManagementPage() {
       let query = supabase.from('user_profiles').select('*');
       
       // If admin, filter out role = owner from database request
-      if (currentUserRole === 'admin') {
+      if (currentUserRole === 'manager') {
         query = query.neq('role', 'owner');
       } else if (currentUserRole !== 'owner' && user) {
         query = query.eq('id', user.id);
@@ -135,11 +114,18 @@ export function UsersManagementPage() {
 
       if (error) throw error;
       
-      // Ensure subscription is typed correctly and has fallback
-      let typedData = (data ?? []).map((item: any) => ({
-        ...item,
-        subscription: item.subscription || 'free'
-      })) as Profile[];
+      // Ensure subscription is typed correctly and has fallback, normalize roles as well
+      let typedData = (data ?? []).map((item: any) => {
+        let r = item.role || 'user';
+        if (r === 'admin') r = 'owner';
+        if (r === 'staff') r = 'employee';
+        if (r === 'customer') r = 'user';
+        return {
+          ...item,
+          role: r,
+          subscription: item.subscription || 'free'
+        };
+      }) as Profile[];
       
       // Direct clientside filter as additional double safety
       if (currentUserRole !== 'owner') {
@@ -155,12 +141,12 @@ export function UsersManagementPage() {
           id: user.id,
           email: user.email || '',
           full_name: authProfile?.full_name || user.user_metadata?.full_name || user.user_metadata?.username || 'مستشار عقاري',
-          role: isOwner ? 'owner' : (isAdmin ? 'admin' : 'customer'),
+          role: isOwner ? 'owner' : (isAdmin ? 'manager' : 'user'),
           subscription: 'free',
           created_at: user.created_at || new Date().toISOString(),
           last_login: new Date().toISOString()
         };
-        const filteredFallback = (currentUserRole === 'admin' && fallbackProfile.role === 'owner') ? [] : [fallbackProfile];
+        const filteredFallback = (currentUserRole === 'manager' && fallbackProfile.role === 'owner') ? [] : [fallbackProfile];
         setUsers(filteredFallback);
         setErrorMsg('ملاحظة: تعذر الاتصال بجدول المستخدمين الموحد في Supabase. تم عرض حسابك الحالي مؤقتاً.');
       } else {
@@ -171,9 +157,9 @@ export function UsersManagementPage() {
     }
   }
 
-  async function updateRole(userId: string, newRole: 'owner' | 'admin' | 'staff' | 'customer' | 'user' | 'manager') {
+  async function updateRole(userId: string, newRole: 'owner' | 'manager' | 'employee' | 'user') {
     const targetUser = users.find(u => u.id === userId);
-    const currentUserRole = authProfile?.role || (isOwner ? 'owner' : (isAdmin ? 'admin' : 'customer'));
+    const currentUserRole = authProfile?.role || (isOwner ? 'owner' : (isAdmin ? 'manager' : 'user'));
 
     // Admin/User cannot edit themselves
     if (userId === authProfile?.id) {
@@ -182,9 +168,24 @@ export function UsersManagementPage() {
     }
 
     // Role protection checks
-    if (currentUserRole !== 'owner') {
-      alert('خطأ أمني: غير مصرح لك كمسؤول بتعديل أو ترقية أدوار المستخدمين الآخرين!');
+    if (currentUserRole !== 'owner' && currentUserRole !== 'manager') {
+      alert('خطأ أمني: غير مصرح لك بتعديل أو ترقية أدوار المستخدمين الآخرين!');
       return;
+    }
+
+    if (currentUserRole === 'manager') {
+      if (targetUser?.role === 'owner' || targetUser?.role === 'manager') {
+        alert('خطأ أمني: كمدير لا يمكنك تعديل أدوار الملاك أو المدراء الآخرين!');
+        return;
+      }
+      if (newRole === 'owner') {
+        alert('خطأ أمني: لا يمكنك كمدير تعيين رتبة مالك (Owner) لأي حساب!');
+        return;
+      }
+      if (newRole === 'manager') {
+        alert('خطأ أمني: رتبة المدير (Manager) تمنح فقط وتعدل بواسطة مالك المنصة مباشرة حماية من الثغرات!');
+        return;
+      }
     }
 
     if (!hasSupabaseKeys) {
@@ -207,7 +208,7 @@ export function UsersManagementPage() {
 
   async function updateSubscription(userId: string, newSub: 'free' | 'basic' | 'premium' | 'enterprise') {
     const targetUser = users.find(u => u.id === userId);
-    const currentUserRole = authProfile?.role || (isOwner ? 'owner' : (isAdmin ? 'admin' : 'customer'));
+    const currentUserRole = authProfile?.role || (isOwner ? 'owner' : (isAdmin ? 'manager' : 'user'));
 
     if (userId === authProfile?.id) {
       alert('لا يمكنك تعديل باقة الاشتراك الخاصة بك من هنا!');
@@ -216,7 +217,7 @@ export function UsersManagementPage() {
 
     // Direct block for non-owners trying to modify owners or admins
     if (currentUserRole !== 'owner') {
-      if (targetUser?.role === 'owner' || targetUser?.role === 'admin') {
+      if (targetUser?.role === 'owner' || targetUser?.role === 'manager') {
         alert('خطأ أمني: كمدير لا يمكنك تعديل باقات المشرفين أو ملاك المنصة!');
         return;
       }
@@ -241,24 +242,32 @@ export function UsersManagementPage() {
   }
 
   async function deleteUser(userId: string, targetEmail: string, targetRole: string) {
-    const currentUserRole = authProfile?.role || (isOwner ? 'owner' : (isAdmin ? 'admin' : 'customer'));
+    const currentUserRole = authProfile?.role || (isOwner ? 'owner' : (isAdmin ? 'manager' : 'user'));
 
     // owner cannot delete themselves from UI
-    if (userId === authProfile?.id) {
+    if (userId === authProfile?.id || userId === user?.id) {
       alert('لا يمكنك حذف حسابك الحالي النشط من لوحة الإشراف!');
       return;
     }
 
-    // Direct block if targets is owner
-    if (targetRole === 'owner' || targetEmail === 'alshawshfras@gmail.com' || targetEmail === 'alshawshfras3@gmail.com') {
-      alert('خطأ أمني: لا يمكن حذف حساب مالك النظام الرئيسي!');
+    // Direct block if targets is owner basic account
+    if (targetEmail === 'alshawshfras@gmail.com' || targetEmail === 'alshawshfras3@gmail.com') {
+      alert('خطأ أمني: لا يمكن حذف حساب مالك النظام الأساسي!');
       return;
+    }
+
+    if (targetRole === 'owner') {
+      const ownerCount = users.filter(u => u.role === 'owner').length;
+      if (ownerCount <= 1) {
+        alert('خطأ أمني: لا يمكن حذف آخر مالك (Owner) نشط للمنصة!');
+        return;
+      }
     }
 
     // Check if admin has authority
     if (currentUserRole !== 'owner') {
-      if (currentUserRole === 'admin') {
-        if (!['customer', 'staff', 'user', 'manager'].includes(targetRole)) {
+      if (currentUserRole === 'manager') {
+        if (!['user', 'employee'].includes(targetRole)) {
           alert('خطأ أمني: كمدير، يمكنك فقط حذف العملاء أو الموظفين!');
           return;
         }
@@ -279,7 +288,18 @@ export function UsersManagementPage() {
 
     try {
       const { error } = await supabase.rpc('delete_user_by_admin', { target_user_id: userId });
-      if (error) throw error;
+      if (error) {
+        const errMsg = error.message || '';
+        const isMissingRpc = 
+          error.code === 'PGRST202' || 
+          errMsg.includes('does not exist') || 
+          errMsg.includes('could not find the function');
+        
+        if (isMissingRpc) {
+          throw new Error("يجب تطبيق migration delete_user_by_admin في Supabase");
+        }
+        throw error;
+      }
 
       alert('تم حذف الحساب والهوية والبروفايل للمستشار بنجاح من السيستم وقاعدة البيانات.');
       fetchUsers();
@@ -445,11 +465,9 @@ export function UsersManagementPage() {
             >
               <option value="all">كل الصلاحيات</option>
               {isOwner && <option value="owner">مالك المنصة</option>}
-              <option value="admin">مدير (Admin)</option>
-              <option value="staff">موظف (Staff)</option>
-              <option value="customer">عميل (Customer)</option>
-              <option value="manager">مدير عمليات</option>
-              <option value="user">مستشار عقاري</option>
+              <option value="manager">مدير عمليات (Manager)</option>
+              <option value="employee">موظف (Employee)</option>
+              <option value="user">مستشار عقاري (User)</option>
             </select>
           </div>
 
@@ -509,11 +527,11 @@ export function UsersManagementPage() {
               <tbody className="divide-y divide-[#F1F5F9] font-semibold">
                 {filteredUsers.map(userItem => {
                   const isUserOwner = userItem.role === 'owner' || userItem.email === 'alshawshfras@gmail.com' || userItem.email === 'alshawshfras3@gmail.com';
-                  const isUserAdmin = userItem.role === 'admin';
+                  const isUserAdmin = userItem.role === 'manager';
                   const isSelf = userItem.id === authProfile?.id;
                   
                   // Disable dropdown controls for Admin trying to update Owner/Admin, or Owner trying to update themselves
-                  const canModifyRole = isOwner && !isSelf;
+                  const canModifyRole = isOwner ? !isSelf : (isAdmin && !isUserOwner && !isUserAdmin);
                   const canModifySubscription = isOwner || (isAdmin && !isUserOwner && !isUserAdmin);
 
                   return (
@@ -553,11 +571,9 @@ export function UsersManagementPage() {
                                  className="px-2 py-1 bg-gray-50 border border-gray-200 text-[11px] font-bold rounded-lg outline-none focus:border-[#0057B8] cursor-pointer disabled:opacity-50"
                               >
                                 {isOwner && <option value="owner">مالك المنصة (Owner)</option>}
-                                <option value="admin">مدير (Admin)</option>
-                                <option value="staff">موظف (Staff)</option>
-                                <option value="customer">عميل (Customer)</option>
-                                {userItem.role === 'manager' && <option value="manager">مدير عمليات (Manager)</option>}
-                                {userItem.role === 'user' && <option value="user">مستشار عقاري (User)</option>}
+                                {(isOwner || userItem.role === 'manager') && <option value="manager">مدير عمليات (Manager)</option>}
+                                <option value="employee">موظف (Employee)</option>
+                                <option value="user">مستشار عقاري (User)</option>
                               </select>
                             </div>
 
@@ -585,7 +601,7 @@ export function UsersManagementPage() {
                             disabled={
                               isSelf || 
                               isUserOwner ||
-                              (!isOwner && !['customer', 'staff', 'user', 'manager'].includes(userItem.role))
+                              (!isOwner && !['user', 'employee'].includes(userItem.role))
                             }
                             className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 rounded-lg text-[11px] font-bold cursor-pointer disabled:opacity-50 transition-all"
                           >

@@ -207,7 +207,7 @@ export interface UserSubscription {
   id: string;
   username: string;
   email: string;
-  role: 'admin' | 'manager' | 'user';
+  role: 'owner' | 'manager' | 'employee' | 'user';
   plan: 'free' | 'premium' | 'enterprise';
   calculationsCount: number;
   expiryDate: string;

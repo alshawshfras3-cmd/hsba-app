@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { normalizeNumberInput } from '../../lib/number-input';
 
 interface NumericInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'value'> {
   value: number;
@@ -27,7 +28,7 @@ export default function NumericInput({
     if (value === 0) {
       if (localVal !== '') setLocalVal('');
     } else {
-      const parsedLocal = parseFloat(localVal);
+      const parsedLocal = parseFloat(localVal.replace(/,/g, ''));
       // If the parent number is different from parsed local representation, sync them
       if (isNaN(parsedLocal) || parsedLocal !== value) {
         setLocalVal(value.toString());
@@ -51,8 +52,8 @@ export default function NumericInput({
       result = result.replace(persian[i], i.toString());
     }
 
-    // Convert Arabic comma (،) and normal comma (,) to decimal dot (.)
-    result = result.replace(/،/g, '.').replace(/,/g, '.');
+    // Convert Arabic comma (،) to decimal dot (.)
+    result = result.replace(/،/g, '.');
 
     return result;
   };
@@ -61,19 +62,11 @@ export default function NumericInput({
     const raw = e.target.value;
     const translated = convertArabicToEnglish(raw);
 
-    // Filter characters
-    let sanitized = allowDecimals
-      ? translated.replace(/[^0-9\.]/g, '')
-      : translated.replace(/[^0-9]/g, '');
+    // Apply normalizeNumberInput to handle digits/dot/comma safely
+    let sanitized = normalizeNumberInput(translated);
 
-    if (allowDecimals) {
-      // Ensure only one dot exists
-      const firstDotIdx = sanitized.indexOf('.');
-      if (firstDotIdx !== -1) {
-        sanitized =
-          sanitized.slice(0, firstDotIdx + 1) +
-          sanitized.slice(firstDotIdx + 1).replace(/\./g, '');
-      }
+    if (!allowDecimals) {
+      sanitized = sanitized.replace(/\./g, '');
     }
 
     setLocalVal(sanitized);
@@ -84,8 +77,7 @@ export default function NumericInput({
       let parsed = allowDecimals ? parseFloat(sanitized) : parseInt(sanitized, 10);
       if (!isNaN(parsed)) {
         if (min !== undefined && parsed < min) {
-          // Keep the local representation but don't clip yet, or trigger callback
-          // For UX, it is best to set the state, but we can clamp on blur if needed
+          // Keep local state
         }
         if (max !== undefined && parsed > max) {
           parsed = max;
@@ -109,7 +101,7 @@ export default function NumericInput({
       return;
     }
 
-    let parsed = allowDecimals ? parseFloat(localVal) : parseInt(localVal, 10);
+    let parsed = allowDecimals ? parseFloat(localVal.replace(/,/g, '')) : parseInt(localVal.replace(/,/g, ''), 10);
     if (!isNaN(parsed)) {
       if (min !== undefined && parsed < min) {
         parsed = min;

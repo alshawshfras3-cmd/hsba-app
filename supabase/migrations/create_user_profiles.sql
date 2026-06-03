@@ -2,12 +2,12 @@
 -- حسبة - إنشاء وتعديل جدول بروفايلات المستخدمين والصلاحيات (user_profiles)
 -- =========================================================================
 
--- 1. إنشاء/تعديل جدول البروفايلات في سكيمة public مع دعم الرتب الجديدة
+-- 1. إنشاء/تعديل جدول البروفايلات في سكيمة public مع دعم الرتب الجديدة المعتمدة
 CREATE TABLE IF NOT EXISTS public.user_profiles (
   id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email text,
   full_name text,
-  role text DEFAULT 'customer',
+  role text DEFAULT 'user',
   subscription text DEFAULT 'free' CHECK (subscription IN ('free', 'basic', 'premium', 'enterprise')),
   subscription_expires_at timestamptz,
   created_at timestamptz DEFAULT now(),
@@ -15,15 +15,15 @@ CREATE TABLE IF NOT EXISTS public.user_profiles (
   is_active boolean DEFAULT true
 );
 
--- تعديل قيد التحقق من الرتب ليشمل الرتب الجديدة والموروثة للتوافق التام
+-- تعديل قيد التحقق من الرتب ليشمل الرتب النهائية المعتمدة فقط
 ALTER TABLE public.user_profiles DROP CONSTRAINT IF EXISTS user_profiles_role_check;
 ALTER TABLE public.user_profiles ADD CONSTRAINT user_profiles_role_check 
-  CHECK (role IN ('owner', 'admin', 'staff', 'customer', 'user', 'manager'));
+  CHECK (role IN ('owner', 'manager', 'employee', 'user'));
 
 -- 2. تفعيل سياسة أمان مستوى الصفوف (Row Level Security - RLS)
 ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
 
--- 3. دوال مساعدة معرّفة بحصانة أمان (SECURITY DEFINER) لمنع الدوران اللانهائي (Infinite Recursion)
+-- 3. دوال مساعدة معرّفة بحصانة أمان (SECURITY DEFINER) لمنع الدوران اللانهائي (Infinite Recursion) مع تحديد search_path الآمن
 -- دالة التحقق من رتبة المالك
 CREATE OR REPLACE FUNCTION public.is_owner(user_id uuid)
 RETURNS boolean AS $$
@@ -34,18 +34,29 @@ BEGIN
   SELECT email, role INTO v_email, v_role FROM public.user_profiles WHERE id = user_id;
   RETURN (v_role = 'owner' OR v_email = 'alshawshfras@gmail.com' OR v_email = 'alshawshfras3@gmail.com');
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
--- دالة التحقق من رتبة المدير (Admin)
-CREATE OR REPLACE FUNCTION public.is_admin(user_id uuid)
+-- دالة التحقق من رتبة المدير (Manager)
+CREATE OR REPLACE FUNCTION public.is_manager(user_id uuid)
 RETURNS boolean AS $$
 DECLARE
   v_role text;
 BEGIN
   SELECT role INTO v_role FROM public.user_profiles WHERE id = user_id;
-  RETURN (v_role = 'admin');
+  RETURN (v_role = 'manager');
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+-- دالة عامة للتحقق من أي رتبة معينة
+CREATE OR REPLACE FUNCTION public.has_role(user_id uuid, requested_role text)
+RETURNS boolean AS $$
+DECLARE
+  v_role text;
+BEGIN
+  SELECT role INTO v_role FROM public.user_profiles WHERE id = user_id;
+  RETURN (v_role = requested_role);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- 4. إزالة السياسات القديمة والموروثة لمنع التعارض
 DROP POLICY IF EXISTS "allow_select_own_profile" ON public.user_profiles;
@@ -56,8 +67,9 @@ DROP POLICY IF EXISTS "admin_read_all" ON public.user_profiles;
 DROP POLICY IF EXISTS "user_read_own" ON public.user_profiles;
 DROP POLICY IF EXISTS "select_policy" ON public.user_profiles;
 DROP POLICY IF EXISTS "update_policy" ON public.user_profiles;
+DROP POLICY IF EXISTS "delete_policy" ON public.user_profiles;
 
--- 5. إنشاء سياسات أمان ذكية ومقاومة للثغرات
+-- 5. إنشاء سياسات أمان ذكية ومقاومة للثغرات تدعم الأدوار الجديدة المعتمدة
 -- سياسة القراءة (SELECT):
 -- - المالك يرى كل شيء وكل الرتب.
 -- - المدير يرى الجميع ما عدا المالك.
@@ -65,28 +77,28 @@ DROP POLICY IF EXISTS "update_policy" ON public.user_profiles;
 CREATE POLICY "select_policy" ON public.user_profiles
 FOR SELECT USING (
   public.is_owner(auth.uid()) OR
-  (public.is_admin(auth.uid()) AND COALESCE(role, 'customer') <> 'owner') OR
+  (public.is_manager(auth.uid()) AND COALESCE(role, 'user') <> 'owner') OR
   (auth.uid() = id)
 );
 
 -- سياسة التحديث (UPDATE):
 -- - المالك يستطيع تعديل كل شيء.
--- - المدير يستطيع تعديل الباقات والأدوار للعملاء والموظفين وجميع الأدوار ما عدا المالك والمدراء الآخرين، ولا يستطيع الترقية لمالك أو مدير آخر.
--- - العضو العادي يعدل بروفايله الخاص فقط دون تغيير هوية الدور رتبته أو الاشتراك.
+-- - المدير يستطيع تعديل الباقات والأدوار للعملاء والموظفين الماليين ما عدا المالك والملّاك الآخرين والمدراء المساعدين الآخرين.
+-- - العضو العادي يحدّث بروفايله الخاص فقط دون تغيير رتبته أو الاشتراك.
 CREATE POLICY "update_policy" ON public.user_profiles
 FOR UPDATE USING (
   public.is_owner(auth.uid()) OR
   (
-    public.is_admin(auth.uid()) AND 
-    COALESCE(role, 'customer') IN ('customer', 'staff', 'user', 'manager')
+    public.is_manager(auth.uid()) AND 
+    COALESCE(role, 'user') IN ('user', 'employee')
   ) OR
   (auth.uid() = id)
 ) WITH CHECK (
   public.is_owner(auth.uid()) OR
   (
-    public.is_admin(auth.uid()) AND 
-    COALESCE(role, 'customer') IN ('customer', 'staff', 'user', 'manager') AND
-    (COALESCE(role, 'customer') NOT IN ('owner', 'admin'))
+    public.is_manager(auth.uid()) AND 
+    COALESCE(role, 'user') IN ('user', 'employee') AND
+    (COALESCE(role, 'user') NOT IN ('owner', 'manager'))
   ) OR
   (
     auth.uid() = id AND 
@@ -97,14 +109,13 @@ FOR UPDATE USING (
 
 -- سياسة الحذف (DELETE):
 -- - المالك يستطيع حذف الجميع ما عدا نفسه.
--- - المدير يستطيع حذف customer و staff (و user و manager) فقط.
-DROP POLICY IF EXISTS "delete_policy" ON public.user_profiles;
+-- - المدير يستطيع حذف المستخدم (user) والموظف (employee) فقط.
 CREATE POLICY "delete_policy" ON public.user_profiles
 FOR DELETE USING (
   public.is_owner(auth.uid()) OR
   (
-    public.is_admin(auth.uid()) AND 
-    COALESCE(role, 'customer') IN ('customer', 'staff', 'user', 'manager')
+    public.is_manager(auth.uid()) AND 
+    COALESCE(role, 'user') IN ('user', 'employee')
   )
 );
 
@@ -117,7 +128,7 @@ BEGIN
   IF new.email = 'alshawshfras@gmail.com' OR new.email = 'alshawshfras3@gmail.com' THEN
     v_role := 'owner';
   ELSE
-    v_role := 'customer';
+    v_role := 'user';
   END IF;
 
   INSERT INTO public.user_profiles (id, email, full_name, role, subscription)
@@ -131,7 +142,7 @@ BEGIN
   ON CONFLICT (id) DO NOTHING;
   RETURN new;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- ربط الدالة بجدول مستخدمي Supabase Auth
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
@@ -145,7 +156,7 @@ SELECT
   id,
   email,
   COALESCE(raw_user_meta_data->>'full_name', raw_user_meta_data->>'username', split_part(email, '@', 1)),
-  CASE WHEN email IN ('alshawshfras@gmail.com', 'alshawshfras3@gmail.com') THEN 'owner'::text ELSE 'customer'::text END,
+  CASE WHEN email IN ('alshawshfras@gmail.com', 'alshawshfras3@gmail.com') THEN 'owner'::text ELSE 'user'::text END,
   'free',
   created_at
 FROM auth.users
@@ -169,7 +180,7 @@ BEGIN
   -- يتم حذف العضو نفسه من auth.users وينتقل الحذف بالتبعية (Cascade) للبروفايل
   DELETE FROM auth.users WHERE id = auth.uid();
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- 10. دالة حذف حساب مستخدم آخر بواسطة مالك المنصة أو المدير العام
 CREATE OR REPLACE FUNCTION public.delete_user_by_admin(target_user_id uuid)
@@ -185,7 +196,7 @@ BEGIN
   WHERE id = auth.uid();
 
   -- جلب رتبة المستهدف بالحذف
-  SELECT COALESCE(role, 'customer') INTO v_target_role
+  SELECT COALESCE(role, 'user') INTO v_target_role
   FROM public.user_profiles
   WHERE id = target_user_id;
 
@@ -198,9 +209,9 @@ BEGIN
   IF (v_caller_role = 'owner' OR v_caller_email = 'alshawshfras@gmail.com' OR v_caller_email = 'alshawshfras3@gmail.com') THEN
     -- المالك يستطيع حذف الجميع ما عدا نفسه
     DELETE FROM auth.users WHERE id = target_user_id;
-  ELSIF (v_caller_role = 'admin') THEN
-    -- المدير يستطيع حذف customer و staff (و user و manager) فقط
-    IF v_target_role IN ('customer', 'staff', 'user', 'manager') THEN
+  ELSIF (v_caller_role = 'manager') THEN
+    -- المدير يستطيع حذف user و employee فقط
+    IF v_target_role IN ('user', 'employee') THEN
       DELETE FROM auth.users WHERE id = target_user_id;
     ELSE
       RAISE EXCEPTION 'غير مصرح للوصول: لا يمكن للمدير حذف حسابات المسؤولين أو ملاك النظام.';
@@ -209,5 +220,52 @@ BEGIN
     RAISE EXCEPTION 'غير مصرح للوصول: هذه العملية مخصصة لمالك المنصة والمدراء المعتمدين فقط.';
   END IF;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+-- 11. دالة التحقق من صلاحيات كتابة الإعدادات
+CREATE OR REPLACE FUNCTION public.can_write_settings(user_id uuid)
+RETURNS boolean AS $$
+DECLARE
+  v_role text;
+BEGIN
+  SELECT role INTO v_role FROM public.user_profiles WHERE id = user_id;
+  RETURN (v_role IN ('owner', 'manager', 'employee'));
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+-- 12. الجدول 11: system_settings وإعدادات الأمان الخاصة به
+CREATE TABLE IF NOT EXISTS public.system_settings (
+  key text PRIMARY KEY,
+  value jsonb NOT NULL,
+  source text DEFAULT 'seed',
+  updated_at timestamptz DEFAULT now(),
+  updated_by text
+);
+
+ALTER TABLE public.system_settings ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "read_system_settings" ON public.system_settings;
+CREATE POLICY "read_system_settings" ON public.system_settings 
+  FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "write_system_settings" ON public.system_settings;
+CREATE POLICY "write_system_settings" ON public.system_settings 
+  FOR ALL USING (public.can_write_settings(auth.uid()));
+
+-- 13. تحديث الأدوار وتوحيدها وتطبيق الاستثناءات
+UPDATE public.user_profiles
+SET role = 'owner'
+WHERE email = 'alshawshfras3@gmail.com';
+
+UPDATE public.user_profiles
+SET role = 'owner'
+WHERE role = 'admin';
+
+UPDATE public.user_profiles
+SET role = 'employee'
+WHERE role = 'staff';
+
+UPDATE public.user_profiles
+SET role = 'user'
+WHERE role = 'customer';
 
