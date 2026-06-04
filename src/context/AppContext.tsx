@@ -186,6 +186,28 @@ function mergeDsrRulesWithSeeds(existingRules: DsrRule[], seedRules: DsrRule[]) 
   };
 }
 
+function deepEqual(a: any, b: any): boolean {
+  if (a === b) return true;
+  if (a && b && typeof a === 'object' && typeof b === 'object') {
+    if (Array.isArray(a)) {
+      if (!Array.isArray(b) || a.length !== b.length) return false;
+      for (let i = 0; i < a.length; i++) {
+        if (!deepEqual(a[i], b[i])) return false;
+      }
+      return true;
+    }
+    const keysA = Object.keys(a).filter(k => a[k] !== undefined && a[k] !== null);
+    const keysB = Object.keys(b).filter(k => b[k] !== undefined && b[k] !== null);
+    if (keysA.length !== keysB.length) return false;
+    for (const key of keysA) {
+      if (!keysB.includes(key)) return false;
+      if (!deepEqual(a[key], b[key])) return false;
+    }
+    return true;
+  }
+  return false;
+}
+
 const defaultSectorsList = [
   { id: 'gov_civil', nameAr: 'حكومي مدني', isActive: true, retirementAge: 60, notes: 'لا يحتاج رتبة' },
   { id: 'semi_gov', nameAr: 'شبه حكومي', isActive: true, retirementAge: 60, notes: 'لا يحتاج رتبة' },
@@ -629,7 +651,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     pensionRulesLibrary,
   };
 
-  const hasUnsavedChanges = JSON.stringify(currentSettings) !== JSON.stringify(savedSettings);
+  const hasUnsavedChanges = !isSettingsLoading && !deepEqual(currentSettings, savedSettings);
 
   const saveChanges = async () => {
     // Save dynamically to granular Supabase keys in system_settings table
