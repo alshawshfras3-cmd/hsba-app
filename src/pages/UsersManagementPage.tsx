@@ -9,7 +9,7 @@ type Profile = {
   id: string;
   email: string;
   full_name: string | null;
-  role: 'owner' | 'user';
+  role: 'admin' | 'user';
   subscription: 'free' | 'basic' | 'premium' | 'enterprise';
   subscription_expires_at?: string | null;
   created_at: string;
@@ -19,11 +19,11 @@ type Profile = {
 };
 
 const roleLabel = { 
-  owner: 'مدير',
+  admin: 'مدير',
   user: 'مستخدم'
 };
 const roleColor = {
-  owner: 'bg-emerald-50 text-emerald-700 border border-emerald-100 font-extrabold',
+  admin: 'bg-emerald-50 text-emerald-700 border border-emerald-100 font-extrabold',
   user: 'bg-slate-100 text-slate-700 border border-slate-200'
 };
 
@@ -61,7 +61,7 @@ export function UsersManagementPage() {
     setErrorMsg('');
 
     // Determine current user role
-    const currentUserRole = isOwner ? 'owner' : 'user';
+    const currentUserRole = isOwner ? 'admin' : 'user';
 
     if (!hasSupabaseKeys) {
       // Return beautiful mock user list for local view
@@ -77,7 +77,7 @@ export function UsersManagementPage() {
           const isSusp = suspendedMocks.includes(em);
           return {
             ...u,
-            role: (em === 'alshawshfras.gmail.com' || em === 'alshawshfras3@gmail.com' || (u.role as any) === 'owner' || (u.role as any) === 'manager' || (u.role as any) === 'admin') ? 'owner' as const : 'user' as const,
+            role: (em === 'alshawshfras3@gmail.com' || (u.role as any) === 'admin') ? 'admin' as const : 'user' as const,
             subscription: u.subscription || 'free',
             status: isSusp ? 'suspended' : 'active',
             is_active: !isSusp
@@ -91,7 +91,7 @@ export function UsersManagementPage() {
             id: user.id,
             email: user.email || '',
             full_name: authProfile?.full_name || user.user_metadata?.full_name || user.user_metadata?.username || 'مستخدم',
-            role: (isOwner ? 'owner' : 'user') as any,
+            role: (isOwner || em === 'alshawshfras3@gmail.com') ? 'admin' : 'user',
             subscription: 'free',
             created_at: user.created_at || new Date().toISOString(),
             last_login: new Date().toISOString(),
@@ -103,7 +103,7 @@ export function UsersManagementPage() {
 
       // Safe filtering on mock list
       let filtered = mockUsers;
-      if (currentUserRole !== 'owner' && user) {
+      if (currentUserRole !== 'admin' && user) {
         filtered = filtered.filter(u => u.id === user.id);
       }
 
@@ -115,7 +115,7 @@ export function UsersManagementPage() {
     try {
       let query = supabase.from('user_profiles').select('*');
       
-      if (currentUserRole !== 'owner' && user) {
+      if (currentUserRole !== 'admin' && user) {
         query = query.eq('id', user.id);
       }
       
@@ -127,8 +127,8 @@ export function UsersManagementPage() {
       let typedData = (data ?? []).map((item: any) => {
         let r = item.role || 'user';
         const em = (item.email || '').toLowerCase().trim();
-        if (em === 'alshawshfras3@gmail.com' || em === 'alshawshfras@gmail.com' || r === 'owner' || r === 'admin' || r === 'manager') {
-          r = 'owner';
+        if (em === 'alshawshfras3@gmail.com' || r === 'admin') {
+          r = 'admin';
         } else {
           r = 'user';
         }
@@ -140,15 +140,15 @@ export function UsersManagementPage() {
 
         return {
           ...item,
-          role: r,
+          role: r as 'admin' | 'user',
           status: statusVal,
           subscription: item.subscription || 'free'
         };
       }) as Profile[];
       
       // Direct clientside filter as additional double safety
-      if (currentUserRole !== 'owner') {
-        typedData = typedData.filter(u => u.role !== 'owner' && u.email?.toLowerCase().trim() !== 'alshawshfras@gmail.com' && u.email?.toLowerCase().trim() !== 'alshawshfras3@gmail.com');
+      if (currentUserRole !== 'admin') {
+        typedData = typedData.filter(u => u.role !== 'admin' && u.email?.toLowerCase().trim() !== 'alshawshfras3@gmail.com');
       }
 
       setUsers(typedData);
@@ -160,14 +160,14 @@ export function UsersManagementPage() {
           id: user.id,
           email: user.email || '',
           full_name: authProfile?.full_name || user.user_metadata?.full_name || user.user_metadata?.username || 'مستخدم',
-          role: (isOwner ? 'owner' : 'user') as any,
+          role: (isOwner || (user.email ?? '').toLowerCase().trim() === 'alshawshfras3@gmail.com') ? 'admin' : 'user',
           subscription: 'free',
           created_at: user.created_at || new Date().toISOString(),
           last_login: new Date().toISOString(),
           status: 'active',
           is_active: true
         };
-        const filteredFallback = (currentUserRole !== 'owner' && fallbackProfile.role === 'owner') ? [] : [fallbackProfile];
+        const filteredFallback = (currentUserRole !== 'admin' && fallbackProfile.role === 'admin') ? [] : [fallbackProfile];
         setUsers(filteredFallback);
         setErrorMsg('ملاحظة: تعذر الاتصال بجدول المستخدمين الموحد في Supabase. تم عرض حسابك الحالي مؤقتاً.');
       } else {
@@ -178,9 +178,16 @@ export function UsersManagementPage() {
     }
   }
 
-  async function updateRole(userId: string, newRole: 'owner' | 'user') {
+  async function updateRole(userId: string, newRole: 'admin' | 'user') {
     const targetUser = users.find(u => u.id === userId);
-    const currentUserRole = isOwner ? 'owner' : 'user';
+    if (!targetUser) return;
+
+    const targetEmail = (targetUser.email || '').toLowerCase().trim();
+
+    if (targetEmail === 'alshawshfras3@gmail.com') {
+      alert('لا يمكن تعديل صلاحية المدير الأساسي.');
+      return;
+    }
 
     // Admin/User cannot edit themselves
     if (userId === authProfile?.id) {
@@ -189,7 +196,7 @@ export function UsersManagementPage() {
     }
 
     // Role protection checks
-    if (currentUserRole !== 'owner') {
+    if (!isOwner) {
       alert('خطأ أمني: غير مصرح لك بتعديل أو ترقية أدوار المستخدمين الآخرين!');
       return;
     }
@@ -213,7 +220,7 @@ export function UsersManagementPage() {
   }
 
   async function toggleStatus(userId: string, currentStatus: string | null | undefined, targetEmail: string) {
-    const isOwnerEmail = targetEmail.toLowerCase().trim() === 'alshawshfras@gmail.com' || targetEmail.toLowerCase().trim() === 'alshawshfras3@gmail.com';
+    const isOwnerEmail = targetEmail.toLowerCase().trim() === 'alshawshfras3@gmail.com';
     if (isOwnerEmail) {
       alert('ممنوع تماماً حظر أو تعطيل حساب مالك النظام الأساسي!');
       return;
@@ -412,7 +419,7 @@ export function UsersManagementPage() {
               className="px-3 py-2 bg-gray-50 border border-gray-200 text-gray-900 rounded-xl text-xs font-bold font-sans outline-none cursor-pointer focus:border-[#0057B8] transition-all"
             >
               <option value="all">كل الصلاحيات</option>
-              <option value="owner">مدير</option>
+              <option value="admin">مدير</option>
               <option value="user">مستخدم</option>
             </select>
           </div>
@@ -456,7 +463,7 @@ export function UsersManagementPage() {
               </thead>
               <tbody className="divide-y divide-[#F1F5F9] font-semibold">
                 {filteredUsers.map(userItem => {
-                  const isUserOwner = userItem.role === 'owner' || userItem.email === 'alshawshfras@gmail.com' || userItem.email === 'alshawshfras3@gmail.com';
+                  const isUserOwner = userItem.role === 'admin' || userItem.email === 'alshawshfras3@gmail.com';
                   const isSelf = userItem.id === authProfile?.id;
                   
                   // Disable dropdown controls for Owner trying to update themselves
@@ -508,7 +515,7 @@ export function UsersManagementPage() {
                                    disabled={!canModifyRole}
                                    className="px-2 py-1 bg-gray-50 border border-gray-200 text-[11px] font-bold rounded-lg outline-none focus:border-[#0057B8] cursor-pointer disabled:opacity-50"
                                 >
-                                  <option value="owner">مدير</option>
+                                  <option value="admin">مدير</option>
                                   <option value="user">مستخدم</option>
                                 </select>
                               )}

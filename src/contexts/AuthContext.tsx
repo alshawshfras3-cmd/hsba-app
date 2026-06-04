@@ -3,7 +3,7 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase, hasSupabaseKeys, SUPABASE_TIMEOUT_MS, cleanStaleSupabaseSession } from '../lib/supabase';
 import { Shield, AlertCircle } from 'lucide-react';
 
-export type UserRole = 'owner' | 'user';
+export type UserRole = 'admin' | 'user';
 
 interface UserProfile {
   id: string;
@@ -59,7 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (result && !result.error && result.data) {
         let profileData = result.data;
         const lowercaseEmail = (email || profileData.email || '').toLowerCase().trim();
-        const isOwnerEmail = lowercaseEmail === 'alshawshfras@gmail.com' || lowercaseEmail === 'alshawshfras3@gmail.com';
+        const isOwnerEmail = lowercaseEmail === 'alshawshfras3@gmail.com';
         
         // Block suspended users (except the protected super admnin)
         if ((profileData.status === 'suspended' || profileData.is_active === false) && !isOwnerEmail) {
@@ -77,9 +77,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         let targetRole = profileData.role;
         
-        // Simplify role model to: owner (مدير) or user (مشترك)
-        if (isOwnerEmail || targetRole === 'owner' || targetRole === 'admin' || targetRole === 'manager') {
-          targetRole = 'owner';
+        // Simplify role model to: admin or user
+        if (isOwnerEmail || targetRole === 'admin') {
+          targetRole = 'admin';
         } else {
           targetRole = 'user';
         }
@@ -107,7 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       console.warn("Could not fetch profile, falling back to basic details", err);
       const lowercaseEmail = (email || '').toLowerCase().trim();
-      const isOwnerEmail = lowercaseEmail === 'alshawshfras@gmail.com' || lowercaseEmail === 'alshawshfras3@gmail.com';
+      const isOwnerEmail = lowercaseEmail === 'alshawshfras3@gmail.com';
       
       const suspendedMocks = JSON.parse(localStorage.getItem('hesba_suspended_mock_emails') || '[]');
       const isSuspendedMock = suspendedMocks.includes(lowercaseEmail) && !isOwnerEmail;
@@ -123,7 +123,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: email || '',
         full_name: userMetadata?.full_name || userMetadata?.username || null,
         avatar_url: userMetadata?.avatar_url || null,
-        role: isOwnerEmail ? 'owner' : 'user',
+        role: isOwnerEmail ? 'admin' : 'user',
         status: isSuspendedMock ? 'suspended' : 'active'
       });
     }
@@ -196,19 +196,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const isOwnerEmail = (email?: string) => {
     const e = email?.toLowerCase().trim();
-    return e === 'alshawshfras@gmail.com' || e === 'alshawshfras3@gmail.com';
+    return e === 'alshawshfras3@gmail.com';
   };
 
-  const isOwner = profile?.role === 'owner' || isOwnerEmail(user?.email);
-  const isAdmin = isOwner;
-  const isStaff = isOwner;
-  const isCustomer = !isOwner;
+  const isAdmin = profile?.role === 'admin' || isOwnerEmail(user?.email);
+  const isOwner = isAdmin;
+  const isStaff = isAdmin;
+  const isCustomer = !isAdmin;
 
-  const canAccessDashboard = isOwner;
+  const canAccessDashboard = isAdmin;
 
   // For compatibility with any legacy code that expects legacyIsAdmin or legacyIsManager checks
-  const legacyIsAdmin = isOwner;
-  const legacyIsManager = isOwner;
+  const legacyIsAdmin = isAdmin;
+  const legacyIsManager = isAdmin;
 
   async function signInWithGoogle() {
     if (!hasSupabaseKeys) {
@@ -218,15 +218,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         id: 'mock_google_user',
         email: mockEmail,
         user_metadata: {
-          full_name: 'فراس الشاوش (مالك المنصة)',
+          full_name: 'فراس الشاوش (مدير المنصة)',
         }
       } as any);
       setProfile({
         id: 'mock_google_user',
         email: mockEmail,
-        full_name: 'فراس الشاوش (مالك المنصة)',
+        full_name: 'فراس الشاوش (مدير المنصة)',
         avatar_url: null,
-        role: 'owner'
+        role: 'admin'
       });
       return;
     }
@@ -238,7 +238,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function signInWithEmail(email: string, password: string) {
     const emailLower = email.trim().toLowerCase();
-    const isOwner = emailLower === 'alshawshfras@gmail.com' || emailLower === 'alshawshfras3@gmail.com';
+    const isOwner = emailLower === 'alshawshfras3@gmail.com';
 
     // Intercept mock mode suspension
     const suspendedMocks = JSON.parse(localStorage.getItem('hesba_suspended_mock_emails') || '[]');
@@ -252,15 +252,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         id: 'mock_email_user',
         email: emailLower,
         user_metadata: {
-          full_name: isOwner ? 'فراس الشاوش (مالك المنصة)' : emailLower.split('@')[0],
+          full_name: isOwner ? 'فراس الشاوش (مدير المنصة)' : emailLower.split('@')[0],
         }
       } as any);
       setProfile({
         id: 'mock_email_user',
         email: emailLower,
-        full_name: isOwner ? 'فراس الشاوش (مالك المنصة)' : emailLower.split('@')[0],
+        full_name: isOwner ? 'فراس الشاوش (مدير المنصة)' : emailLower.split('@')[0],
         avatar_url: null,
-        role: isOwner ? 'owner' : 'user',
+        role: isOwner ? 'admin' : 'user',
         status: 'active'
       });
       setIsSuspendedUser(false);
@@ -292,7 +292,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function signUpWithEmail(email: string, password: string, fullName: string) {
     if (!hasSupabaseKeys) {
       const emailLower = email.trim().toLowerCase();
-      const isOwner = emailLower === 'alshawshfras@gmail.com' || emailLower === 'alshawshfras3@gmail.com';
+      const isOwner = emailLower === 'alshawshfras3@gmail.com';
       const mockUser = {
         id: 'mock_email_user',
         email: emailLower,
@@ -306,7 +306,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: emailLower,
         full_name: fullName,
         avatar_url: null,
-        role: isOwner ? 'owner' : 'user'
+        role: isOwner ? 'admin' : 'user'
       });
       return { user: mockUser, session: { access_token: 'mock_token' } };
     }
