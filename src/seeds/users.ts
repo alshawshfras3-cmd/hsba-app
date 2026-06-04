@@ -5,7 +5,7 @@ export const initialUserSubscriptions: UserSubscription[] = [
     id: 'user_01',
     username: 'أحمد القحطاني',
     email: 'ahmed.q@sahlah.com',
-    role: 'manager',
+    role: 'owner',
     plan: 'enterprise',
     calculationsCount: 1450,
     expiryDate: '2028-12-31',

@@ -84,20 +84,20 @@ export default function Header() {
             </button>
           )}
 
-          {(userRole === 'owner' || userRole === 'manager' || userRole === 'employee') && (
+          {userRole === 'owner' && (
             <button
-              id="nav-admin-btn"
-              onClick={() => handleNavChange('admin')}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-sans text-xs font-bold transition-all ${
-                location.pathname === '/admin'
-                  ? 'bg-white dark:bg-slate-900 text-[#0057B8] dark:text-white shadow-sm'
-                  : 'text-gray-500 dark:text-slate-450 hover:text-[#111827] dark:hover:text-white'
-              }`}
-            >
-              <ShieldAlert className="w-4 h-4" />
-              <span>لوحة التحكم للإدارة</span>
-            </button>
-          )}
+               id="nav-admin-btn"
+               onClick={() => handleNavChange('admin')}
+               className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-sans text-xs font-bold transition-all ${
+                 location.pathname === '/admin'
+                   ? 'bg-white dark:bg-slate-900 text-[#0057B8] dark:text-white shadow-sm'
+                   : 'text-gray-500 dark:text-slate-450 hover:text-[#111827] dark:hover:text-white'
+               }`}
+             >
+               <ShieldAlert className="w-4 h-4" />
+               <span>لوحة التحكم للإدارة</span>
+             </button>
+           )}
         </div>
 
         {/* Brand Minimal Accent */}
@@ -109,12 +109,10 @@ export default function Header() {
                   {user.email}
                 </span>
                 <span className={`inline-block text-[9px] font-bold px-1.5 py-0.5 mt-1 rounded leading-none ${
-                  userRole === 'owner' ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white dark:from-purple-950 dark:to-indigo-950/40 dark:text-purple-350' :
-                  userRole === 'manager' ? 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300' :
-                  userRole === 'employee' ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300' :
+                  userRole === 'owner' ? 'bg-emerald-50 text-emerald-700 border border-emerald-150/40 dark:bg-emerald-950/40 dark:text-emerald-350' :
                   'bg-slate-100 text-[#475569] dark:bg-slate-700 dark:text-slate-300'
                 }`}>
-                  {userRole === 'owner' ? 'مالك رئيسي' : userRole === 'manager' ? 'مدير عام مسبق' : userRole === 'employee' ? 'موظف مالي' : 'مستشار'}
+                  {userRole === 'owner' ? 'مدير' : 'مستخدم'}
                 </span>
               </div>
               <button
@@ -195,24 +193,21 @@ export default function Header() {
                 </div>
                 <div className="flex justify-between text-xs font-bold text-slate-500 dark:text-slate-400">
                   <span>صلاحية الحساب:</span>
-                  <span className="text-emerald-600 dark:text-emerald-400">{userRole === 'owner' ? 'مالك رئيسي للسيستم' : (userRole === 'manager' ? 'مدير عمليات معتمد' : (userRole === 'employee' ? 'موظف مالي داخلي' : 'مستشار مالي معتمد'))}</span>
-                </div>
-                <div className="flex justify-between text-xs font-bold text-slate-500 dark:text-slate-400">
-                  <span>باقة الاشتراك مفعّلة:</span>
-                  <span className="text-indigo-600 dark:text-indigo-400 font-bold">{planName}</span>
+                  <span className="text-emerald-600 dark:text-emerald-400">{userRole === 'owner' ? 'مدير' : 'مستخدم'}</span>
                 </div>
               </div>
  
               {/* Navigation toggles if Admin / Manager */}
-              {(userRole === 'owner' || userRole === 'manager' || userRole === 'employee') && (
+              {userRole === 'owner' && (
                 <div className="grid grid-cols-2 gap-3 pt-2">
                   <button
                     onClick={() => {
                       setActiveNav('calculator');
                       setIsMobileSettingsOpen(false);
+                      location.navigate('/');
                     }}
                     className={`p-3.5 rounded-xl text-center border font-bold text-xs flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
-                      activeNav === 'calculator' 
+                      location.pathname !== '/admin' 
                         ? 'bg-[#0057B8]/10 text-[#0057B8] border-[#0057B8] dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800' 
                         : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-350'
                     }`}
@@ -224,9 +219,10 @@ export default function Header() {
                     onClick={() => {
                       setActiveNav('admin');
                       setIsMobileSettingsOpen(false);
+                      location.navigate('/admin');
                     }}
                     className={`p-3.5 rounded-xl text-center border font-bold text-xs flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
-                      activeNav === 'admin' 
+                      location.pathname === '/admin' 
                         ? 'bg-[#0057B8]/10 text-[#0057B8] border-[#0057B8] dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800' 
                         : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-350'
                     }`}

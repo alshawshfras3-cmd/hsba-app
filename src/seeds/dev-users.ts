@@ -2,7 +2,7 @@ export interface DevUserProfile {
   id: string;
   email: string;
   full_name: string | null;
-  role: 'owner' | 'manager' | 'employee' | 'user';
+  role: 'owner' | 'user';
   subscription: 'free' | 'basic' | 'premium' | 'enterprise';
   subscription_expires_at?: string | null;
   created_at: string;
@@ -23,7 +23,7 @@ export const devUsers: DevUserProfile[] = [
     id: 'manager_id_1',
     email: 'manager@hesba.sa',
     full_name: 'مدير الصلاحيات المساعد',
-    role: 'manager',
+    role: 'owner',
     subscription: 'premium',
     created_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
     last_login: new Date().toISOString(),
@@ -32,7 +32,7 @@ export const devUsers: DevUserProfile[] = [
     id: 'employee_id_1',
     email: 'employee@hesba.sa',
     full_name: 'الموظف الداخلي المالي',
-    role: 'employee',
+    role: 'user',
     subscription: 'basic',
     created_at: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
     last_login: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),

@@ -176,9 +176,6 @@ export function AccountPage() {
     }
   };
 
-  const currentSub = userSubscriptions?.find(sub => sub.email === user?.email);
-  const planName = currentSub?.plan === 'enterprise' ? 'مؤسسي متميز (Enterprise)' : (currentSub?.plan === 'premium' ? 'حساب ذهبي متكامل (Premium)' : 'اشتراك قياسي مجاني (Standard)');
-
   const getCreationDate = () => {
     if (!user?.created_at) return 'غير متوفر';
     try {
@@ -193,8 +190,8 @@ export function AccountPage() {
     }
   };
 
-  const hasAdminAccess = userRole === 'owner' || userRole === 'manager' || userRole === 'employee';
-  const displayFullName = profile?.full_name || user?.user_metadata?.full_name || user?.user_metadata?.username || 'مستشار حسبة دائم';
+  const hasAdminAccess = userRole === 'owner';
+  const displayFullName = profile?.full_name || user?.user_metadata?.full_name || user?.user_metadata?.username || (userRole === 'owner' ? 'مدير حسبة' : 'مستخدم حسبة');
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 text-right select-none animate-fade-in text-[#1E293B] dark:text-slate-100 min-h-screen transition-colors duration-200" dir="rtl">
@@ -205,10 +202,10 @@ export function AccountPage() {
           <div className="w-10 h-10 bg-[#0057B8] dark:bg-[#0EA5A4] text-white rounded-2xl flex items-center justify-center">
             <User className="w-5 h-5" />
           </div>
-          <span>ملفي الشخصي وإعدادات العضوية</span>
+          <span>ملفي الشخصي وإعدادات الحساب</span>
         </h1>
         <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-semibold">
-          تحكم في بياناتك الشخصية، والمظهر الملائم لعينيك، والأمان الهيكلي وحذف العضوية لمنصة البنك المركزي المعتمدة.
+          تحكم في بياناتك الشخصية، والمظهر الملائم لعينيك، والأمان الهيكلي لمنصة البنك المركزي المعتمدة.
         </p>
       </div>
 
@@ -221,7 +218,7 @@ export function AccountPage() {
           <div className="bg-white dark:bg-[#0F172A] border border-gray-150/70 dark:border-slate-800 rounded-3xl p-6 md:p-8 shadow-md space-y-6">
             <h3 className="font-sans font-bold text-base text-gray-950 dark:text-white border-b border-gray-100 dark:border-slate-800 pb-3 flex items-center gap-2">
               <ShieldCheck className="w-5 h-5 text-emerald-500" />
-              <span>تفاصيل الهوية والاشتراك المالي</span>
+              <span>تفاصيل الهوية والصلاحيات</span>
             </h3>
 
             {/* Static Stats Grid */}
@@ -232,10 +229,10 @@ export function AccountPage() {
               </div>
 
               <div className="bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-2xl space-y-1">
-                <span className="text-[10px] text-gray-400 dark:text-slate-400 font-bold block">باقة الترخيص الحالية:</span>
-                <span className="text-sm font-extrabold text-[#0057B8] dark:text-[#0EA5A4] flex items-center gap-1.5 font-sans">
-                  <Award className="w-4 h-4 text-amber-500" />
-                  <span>{planName}</span>
+                <span className="text-[10px] text-gray-400 dark:text-slate-400 font-bold block">حالة تفعيل الحساب:</span>
+                <span className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 font-sans">
+                  <Award className="w-4 h-4 text-emerald-500" />
+                  <span>معتمد ومفعّل بالكامل</span>
                 </span>
               </div>
 
@@ -243,7 +240,7 @@ export function AccountPage() {
                 <span className="text-[10px] text-gray-400 dark:text-slate-400 font-bold block">مستوى الصلاحية في لوحة الإدارة:</span>
                 <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
-                  <span>{userRole === 'owner' ? 'مالك المنصة والسيستم' : userRole === 'manager' ? 'مدير عام مالي' : userRole === 'employee' ? 'موظف مالي في المنصة' : 'مستشار ووسيط عقاري مالي'}</span>
+                  <span>{userRole === 'owner' ? 'مدير' : 'مستخدم'}</span>
                 </span>
               </div>
 
@@ -348,67 +345,6 @@ export function AccountPage() {
             </form>
           </div>
 
-          {/* Secure Self-Deletion Card */}
-          <div className="bg-red-50/50 dark:bg-red-950/15 border border-red-200/50 dark:border-red-900/40 rounded-3xl p-6 md:p-8 space-y-4">
-            <h3 className="font-sans font-black text-rose-700 dark:text-rose-400 text-base flex items-center gap-2">
-              <Trash2 className="w-5 h-5" />
-              <span>منطقة الخطر: حذف الحساب نهائياً</span>
-            </h3>
-            
-            <p className="text-xs text-rose-900/80 dark:text-rose-300/80 leading-relaxed font-sans">
-              عند القيام بحذف حسابك، سيتم محو ملفك الشخصي بالكامل من خوادم حسبة، بما في ذلك عروضك وسجل تصفحك والاشتراك المسدد. هذا الإجراء نهائي ولا يمكن الرجوع عنه أبداً لمتطلبات الأمان وتلقين البيانات.
-            </p>
-
-            {!showDeleteConfirm ? (
-              <button
-                type="button"
-                onClick={() => { handleVibrate(); setShowDeleteConfirm(true); }}
-                className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer"
-              >
-                طلب حذف الحساب الدائم والنهائي
-              </button>
-            ) : (
-              <div className="bg-white dark:bg-slate-900 border border-red-250 p-5 rounded-2xl space-y-4 animate-fade-in">
-                <div className="space-y-1.5">
-                  <p className="text-xs font-extrabold text-red-700 dark:text-red-400">تحذير أخير للتحقق من هوية الشخص الأساسي:</p>
-                  <p className="text-[10px] text-gray-500 dark:text-slate-400 leading-normal">
-                    لتأكيد قرار الإلغاء، يرجى كتابة كامل بريدك الإلكتروني الحالي (<code className="font-mono font-bold text-gray-700 dark:text-white bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-[11px]">{user?.email}</code>) في الحقل أدناه:
-                  </p>
-                </div>
-
-                <input
-                  type="text"
-                  value={confirmDeleteEmail}
-                  onChange={e => setConfirmDeleteEmail(e.target.value)}
-                  placeholder="name@example.com"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-left"
-                  dir="ltr"
-                />
-
-                {deleteError && (
-                  <p className="text-[11px] text-red-600 font-bold select-text">{deleteError}</p>
-                )}
-
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={handleSelfDelete}
-                    disabled={deleteLoading}
-                    className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg cursor-pointer disabled:opacity-50"
-                  >
-                    {deleteLoading ? 'جاري شطب الحساب والخرائط...' : 'نعم، قم بشطب ملف بياناتي وحذفه نهائياً'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setShowDeleteConfirm(false); setConfirmDeleteEmail(''); setDeleteError(''); }}
-                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-white text-xs font-bold rounded-lg cursor-pointer"
-                  >
-                    تراجع وإلغاء القرار
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
 
         </div>
 

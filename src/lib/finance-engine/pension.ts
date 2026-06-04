@@ -9,7 +9,15 @@ import {
 } from '../date-utils';
 import { ApprovedSalarySourceRule, PensionCalculationRule, SectorClassificationMapping, BankRetirementRule, PensionLibraryRule, BankSectorPensionRule } from '../../types/pension-rules';
 
-const getSectorRetirementAge = (sectorId: string, defaultValue = 60): number => {
+const getSectorRetirementAge = (sectorId: string, defaultValue = 60, customSectors?: any[]): number => {
+  if (customSectors && Array.isArray(customSectors)) {
+    let idToLookup = sectorId;
+    if (sectorId === 'gov_civil') idToLookup = ['government', 'civilian'].join('_');
+    const matched = customSectors.find(s => s.id === sectorId || s.id === idToLookup);
+    if (matched && typeof matched.retirementAge === 'number' && matched.retirementAge > 0) {
+      return matched.retirementAge;
+    }
+  }
   try {
     const saved = localStorage.getItem("hasba_custom_sectors");
     if (saved) {
@@ -133,6 +141,7 @@ export function calculatePensionSalary(params: {
 
   ageCalcCalendar?: 'gregorian' | 'hijri';
   serviceCalcCalendar?: 'gregorian' | 'hijri';
+  customSectors?: any[];
 }): PensionOutput {
   const {
     sectorId,
@@ -153,7 +162,8 @@ export function calculatePensionSalary(params: {
     directPensionSalary,
 
     ageCalcCalendar = 'gregorian',
-    serviceCalcCalendar = 'gregorian'
+    serviceCalcCalendar = 'gregorian',
+    customSectors
   } = params;
 
   // If retiree, use direct input
@@ -178,7 +188,7 @@ export function calculatePensionSalary(params: {
 
   // 2. Determine retirement age (e.g., 60 years or military specific)
   const isMilitary = (sectorId as string) === 'military';
-  const retirementAge = retirementAgeCustom || (isMilitary ? 45 : getSectorRetirementAge(sectorId, 60));
+  const retirementAge = retirementAgeCustom || (isMilitary ? 45 : getSectorRetirementAge(sectorId, 60, customSectors));
   const retirementAgeMonths = Math.round(retirementAge * 12);
 
   // 3. Months until retirement

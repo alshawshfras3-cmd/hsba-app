@@ -30,7 +30,9 @@ export function DiagnosticsPage() {
     dsrRules,
     supportSettings,
     personalRules,
-    termRules
+    termRules,
+    bankSectorRules,
+    customSectors
   } = useAppState();
 
   // Load custom DB rules
@@ -129,7 +131,9 @@ export function DiagnosticsPage() {
 
       approvedSalaryDbRules: dbApprovedSalaryRules,
       pensionDbRules: dbPensionRules,
-      sectorMappings: dbSectorMappings
+      sectorMappings: dbSectorMappings,
+      bankSectorRules,
+      customSectors
     }, { _debug: true });
 
     setDiagnosticsOutput(calcOutput);
@@ -175,7 +179,8 @@ export function DiagnosticsPage() {
           productId: 'personal',
           termYears: 5,
           banks, products, militaryRanks, salaryRules, pensionRules, marginRules, dsrRules, supportSettings, personalRules, termRules,
-          approvedSalaryDbRules: dbApprovedSalaryRules, pensionDbRules: dbPensionRules, sectorMappings: dbSectorMappings
+          approvedSalaryDbRules: dbApprovedSalaryRules, pensionDbRules: dbPensionRules, sectorMappings: dbSectorMappings,
+          bankSectorRules, customSectors
         });
         return out.pensionSalary === 7515;
       }
@@ -206,7 +211,8 @@ export function DiagnosticsPage() {
           productId: 'personal',
           termYears: 5,
           banks, products, militaryRanks, salaryRules, pensionRules, marginRules, dsrRules, supportSettings, personalRules, termRules,
-          approvedSalaryDbRules: dbApprovedSalaryRules, pensionDbRules: dbPensionRules, sectorMappings: dbSectorMappings
+          approvedSalaryDbRules: dbApprovedSalaryRules, pensionDbRules: dbPensionRules, sectorMappings: dbSectorMappings,
+          bankSectorRules, customSectors
         });
         return out.pensionSalary === 10400;
       }
@@ -237,7 +243,8 @@ export function DiagnosticsPage() {
           productId: 'both',
           termYears: 20,
           banks, products, militaryRanks, salaryRules, pensionRules, marginRules, dsrRules, supportSettings, personalRules, termRules,
-          approvedSalaryDbRules: dbApprovedSalaryRules, pensionDbRules: dbPensionRules, sectorMappings: dbSectorMappings
+          approvedSalaryDbRules: dbApprovedSalaryRules, pensionDbRules: dbPensionRules, sectorMappings: dbSectorMappings,
+          bankSectorRules, customSectors
         });
         return out.financeAmount === 571391;
       }
@@ -262,7 +269,8 @@ export function DiagnosticsPage() {
           productId: 'personal',
           termYears: 5,
           banks, products, militaryRanks, salaryRules, pensionRules, marginRules, dsrRules, supportSettings, personalRules, termRules,
-          approvedSalaryDbRules: dbApprovedSalaryRules, pensionDbRules: dbPensionRules, sectorMappings: dbSectorMappings
+          approvedSalaryDbRules: dbApprovedSalaryRules, pensionDbRules: dbPensionRules, sectorMappings: dbSectorMappings,
+          bankSectorRules, customSectors
         });
         return out.financeAmount === 60000;
       }

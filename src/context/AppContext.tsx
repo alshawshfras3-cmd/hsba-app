@@ -107,7 +107,7 @@ interface AppContextType {
   // Supabase Auth and Roles state
   user: any;
   setUser: React.Dispatch<React.SetStateAction<any>>;
-  userRole: 'owner' | 'manager' | 'employee' | 'user' | null;
+  userRole: 'owner' | 'user' | null;
   authLoading: boolean;
   isSettingsLoading: boolean;
   signOut: () => Promise<void>;
@@ -438,11 +438,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const { user, setUser, profile, isOwner, isAdmin, isStaff, canAccessDashboard, signOut, loading: authLoading } = useAuth();
   
   const getNormalizedRole = () => {
-    let r = profile?.role || (isOwner ? 'owner' : (isAdmin ? 'manager' : (isStaff ? 'employee' : 'user')));
-    if (r === 'admin') return 'owner';
-    if (r === 'staff') return 'employee';
-    if (r === 'customer') return 'user';
-    return r;
+    let r = profile?.role || (isOwner ? 'owner' : 'user');
+    if (r === 'admin' || (r as any) === 'manager' || (r as any) === 'employee' || r === 'owner' || isOwner) return 'owner';
+    return 'user';
   };
   const userRole = getNormalizedRole();
 

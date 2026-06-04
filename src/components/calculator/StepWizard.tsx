@@ -31,7 +31,15 @@ import {
   calculatePensionFromRule 
 } from '../../lib/finance-engine/pension';
 
-const getSectorRetirementAge = (sectorId: string, defaultValue = 60): number => {
+const getSectorRetirementAge = (sectorId: string, defaultValue = 60, customSectors?: any[]): number => {
+  if (customSectors && Array.isArray(customSectors)) {
+    let idToLookup = sectorId;
+    if (sectorId === 'gov_civil') idToLookup = 'gov_civil';
+    const matched = customSectors.find((s: any) => s.id === sectorId || s.id === idToLookup);
+    if (matched && typeof matched.retirementAge === 'number' && matched.retirementAge > 0) {
+      return matched.retirementAge;
+    }
+  }
   try {
     const saved = localStorage.getItem("hasba_custom_sectors");
     if (saved) {
@@ -118,7 +126,8 @@ export default function StepWizard() {
     setCurrentStep,
     results,
     setResults,
-    bankSectorRules
+    bankSectorRules,
+    customSectors
   } = useAppState();
 
   // --- Step Form Values State ---
@@ -467,7 +476,8 @@ export default function StepWizard() {
       advancePaymentTiers,
       personalRules,
       termRules,
-      bankSectorRules
+      bankSectorRules,
+      customSectors
     };
 
     const calculationResults = calculateBanksFinancing(calcParams);
@@ -668,25 +678,25 @@ export default function StepWizard() {
                         
                         if (sec.id === 'retired') {
                           setSalaryMode('direct');
-                          setRetirementAge(getSectorRetirementAge('retired', 60));
+                          setRetirementAge(getSectorRetirementAge('retired', 60, customSectors));
                           setAhliGroup('');
                           setMilitarySubtype('');
                           setMilitaryRank('');
                           setMilitaryType('');
                         } else if (sec.id === 'gov_civil') {
-                          setRetirementAge(getSectorRetirementAge('gov_civil', 60));
+                          setRetirementAge(getSectorRetirementAge('gov_civil', 60, customSectors));
                           setAhliGroup('A');
                           setMilitarySubtype('');
                           setMilitaryRank('');
                           setMilitaryType('');
                         } else if (sec.id === 'semi_gov') {
-                          setRetirementAge(getSectorRetirementAge('semi_gov', 60));
+                          setRetirementAge(getSectorRetirementAge('semi_gov', 60, customSectors));
                           setAhliGroup('A');
                           setMilitarySubtype('');
                           setMilitaryRank('');
                           setMilitaryType('');
                         } else if (sec.id === 'companies') {
-                          setRetirementAge(getSectorRetirementAge('companies', 60));
+                          setRetirementAge(getSectorRetirementAge('companies', 60, customSectors));
                           setAhliGroup('A');
                           setMilitarySubtype('');
                           setMilitaryRank('');

@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase, hasSupabaseKeys, SUPABASE_TIMEOUT_MS, cleanStaleSupabaseSession } from '../lib/supabase';
+import { Shield, AlertCircle } from 'lucide-react';
 
-export type UserRole = 'owner' | 'manager' | 'employee' | 'user';
+export type UserRole = 'owner' | 'user';
 
 interface UserProfile {
   id: string;
@@ -10,6 +11,7 @@ interface UserProfile {
   full_name: string | null;
   avatar_url: string | null;
   role: UserRole;
+  status?: string | null;
 }
 
 interface AuthContextType {
@@ -38,6 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isSuspendedUser, setIsSuspendedUser] = useState(false);
 
   async function fetchProfile(userId: string, email?: string, userMetadata?: any) {
     if (!hasSupabaseKeys) return;
@@ -58,19 +61,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const lowercaseEmail = (email || profileData.email || '').toLowerCase().trim();
         const isOwnerEmail = lowercaseEmail === 'alshawshfras@gmail.com' || lowercaseEmail === 'alshawshfras3@gmail.com';
         
+        // Block suspended users (except the protected super admnin)
+        if ((profileData.status === 'suspended' || profileData.is_active === false) && !isOwnerEmail) {
+          setIsSuspendedUser(true);
+          setProfile({
+            ...profileData,
+            role: 'user',
+            status: 'suspended'
+          });
+          setLoading(false);
+          return;
+        } else {
+          setIsSuspendedUser(false);
+        }
+
         let targetRole = profileData.role;
         
-        // Normalize role
-        if (targetRole === 'admin') targetRole = 'owner';
-        if (targetRole === 'staff') targetRole = 'employee';
-        if (targetRole === 'customer') targetRole = 'user';
-        
-        if (isOwnerEmail && targetRole !== 'owner') {
+        // Simplify role model to: owner (مدير) or user (مشترك)
+        if (isOwnerEmail || targetRole === 'owner' || targetRole === 'admin' || targetRole === 'manager') {
           targetRole = 'owner';
+        } else {
+          targetRole = 'user';
         }
         
-        // Update database if it is admin or mismatch
-        if (profileData.role !== targetRole || (isOwnerEmail && profileData.role !== 'owner')) {
+        // Update database if profile has outdated role
+        if (profileData.role !== targetRole) {
           try {
             await supabase
               .from('user_profiles')
@@ -83,7 +98,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         setProfile({
           ...profileData,
-          role: targetRole as UserRole
+          role: targetRole as UserRole,
+          status: profileData.status || (profileData.is_active === false ? 'suspended' : 'active')
         });
       } else {
         throw new Error(result?.error?.message || "Profile not loaded");
@@ -92,12 +108,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.warn("Could not fetch profile, falling back to basic details", err);
       const lowercaseEmail = (email || '').toLowerCase().trim();
       const isOwnerEmail = lowercaseEmail === 'alshawshfras@gmail.com' || lowercaseEmail === 'alshawshfras3@gmail.com';
+      
+      const suspendedMocks = JSON.parse(localStorage.getItem('hesba_suspended_mock_emails') || '[]');
+      const isSuspendedMock = suspendedMocks.includes(lowercaseEmail) && !isOwnerEmail;
+      
+      if (isSuspendedMock) {
+        setIsSuspendedUser(true);
+      } else {
+        setIsSuspendedUser(false);
+      }
+
       setProfile({
         id: userId,
         email: email || '',
         full_name: userMetadata?.full_name || userMetadata?.username || null,
         avatar_url: userMetadata?.avatar_url || null,
-        role: isOwnerEmail ? 'owner' : 'user'
+        role: isOwnerEmail ? 'owner' : 'user',
+        status: isSuspendedMock ? 'suspended' : 'active'
       });
     }
   }
@@ -173,15 +200,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const isOwner = profile?.role === 'owner' || isOwnerEmail(user?.email);
-  const isAdmin = profile?.role === 'manager';
-  const isStaff = profile?.role === 'employee';
-  const isCustomer = profile?.role === 'user' || (!isOwner && !isAdmin && !isStaff);
+  const isAdmin = isOwner;
+  const isStaff = isOwner;
+  const isCustomer = !isOwner;
 
-  const canAccessDashboard = isOwner || isAdmin || isStaff;
+  const canAccessDashboard = isOwner;
 
   // For compatibility with any legacy code that expects legacyIsAdmin or legacyIsManager checks
-  const legacyIsAdmin = isOwner || isAdmin;
-  const legacyIsManager = isStaff || isOwner || isAdmin;
+  const legacyIsAdmin = isOwner;
+  const legacyIsManager = isOwner;
 
   async function signInWithGoogle() {
     if (!hasSupabaseKeys) {
@@ -210,10 +237,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function signInWithEmail(email: string, password: string) {
+    const emailLower = email.trim().toLowerCase();
+    const isOwner = emailLower === 'alshawshfras@gmail.com' || emailLower === 'alshawshfras3@gmail.com';
+
+    // Intercept mock mode suspension
+    const suspendedMocks = JSON.parse(localStorage.getItem('hesba_suspended_mock_emails') || '[]');
+    if (suspendedMocks.includes(emailLower) && !isOwner) {
+      throw new Error("تم إيقاف هذا الحساب بواسطة الإدارة");
+    }
+
     if (!hasSupabaseKeys) {
       // Mock email password for Preview
-      const emailLower = email.trim().toLowerCase();
-      const isOwner = emailLower === 'alshawshfras@gmail.com' || emailLower === 'alshawshfras3@gmail.com';
       setUser({
         id: 'mock_email_user',
         email: emailLower,
@@ -226,12 +260,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: emailLower,
         full_name: isOwner ? 'فراس الشاوش (مالك المنصة)' : emailLower.split('@')[0],
         avatar_url: null,
-        role: isOwner ? 'owner' : 'user'
+        role: isOwner ? 'owner' : 'user',
+        status: 'active'
       });
+      setIsSuspendedUser(false);
       return;
     }
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+
+    // Intercept real database suspension prior to completing auth
+    const { data, error } = await supabase.auth.signInWithPassword({ email: emailLower, password });
     if (error) throw error;
+
+    if (data?.user) {
+      // Fetch their profile and check status immediately
+      const { data: prof, error: profErr } = await supabase
+        .from('user_profiles')
+        .select('status, is_active')
+        .eq('id', data.user.id)
+        .maybeSingle();
+        
+      if (!profErr && prof) {
+        if ((prof.status === 'suspended' || prof.is_active === false) && !isOwner) {
+          await supabase.auth.signOut();
+          setIsSuspendedUser(true);
+          throw new Error("تم إيقاف هذا الحساب بواسطة الإدارة");
+        }
+      }
+    }
   }
 
   async function signUpWithEmail(email: string, password: string, fullName: string) {
@@ -271,6 +326,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     setProfile(null);
     setSession(null);
+    setIsSuspendedUser(false);
   }
 
   return (
@@ -281,7 +337,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signInWithGoogle, signInWithEmail, signUpWithEmail, signOut,
       setUser, setProfile
     }}>
-      {children}
+      {isSuspendedUser && user && !isOwnerEmail(user.email) ? (
+        <div className="fixed inset-0 bg-[#F8FAFC] z-[99999] flex items-center justify-center p-6 select-none" dir="rtl">
+          <div className="bg-white border border-[#E2E8F0] p-8 rounded-2xl shadow-xl max-w-sm w-full text-center space-y-6">
+            <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto border border-red-100 animate-pulse">
+              <Shield className="w-8 h-8 animate-bounce" />
+            </div>
+            <div className="space-y-2">
+              <h2 className="font-sans font-black text-lg text-gray-950">تم إيقاف الحساب</h2>
+              <p className="text-sm font-bold text-red-600 leading-relaxed font-sans">
+                تم إيقاف هذا الحساب بواسطة الإدارة
+              </p>
+              <p className="text-[11px] text-gray-400 font-medium leading-relaxed">
+                إذا كنت ترى أن هذا الإجراء تم بالخطأ، يرجى مراجعة إدارة منصة حسبة العقارية لتفعيل الحساب.
+              </p>
+            </div>
+            <button
+              onClick={async () => {
+                await signOut();
+                setIsSuspendedUser(false);
+              }}
+              className="w-full py-3 bg-[#0057B8] text-white hover:bg-[#004bb0] text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer"
+            >
+              العودة لتسجيل الدخول
+            </button>
+          </div>
+        </div>
+      ) : (
+        children
+      )}
     </AuthContext.Provider>
   );
 }

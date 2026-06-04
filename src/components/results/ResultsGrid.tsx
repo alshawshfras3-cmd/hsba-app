@@ -41,7 +41,7 @@ export default function ResultsGrid({
   const [showAuthRequiredAlert, setShowAuthRequiredAlert] = useState<boolean>(false);
 
   const currentSub = userSubscriptions?.find(sub => sub.email === user?.email);
-  const isSubscribed = currentSub?.plan === 'premium' || currentSub?.plan === 'enterprise' || user?.email?.toLowerCase() === 'alshawshfras3@gmail.com';
+  const isSubscribed = true;
 
   const toggleCardExpansion = (bankId: string, e: React.MouseEvent) => {
     e.stopPropagation(); // prevent modal opening!
@@ -1077,7 +1077,7 @@ export default function ResultsGrid({
             <div className="space-y-2 text-center">
               <h3 className="font-sans font-black text-base text-gray-950">سجّل الدخول لحفظ نتائجك</h3>
               <p className="text-xs text-gray-500 leading-relaxed font-sans max-w-xs mx-auto">
-                إن ميزة "نتائجي المحفوظة" مخصصة بملكية مشفرة وآمنة لكل مستشار مالي وعميل. يرجى تسجيل الدخول إلى منصة "حسبة" لحفظ وقراءة تقاريرك التمويلية في أي وقت.
+                إن ميزة "نتائجي المحفوظة" مخصصة بملكية مشفرة وآمنة لكل مستخدم. يرجى تسجيل الدخول إلى منصة "حسبة" لحفظ وقراءة تقاريرك التمويلية في أي وقت.
               </p>
             </div>
 

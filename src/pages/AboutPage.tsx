@@ -50,7 +50,7 @@ export function AboutPage() {
       <div className="bg-[#0057B8]/5 border border-[#0057B8]/10 rounded-2xl p-6 md:p-8 space-y-6 mb-12">
         <h3 className="font-sans font-bold text-lg text-gray-900 flex items-center gap-2">
           <Users className="w-5 h-5 text-[#0057B8]" />
-          <span>لماذا يثق بنا مستشارو التمويل والعملاء؟</span>
+          <span>لماذا يثق بنا مستخدمو المنصة والعملاء؟</span>
         </h3>
         
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

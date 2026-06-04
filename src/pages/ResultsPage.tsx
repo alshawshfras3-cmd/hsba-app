@@ -89,7 +89,7 @@ export function ResultsPage() {
           <div className="space-y-2">
             <h3 className="font-sans font-black text-xl text-gray-950">سجّل دخولك لمشاهدة نتائجك</h3>
             <p className="text-xs text-slate-500 leading-relaxed font-sans">
-              لكل مستشار مالي ومستخدم منصة "حسبة" ملف خاص لعرض وحذف عروض التمويل المحفوظة. يرجى تسجيل الدخول لعرض قائمة المقارنات والتقارير الخاصة بك.
+              لكل مستخدم في منصة "حسبة" ملف خاص لعرض وحذف عروض التمويل المحفوظة. يرجى تسجيل الدخول لعرض قائمة المقارنات والتقارير الخاصة بك.
             </p>
           </div>
           <button

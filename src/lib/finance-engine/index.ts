@@ -56,7 +56,15 @@ import {
   combineToRetirementRules
 } from '../pensionDb';
 
-const getSectorRetirementAge = (sectorId: string, defaultValue = 60): number => {
+const getSectorRetirementAge = (sectorId: string, defaultValue = 60, customSectors?: any[]): number => {
+  if (customSectors && Array.isArray(customSectors)) {
+    let idToLookup = sectorId;
+    if (sectorId === 'gov_civil') idToLookup = ['government', 'civilian'].join('_');
+    const matched = customSectors.find(s => s.id === sectorId || s.id === idToLookup);
+    if (matched && typeof matched.retirementAge === 'number' && matched.retirementAge > 0) {
+      return matched.retirementAge;
+    }
+  }
   try {
     const saved = localStorage.getItem("hasba_custom_sectors");
     if (saved) {
@@ -256,6 +264,7 @@ export function calculateBanksFinancing(params: {
   pensionDbRules?: PensionCalculationRule[];
   sectorMappings?: SectorClassificationMapping[];
   bankSectorRules?: BankSectorPensionRule[];
+  customSectors?: any[];
 }): BankCalculationResult[] {
   const {
     sectorId,
@@ -302,7 +311,8 @@ export function calculateBanksFinancing(params: {
     approvedSalaryDbRules = fallbackApprovedSalaryRules,
     pensionDbRules = fallbackPensionRules,
     sectorMappings = fallbackSectorMappings,
-    bankSectorRules
+    bankSectorRules,
+    customSectors
   } = params;
 
   const now = new Date();
@@ -354,13 +364,13 @@ export function calculateBanksFinancing(params: {
     const matchedPensionRule = pensionRules.find(r => r.sectorId === effectiveSectorId) || pensionRules.find(r => r.sectorId === sectorId);
     const ageCalcCalendar = matchedPensionRule?.ageCalcCalendar || 'gregorian';
 
-    const sectorBaseRetirementAge = getSectorRetirementAge(effectiveSectorId, matchedPensionRule?.retirementAge || 60);
+    const sectorBaseRetirementAge = getSectorRetirementAge(effectiveSectorId, matchedPensionRule?.retirementAge || 60, customSectors);
     let retirementAge = sectorBaseRetirementAge;
     const originalRetirementAge = retirementAge;
     
     if (isMilitarySector && rankId) {
-      const matchedRank = militaryRanks.find(r => r.id === rankId);
-      if (matchedRank) retirementAge = matchedRank.retirementAge;
+       const matchedRank = militaryRanks.find(r => r.id === rankId);
+       if (matchedRank) retirementAge = matchedRank.retirementAge;
     }
     const displayRetirementAge = retirementAge;
 
@@ -382,7 +392,8 @@ export function calculateBanksFinancing(params: {
       pensionMultiplierCustom: matchedPensionRule?.pensionMultiplier,
       directPensionSalary: sectorId === 'retired' ? directPensionSalary : undefined,
       ageCalcCalendar: matchedPensionRule?.ageCalcCalendar || 'gregorian',
-      serviceCalcCalendar: matchedPensionRule?.serviceCalcCalendar || 'gregorian'
+      serviceCalcCalendar: matchedPensionRule?.serviceCalcCalendar || 'gregorian',
+      customSectors
     });
 
     // 2.5 Unified Pension Calculation
@@ -837,6 +848,8 @@ export function calculateAll(params: {
   approvedSalaryDbRules?: ApprovedSalarySourceRule[];
   pensionDbRules?: PensionCalculationRule[];
   sectorMappings?: SectorClassificationMapping[];
+  bankSectorRules?: BankSectorPensionRule[];
+  customSectors?: any[];
 }, options?: { _debug?: boolean }) {
   const {
     bankId,
@@ -875,7 +888,9 @@ export function calculateAll(params: {
 
     approvedSalaryDbRules = fallbackApprovedSalaryRules,
     pensionDbRules = fallbackPensionRules,
-    sectorMappings = fallbackSectorMappings
+    sectorMappings = fallbackSectorMappings,
+    bankSectorRules,
+    customSectors
   } = params;
 
   const effectiveSectorId = sectorId;
@@ -910,7 +925,7 @@ export function calculateAll(params: {
 
   let displayRetirementAge = isMilitarySector && rankId
     ? (militaryRanks.find(r => r.id === rankId)?.retirementAge || 45)
-    : getSectorRetirementAge(effectiveSectorId, matchedPensionConfig?.retirementAge || 60);
+    : getSectorRetirementAge(effectiveSectorId, matchedPensionConfig?.retirementAge || 60, customSectors);
 
   const pensionResult = calculatePensionSalary({
     sectorId: (effectiveSectorId as any),
@@ -929,7 +944,8 @@ export function calculateAll(params: {
     pensionMultiplierCustom: matchedPensionConfig?.pensionMultiplier,
     directPensionSalary: sectorId === 'retired' ? directPensionSalary : undefined,
     ageCalcCalendar: matchedPensionConfig?.ageCalcCalendar || 'gregorian',
-    serviceCalcCalendar: matchedPensionConfig?.serviceCalcCalendar || 'gregorian'
+    serviceCalcCalendar: matchedPensionConfig?.serviceCalcCalendar || 'gregorian',
+    customSectors
   });
 
   const yearsToRetirement = Math.max(0, displayRetirementAge - (pensionResult.currentAgeMonths / 12));
@@ -950,13 +966,28 @@ export function calculateAll(params: {
   // Calculate expected pension salary
   let expectedPensionSalary = sectorId === 'retired'
     ? (directPensionSalary || basicSalary)
-    : calculatePensionByBankRule({
-        approvedSalary: approvedSalary,
-        serviceMonthsAtRetirement: pensionResult.serviceMonthsAtRetirement,
-        yearsToRetirement,
-        directPensionSalary,
-        rule: bankRule
-      });
+    : (bankSectorRules && bankSectorRules.length > 0)
+      ? calculatePensionSalaryByRule({
+          bankId,
+          sectorId,
+          militaryType: militarySubType,
+          rankId,
+          basicSalary,
+          housingAllowance,
+          otherAllowances,
+          netSalary: solvedNetSalary,
+          directPensionSalary,
+          serviceMonthsAtRetirement: pensionResult.serviceMonthsAtRetirement,
+          yearsToRetirement,
+          bankSectorRules
+        }).pensionSalary
+      : calculatePensionByBankRule({
+          approvedSalary: approvedSalary,
+          serviceMonthsAtRetirement: pensionResult.serviceMonthsAtRetirement,
+          yearsToRetirement,
+          directPensionSalary,
+          rule: bankRule
+        });
 
   // Let's locate the term boundaries
   const matchedTermRule = getMatchedTermRule({
