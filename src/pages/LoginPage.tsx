@@ -82,7 +82,12 @@ export function LoginPage() {
       }
       setLoadingAction(true);
       try {
-        await signUpWithEmail(email.trim(), password, fullName.trim());
+        const data = await signUpWithEmail(email.trim(), password, fullName.trim());
+        if (hasSupabaseKeys && (!data || !data.session)) {
+          setSuccessMsg('تم إرسال رابط/رمز تأكيد إلى بريدك الإلكتروني. يرجى فتح البريد وتأكيد الحساب قبل تسجيل الدخول.');
+        } else {
+          setSuccessMsg('تم إنشاء العضوية وتأكيد الحساب بنجاح!');
+        }
       } catch (e: any) {
         setErrorMsg(translateError(e));
       } finally {

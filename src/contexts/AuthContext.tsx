@@ -25,7 +25,7 @@ interface AuthContextType {
   canAccessDashboard: boolean;
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
-  signUpWithEmail: (email: string, password: string, fullName: string) => Promise<void>;
+  signUpWithEmail: (email: string, password: string, fullName: string) => Promise<any>;
   signOut: () => Promise<void>;
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
   setProfile: React.Dispatch<React.SetStateAction<UserProfile | null>>;
@@ -238,13 +238,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!hasSupabaseKeys) {
       const emailLower = email.trim().toLowerCase();
       const isOwner = emailLower === 'alshawshfras@gmail.com' || emailLower === 'alshawshfras3@gmail.com';
-      setUser({
+      const mockUser = {
         id: 'mock_email_user',
         email: emailLower,
         user_metadata: {
           full_name: fullName,
         }
-      } as any);
+      } as any;
+      setUser(mockUser);
       setProfile({
         id: 'mock_email_user',
         email: emailLower,
@@ -252,14 +253,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         avatar_url: null,
         role: isOwner ? 'owner' : 'user'
       });
-      return;
+      return { user: mockUser, session: { access_token: 'mock_token' } };
     }
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { data: { full_name: fullName } }
     });
     if (error) throw error;
+    return data;
   }
 
   async function signOut() {
