@@ -103,7 +103,10 @@ export default function AdminDashboard() {
     userSubscriptions, setUserSubscriptions,
     termRules, setTermRules,
     adminSubPage, setAdminSubPage,
-    hasUnsavedChanges, saveChanges, cancelChanges
+    hasUnsavedChanges, saveChanges, cancelChanges,
+    customSectors: sectors, setCustomSectors: setSectors,
+    bankSectorRules, setBankSectorRules,
+    pensionRulesLibrary: libraryRules, setPensionRulesLibrary: setLibraryRules
   } = useAppState();
 
   const formBanksList = banks.map(b => ({ id: b.id, nameAr: b.nameAr }));
@@ -236,21 +239,6 @@ export default function AdminDashboard() {
       notes: "اعتماد الدخل التقاعدي المباشر المدخل"
     }
   ];
-
-  const [libraryRules, setLibraryRules] = useState<PensionLibraryRule[]>(() => {
-    try {
-      const saved = localStorage.getItem("pension_rules_library");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
-      }
-    } catch (e) {
-      console.error("Error reading pension_rules_library", e);
-    }
-    return defaultLibraryRules;
-  });
 
   const [isLibraryModalOpen, setIsLibraryModalOpen] = useState(false);
   const [editingLibraryRule, setEditingLibraryRule] = useState<PensionLibraryRule | null>(null);
@@ -393,44 +381,6 @@ export default function AdminDashboard() {
   const generateDefaultBankSectorRules = (allBanks: Bank[], rulesList?: PensionLibraryRule[]): BankSectorPensionRule[] => {
     return ensureBankSectorPensionRules(allBanks, []);
   };
-
-  const [bankSectorRules, setBankSectorRules] = useState<BankSectorPensionRule[]>(() => {
-    try {
-      const saved = localStorage.getItem("bank_sector_pension_rules");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const allowedSectors = ['gov_civil', 'military', 'semi_gov', 'companies', 'retired'];
-          const sectorMigrationMap: Record<string, string> = {
-            [['government', 'civilian'].join('_')]: 'gov_civil',
-            military_officer: 'military',
-            military_individual: 'military',
-            retiree: 'retired'
-          };
-
-          const migratedAndFiltered = parsed
-            .map((rule: any) => {
-              let updatedSectorId = rule.sectorId || '';
-              if (sectorMigrationMap[updatedSectorId]) {
-                updatedSectorId = sectorMigrationMap[updatedSectorId];
-              }
-
-              return {
-                ...rule,
-                id: `${rule.bankId}_${updatedSectorId}`,
-                sectorId: updatedSectorId,
-                isCustomized: false
-              };
-            })
-            .filter((rule: any) => allowedSectors.includes(rule.sectorId));
-          return migratedAndFiltered;
-        }
-      }
-    } catch (e) {
-      console.error("Error reading bank_sector_pension_rules", e);
-    }
-    return [];
-  });
 
   // Ensure default bank choice and dynamic links on load or bank change
   useEffect(() => {
@@ -1341,39 +1291,11 @@ export default function AdminDashboard() {
   };
 
   // --- Sectors States & Management ---
-  const [sectors, setSectors] = useState(() => {
-    try {
-      const saved = localStorage.getItem("hasba_custom_sectors");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.filter((s: any) => s.id !== 'private' && s.id !== 'resident');
-        }
-      }
-    } catch (e) {
-      console.error("Error loading sectors:", e);
-    }
-    return [
-      { id: 'gov_civil', nameAr: 'حكومي مدني', isActive: true, retirementAge: 60, notes: 'لا يحتاج رتبة' },
-      { id: 'semi_gov', nameAr: 'شبه حكومي', isActive: true, retirementAge: 60, notes: 'لا يحتاج رتبة' },
-      { id: 'companies', nameAr: 'موظف شركات', isActive: true, retirementAge: 60, notes: 'لا يحتاج رتبة' },
-      { id: 'military', nameAr: 'عسكري', isActive: true, retirementAge: 0, notes: 'يحتاج اختيار رتبة (السن يأتي من الرتبة)' },
-      { id: 'retired', nameAr: 'متقاعد', isActive: true, retirementAge: 0, notes: 'لا ينطبق (متقاعد حالي)' }
-    ];
-  });
   const [isSectorModalOpen, setIsSectorModalOpen] = useState(false);
   const [editingSector, setEditingSector] = useState<{ id: string; nameAr: string; isActive: boolean; retirementAge?: number; notes: string } | null>(null);
   const [formSectorNameAr, setFormSectorNameAr] = useState('');
   const [formSectorIsActive, setFormSectorIsActive] = useState(true);
   const [formSectorRetirementAge, setFormSectorRetirementAge] = useState('60');
-
-  useEffect(() => {
-    try {
-      localStorage.setItem("hasba_custom_sectors", JSON.stringify(sectors));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [sectors]);
 
   const openEditSectorModal = (sec: any) => {
     setEditingSector(sec);

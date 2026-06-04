@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { useAppState } from "../context/AppContext";
 import { useAuth } from "../contexts/AuthContext";
 import { useLocation } from "../hooks/useLocation";
-import { useTheme } from "../contexts/ThemeContext";
 import { supabase, hasSupabaseKeys } from "../lib/supabase";
 import { 
   User, 
@@ -21,16 +20,12 @@ import {
   ArrowRight,
   Info,
   Trash2,
-  Lock,
-  Sun,
-  Moon,
-  Laptop
+  Lock
 } from "lucide-react";
 
 export function AccountPage() {
   const { user, userRole, signOut, userSubscriptions, refreshProfile } = useAppState();
   const { profile } = useAuth();
-  const { theme, setTheme } = useTheme();
   const location = useLocation();
 
   // Profile states
@@ -419,63 +414,6 @@ export function AccountPage() {
 
         {/* Dashboard Right Column Action Panel */}
         <div className="space-y-6">
-          
-          {/* Theme Preference Settings Selector (Direct Integration on Account) */}
-          <div className="bg-white dark:bg-[#0F172A] border border-gray-150/70 dark:border-slate-800 rounded-3xl p-6 shadow-md space-y-4 text-right">
-            <h3 className="font-sans font-bold text-xs text-gray-400 uppercase tracking-wider">
-              مظهر العرض والواجهة الداكنة:
-            </h3>
-
-            <div className="grid grid-cols-1 gap-2.5">
-              {/* Light Theme Trigger */}
-              <button
-                onClick={() => setTheme('light')}
-                className={`p-3 rounded-2xl border text-right transition-all flex items-center justify-between cursor-pointer ${
-                  theme === 'light' 
-                    ? 'bg-[#0057B8]/5 border-[#0057B8] text-[#0057B8] dark:text-[#38BDF8]' 
-                    : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-[#1E293B] dark:border-slate-800 dark:text-slate-300'
-                }`}
-              >
-                <div className="flex items-center gap-2.5">
-                  <Sun className="w-4 h-4 text-amber-500 animate-spin-slow" />
-                  <span className="text-xs font-extrabold font-sans">المظهر النهاري الكلاسيكي</span>
-                </div>
-                {theme === 'light' && <span className="w-1.5 h-1.5 rounded-full bg-[#0057B8] dark:bg-sky-400"></span>}
-              </button>
-
-              {/* Dark Theme Trigger */}
-              <button
-                onClick={() => setTheme('dark')}
-                className={`p-3 rounded-2xl border text-right transition-all flex items-center justify-between cursor-pointer ${
-                  theme === 'dark' 
-                    ? 'bg-slate-800/80 border-[#0EA5A4] text-emerald-400' 
-                    : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-[#1E293B] dark:border-slate-800 dark:text-slate-300'
-                }`}
-              >
-                <div className="flex items-center gap-2.5">
-                  <Moon className="w-4 h-4 text-indigo-400" />
-                  <span className="text-xs font-extrabold font-sans">المظهر الليلي الهادئ للعين</span>
-                </div>
-                {theme === 'dark' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>}
-              </button>
-
-              {/* System Autodetect Trigger */}
-              <button
-                onClick={() => setTheme('system')}
-                className={`p-3 rounded-2xl border text-right transition-all flex items-center justify-between cursor-pointer ${
-                  theme === 'system' 
-                    ? 'bg-[#0EA5A4]/5 border-[#0EA5A4] text-[#0EA5A4]' 
-                    : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 dark:bg-[#1E293B] dark:border-slate-800 dark:text-slate-300'
-                }`}
-              >
-                <div className="flex items-center gap-2.5">
-                  <Laptop className="w-4 h-4 text-teal-500" />
-                  <span className="text-xs font-extrabold font-sans">تلقائي (مطابقة ثيم جهازك)</span>
-                </div>
-                {theme === 'system' && <span className="w-1.5 h-1.5 rounded-full bg-teal-500"></span>}
-              </button>
-            </div>
-          </div>
 
           <div className="bg-white dark:bg-[#0F172A] border border-gray-150/70 dark:border-slate-800 rounded-3xl p-6 shadow-md space-y-4">
             <h3 className="font-sans font-extrabold text-xs text-gray-400 uppercase tracking-wider">

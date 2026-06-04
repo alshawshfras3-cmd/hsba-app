@@ -117,7 +117,8 @@ export default function StepWizard() {
     currentStep,
     setCurrentStep,
     results,
-    setResults
+    setResults,
+    bankSectorRules
   } = useAppState();
 
   // --- Step Form Values State ---
@@ -212,7 +213,6 @@ export default function StepWizard() {
   const [approvedSalaryDbRules, setApprovedSalaryDbRules] = useState<ApprovedSalarySourceRule[]>(fallbackApprovedSalaryRules);
   const [pensionDbRules, setPensionDbRules] = useState<PensionCalculationRule[]>(fallbackPensionRules);
   const [sectorMappings, setSectorMappings] = useState<SectorClassificationMapping[]>(fallbackSectorMappings);
-  const [bankSectorRules, setBankSectorRules] = useState<BankSectorPensionRule[]>([]);
 
   useEffect(() => {
     async function loadPensionDb() {
@@ -225,12 +225,6 @@ export default function StepWizard() {
         setApprovedSalaryDbRules(sal);
         setPensionDbRules(pen);
         setSectorMappings(map);
-        
-        // Load bank sector rules
-        const saved = localStorage.getItem("bank_sector_pension_rules");
-        if (saved) {
-          setBankSectorRules(JSON.parse(saved));
-        }
       } catch (err) {
         console.error("Failed to load pension DB in StepWizard", err);
       }

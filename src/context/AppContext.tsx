@@ -45,6 +45,8 @@ import {
 
 import { supabase, hasSupabaseKeys } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { BankSectorPensionRule, PensionLibraryRule } from '../types/pension-rules';
+import { defaultLibraryRules } from '../lib/finance-engine/pension';
 
 interface AppContextType {
   banks: Bank[];
@@ -77,6 +79,13 @@ interface AppContextType {
   setCalculationLogs: React.Dispatch<React.SetStateAction<CalculationLog[]>>;
   userSubscriptions: UserSubscription[];
   setUserSubscriptions: React.Dispatch<React.SetStateAction<UserSubscription[]>>;
+
+  customSectors: any[];
+  setCustomSectors: React.Dispatch<React.SetStateAction<any[]>>;
+  pensionRulesLibrary: PensionLibraryRule[];
+  setPensionRulesLibrary: React.Dispatch<React.SetStateAction<PensionLibraryRule[]>>;
+  bankSectorRules: BankSectorPensionRule[];
+  setBankSectorRules: React.Dispatch<React.SetStateAction<BankSectorPensionRule[]>>;
 
   activeNav: 'calculator' | 'admin';
   setActiveNav: (val: 'calculator' | 'admin') => void;
@@ -121,6 +130,9 @@ interface AdminSettings {
   personalRules: PersonalFinanceRules[];
   advancedRules: AdvancedRule[];
   userSubscriptions?: UserSubscription[];
+  customSectors?: any[];
+  bankSectorRules?: BankSectorPensionRule[];
+  pensionRulesLibrary?: PensionLibraryRule[];
 }
 
 function upgradeMarginRules(rules: MarginRule[]): MarginRule[] {
@@ -174,6 +186,133 @@ function mergeDsrRulesWithSeeds(existingRules: DsrRule[], seedRules: DsrRule[]) 
   };
 }
 
+const defaultSectorsList = [
+  { id: 'gov_civil', nameAr: 'حكومي مدني', isActive: true, retirementAge: 60, notes: 'لا يحتاج رتبة' },
+  { id: 'semi_gov', nameAr: 'شبه حكومي', isActive: true, retirementAge: 60, notes: 'لا يحتاج رتبة' },
+  { id: 'companies', nameAr: 'موظف شركات', isActive: true, retirementAge: 60, notes: 'لا يحتاج رتبة' },
+  { id: 'military', nameAr: 'عسكري', isActive: true, retirementAge: 0, notes: 'يحتاج اختيار رتبة (السن يأتي من الرتبة)' },
+  { id: 'retired', nameAr: 'متقاعد', isActive: true, retirementAge: 0, notes: 'لا ينطبق (متقاعد حالي)' }
+];
+
+export const ensureBankSectorPensionRules = (allBanks: Bank[], currentRules: BankSectorPensionRule[]): BankSectorPensionRule[] => {
+  const allowedSectors = ['gov_civil', 'military', 'semi_gov', 'companies', 'retired'];
+  const sectorMigrationMap: Record<string, string> = {
+    [['government', 'civilian'].join('_')]: 'gov_civil',
+    military_officer: 'military',
+    military_individual: 'military',
+    retiree: 'retired'
+  };
+
+  let processed = (currentRules || []).map(rule => {
+    let updatedSectorId = rule.sectorId || '';
+    if (sectorMigrationMap[updatedSectorId]) {
+      updatedSectorId = sectorMigrationMap[updatedSectorId];
+    }
+    return {
+      ...rule,
+      id: `${rule.bankId}_${updatedSectorId}`,
+      sectorId: updatedSectorId
+    };
+  });
+
+  processed = processed.filter(r => allowedSectors.includes(r.sectorId));
+
+  const deduped: BankSectorPensionRule[] = [];
+  const seen = new Set<string>();
+  processed.forEach(rule => {
+    const key = `${rule.bankId}_${rule.sectorId}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      deduped.push(rule);
+    }
+  });
+
+  const finalRules = [...deduped];
+
+  allBanks.forEach(bank => {
+    allowedSectors.forEach(sectorId => {
+      const alreadyExists = finalRules.some(r => r.bankId === bank.id && r.sectorId === sectorId);
+      
+      if (!alreadyExists) {
+        let salarySource: 'basic_only' | 'basic_housing' | 'net_salary' | 'manual' = 'basic_only';
+        let calcMethod: 'service_growth' | 'fixed_percentage' | 'direct' = 'service_growth';
+        let divisorYears = 40;
+        let growthRate = 0;
+        let growthMinYears = 0;
+        let growthMaxYears = 0;
+        let noGrowthAboveYears = 0;
+        let thresholdYears = 5;
+        let rateBelow = 70;
+        let rateAbove = 80;
+        let capAtApprovedSalary = true;
+
+        if (sectorId === 'gov_civil') {
+          salarySource = 'basic_only';
+          calcMethod = 'service_growth';
+          divisorYears = 40;
+          growthRate = 2.5;
+          growthMinYears = 5;
+          growthMaxYears = 12;
+          noGrowthAboveYears = 25;
+          capAtApprovedSalary = true;
+        } else if (sectorId === 'military') {
+          salarySource = 'basic_only';
+          calcMethod = 'service_growth';
+          divisorYears = 35;
+          growthRate = 2.5;
+          growthMinYears = 5;
+          growthMaxYears = 12;
+          noGrowthAboveYears = 25;
+          capAtApprovedSalary = true;
+        } else if (sectorId === 'semi_gov') {
+          salarySource = 'basic_only';
+          calcMethod = 'service_growth';
+          divisorYears = 40;
+          growthRate = 1.25;
+          growthMinYears = 5;
+          growthMaxYears = 12;
+          noGrowthAboveYears = 25;
+          capAtApprovedSalary = true;
+        } else if (sectorId === 'companies') {
+          salarySource = 'basic_only';
+          calcMethod = 'service_growth';
+          divisorYears = 40;
+          growthRate = 0;
+          growthMinYears = 0;
+          growthMaxYears = 0;
+          noGrowthAboveYears = 0;
+          capAtApprovedSalary = true;
+        } else if (sectorId === 'retired') {
+          salarySource = 'manual';
+          calcMethod = 'direct';
+          capAtApprovedSalary = false;
+        }
+
+        finalRules.push({
+          id: `${bank.id}_${sectorId}`,
+          bankId: bank.id,
+          sectorId: sectorId,
+          isActive: true,
+          notes: '',
+          salarySource,
+          calcMethod,
+          divisorYears,
+          growthRate,
+          growthMinYears,
+          growthMaxYears,
+          noGrowthAboveYears,
+          thresholdYears,
+          rateBelow,
+          rateAbove,
+          capAtApprovedSalary
+        });
+      }
+    });
+  });
+
+  return finalRules;
+};
+
 const getInitialSettings = (): AdminSettings => {
   return {
     banks: initialBanks,
@@ -190,6 +329,9 @@ const getInitialSettings = (): AdminSettings => {
     personalRules: initialPersonalFinanceRules,
     advancedRules: initialAdvancedRules,
     userSubscriptions: initialUserSubscriptions,
+    customSectors: defaultSectorsList,
+    bankSectorRules: [],
+    pensionRulesLibrary: defaultLibraryRules,
   };
 };
 
@@ -212,6 +354,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   const [calculationLogs, setCalculationLogs] = useState<CalculationLog[]>(initialCalculationLogs);
   const [userSubscriptions, setUserSubscriptions] = useState<UserSubscription[]>(initialData.userSubscriptions || initialUserSubscriptions);
+
+  const [customSectors, setCustomSectors] = useState<any[]>(initialData.customSectors || defaultSectorsList);
+  const [bankSectorRules, setBankSectorRules] = useState<BankSectorPensionRule[]>(initialData.bankSectorRules || []);
+  const [pensionRulesLibrary, setPensionRulesLibrary] = useState<PensionLibraryRule[]>(initialData.pensionRulesLibrary || defaultLibraryRules);
 
   const [activeNav, setActiveNav] = useState<'calculator' | 'admin'>('calculator');
   const [adminSubPage, setAdminSubPage] = useState<string>('banks');
@@ -240,6 +386,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     if (data.personalRules) setPersonalRules(data.personalRules);
     if (data.advancedRules) setAdvancedRules(data.advancedRules);
     if (data.userSubscriptions) setUserSubscriptions(data.userSubscriptions);
+    if (data.customSectors) setCustomSectors(data.customSectors);
+    if (data.bankSectorRules) setBankSectorRules(data.bankSectorRules);
+    if (data.pensionRulesLibrary) setPensionRulesLibrary(data.pensionRulesLibrary);
 
     const merged: AdminSettings = {
       banks: data.banks || initialData.banks,
@@ -256,6 +405,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       personalRules: data.personalRules || initialData.personalRules,
       advancedRules: data.advancedRules || initialData.advancedRules,
       userSubscriptions: data.userSubscriptions || initialData.userSubscriptions,
+      customSectors: data.customSectors || initialData.customSectors,
+      bankSectorRules: data.bankSectorRules || initialData.bankSectorRules,
+      pensionRulesLibrary: data.pensionRulesLibrary || initialData.pensionRulesLibrary,
     };
     setSavedSettings(merged);
   };
@@ -334,6 +486,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           term_rules: initialTermRules,
           advanced_rules: initialAdvancedRules,
           user_subscriptions: initialUserSubscriptions,
+          hasba_custom_sectors: defaultSectorsList,
+          bank_sector_pension_rules: [],
+          pension_rules_library: defaultLibraryRules
         };
 
         const finalSettings: Record<string, any> = {};
@@ -384,6 +539,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         const hSupport = await fetchHousingSupportTiers();
         const aPayment = await fetchAdvancePaymentTiers();
 
+        let loadedBankSectorRules = finalSettings.bank_sector_pension_rules || [];
+        loadedBankSectorRules = ensureBankSectorPensionRules(finalSettings.banks || initialData.banks, loadedBankSectorRules);
+
         const loadedSettings: AdminSettings = {
           banks: finalSettings.banks || initialData.banks,
           products: finalSettings.product_acceptance || initialData.products,
@@ -399,6 +557,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           personalRules: finalSettings.personal_finance_rules || initialData.personalRules,
           advancedRules: finalSettings.advanced_rules || initialData.advancedRules,
           userSubscriptions: finalSettings.user_subscriptions || initialData.userSubscriptions,
+          customSectors: finalSettings.hasba_custom_sectors || defaultSectorsList,
+          bankSectorRules: loadedBankSectorRules,
+          pensionRulesLibrary: finalSettings.pension_rules_library || defaultLibraryRules,
         };
 
         applySettingsState(loadedSettings);
@@ -410,6 +571,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
             localStorage.removeItem(`hasba_sett_${key}`);
           }
           localStorage.setItem("hasba_settings_cache", JSON.stringify(loadedSettings));
+          localStorage.setItem("hasba_custom_sectors", JSON.stringify(loadedSettings.customSectors));
+          localStorage.setItem("bank_sector_pension_rules", JSON.stringify(loadedSettings.bankSectorRules));
+          localStorage.setItem("pension_rules_library", JSON.stringify(loadedSettings.pensionRulesLibrary));
         } catch (_) {}
 
       } catch (err) {
@@ -460,6 +624,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     personalRules,
     advancedRules,
     userSubscriptions,
+    customSectors,
+    bankSectorRules,
+    pensionRulesLibrary,
   };
 
   const hasUnsavedChanges = JSON.stringify(currentSettings) !== JSON.stringify(savedSettings);
@@ -483,7 +650,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           { key: 'support_settings', value: supportSettings },
           { key: 'personal_finance_rules', value: personalRules },
           { key: 'advanced_rules', value: advancedRules },
-          { key: 'user_subscriptions', value: userSubscriptions }
+          { key: 'user_subscriptions', value: userSubscriptions },
+          { key: 'hasba_custom_sectors', value: customSectors },
+          { key: 'bank_sector_pension_rules', value: bankSectorRules },
+          { key: 'pension_rules_library', value: pensionRulesLibrary }
         ];
 
         const updated_by_user = user?.email || user?.id || null;
@@ -506,6 +676,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         try {
           localStorage.setItem("hasba_settings_cache", JSON.stringify(currentSettings));
           localStorage.removeItem("hasba_admin_settings");
+          localStorage.setItem("hasba_custom_sectors", JSON.stringify(customSectors));
+          localStorage.setItem("bank_sector_pension_rules", JSON.stringify(bankSectorRules));
+          localStorage.setItem("pension_rules_library", JSON.stringify(pensionRulesLibrary));
+          
           const DEFAULTS_MAP: Record<string, any> = {
             banks: initialBanks,
             margin_rules: initialMarginRules,
@@ -537,6 +711,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       try {
         localStorage.setItem("hasba_settings_cache", JSON.stringify(currentSettings));
         localStorage.removeItem("hasba_admin_settings");
+        localStorage.setItem("hasba_custom_sectors", JSON.stringify(customSectors));
+        localStorage.setItem("bank_sector_pension_rules", JSON.stringify(bankSectorRules));
+        localStorage.setItem("pension_rules_library", JSON.stringify(pensionRulesLibrary));
       } catch (e) {
         console.error("Error saving local settings:", e);
       }
@@ -580,6 +757,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         setCalculationLogs,
         userSubscriptions,
         setUserSubscriptions,
+        customSectors,
+        setCustomSectors,
+        bankSectorRules,
+        setBankSectorRules,
+        pensionRulesLibrary,
+        setPensionRulesLibrary,
         activeNav,
         setActiveNav,
         adminSubPage,

@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { useAppState } from '../../context/AppContext';
-import { Calculator, ShieldAlert, Award, FileText, LogOut, Settings, X, ShieldCheck, User, Sun, Moon, Laptop } from 'lucide-react';
+import { Calculator, ShieldAlert, Award, FileText, LogOut, Settings, X, ShieldCheck, User } from 'lucide-react';
 import { useLocation } from '../../hooks/useLocation';
-import { useTheme } from '../../contexts/ThemeContext';
 
 export default function Header() {
   const { 
@@ -16,19 +15,8 @@ export default function Header() {
     userSubscriptions
   } = useAppState();
 
-  const { theme, setTheme } = useTheme();
   const location = useLocation();
   const [isMobileSettingsOpen, setIsMobileSettingsOpen] = useState(false);
-
-  const handleCycleTheme = async () => {
-    if (theme === 'light') {
-      await setTheme('dark');
-    } else if (theme === 'dark') {
-      await setTheme('system');
-    } else {
-      await setTheme('light');
-    }
-  };
 
   const handleNavChange = (target: 'calculator' | 'admin') => {
     if (target === 'calculator') {
@@ -114,18 +102,6 @@ export default function Header() {
 
         {/* Brand Minimal Accent */}
         <div className="hidden md:flex items-center gap-3">
-          {/* Theme switcher segment button */}
-          <button
-            onClick={handleCycleTheme}
-            id="theme-toggle-btn"
-            title={`تنسيق العرض الحالي: ${theme === 'light' ? 'نهاري' : theme === 'dark' ? 'داكن' : 'تلقائي'}`}
-            className="w-10 h-10 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-amber-400 rounded-xl flex items-center justify-center transition-all cursor-pointer shadow-xs shrink-0"
-          >
-            {theme === 'light' && <Sun className="w-5 h-5 text-amber-500 animate-pulse" />}
-            {theme === 'dark' && <Moon className="w-5 h-5 text-indigo-400" />}
-            {theme === 'system' && <Laptop className="w-5 h-5 text-teal-500" />}
-          </button>
-
           {user ? (
             <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 p-1.5 pr-4 pl-1.5 rounded-full select-none font-sans">
               <div className="text-right">
