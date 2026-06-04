@@ -42,7 +42,7 @@ const subscriptionColor = {
 };
 
 export function UsersManagementPage() {
-  const { isOwner, isAdmin, isStaff, isCustomer, user, profile: authProfile } = useAuth();
+  const { isAdmin, isStaff, isCustomer, user, profile: authProfile } = useAuth();
   const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
@@ -54,14 +54,14 @@ export function UsersManagementPage() {
 
   useEffect(() => {
     fetchUsers();
-  }, [isOwner, isAdmin]);
+  }, [isAdmin]);
 
   async function fetchUsers() {
     setLoading(true);
     setErrorMsg('');
 
     // Determine current user role
-    const currentUserRole = isOwner ? 'admin' : 'user';
+    const currentUserRole = isAdmin ? 'admin' : 'user';
 
     if (!hasSupabaseKeys) {
       // Return beautiful mock user list for local view
@@ -91,7 +91,7 @@ export function UsersManagementPage() {
             id: user.id,
             email: user.email || '',
             full_name: authProfile?.full_name || user.user_metadata?.full_name || user.user_metadata?.username || 'مستخدم',
-            role: (isOwner || em === 'alshawshfras3@gmail.com') ? 'admin' : 'user',
+            role: (isAdmin || em === 'alshawshfras3@gmail.com') ? 'admin' : 'user',
             subscription: 'free',
             created_at: user.created_at || new Date().toISOString(),
             last_login: new Date().toISOString(),
@@ -160,7 +160,7 @@ export function UsersManagementPage() {
           id: user.id,
           email: user.email || '',
           full_name: authProfile?.full_name || user.user_metadata?.full_name || user.user_metadata?.username || 'مستخدم',
-          role: (isOwner || (user.email ?? '').toLowerCase().trim() === 'alshawshfras3@gmail.com') ? 'admin' : 'user',
+          role: (isAdmin || (user.email ?? '').toLowerCase().trim() === 'alshawshfras3@gmail.com') ? 'admin' : 'user',
           subscription: 'free',
           created_at: user.created_at || new Date().toISOString(),
           last_login: new Date().toISOString(),
@@ -196,7 +196,7 @@ export function UsersManagementPage() {
     }
 
     // Role protection checks
-    if (!isOwner) {
+    if (!isAdmin) {
       alert('خطأ أمني: غير مصرح لك بتعديل أو ترقية أدوار المستخدمين الآخرين!');
       return;
     }
@@ -299,7 +299,7 @@ export function UsersManagementPage() {
     );
   }
 
-  if (!isOwner) {
+  if (!isAdmin) {
     return (
       <div className="p-8 text-center bg-white border border-red-100 rounded-2xl max-w-md mx-auto my-12 space-y-4" dir="rtl">
         <AlertCircle className="w-12 h-12 text-red-500 mx-auto" />
@@ -457,8 +457,8 @@ export function UsersManagementPage() {
                   <th className="p-4 font-bold text-center">الصلاحية الحالية</th>
                   <th className="p-4 font-bold text-center">تاريخ التسجيل</th>
                   <th className="p-4 font-bold text-center">حالة الحساب</th>
-                  {isOwner && <th className="p-4 font-bold text-center">تحديث الصلاحية والدور</th>}
-                  {isOwner && <th className="p-4 font-bold text-center">التحكم بالحظر</th>}
+                  {isAdmin && <th className="p-4 font-bold text-center">تحديث الصلاحية والدور</th>}
+                  {isAdmin && <th className="p-4 font-bold text-center">التحكم بالحظر</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#F1F5F9] font-semibold">
@@ -466,8 +466,8 @@ export function UsersManagementPage() {
                   const isUserOwner = userItem.role === 'admin' || userItem.email === 'alshawshfras3@gmail.com';
                   const isSelf = userItem.id === authProfile?.id;
                   
-                  // Disable dropdown controls for Owner trying to update themselves
-                  const canModifyRole = isOwner ? !isSelf : false;
+                  // Disable dropdown controls for Admin trying to update themselves
+                  const canModifyRole = isAdmin ? !isSelf : false;
 
                   const isSuspended = userItem.status === 'suspended' || userItem.is_active === false;
 
@@ -499,7 +499,7 @@ export function UsersManagementPage() {
                           </span>
                         )}
                       </td>
-                      {isOwner && (
+                      {isAdmin && (
                         <td className="p-4 text-center">
                           <div className="flex items-center justify-center gap-3">
                             <div className="flex flex-col gap-0.5 text-[9px] text-gray-400">
@@ -523,7 +523,7 @@ export function UsersManagementPage() {
                           </div>
                         </td>
                       )}
-                      {isOwner && (
+                      {isAdmin && (
                         <td className="p-4 text-center">
                           <button
                             onClick={() => toggleStatus(userItem.id, userItem.status, userItem.email)}

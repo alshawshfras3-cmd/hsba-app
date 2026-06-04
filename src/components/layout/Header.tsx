@@ -84,7 +84,7 @@ export default function Header() {
             </button>
           )}
 
-          {userRole === 'owner' && (
+          {userRole === 'admin' && (
             <button
                id="nav-admin-btn"
                onClick={() => handleNavChange('admin')}
@@ -109,10 +109,10 @@ export default function Header() {
                   {user.email}
                 </span>
                 <span className={`inline-block text-[9px] font-bold px-1.5 py-0.5 mt-1 rounded leading-none ${
-                  userRole === 'owner' ? 'bg-emerald-50 text-emerald-700 border border-emerald-150/40 dark:bg-emerald-950/40 dark:text-emerald-350' :
+                  userRole === 'admin' ? 'bg-emerald-50 text-emerald-700 border border-emerald-150/40 dark:bg-emerald-950/40 dark:text-emerald-350' :
                   'bg-slate-100 text-[#475569] dark:bg-slate-700 dark:text-slate-300'
                 }`}>
-                  {userRole === 'owner' ? 'مدير' : 'مستخدم'}
+                  {userRole === 'admin' ? 'مدير' : 'مستخدم'}
                 </span>
               </div>
               <button
@@ -193,12 +193,12 @@ export default function Header() {
                 </div>
                 <div className="flex justify-between text-xs font-bold text-slate-500 dark:text-slate-400">
                   <span>صلاحية الحساب:</span>
-                  <span className="text-emerald-600 dark:text-emerald-400">{userRole === 'owner' ? 'مدير' : 'مستخدم'}</span>
+                  <span className="text-emerald-600 dark:text-emerald-400">{userRole === 'admin' ? 'مدير' : 'مستخدم'}</span>
                 </div>
               </div>
  
               {/* Navigation toggles if Admin / Manager */}
-              {userRole === 'owner' && (
+              {userRole === 'admin' && (
                 <div className="grid grid-cols-2 gap-3 pt-2">
                   <button
                     onClick={() => {

@@ -190,8 +190,8 @@ export function AccountPage() {
     }
   };
 
-  const hasAdminAccess = userRole === 'owner';
-  const displayFullName = profile?.full_name || user?.user_metadata?.full_name || user?.user_metadata?.username || (userRole === 'owner' ? 'مدير حسبة' : 'مستخدم حسبة');
+  const hasAdminAccess = userRole === 'admin';
+  const displayFullName = profile?.full_name || user?.user_metadata?.full_name || user?.user_metadata?.username || (userRole === 'admin' ? 'مدير حسبة' : 'مستخدم حسبة');
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 text-right select-none animate-fade-in text-[#1E293B] dark:text-slate-100 min-h-screen transition-colors duration-200" dir="rtl">
@@ -240,7 +240,7 @@ export function AccountPage() {
                 <span className="text-[10px] text-gray-400 dark:text-slate-400 font-bold block">مستوى الصلاحية في لوحة الإدارة:</span>
                 <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
-                  <span>{userRole === 'owner' ? 'مدير' : 'مستخدم'}</span>
+                  <span>{userRole === 'admin' ? 'مدير' : 'مستخدم'}</span>
                 </span>
               </div>
 

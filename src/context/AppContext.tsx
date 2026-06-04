@@ -107,7 +107,7 @@ interface AppContextType {
   // Supabase Auth and Roles state
   user: any;
   setUser: React.Dispatch<React.SetStateAction<any>>;
-  userRole: 'owner' | 'user' | null;
+  userRole: 'admin' | 'user' | null;
   authLoading: boolean;
   isSettingsLoading: boolean;
   signOut: () => Promise<void>;
@@ -206,6 +206,54 @@ function deepEqual(a: any, b: any): boolean {
     return true;
   }
   return false;
+}
+
+function deepClone<T>(obj: T): T {
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+  return JSON.parse(JSON.stringify(obj));
+}
+
+function normalizeBeforeCompare(val: any): any {
+  if (val === null || val === undefined) return null;
+  if (Array.isArray(val)) {
+    const normalizedArr = val.map(normalizeBeforeCompare);
+    const firstItem = normalizedArr[0];
+    if (firstItem && typeof firstItem === 'object') {
+      const sortKey = ('id' in firstItem) ? 'id' : (('key' in firstItem) ? 'key' : null);
+      if (sortKey) {
+        normalizedArr.sort((x, y) => {
+          const valX = String(x[sortKey] || '');
+          const valY = String(y[sortKey] || '');
+          return valX.localeCompare(valY);
+        });
+      }
+    }
+    return normalizedArr;
+  }
+  if (typeof val === 'object') {
+    const res: any = {};
+    const keys = Object.keys(val).sort();
+    for (const key of keys) {
+      if ([
+        'updated_at',
+        'updated_by',
+        'source',
+        '_temp',
+        'isDirty',
+        'uiState'
+      ].includes(key)) {
+        continue;
+      }
+      const v = val[key];
+      if (v !== undefined && v !== null) {
+        res[key] = normalizeBeforeCompare(v);
+      }
+    }
+    return res;
+  }
+  return val;
 }
 
 const defaultSectorsList = [
@@ -392,44 +440,46 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   // Helper helper to correctly apply partial or full settings update to state and savedSettings
   const applySettingsState = (data: Partial<AdminSettings>) => {
-    if (data.banks) setBanks(data.banks);
-    if (data.products) setProducts(data.products);
-    if (data.militaryRanks) setMilitaryRanks(data.militaryRanks);
-    if (data.salaryRules) setSalaryRules(data.salaryRules);
-    if (data.pensionRules) setPensionRules(data.pensionRules);
-    if (data.termRules) setTermRules(data.termRules);
-    if (data.marginRules) {
-      setMarginRules(upgradeMarginRules(data.marginRules));
+    const clonedData = deepClone(data);
+
+    if (clonedData.banks) setBanks(clonedData.banks);
+    if (clonedData.products) setProducts(clonedData.products);
+    if (clonedData.militaryRanks) setMilitaryRanks(clonedData.militaryRanks);
+    if (clonedData.salaryRules) setSalaryRules(clonedData.salaryRules);
+    if (clonedData.pensionRules) setPensionRules(clonedData.pensionRules);
+    if (clonedData.termRules) setTermRules(clonedData.termRules);
+    if (clonedData.marginRules) {
+      setMarginRules(upgradeMarginRules(clonedData.marginRules));
     }
-    if (data.dsrRules) setDsrRules(data.dsrRules);
-    if (data.supportSettings) setSupportSettings(data.supportSettings);
-    if (data.housingSupportTiers) setHousingSupportTiers(data.housingSupportTiers);
-    if (data.advancePaymentTiers) setAdvancePaymentTiers(data.advancePaymentTiers);
-    if (data.personalRules) setPersonalRules(data.personalRules);
-    if (data.advancedRules) setAdvancedRules(data.advancedRules);
-    if (data.userSubscriptions) setUserSubscriptions(data.userSubscriptions);
-    if (data.customSectors) setCustomSectors(data.customSectors);
-    if (data.bankSectorRules) setBankSectorRules(data.bankSectorRules);
-    if (data.pensionRulesLibrary) setPensionRulesLibrary(data.pensionRulesLibrary);
+    if (clonedData.dsrRules) setDsrRules(clonedData.dsrRules);
+    if (clonedData.supportSettings) setSupportSettings(clonedData.supportSettings);
+    if (clonedData.housingSupportTiers) setHousingSupportTiers(clonedData.housingSupportTiers);
+    if (clonedData.advancePaymentTiers) setAdvancePaymentTiers(clonedData.advancePaymentTiers);
+    if (clonedData.personalRules) setPersonalRules(clonedData.personalRules);
+    if (clonedData.advancedRules) setAdvancedRules(clonedData.advancedRules);
+    if (clonedData.userSubscriptions) setUserSubscriptions(clonedData.userSubscriptions);
+    if (clonedData.customSectors) setCustomSectors(clonedData.customSectors);
+    if (clonedData.bankSectorRules) setBankSectorRules(clonedData.bankSectorRules);
+    if (clonedData.pensionRulesLibrary) setPensionRulesLibrary(clonedData.pensionRulesLibrary);
 
     const merged: AdminSettings = {
-      banks: data.banks || initialData.banks,
-      products: data.products || initialData.products,
-      militaryRanks: data.militaryRanks || initialData.militaryRanks,
-      salaryRules: data.salaryRules || initialData.salaryRules,
-      pensionRules: data.pensionRules || initialData.pensionRules,
-      termRules: data.termRules || initialData.termRules,
-      marginRules: data.marginRules ? upgradeMarginRules(data.marginRules) : initialData.marginRules,
-      dsrRules: data.dsrRules || initialData.dsrRules,
-      supportSettings: data.supportSettings || initialData.supportSettings,
-      housingSupportTiers: data.housingSupportTiers || initialData.housingSupportTiers,
-      advancePaymentTiers: data.advancePaymentTiers || initialData.advancePaymentTiers,
-      personalRules: data.personalRules || initialData.personalRules,
-      advancedRules: data.advancedRules || initialData.advancedRules,
-      userSubscriptions: data.userSubscriptions || initialData.userSubscriptions,
-      customSectors: data.customSectors || initialData.customSectors,
-      bankSectorRules: data.bankSectorRules || initialData.bankSectorRules,
-      pensionRulesLibrary: data.pensionRulesLibrary || initialData.pensionRulesLibrary,
+      banks: clonedData.banks || deepClone(initialData.banks),
+      products: clonedData.products || deepClone(initialData.products),
+      militaryRanks: clonedData.militaryRanks || deepClone(initialData.militaryRanks),
+      salaryRules: clonedData.salaryRules || deepClone(initialData.salaryRules),
+      pensionRules: clonedData.pensionRules || deepClone(initialData.pensionRules),
+      termRules: clonedData.termRules || deepClone(initialData.termRules),
+      marginRules: clonedData.marginRules ? upgradeMarginRules(clonedData.marginRules) : deepClone(initialData.marginRules),
+      dsrRules: clonedData.dsrRules || deepClone(initialData.dsrRules),
+      supportSettings: clonedData.supportSettings || deepClone(initialData.supportSettings),
+      housingSupportTiers: clonedData.housingSupportTiers || deepClone(initialData.housingSupportTiers),
+      advancePaymentTiers: clonedData.advancePaymentTiers || deepClone(initialData.advancePaymentTiers),
+      personalRules: clonedData.personalRules || deepClone(initialData.personalRules),
+      advancedRules: clonedData.advancedRules || deepClone(initialData.advancedRules),
+      userSubscriptions: clonedData.userSubscriptions || deepClone(initialData.userSubscriptions),
+      customSectors: clonedData.customSectors || deepClone(initialData.customSectors),
+      bankSectorRules: clonedData.bankSectorRules || deepClone(initialData.bankSectorRules),
+      pensionRulesLibrary: clonedData.pensionRulesLibrary || deepClone(initialData.pensionRulesLibrary),
     };
     setSavedSettings(merged);
   };
@@ -438,8 +488,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const { user, setUser, profile, isOwner, isAdmin, isStaff, canAccessDashboard, signOut, loading: authLoading } = useAuth();
   
   const getNormalizedRole = () => {
-    let r = profile?.role || (isOwner ? 'owner' : 'user');
-    if (r === 'admin' || (r as any) === 'manager' || (r as any) === 'employee' || r === 'owner' || isOwner) return 'owner';
+    let r = profile?.role || 'user';
+    if (r === 'admin' || profile?.email === 'alshawshfras3@gmail.com') return 'admin';
     return 'user';
   };
   const userRole = getNormalizedRole();
@@ -649,9 +699,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     pensionRulesLibrary,
   };
 
-  const hasUnsavedChanges = !isSettingsLoading && !deepEqual(currentSettings, savedSettings);
+  const hasUnsavedChanges = !isSettingsLoading && !deepEqual(
+    normalizeBeforeCompare(currentSettings),
+    normalizeBeforeCompare(savedSettings)
+  );
 
   const saveChanges = async () => {
+    const clonedCurrent = deepClone(currentSettings);
     // Save dynamically to granular Supabase keys in system_settings table
     if (hasSupabaseKeys) {
       try {
@@ -692,9 +746,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         console.log("All settings successfully synced to granular keys in system_settings database");
 
         // ONLY save to unified cache on SUCCESSFUL Supabase write
-        setSavedSettings(currentSettings);
+        setSavedSettings(clonedCurrent);
         try {
-          localStorage.setItem("hasba_settings_cache", JSON.stringify(currentSettings));
+          localStorage.setItem("hasba_settings_cache", JSON.stringify(clonedCurrent));
           localStorage.removeItem("hasba_admin_settings");
           localStorage.setItem("hasba_custom_sectors", JSON.stringify(customSectors));
           localStorage.setItem("bank_sector_pension_rules", JSON.stringify(bankSectorRules));
@@ -727,9 +781,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       }
     } else {
       // Local fallbacks
-      setSavedSettings(currentSettings);
+      setSavedSettings(clonedCurrent);
       try {
-        localStorage.setItem("hasba_settings_cache", JSON.stringify(currentSettings));
+        localStorage.setItem("hasba_settings_cache", JSON.stringify(clonedCurrent));
         localStorage.removeItem("hasba_admin_settings");
         localStorage.setItem("hasba_custom_sectors", JSON.stringify(customSectors));
         localStorage.setItem("bank_sector_pension_rules", JSON.stringify(bankSectorRules));
@@ -741,7 +795,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   };
 
   const cancelChanges = () => {
-    applySettingsState(savedSettings);
+    applySettingsState(deepClone(savedSettings));
   };
 
   return (

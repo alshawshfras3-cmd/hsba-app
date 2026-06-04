@@ -16,10 +16,10 @@ import { Calculator, ShieldCheck, Mail, Phone, ExternalLink, ShieldAlert, Loader
 import { supabase, hasSupabaseKeys, cleanStaleSupabaseSession } from './lib/supabase';
 
 function AdminViewGuard() {
-  const { signOut, profile, isOwner, user } = useAuth();
+  const { signOut, profile, isAdmin, user } = useAuth();
 
   const userRole = profile?.role || 'user';
-  const isAllowed = userRole === 'owner' || isOwner;
+  const isAllowed = userRole === 'admin' || isAdmin;
 
   if (!isAllowed) {
     return (
@@ -31,7 +31,7 @@ function AdminViewGuard() {
           <div>
             <h3 className="font-sans font-bold text-lg text-gray-900">عذراً، الوصول غير مصرح به</h3>
             <p className="text-xs text-gray-500 mt-2 leading-relaxed font-sans">
-              حسابك الحالي (<span className="font-mono text-gray-700 font-semibold">{user?.email}</span>) لا يملك صلاحية (مالك) المطلوبة لتسجيل دخول لوحة الإدارة. رتبتك الحالية هي: (<span className="font-bold text-red-600 font-mono">{userRole || 'غير معرّف'}</span>). يرجى التواصل مع الإدارة.
+              حسابك الحالي (<span className="font-mono text-gray-700 font-semibold">{user?.email}</span>) لا يملك صلاحية (مدير) المطلوبة لتسجيل دخول لوحة الإدارة. رتبتك الحالية هي: (<span className="font-bold text-red-600 font-mono">{userRole === 'admin' ? 'مدير' : 'مستخدم'}</span>). يرجى التواصل مع الإدارة.
             </p>
           </div>
           <button

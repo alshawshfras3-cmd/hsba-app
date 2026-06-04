@@ -18,7 +18,7 @@ create table if not exists user_profiles (
 -- تعديل قيد التحقق من الرتب ليشمل الرتب النهائية المعتمدة فقط
 alter table user_profiles drop constraint if exists user_profiles_role_check;
 alter table user_profiles add constraint user_profiles_role_check 
-  check (role in ('owner', 'manager', 'employee', 'user'));
+  check (role in ('admin', 'user'));
 
 -- 2. الجدول 2: institution_settings (إعدادات عامة لكل بنك)
 create table if not exists institution_settings (
@@ -156,24 +156,28 @@ create table if not exists advance_payment_tiers (
 -- 3) الدوال الأمنية المعتمدة (SECURITY DEFINER مع SET search_path = public)
 -- =========================================================================
 
-CREATE OR REPLACE FUNCTION public.is_owner(user_id uuid)
+CREATE OR REPLACE FUNCTION public.is_admin(user_id uuid)
 RETURNS boolean AS $$
 DECLARE
   v_email text;
   v_role text;
 BEGIN
   SELECT email, role INTO v_email, v_role FROM public.user_profiles WHERE id = user_id;
-  RETURN (v_role = 'owner' OR v_email = 'alshawshfras@gmail.com' OR v_email = 'alshawshfras3@gmail.com');
+  RETURN (v_role = 'admin' OR v_email = 'alshawshfras@gmail.com' OR v_email = 'alshawshfras3@gmail.com');
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+CREATE OR REPLACE FUNCTION public.is_owner(user_id uuid)
+RETURNS boolean AS $$
+BEGIN
+  RETURN public.is_admin(user_id);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 CREATE OR REPLACE FUNCTION public.is_manager(user_id uuid)
 RETURNS boolean AS $$
-DECLARE
-  v_role text;
 BEGIN
-  SELECT role INTO v_role FROM public.user_profiles WHERE id = user_id;
-  RETURN (v_role = 'manager');
+  RETURN public.is_admin(user_id);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
@@ -189,11 +193,8 @@ $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 CREATE OR REPLACE FUNCTION public.can_write_settings(user_id uuid)
 RETURNS boolean AS $$
-DECLARE
-  v_role text;
 BEGIN
-  SELECT role INTO v_role FROM public.user_profiles WHERE id = user_id;
-  RETURN (v_role IN ('owner', 'manager', 'employee'));
+  RETURN public.is_admin(user_id);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
@@ -273,26 +274,16 @@ drop policy if exists "admin_update_all" on user_profiles;
 
 CREATE POLICY "select_policy" ON public.user_profiles
 FOR SELECT USING (
-  public.is_owner(auth.uid()) OR
-  (public.is_manager(auth.uid()) AND COALESCE(role, 'user') <> 'owner') OR
+  public.is_admin(auth.uid()) OR
   (auth.uid() = id)
 );
 
 CREATE POLICY "update_policy" ON public.user_profiles
 FOR UPDATE USING (
-  public.is_owner(auth.uid()) OR
-  (
-    public.is_manager(auth.uid()) AND 
-    COALESCE(role, 'user') IN ('user', 'employee')
-  ) OR
+  public.is_admin(auth.uid()) OR
   (auth.uid() = id)
 ) WITH CHECK (
-  public.is_owner(auth.uid()) OR
-  (
-    public.is_manager(auth.uid()) AND 
-    COALESCE(role, 'user') IN ('user', 'employee') AND
-    (COALESCE(role, 'user') NOT IN ('owner', 'manager'))
-  ) OR
+  public.is_admin(auth.uid()) OR
   (
     auth.uid() = id AND 
     (role = (SELECT role FROM public.user_profiles WHERE id = auth.uid())) AND
@@ -302,11 +293,7 @@ FOR UPDATE USING (
 
 CREATE POLICY "delete_policy" ON public.user_profiles
 FOR DELETE USING (
-  public.is_owner(auth.uid()) OR
-  (
-    public.is_manager(auth.uid()) AND 
-    COALESCE(role, 'user') IN ('user', 'employee')
-  )
+  public.is_admin(auth.uid())
 );
 
 
@@ -393,7 +380,7 @@ declare
   v_role text;
 begin
   if new.email = 'alshawshfras@gmail.com' or new.email = 'alshawshfras3@gmail.com' then
-    v_role := 'owner';
+    v_role := 'admin';
   else
     v_role := 'user';
   end if;
@@ -418,19 +405,20 @@ begin
 end;
 $$ language plpgsql security definer set search_path = public;
 
--- دالة حذف حساب مستخدم آخر بواسطة مالك المنصة أو المدير العام
+-- دالة حذف حساب مستخدم آخر بواسطة مسؤول المنصة
 create or replace function public.delete_user_by_admin(target_user_id uuid)
 returns void as $$
 declare
   v_caller_role text;
   v_caller_email text;
   v_target_role text;
+  v_target_email text;
 begin
   select email, role into v_caller_email, v_caller_role 
   from public.user_profiles 
   where id = auth.uid();
 
-  select coalesce(role, 'user') into v_target_role
+  select coalesce(role, 'user'), email into v_target_role, v_target_email
   from public.user_profiles
   where id = target_user_id;
 
@@ -438,16 +426,14 @@ begin
     raise exception 'خطأ أمني: لا يمكنك إزالة حسابك من هنا بشكل مباشر.';
   end if;
 
-  if (v_caller_role = 'owner' or v_caller_email = 'alshawshfras@gmail.com' or v_caller_email = 'alshawshfras3@gmail.com') then
+  if v_target_email = 'alshawshfras3@gmail.com' then
+    raise exception 'خطأ أمني: لا يمكن حذف حساب المدير العام المحمي.';
+  end if;
+
+  if (v_caller_role = 'admin' or v_caller_email = 'alshawshfras@gmail.com' or v_caller_email = 'alshawshfras3@gmail.com') then
     delete from auth.users where id = target_user_id;
-  elsif (v_caller_role = 'manager') then
-    if v_target_role in ('user', 'employee') then
-      delete from auth.users where id = target_user_id;
-    else
-      raise exception 'غير مصرح للوصول: لا يمكن للمدير حذف حسابات المسؤولين أو ملاك النظام.';
-    END IF;
   else
-    raise exception 'غير مصرح للوصول: هذه العملية مخصصة لمالك المنصة والمدراء المعتمدين فقط.';
+    raise exception 'غير مصرح للوصول: هذه العملية مخصصة لمدراء المنصة فقط.';
   end if;
 end;
 $$ language plpgsql security definer set search_path = public;
@@ -473,18 +459,10 @@ CREATE POLICY "write_system_settings" ON public.system_settings
 
 -- 12. تحديث الأدوار وتوحيدها وتطبيق الاستثناءات
 UPDATE public.user_profiles
-SET role = 'owner'
+SET role = 'admin'
 WHERE email = 'alshawshfras3@gmail.com';
 
 UPDATE public.user_profiles
-SET role = 'owner'
-WHERE role = 'admin';
-
-UPDATE public.user_profiles
-SET role = 'employee'
-WHERE role = 'staff';
-
-UPDATE public.user_profiles
 SET role = 'user'
-WHERE role = 'customer';
+WHERE role IS NULL OR role NOT IN ('admin', 'user');
 
