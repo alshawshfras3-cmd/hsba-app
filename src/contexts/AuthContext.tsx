@@ -45,19 +45,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function fetchProfile(userId: string, email?: string, userMetadata?: any) {
     if (!hasSupabaseKeys) return;
     try {
-      const queryPromise = supabase
-        .from('app_users')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle();
+      // Try app_users first, fallback to user_profiles
+      let profileData = null;
+      try {
+        const { data, error } = await supabase
+          .from('app_users')
+          .select('*')
+          .eq('id', userId)
+          .maybeSingle();
+        if (!error && data) {
+          profileData = data;
+        }
+      } catch (e) {
+        console.warn("Could not load from app_users", e);
+      }
 
-      const timeoutPromise = new Promise<{ data: any; error: any }>((_, reject) =>
-        setTimeout(() => reject(new Error("Timeout load profile")), SUPABASE_TIMEOUT_MS)
-      );
+      if (!profileData) {
+        try {
+          const { data, error } = await supabase
+            .from('user_profiles')
+            .select('*')
+            .eq('id', userId)
+            .maybeSingle();
+          if (!error && data) {
+            profileData = data;
+          }
+        } catch (e) {
+          console.warn("Could not load from user_profiles fallback", e);
+        }
+      }
 
-      const result = await Promise.race([queryPromise, timeoutPromise]) as any;
-      if (result && !result.error && result.data) {
-        let profileData = result.data;
+      if (profileData) {
         const lowercaseEmail = (email || profileData.email || '').toLowerCase().trim();
         const isOwnerEmail = lowercaseEmail === 'admin@hesba.com';
         
@@ -67,7 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setProfile({
             id: profileData.id,
             email: lowercaseEmail,
-            full_name: profileData.full_name,
+            full_name: profileData.full_name || profileData.username || null,
             avatar_url: null,
             role: 'user',
             is_blocked: true
@@ -83,13 +101,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfile({
           id: profileData.id,
           email: lowercaseEmail,
-          full_name: profileData.full_name,
+          full_name: profileData.full_name || profileData.username || null,
           avatar_url: null,
           role: targetRole as UserRole,
           is_blocked: profileData.is_blocked === true
         });
       } else {
-        throw new Error(result?.error?.message || "Profile not loaded");
+        throw new Error("Profile not found in either app_users or user_profiles");
       }
     } catch (err) {
       console.warn("Could not fetch profile, falling back to basic details", err);
@@ -247,19 +265,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) throw error;
 
     if (data?.user) {
-      // Fetch their profile and check status immediately
-      const { data: prof, error: profErr } = await supabase
-        .from('app_users')
-        .select('is_blocked')
-        .eq('id', data.user.id)
-        .maybeSingle();
-        
-      if (!profErr && prof) {
-        if (prof.is_blocked === true && !isOwner) {
-          await supabase.auth.signOut();
-          setIsSuspendedUser(true);
-          throw new Error("تم إيقاف هذا الحساب بواسطة الإدارة");
+      // Fetch their profile and check status immediately across both tables
+      let isBlocked = false;
+      try {
+        const { data: prof, error: profErr } = await supabase
+          .from('app_users')
+          .select('is_blocked')
+          .eq('id', data.user.id)
+          .maybeSingle();
+        if (!profErr && prof) {
+          isBlocked = prof.is_blocked === true;
+        } else {
+          // Try user_profiles
+          const { data: profLegacy, error: profLegacyErr } = await supabase
+            .from('user_profiles')
+            .select('is_blocked, role')
+            .eq('id', data.user.id)
+            .maybeSingle();
+          if (!profLegacyErr && profLegacy) {
+            isBlocked = profLegacy.is_blocked === true || profLegacy.role === 'suspended';
+          }
         }
+      } catch (err) {
+        console.warn("Could not check suspension status from DB", err);
+      }
+        
+      if (isBlocked && !isOwner) {
+        await supabase.auth.signOut();
+        setIsSuspendedUser(true);
+        throw new Error("تم إيقاف هذا الحساب بواسطة الإدارة");
       }
     }
   }
