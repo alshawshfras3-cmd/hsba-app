@@ -59,7 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (result && !result.error && result.data) {
         let profileData = result.data;
         const lowercaseEmail = (email || profileData.email || '').toLowerCase().trim();
-        const isOwnerEmail = lowercaseEmail === 'admin@hesba.com' || lowercaseEmail === 'alshawshfras3@gmail.com';
+        const isOwnerEmail = lowercaseEmail === 'admin@hesba.com';
         
         // Block suspended users (except the protected super admin)
         if ((profileData.status === 'suspended' || profileData.is_active === false) && !isOwnerEmail) {
@@ -107,7 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       console.warn("Could not fetch profile, falling back to basic details", err);
       const lowercaseEmail = (email || '').toLowerCase().trim();
-      const isOwnerEmail = lowercaseEmail === 'admin@hesba.com' || lowercaseEmail === 'alshawshfras3@gmail.com';
+      const isOwnerEmail = lowercaseEmail === 'admin@hesba.com';
       
       const suspendedMocks = JSON.parse(localStorage.getItem('hesba_suspended_mock_emails') || '[]');
       const isSuspendedMock = suspendedMocks.includes(lowercaseEmail) && !isOwnerEmail;
@@ -196,7 +196,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const isOwnerEmail = (email?: string) => {
     const e = email?.toLowerCase().trim();
-    return e === 'admin@hesba.com' || e === 'alshawshfras3@gmail.com';
+    return e === 'admin@hesba.com';
   };
 
   const isAdmin = profile?.role === 'admin' || isOwnerEmail(user?.email);

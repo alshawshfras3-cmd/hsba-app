@@ -255,7 +255,7 @@ export function LoginPage() {
                 onClick={async () => {
                   setLoadingAction(true);
                   try {
-                    await signInWithEmail('alshawshfras3@gmail.com', 'bypass');
+                    await signInWithEmail('admin@hesba.com', 'bypass');
                   } catch (e) {
                     console.error(e);
                   } finally {
@@ -265,7 +265,7 @@ export function LoginPage() {
                 className="w-full py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-sm cursor-pointer"
               >
                 <Sparkles className="w-4 h-4" />
-                <span>الدخول الفوري كمسؤول (alshawshfras3@gmail.com)</span>
+                <span>الدخول الفوري كمسؤول (admin@hesba.com)</span>
               </button>
             </div>
           )}

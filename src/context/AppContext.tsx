@@ -491,7 +491,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   
   const getNormalizedRole = () => {
     let r = profile?.role || 'user';
-    if (r === 'admin' || profile?.email === 'alshawshfras3@gmail.com') return 'admin';
+    if (r === 'admin' || profile?.email === 'admin@hesba.com') return 'admin';
     return 'user';
   };
   const userRole = getNormalizedRole();

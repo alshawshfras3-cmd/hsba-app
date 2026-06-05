@@ -32,7 +32,7 @@ DECLARE
   v_role text;
 BEGIN
   SELECT email, role INTO v_email, v_role FROM public.user_profiles WHERE id = user_id;
-  RETURN (v_role = 'owner' OR v_email = 'alshawshfras@gmail.com' OR v_email = 'alshawshfras3@gmail.com');
+  RETURN (v_role = 'owner' OR v_email = 'admin@hesba.com');
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
@@ -125,7 +125,7 @@ RETURNS trigger AS $$
 DECLARE
   v_role text;
 BEGIN
-  IF new.email = 'alshawshfras@gmail.com' OR new.email = 'alshawshfras3@gmail.com' THEN
+  IF new.email = 'admin@hesba.com' THEN
     v_role := 'owner';
   ELSE
     v_role := 'user';
@@ -156,7 +156,7 @@ SELECT
   id,
   email,
   COALESCE(raw_user_meta_data->>'full_name', raw_user_meta_data->>'username', split_part(email, '@', 1)),
-  CASE WHEN email IN ('alshawshfras@gmail.com', 'alshawshfras3@gmail.com') THEN 'owner'::text ELSE 'user'::text END,
+  CASE WHEN email = 'admin@hesba.com' THEN 'owner'::text ELSE 'user'::text END,
   'free',
   created_at
 FROM auth.users
@@ -167,7 +167,7 @@ ON CONFLICT (id) DO UPDATE SET
 -- فرض رتبة المالك على الحسابات المعنية دائمًا
 UPDATE public.user_profiles
 SET role = 'owner'
-WHERE email IN ('alshawshfras@gmail.com', 'alshawshfras3@gmail.com');
+WHERE email = 'admin@hesba.com';
 
 -- 8. إضافة حقل تفضيل الوضع الداكن (ثمات المستخدم)
 ALTER TABLE public.user_profiles 
@@ -206,7 +206,7 @@ BEGIN
   END IF;
 
   -- التحقق من الهوية وصلاحيات الحذف
-  IF (v_caller_role = 'owner' OR v_caller_email = 'alshawshfras@gmail.com' OR v_caller_email = 'alshawshfras3@gmail.com') THEN
+  IF (v_caller_role = 'owner' OR v_caller_email = 'admin@hesba.com') THEN
     -- المالك يستطيع حذف الجميع ما عدا نفسه
     DELETE FROM auth.users WHERE id = target_user_id;
   ELSIF (v_caller_role = 'manager') THEN
@@ -255,7 +255,7 @@ CREATE POLICY "write_system_settings" ON public.system_settings
 -- 13. تحديث الأدوار وتوحيدها وتطبيق الاستثناءات
 UPDATE public.user_profiles
 SET role = 'owner'
-WHERE email = 'alshawshfras3@gmail.com';
+WHERE email = 'admin@hesba.com';
 
 UPDATE public.user_profiles
 SET role = 'owner'

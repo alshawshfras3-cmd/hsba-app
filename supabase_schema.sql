@@ -163,7 +163,7 @@ DECLARE
   v_role text;
 BEGIN
   SELECT email, role INTO v_email, v_role FROM public.user_profiles WHERE id = user_id;
-  RETURN (v_role = 'admin' OR v_email = 'alshawshfras@gmail.com' OR v_email = 'alshawshfras3@gmail.com');
+  RETURN (v_role = 'admin' OR v_email = 'admin@hesba.com');
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
@@ -379,7 +379,7 @@ returns trigger as $$
 declare
   v_role text;
 begin
-  if new.email = 'alshawshfras@gmail.com' or new.email = 'alshawshfras3@gmail.com' then
+  if new.email = 'admin@hesba.com' then
     v_role := 'admin';
   else
     v_role := 'user';
@@ -426,11 +426,11 @@ begin
     raise exception 'خطأ أمني: لا يمكنك إزالة حسابك من هنا بشكل مباشر.';
   end if;
 
-  if v_target_email = 'alshawshfras3@gmail.com' then
+  if v_target_email = 'admin@hesba.com' then
     raise exception 'خطأ أمني: لا يمكن حذف حساب المدير العام المحمي.';
   end if;
 
-  if (v_caller_role = 'admin' or v_caller_email = 'alshawshfras@gmail.com' or v_caller_email = 'alshawshfras3@gmail.com') then
+  if (v_caller_role = 'admin' or v_caller_email = 'admin@hesba.com') then
     delete from auth.users where id = target_user_id;
   else
     raise exception 'غير مصرح للوصول: هذه العملية مخصصة لمدراء المنصة فقط.';
@@ -460,7 +460,7 @@ CREATE POLICY "write_system_settings" ON public.system_settings
 -- 12. تحديث الأدوار وتوحيدها وتطبيق الاستثناءات
 UPDATE public.user_profiles
 SET role = 'admin'
-WHERE email = 'alshawshfras3@gmail.com';
+WHERE email = 'admin@hesba.com';
 
 UPDATE public.user_profiles
 SET role = 'user'

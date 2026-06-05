@@ -38,7 +38,7 @@ export function AdminLoginPage() {
     }
 
     // Check pre-configured admin emails
-    const isOwnerEmail = queryEmail === 'admin@hesba.com' || queryEmail === 'alshawshfras3@gmail.com';
+    const isOwnerEmail = queryEmail === 'admin@hesba.com';
 
     if (!hasSupabaseKeys) {
       // Mock flow if no keys are set

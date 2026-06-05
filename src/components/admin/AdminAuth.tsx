@@ -91,9 +91,9 @@ export default function AdminAuth() {
         setGoogleLoading(false);
         setUser({
           id: 'mock_google_id',
-          email: 'alshawshfras3@gmail.com',
+          email: 'admin@hesba.com',
           user_metadata: {
-            username: 'فراس الشاوش (مسؤول)'
+            username: 'مدير النظام'
           }
         });
       }, 500);
@@ -148,9 +148,9 @@ export default function AdminAuth() {
               onClick={() => {
                 setUser({
                   id: 'offline_admin',
-                  email: 'alshawshfras3@gmail.com',
+                  email: 'admin@hesba.com',
                   user_metadata: {
-                    username: 'فراس الشاوش (مدير النظام)'
+                    username: 'مدير النظام'
                   }
                 });
               }}

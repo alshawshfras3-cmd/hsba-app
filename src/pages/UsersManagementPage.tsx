@@ -62,7 +62,7 @@ export function UsersManagementPage() {
           const isSusp = suspendedMocks.includes(em);
           return {
             ...u,
-            role: (em === 'alshawshfras3@gmail.com' || (u.role as any) === 'admin') ? 'admin' as const : 'user' as const,
+            role: (em === 'admin@hesba.com' || (u.role as any) === 'admin') ? 'admin' as const : 'user' as const,
             subscription: u.subscription || 'free',
             status: isSusp ? 'suspended' : 'active',
             is_active: !isSusp
@@ -76,7 +76,7 @@ export function UsersManagementPage() {
             id: user.id,
             email: user.email || '',
             full_name: authProfile?.full_name || user.user_metadata?.full_name || user.user_metadata?.username || 'مستخدم',
-            role: (isAdmin || em === 'alshawshfras3@gmail.com') ? 'admin' : 'user',
+            role: (isAdmin || em === 'admin@hesba.com') ? 'admin' : 'user',
             subscription: 'free',
             created_at: user.created_at || new Date().toISOString(),
             last_login: new Date().toISOString(),
@@ -112,7 +112,7 @@ export function UsersManagementPage() {
       let typedData = (data ?? []).map((item: any) => {
         let r = item.role || 'user';
         const em = (item.email || '').toLowerCase().trim();
-        if (em === 'alshawshfras3@gmail.com' || r === 'admin') {
+        if (em === 'admin@hesba.com' || r === 'admin') {
           r = 'admin';
         } else {
           r = 'user';
@@ -133,7 +133,7 @@ export function UsersManagementPage() {
       
       // Direct clientside filter as additional double safety
       if (currentUserRole !== 'admin') {
-        typedData = typedData.filter(u => u.role !== 'admin' && u.email?.toLowerCase().trim() !== 'alshawshfras3@gmail.com');
+        typedData = typedData.filter(u => u.role !== 'admin' && u.email?.toLowerCase().trim() !== 'admin@hesba.com');
       }
 
       setUsers(typedData);
@@ -145,7 +145,7 @@ export function UsersManagementPage() {
           id: user.id,
           email: user.email || '',
           full_name: authProfile?.full_name || user.user_metadata?.full_name || user.user_metadata?.username || 'مستخدم',
-          role: (isAdmin || (user.email ?? '').toLowerCase().trim() === 'alshawshfras3@gmail.com') ? 'admin' : 'user',
+          role: (isAdmin || (user.email ?? '').toLowerCase().trim() === 'admin@hesba.com') ? 'admin' : 'user',
           subscription: 'free',
           created_at: user.created_at || new Date().toISOString(),
           last_login: new Date().toISOString(),
@@ -169,7 +169,7 @@ export function UsersManagementPage() {
 
     const targetEmail = (targetUser.email || '').toLowerCase().trim();
 
-    if (targetEmail === 'alshawshfras3@gmail.com') {
+    if (targetEmail === 'admin@hesba.com') {
       alert('لا يمكن تعديل صلاحية المدير الأساسي.');
       return;
     }
@@ -205,7 +205,7 @@ export function UsersManagementPage() {
   }
 
   async function toggleStatus(userId: string, currentStatus: string | null | undefined, targetEmail: string) {
-    const isOwnerEmail = targetEmail.toLowerCase().trim() === 'alshawshfras3@gmail.com';
+    const isOwnerEmail = targetEmail.toLowerCase().trim() === 'admin@hesba.com';
     if (isOwnerEmail) {
       alert('ممنوع تماماً حظر أو تعطيل حساب مالك النظام الأساسي!');
       return;
@@ -446,7 +446,7 @@ export function UsersManagementPage() {
               </thead>
               <tbody className="divide-y divide-[#F1F5F9] font-semibold">
                 {filteredUsers.map(userItem => {
-                  const isOwner = userItem.email?.toLowerCase().trim() === 'alshawshfras3@gmail.com';
+                  const isOwner = userItem.email?.toLowerCase().trim() === 'admin@hesba.com';
                   const isSelf = userItem.id === authProfile?.id;
                   
                   // Disable dropdown controls for Admin trying to update themselves or the primary owner

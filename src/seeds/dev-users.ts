@@ -12,8 +12,8 @@ export interface DevUserProfile {
 export const devUsers: DevUserProfile[] = [
   {
     id: 'owner_id',
-    email: 'alshawshfras3@gmail.com',
-    full_name: 'فراس الشاوش (مالك المنصة)',
+    email: 'admin@hesba.com',
+    full_name: 'مدير المنصة',
     role: 'admin',
     subscription: 'enterprise',
     created_at: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString(),
