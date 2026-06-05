@@ -57,6 +57,7 @@ import {
 } from '../../lib/adminOperations';
 import { getHousingSupport, getAdvancePayment } from '../../lib/housingSupportService';
 import { HousingSupportTier, AdvancePaymentTier } from '../../types';
+import { clearLegacyStorage } from '../../lib/utils';
 
 const LOGO_COLOR_PRESETS = [
   { value: 'from-emerald-700 to-emerald-950', name: 'أخضر داكن (الأهلي)' },
@@ -111,6 +112,13 @@ export default function AdminDashboard() {
   } = useAppState();
 
   const formBanksList = banks.map(b => ({ id: b.id, nameAr: b.nameAr }));
+
+  // Clear legacy localStorage cache keys once immediately after successfully loading/synced settings
+  useEffect(() => {
+    if (banks && banks.length > 0) {
+      clearLegacyStorage();
+    }
+  }, [banks]);
 
   // Sidebar navigations
   const menuItems = [
