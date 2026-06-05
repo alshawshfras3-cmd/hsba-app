@@ -190,13 +190,20 @@ export function useSettings() {
 
       // Stage 2: Success -> save backup in "hasba_settings_cache" and remove other caches
       try {
-        localStorage.removeItem("hasba_admin_settings");
-        localStorage.removeItem("hasba_custom_sectors");
-        localStorage.removeItem("bank_sector_pension_rules");
-        localStorage.removeItem("pension_rules_library");
-        Object.keys(DEFAULTS).forEach(k => {
-          localStorage.removeItem(`hasba_sett_${k}`);
-        });
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const key = localStorage.key(i);
+          if (key) {
+            if (
+              key === 'hasba_admin_settings' || 
+              key === 'hasba_custom_sectors' || 
+              key === 'bank_sector_pension_rules' || 
+              key === 'pension_rules_library' || 
+              key.startsWith('hasba_sett_')
+            ) {
+              localStorage.removeItem(key);
+            }
+          }
+        }
 
         const cacheToSave: Record<string, any> = {};
         for (const dbKey of Object.keys(DEFAULTS)) {

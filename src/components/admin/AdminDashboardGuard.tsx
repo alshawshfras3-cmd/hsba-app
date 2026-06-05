@@ -45,7 +45,7 @@ export function AdminDashboardGuard({ children }: GuardProps) {
               غير مصرح لك بدخول لوحة التحكم.
             </p>
             <p className="text-[11px] text-slate-400 font-medium leading-relaxed">
-              الحساب الحالي (<span className="font-mono text-slate-700 font-bold">{user?.email}</span>) لا يملك رتبة مدير. رتبتك الحالية هي: مستخدم.
+              الحساب الحالي (<span className="font-mono text-slate-700 font-bold">{user?.email}</span>) لا يملك صلاحية الوصول للوحة التحكم وإجراء التغييرات.
             </p>
           </div>
           <button

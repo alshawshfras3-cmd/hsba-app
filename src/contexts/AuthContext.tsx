@@ -59,9 +59,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (result && !result.error && result.data) {
         let profileData = result.data;
         const lowercaseEmail = (email || profileData.email || '').toLowerCase().trim();
-        const isOwnerEmail = lowercaseEmail === 'alshawshfras3@gmail.com';
+        const isOwnerEmail = lowercaseEmail === 'admin@hesba.com' || lowercaseEmail === 'alshawshfras3@gmail.com';
         
-        // Block suspended users (except the protected super admnin)
+        // Block suspended users (except the protected super admin)
         if ((profileData.status === 'suspended' || profileData.is_active === false) && !isOwnerEmail) {
           setIsSuspendedUser(true);
           setProfile({
@@ -107,7 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       console.warn("Could not fetch profile, falling back to basic details", err);
       const lowercaseEmail = (email || '').toLowerCase().trim();
-      const isOwnerEmail = lowercaseEmail === 'alshawshfras3@gmail.com';
+      const isOwnerEmail = lowercaseEmail === 'admin@hesba.com' || lowercaseEmail === 'alshawshfras3@gmail.com';
       
       const suspendedMocks = JSON.parse(localStorage.getItem('hesba_suspended_mock_emails') || '[]');
       const isSuspendedMock = suspendedMocks.includes(lowercaseEmail) && !isOwnerEmail;
@@ -196,7 +196,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const isOwnerEmail = (email?: string) => {
     const e = email?.toLowerCase().trim();
-    return e === 'alshawshfras3@gmail.com';
+    return e === 'admin@hesba.com' || e === 'alshawshfras3@gmail.com';
   };
 
   const isAdmin = profile?.role === 'admin' || isOwnerEmail(user?.email);
@@ -213,18 +213,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function signInWithGoogle() {
     if (!hasSupabaseKeys) {
       // Mock OAuth Flow for Preview
-      const mockEmail = 'alshawshfras3@gmail.com';
+      const mockEmail = 'admin@hesba.com';
       setUser({
         id: 'mock_google_user',
         email: mockEmail,
         user_metadata: {
-          full_name: 'فراس الشاوش (مدير المنصة)',
+          full_name: 'مدير المنصة',
         }
       } as any);
       setProfile({
         id: 'mock_google_user',
         email: mockEmail,
-        full_name: 'فراس الشاوش (مدير المنصة)',
+        full_name: 'مدير المنصة',
         avatar_url: null,
         role: 'admin'
       });
@@ -238,7 +238,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function signInWithEmail(email: string, password: string) {
     const emailLower = email.trim().toLowerCase();
-    const isOwner = emailLower === 'alshawshfras3@gmail.com';
+    const isOwner = isOwnerEmail(emailLower);
 
     // Intercept mock mode suspension
     const suspendedMocks = JSON.parse(localStorage.getItem('hesba_suspended_mock_emails') || '[]');
@@ -252,13 +252,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         id: 'mock_email_user',
         email: emailLower,
         user_metadata: {
-          full_name: isOwner ? 'فراس الشاوش (مدير المنصة)' : emailLower.split('@')[0],
+          full_name: isOwner ? 'مدير المنصة' : emailLower.split('@')[0],
         }
       } as any);
       setProfile({
         id: 'mock_email_user',
         email: emailLower,
-        full_name: isOwner ? 'فراس الشاوش (مدير المنصة)' : emailLower.split('@')[0],
+        full_name: isOwner ? 'مدير المنصة' : emailLower.split('@')[0],
         avatar_url: null,
         role: isOwner ? 'admin' : 'user',
         status: 'active'
@@ -292,7 +292,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function signUpWithEmail(email: string, password: string, fullName: string) {
     if (!hasSupabaseKeys) {
       const emailLower = email.trim().toLowerCase();
-      const isOwner = emailLower === 'alshawshfras3@gmail.com';
+      const isOwner = isOwnerEmail(emailLower);
       const mockUser = {
         id: 'mock_email_user',
         email: emailLower,

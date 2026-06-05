@@ -27,20 +27,6 @@ const roleColor = {
   user: 'bg-slate-100 text-slate-700 border border-slate-200'
 };
 
-const subscriptionLabel = {
-  free: 'مجانية',
-  basic: 'أساسية',
-  premium: 'مميزة',
-  enterprise: 'مؤسسات'
-};
-
-const subscriptionColor = {
-  free: 'bg-slate-100 text-slate-700 border border-slate-200',
-  basic: 'bg-emerald-50 text-emerald-700 border border-emerald-100',
-  premium: 'bg-amber-50 text-amber-700 border border-amber-100',
-  enterprise: 'bg-purple-50 text-purple-700 border border-purple-100'
-};
-
 export function UsersManagementPage() {
   const { isAdmin, isStaff, isCustomer, user, profile: authProfile } = useAuth();
   const [users, setUsers] = useState<Profile[]>([]);
@@ -50,7 +36,6 @@ export function UsersManagementPage() {
   // Search and Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
-  const [subscriptionFilter, setSubscriptionFilter] = useState('all');
 
   useEffect(() => {
     fetchUsers();
@@ -322,18 +307,16 @@ export function UsersManagementPage() {
       (u.email || '').toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchRole = roleFilter === 'all' || u.role === roleFilter;
-    const matchSub = subscriptionFilter === 'all' || u.subscription === subscriptionFilter;
 
-    return matchSearch && matchRole && matchSub;
+    return matchSearch && matchRole;
   });
 
   function handleExportCSV() {
-    const headers = ['الاسم', 'البريد الإلكتروني', 'الصلاحية', 'الباقة', 'تاريخ التسجيل', 'آخر دخول'];
+    const headers = ['الاسم', 'البريد الإلكتروني', 'الصلاحية', 'تاريخ التسجيل', 'آخر دخول'];
     const rows = filteredUsers.map(u => [
       u.full_name || 'مستخدم غير معرّف',
       u.email,
       roleLabel[u.role] || u.role,
-      subscriptionLabel[u.subscription] || 'مجانية',
       u.created_at ? new Date(u.created_at).toLocaleDateString('ar-SA') : '',
       u.last_login ? new Date(u.last_login).toLocaleDateString('ar-SA') : 'غير متوفر'
     ]);

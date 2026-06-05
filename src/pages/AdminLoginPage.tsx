@@ -17,16 +17,34 @@ export function AdminLoginPage() {
     setLoading(true);
     setErrorMsg(null);
 
-    const emailTrimmed = email.trim().toLowerCase();
+    const inputTrimmed = email.trim();
+    let queryEmail = inputTrimmed.toLowerCase();
 
-    // Check pre-configured admin email
-    const isOwnerEmail = emailTrimmed === 'alshawshfras3@gmail.com';
+    // Check if input is a username (doesn't contain '@')
+    if (!inputTrimmed.includes('@') && hasSupabaseKeys) {
+      try {
+        const { data: prof, error: profErr } = await supabase
+          .from('user_profiles')
+          .select('email')
+          .eq('username', inputTrimmed)
+          .maybeSingle();
+
+        if (prof?.email) {
+          queryEmail = prof.email.trim().toLowerCase();
+        }
+      } catch (err) {
+        console.error("Username lookup failed:", err);
+      }
+    }
+
+    // Check pre-configured admin emails
+    const isOwnerEmail = queryEmail === 'admin@hesba.com' || queryEmail === 'alshawshfras3@gmail.com';
 
     if (!hasSupabaseKeys) {
       // Mock flow if no keys are set
       setTimeout(() => {
         setLoading(false);
-        if (isOwnerEmail || emailTrimmed.includes('admin')) {
+        if (isOwnerEmail || queryEmail.includes('admin') || inputTrimmed === 'admin') {
           navigate('/admin/dashboard');
         } else {
           setErrorMsg('غير مصرح لك بدخول لوحة التحكم.');
@@ -38,7 +56,7 @@ export function AdminLoginPage() {
     try {
       // 1. Sign in with password
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: emailTrimmed,
+        email: queryEmail,
         password: password,
       });
 
@@ -74,7 +92,7 @@ export function AdminLoginPage() {
       console.error("Login failure:", err);
       const msg = err?.message || '';
       if (msg.includes('Invalid login credentials') || msg.includes('custom-claims') || msg.includes('invalid-claim')) {
-        setErrorMsg('البريد الإلكتروني أو كلمة المرور غير صحيحة.');
+        setErrorMsg('الاسم/البريد الإلكتروني أو كلمة المرور غير صحيحة.');
       } else {
         setErrorMsg(msg || 'حدث خطأ أثناء محاولة الدخول، يرجى المحاولة لاحقاً.');
       }
@@ -110,14 +128,14 @@ export function AdminLoginPage() {
         {/* Email form */}
         <form onSubmit={handleLogin} className="space-y-5">
           <div className="space-y-1.5">
-            <label className="text-[11px] font-bold text-slate-700 block">البريد الإلكتروني</label>
+            <label className="text-[11px] font-bold text-slate-700 block">اسم المستخدم أو البريد الإلكتروني</label>
             <div className="relative">
               <input
-                type="email"
+                type="text"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@hesba.sa"
+                placeholder="admin@hesba.com"
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:border-[#0057B8] text-xs font-semibold rounded-xl focus:ring-1 focus:ring-[#0057B8] outline-none transition-all pr-11 text-left"
                 dir="ltr"
               />

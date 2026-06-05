@@ -54,6 +54,27 @@ export function migrateAllowedSectors(sectors: string[] | undefined | null): Sec
 
 export function runAllStorageMigrations(): void {
   try {
+    // If a consolidated unified cache already exists, we can immediately clean up all old separate legacy keys
+    const cacheExists = localStorage.getItem("hasba_settings_cache");
+    if (cacheExists) {
+      console.log("Unified settings cache detected. Cleaning up stale legacy storage keys...");
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        if (key) {
+          if (
+            key === 'hasba_admin_settings' || 
+            key === 'hasba_custom_sectors' || 
+            key === 'bank_sector_pension_rules' || 
+            key === 'pension_rules_library' || 
+            key.startsWith('hasba_sett_')
+          ) {
+            localStorage.removeItem(key);
+          }
+        }
+      }
+      return;
+    }
+
     const keysToMigrate = [
       'bank_sector_pension_rules',
       'pension_rules_library',
