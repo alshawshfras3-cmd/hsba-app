@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useLocation } from '../hooks/useLocation';
 import { Lock, Mail, Loader2, ShieldAlert, AlertCircle } from 'lucide-react';
-import { getAdminCredentials } from '../lib/adminCredentials';
+import { supabase } from '../lib/supabase';
 
 export function AdminLoginPage() {
   const { navigate } = useLocation();
@@ -15,35 +15,47 @@ export function AdminLoginPage() {
     setLoading(true);
     setErrorMsg(null);
 
-    const inputEmailOrUser = email.trim();
-    const inputPassword = password;
-
     try {
-      // Fetch latest admin credentials (via table admin_settings or fallback)
-      const settings = await getAdminCredentials();
+      const { data, error } = await supabase
+        .from('admin_settings')
+        .select('admin_username, admin_email, admin_password')
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Admin settings load error:', error);
+        setErrorMsg('تعذر الاتصال بإعدادات لوحة التحكم');
+        return;
+      }
+
+      if (!data) {
+        setErrorMsg('إعدادات لوحة التحكم غير موجودة');
+        return;
+      }
+
+      const cleanIdentifier = email.trim();
 
       const identifierOk =
-        inputEmailOrUser.toLowerCase() === settings.admin_email.toLowerCase() ||
-        inputEmailOrUser === settings.admin_username;
+        cleanIdentifier === data.admin_email ||
+        cleanIdentifier === data.admin_username;
 
-      const passwordOk = inputPassword === settings.admin_password;
+      const passwordOk = password === data.admin_password;
 
-      if (identifierOk && passwordOk) {
-        // Create session
-        sessionStorage.setItem('hesba_admin_session', JSON.stringify({
-          isAdmin: true,
-          identifier: inputEmailOrUser,
-          loginAt: new Date().toISOString()
-        }));
-        
-        // Successful login, navigate to admin dashboard
-        navigate('/admin/dashboard');
-      } else {
-        setErrorMsg('غير مصرح لك بدخول لوحة التحكم. البيانات المدخلة غير صحيحة.');
+      if (!identifierOk || !passwordOk) {
+        setErrorMsg('غير مصرح');
+        return;
       }
-    } catch (err: any) {
-      console.error("Login failure:", err);
-      setErrorMsg('حدث خطأ أثناء محاولة الدخول، يرجى المحاولة لاحقاً.');
+
+      sessionStorage.setItem('hesba_admin_session', JSON.stringify({
+        isAdmin: true,
+        identifier: cleanIdentifier,
+        loginAt: new Date().toISOString()
+      }));
+
+      navigate('/admin/dashboard');
+    } catch (err) {
+      console.error('Admin login unexpected error:', err);
+      setErrorMsg('حدث خطأ أثناء تسجيل الدخول');
     } finally {
       setLoading(false);
     }
