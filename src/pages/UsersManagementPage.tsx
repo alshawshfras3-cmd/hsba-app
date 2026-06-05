@@ -68,58 +68,34 @@ export function UsersManagementPage() {
     }
 
     try {
-      // Query app_users instead of old user_profiles setup
+      // Query app_users directly
       const { data, error } = await supabase
         .from('app_users')
         .select('*')
         .order('created_at', { ascending: false });
 
       if (error) {
-        // Fallback to user_profiles if app_users does not exist yet to prevent crash, but only keep requested attributes
-        console.warn("app_users select failed, trying user_profiles fallback: ", error.message);
-        const { data: profData, error: profErr } = await supabase
-          .from('user_profiles')
-          .select('id, email, full_name, is_active, status, created_at')
-          .order('created_at', { ascending: false });
-
-        if (profErr) {
-          throw new Error("تعذر تحميل قائمة المستخدمين من الجداول المتوفرة.");
-        }
-
-        const normalized: AppUser[] = (profData ?? []).map((item: any) => ({
-          id: item.id,
-          email: item.email || '',
-          full_name: item.full_name || 'مستخدم',
-          is_blocked: item.is_active === false || item.status === 'suspended',
-          created_at: item.created_at || new Date().toISOString()
-        }));
-
-        const filtered = normalized.filter(u => {
-          const emailLower = u.email.toLowerCase().trim();
-          return emailLower !== currentAdminEmail && emailLower !== 'admin@hesba.com';
-        });
-
-        setUsers(filtered);
-      } else {
-        const normalized: AppUser[] = (data ?? []).map((item: any) => ({
-          id: item.id,
-          email: item.email || '',
-          full_name: item.full_name || 'مستخدم',
-          phone: item.phone,
-          is_blocked: item.is_blocked === true,
-          created_at: item.created_at || new Date().toISOString()
-        }));
-
-        const filtered = normalized.filter(u => {
-          const emailLower = u.email.toLowerCase().trim();
-          return emailLower !== currentAdminEmail && emailLower !== 'admin@hesba.com';
-        });
-
-        setUsers(filtered);
+        throw error;
       }
+
+      const normalized: AppUser[] = (data ?? []).map((item: any) => ({
+        id: item.id,
+        email: item.email || '',
+        full_name: item.full_name || 'مستخدم',
+        phone: item.phone,
+        is_blocked: item.is_blocked === true,
+        created_at: item.created_at || new Date().toISOString()
+      }));
+
+      const filtered = normalized.filter(u => {
+        const emailLower = u.email.toLowerCase().trim();
+        return emailLower !== currentAdminEmail && emailLower !== 'admin@hesba.com';
+      });
+
+      setUsers(filtered);
     } catch (err: any) {
       console.error("Error fetching users:", err);
-      setErrorMsg(err?.message || 'فشل تحميل بيانات المستخدمين والبروفايلات.');
+      setErrorMsg(err?.message || 'فشل تحميل بيانات المستخدمين من جدول app_users.');
     } finally {
       setLoading(false);
     }
@@ -157,24 +133,14 @@ export function UsersManagementPage() {
     }
 
     try {
-      // 1. Try to update in app_users
+      // Update in app_users
       const { error: appErr } = await supabase
         .from('app_users')
         .update({ is_blocked: nextBlockedState, updated_at: new Date().toISOString() })
         .eq('id', userId);
 
       if (appErr) {
-        console.warn("Could not update app_users, falling back to user_profiles status sync", appErr.message);
-        // Fallback update on user_profiles if exist
-        const { error: profErr } = await supabase
-          .from('user_profiles')
-          .update({ 
-            is_active: !nextBlockedState, 
-            status: nextBlockedState ? 'suspended' : 'active' 
-          })
-          .eq('id', userId);
-
-        if (profErr) throw profErr;
+        throw appErr;
       }
 
       alert(nextBlockedState ? 'تم حظر حساب المستخدم بنجاح.' : 'تم إلغاء حظر حساب المستخدم وتفعيله المباشر.');
