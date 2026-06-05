@@ -57,7 +57,7 @@ import {
 } from '../../lib/adminOperations';
 import { getHousingSupport, getAdvancePayment } from '../../lib/housingSupportService';
 import { HousingSupportTier, AdvancePaymentTier } from '../../types';
-import { clearLegacyStorage } from '../../lib/utils';
+import { clearLegacyStorage } from '@/lib/utils';
 
 const LOGO_COLOR_PRESETS = [
   { value: 'from-emerald-700 to-emerald-950', name: 'أخضر داكن (الأهلي)' },
