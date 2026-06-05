@@ -1,324 +1,213 @@
 import React, { useEffect, useState } from 'react';
 import { supabase, hasSupabaseKeys } from '../lib/supabase';
-import { useAuth } from '../contexts/AuthContext';
-import { Shield, Sparkles, User, Mail, Calendar, Settings, AlertCircle, Loader2 } from 'lucide-react';
-
+import { Shield, User, Mail, Calendar, AlertCircle, Loader2 } from 'lucide-react';
+import { getAdminCredentials } from '../lib/adminCredentials';
 import { devUsers } from '../seeds/dev-users';
 
-type Profile = {
+type AppUser = {
   id: string;
   email: string;
   full_name: string | null;
-  role: 'admin' | 'user';
-  subscription: 'free' | 'basic' | 'premium' | 'enterprise';
-  subscription_expires_at?: string | null;
+  phone?: string | null;
+  is_blocked: boolean;
   created_at: string;
-  last_login?: string | null;
-  is_active?: boolean;
-  status?: string | null;
-};
-
-const roleLabel = { 
-  admin: 'مدير',
-  user: 'مستخدم'
-};
-const roleColor = {
-  admin: 'bg-emerald-50 text-emerald-700 border border-emerald-100 font-extrabold',
-  user: 'bg-slate-100 text-slate-700 border border-slate-200'
 };
 
 export function UsersManagementPage() {
-  const { isAdmin, isStaff, isCustomer, user, profile: authProfile } = useAuth();
-  const [users, setUsers] = useState<Profile[]>([]);
+  const [users, setUsers] = useState<AppUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
-
-  // Search and Filters
   const [searchTerm, setSearchTerm] = useState('');
-  const [roleFilter, setRoleFilter] = useState('all');
+  const [showBlockedOnly, setShowBlockedOnly] = useState('all'); // all, active, blocked
+
+  const [adminEmail, setAdminEmail] = useState('admin@hesba.com');
 
   useEffect(() => {
-    fetchUsers();
-  }, [isAdmin]);
+    fetchUsersAndAdminEmail();
+  }, []);
 
-  async function fetchUsers() {
+  async function fetchUsersAndAdminEmail() {
     setLoading(true);
     setErrorMsg('');
 
-    // Determine current user role
-    const currentUserRole = isAdmin ? 'admin' : 'user';
+    let currentAdminEmail = 'admin@hesba.com';
+    try {
+      const credentials = await getAdminCredentials();
+      currentAdminEmail = credentials.admin_email.toLowerCase().trim();
+      setAdminEmail(currentAdminEmail);
+    } catch (e) {
+      console.warn("Could not load admin credentials:", e);
+    }
 
     if (!hasSupabaseKeys) {
-      // Return beautiful mock user list for local view
-      let mockUsers: Profile[] = [];
-      const isDevMode = (import.meta as any).env?.DEV === true;
-      const showDevUsers = isDevMode && !hasSupabaseKeys && !user;
-
+      // Mock static data
       const suspendedMocks = JSON.parse(localStorage.getItem('hesba_suspended_mock_emails') || '[]');
-
-      if (showDevUsers) {
-        mockUsers = devUsers.map(u => {
-          const em = u.email.toLowerCase().trim();
-          const isSusp = suspendedMocks.includes(em);
+      
+      const parsedMockUsers: AppUser[] = devUsers
+        .map(u => {
+          const emailLower = u.email.toLowerCase().trim();
+          const isBlocked = suspendedMocks.includes(emailLower);
           return {
-            ...u,
-            role: (em === 'admin@hesba.com' || (u.role as any) === 'admin') ? 'admin' as const : 'user' as const,
-            subscription: u.subscription || 'free',
-            status: isSusp ? 'suspended' : 'active',
-            is_active: !isSusp
+            id: u.id,
+            email: u.email,
+            full_name: u.full_name,
+            phone: (u as any).phone || null,
+            is_blocked: isBlocked,
+            created_at: u.created_at || new Date().toISOString()
           };
-        }) as Profile[];
-      } else if (user) {
-        const em = (user.email ?? '').toLowerCase().trim();
-        const isSusp = suspendedMocks.includes(em);
-        mockUsers = [
-          {
-            id: user.id,
-            email: user.email || '',
-            full_name: authProfile?.full_name || user.user_metadata?.full_name || user.user_metadata?.username || 'مستخدم',
-            role: (isAdmin || em === 'admin@hesba.com') ? 'admin' : 'user',
-            subscription: 'free',
-            created_at: user.created_at || new Date().toISOString(),
-            last_login: new Date().toISOString(),
-            status: isSusp ? 'suspended' : 'active',
-            is_active: !isSusp
-          }
-        ];
-      }
+        })
+        // Filter out admin users from users table
+        .filter(u => {
+          const emailLower = u.email.toLowerCase().trim();
+          return emailLower !== currentAdminEmail && emailLower !== 'admin@hesba.com' && !emailLower.includes('admin');
+        });
 
-      // Safe filtering on mock list
-      let filtered = mockUsers;
-      if (currentUserRole !== 'admin' && user) {
-        filtered = filtered.filter(u => u.id === user.id);
-      }
-
-      setUsers(filtered);
+      setUsers(parsedMockUsers);
       setLoading(false);
       return;
     }
 
     try {
-      let query = supabase.from('user_profiles').select('*');
-      
-      if (currentUserRole !== 'admin' && user) {
-        query = query.eq('id', user.id);
-      }
-      
-      const { data, error } = await query.order('created_at', { ascending: false });
+      // Query app_users instead of old user_profiles setup
+      const { data, error } = await supabase
+        .from('app_users')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      
-      // Ensure subscription is typed correctly and has fallback, normalize roles as well
-      let typedData = (data ?? []).map((item: any) => {
-        let r = item.role || 'user';
-        const em = (item.email || '').toLowerCase().trim();
-        if (em === 'admin@hesba.com' || r === 'admin') {
-          r = 'admin';
-        } else {
-          r = 'user';
+      if (error) {
+        // Fallback to user_profiles if app_users does not exist yet to prevent crash, but only keep requested attributes
+        console.warn("app_users select failed, trying user_profiles fallback: ", error.message);
+        const { data: profData, error: profErr } = await supabase
+          .from('user_profiles')
+          .select('id, email, full_name, is_active, status, created_at')
+          .order('created_at', { ascending: false });
+
+        if (profErr) {
+          throw new Error("تعذر تحميل قائمة المستخدمين من الجداول المتوفرة.");
         }
 
-        let statusVal = item.status;
-        if (!statusVal) {
-          statusVal = item.is_active === false ? 'suspended' : 'active';
-        }
+        const normalized: AppUser[] = (profData ?? []).map((item: any) => ({
+          id: item.id,
+          email: item.email || '',
+          full_name: item.full_name || 'مستخدم',
+          is_blocked: item.is_active === false || item.status === 'suspended',
+          created_at: item.created_at || new Date().toISOString()
+        }));
 
-        return {
-          ...item,
-          role: r as 'admin' | 'user',
-          status: statusVal,
-          subscription: item.subscription || 'free'
-        };
-      }) as Profile[];
-      
-      // Direct clientside filter as additional double safety
-      if (currentUserRole !== 'admin') {
-        typedData = typedData.filter(u => u.role !== 'admin' && u.email?.toLowerCase().trim() !== 'admin@hesba.com');
-      }
+        const filtered = normalized.filter(u => {
+          const emailLower = u.email.toLowerCase().trim();
+          return emailLower !== currentAdminEmail && emailLower !== 'admin@hesba.com';
+        });
 
-      setUsers(typedData);
-    } catch (err: any) {
-      console.error("Error fetching user profiles:", err);
-      // Fallback gracefully in case the public.user_profiles table doesn't exist yet
-      if (user) {
-        const fallbackProfile: Profile = {
-          id: user.id,
-          email: user.email || '',
-          full_name: authProfile?.full_name || user.user_metadata?.full_name || user.user_metadata?.username || 'مستخدم',
-          role: (isAdmin || (user.email ?? '').toLowerCase().trim() === 'admin@hesba.com') ? 'admin' : 'user',
-          subscription: 'free',
-          created_at: user.created_at || new Date().toISOString(),
-          last_login: new Date().toISOString(),
-          status: 'active',
-          is_active: true
-        };
-        const filteredFallback = (currentUserRole !== 'admin' && fallbackProfile.role === 'admin') ? [] : [fallbackProfile];
-        setUsers(filteredFallback);
-        setErrorMsg('ملاحظة: تعذر الاتصال بجدول المستخدمين الموحد في Supabase. تم عرض حسابك الحالي مؤقتاً.');
+        setUsers(filtered);
       } else {
-        setErrorMsg('فشل تحميل بيانات البروفايلات العقارية ولا يوجد مستخدم نشط حالياً.');
+        const normalized: AppUser[] = (data ?? []).map((item: any) => ({
+          id: item.id,
+          email: item.email || '',
+          full_name: item.full_name || 'مستخدم',
+          phone: item.phone,
+          is_blocked: item.is_blocked === true,
+          created_at: item.created_at || new Date().toISOString()
+        }));
+
+        const filtered = normalized.filter(u => {
+          const emailLower = u.email.toLowerCase().trim();
+          return emailLower !== currentAdminEmail && emailLower !== 'admin@hesba.com';
+        });
+
+        setUsers(filtered);
       }
+    } catch (err: any) {
+      console.error("Error fetching users:", err);
+      setErrorMsg(err?.message || 'فشل تحميل بيانات المستخدمين والبروفايلات.');
     } finally {
       setLoading(false);
     }
   }
 
-  async function updateRole(userId: string, newRole: 'admin' | 'user') {
-    const targetUser = users.find(u => u.id === userId);
-    if (!targetUser) return;
-
-    const targetEmail = (targetUser.email || '').toLowerCase().trim();
-
-    if (targetEmail === 'admin@hesba.com') {
-      alert('لا يمكن تعديل صلاحية المدير الأساسي.');
+  async function toggleBlockStatus(userId: string, email: string, currentlyBlocked: boolean) {
+    const emailLower = email.toLowerCase().trim();
+    if (emailLower === adminEmail || emailLower === 'admin@hesba.com') {
+      alert('ممنوع تماماً حظر حساب مالك أو مسؤول النظام الأساسي!');
       return;
     }
 
-    // Admin/User cannot edit themselves
-    if (userId === authProfile?.id) {
-      alert('لا يمكنك تعديل صلاحيتك الخاصة حماية للنظام!');
-      return;
-    }
-
-    // Role protection checks
-    if (!isAdmin) {
-      alert('خطأ أمني: غير مصرح لك بتعديل أو ترقية أدوار المستخدمين الآخرين!');
-      return;
-    }
-
-    if (!hasSupabaseKeys) {
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
-      return;
-    }
-
-    try {
-      const { error } = await supabase
-        .from('user_profiles')
-        .update({ role: newRole })
-        .eq('id', userId);
-
-      if (error) throw error;
-      fetchUsers();
-    } catch (err: any) {
-      alert(err?.message || 'حدث خطأ أثناء تحديث الدور');
-    }
-  }
-
-  async function toggleStatus(userId: string, currentStatus: string | null | undefined, targetEmail: string) {
-    const isOwnerEmail = targetEmail.toLowerCase().trim() === 'admin@hesba.com';
-    if (isOwnerEmail) {
-      alert('ممنوع تماماً حظر أو تعطيل حساب مالك النظام الأساسي!');
-      return;
-    }
-
-    if (userId === authProfile?.id) {
-      alert('لا يمكنك حظر حسابك الحالي النشط!');
-      return;
-    }
-
-    const nextStatus = (currentStatus === 'suspended') ? 'active' : 'suspended';
-    const isBanning = nextStatus === 'suspended';
-
+    const nextBlockedState = !currentlyBlocked;
     const confirmAction = window.confirm(
-      isBanning 
-        ? `هل أنت متأكد من حظر المستخدم (${targetEmail})؟\nلن يتمكن من استخدام النظام أو تسجيل الدخول بعد الآن.`
-        : `هل أنت متأكد من إلغاء الحظر وتفعيل حساب المستخدم (${targetEmail})؟`
+      nextBlockedState 
+        ? `هل أنت متأكد من حظر المستخدم (${email})؟\nلن يتمكن من تسجيل الدخول بعد تغيير الحالة.`
+        : `هل أنت متأكد من إلغاء الحظر وتفعيل حساب المستخدم (${email})؟`
     );
     if (!confirmAction) return;
 
     if (!hasSupabaseKeys) {
-      // Mock ban
+      // Offline/Mock ban storage
       const suspendedMocks = JSON.parse(localStorage.getItem('hesba_suspended_mock_emails') || '[]');
       let updatedMocks = [];
-      if (isBanning) {
-        updatedMocks = [...suspendedMocks, targetEmail.toLowerCase().trim()];
+      if (nextBlockedState) {
+        updatedMocks = [...suspendedMocks, emailLower];
       } else {
-        updatedMocks = suspendedMocks.filter((e: string) => e !== targetEmail.toLowerCase().trim());
+        updatedMocks = suspendedMocks.filter((e: string) => e !== emailLower);
       }
       localStorage.setItem('hesba_suspended_mock_emails', JSON.stringify(updatedMocks));
       
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, status: nextStatus, is_active: !isBanning } : u));
-      alert(isBanning ? 'تم حظر المستخدم في قائمة معاينة النظام بنجاح.' : 'تم إلغاء حظر المستخدم في قائمة معاينة النظام بنجاح.');
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, is_blocked: nextBlockedState } : u));
+      alert(nextBlockedState ? 'تم حظر المستخدم بنجاح.' : 'تم إلغاء حظر المستخدم بنجاح.');
       return;
     }
 
     try {
-      // Direct dual payload update
-      let updatePayload: any = { is_active: !isBanning, status: nextStatus };
-      
-      const { error } = await supabase
-        .from('user_profiles')
-        .update(updatePayload)
+      // 1. Try to update in app_users
+      const { error: appErr } = await supabase
+        .from('app_users')
+        .update({ is_blocked: nextBlockedState, updated_at: new Date().toISOString() })
         .eq('id', userId);
 
-      if (error) {
-        // Fallback checks
-        if (error.message?.includes('column "status"') || error.message?.includes('status')) {
-          const { error: fallbackError } = await supabase
-            .from('user_profiles')
-            .update({ is_active: !isBanning })
-            .eq('id', userId);
-          if (fallbackError) throw fallbackError;
-        } else {
-          throw error;
-        }
+      if (appErr) {
+        console.warn("Could not update app_users, falling back to user_profiles status sync", appErr.message);
+        // Fallback update on user_profiles if exist
+        const { error: profErr } = await supabase
+          .from('user_profiles')
+          .update({ 
+            is_active: !nextBlockedState, 
+            status: nextBlockedState ? 'suspended' : 'active' 
+          })
+          .eq('id', userId);
+
+        if (profErr) throw profErr;
       }
 
-      alert(isBanning ? 'تم حظر حساب المستخدم بنجاح.' : 'تم إلغاء حظر حساب المستخدم وتفعيله المباشر.');
-      fetchUsers();
+      alert(nextBlockedState ? 'تم حظر حساب المستخدم بنجاح.' : 'تم إلغاء حظر حساب المستخدم وتفعيله المباشر.');
+      fetchUsersAndAdminEmail();
     } catch (err: any) {
-      console.error('Error toggling ban status:', err);
+      console.error('Error toggling block status:', err);
       alert(err?.message || 'حدث خطأ أثناء تغيير حالة حظر حساب العضو.');
     }
   }
 
-  if (!user && hasSupabaseKeys) {
-    return (
-      <div className="p-8 text-center bg-white border border-amber-100 rounded-2xl max-w-md mx-auto my-12 space-y-4" dir="rtl">
-        <AlertCircle className="w-12 h-12 text-amber-500 mx-auto" />
-        <h3 className="text-lg font-bold text-gray-950">يرجى تسجيل الدخول</h3>
-        <p className="text-xs text-gray-500 leading-relaxed">
-          يرجى تسجيل الدخول للوصول إلى تفاصيل الحساب.
-        </p>
-      </div>
-    );
-  }
-
-  if (!isAdmin) {
-    return (
-      <div className="p-8 text-center bg-white border border-red-100 rounded-2xl max-w-md mx-auto my-12 space-y-4" dir="rtl">
-        <AlertCircle className="w-12 h-12 text-red-500 mx-auto" />
-        <h3 className="text-lg font-bold text-gray-950">غير مصرح بالوصول</h3>
-        <p className="text-xs text-gray-500 leading-relaxed">
-          أنت غير مسجل كمسؤول معتمد في النظام. هذه الصفحة مخصصة لمدراء الإدارة والتحكم.
-        </p>
-      </div>
-    );
-  }
-
-  // Calc statistics over already filtered list (means owner is fully hidden from admin's perspective)
-  const totalCount = users.length;
-  const activeSubsCount = users.filter(u => ['basic', 'premium', 'enterprise'].includes(u.subscription)).length;
-  const freeCount = users.filter(u => u.subscription === 'free' || !u.subscription).length;
-
+  // Filter users
   const filteredUsers = users.filter(u => {
     const matchSearch = 
       (u.full_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (u.email || '').toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchRole = roleFilter === 'all' || u.role === roleFilter;
+    let matchStatus = true;
+    if (showBlockedOnly === 'blocked') {
+      matchStatus = u.is_blocked === true;
+    } else if (showBlockedOnly === 'active') {
+      matchStatus = u.is_blocked === false;
+    }
 
-    return matchSearch && matchRole;
+    return matchSearch && matchStatus;
   });
 
   function handleExportCSV() {
-    const headers = ['الاسم', 'البريد الإلكتروني', 'الصلاحية', 'تاريخ التسجيل', 'آخر دخول'];
+    const headers = ['الاسم', 'البريد الإلكتروني', 'تاريخ التسجيل', 'الحالة'];
     const rows = filteredUsers.map(u => [
       u.full_name || 'مستخدم غير معرّف',
       u.email,
-      roleLabel[u.role] || u.role,
       u.created_at ? new Date(u.created_at).toLocaleDateString('ar-SA') : '',
-      u.last_login ? new Date(u.last_login).toLocaleDateString('ar-SA') : 'غير متوفر'
+      u.is_blocked ? 'محظور' : 'نشط'
     ]);
 
     const csvContent = "\uFEFF" + [
@@ -330,7 +219,7 @@ export function UsersManagementPage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `hesba_users_export_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute("download", `hesba_users_clean_export_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -340,11 +229,11 @@ export function UsersManagementPage() {
     <div className="space-y-6" dir="rtl">
       <div>
         <h2 className="text-lg font-bold text-[#111827] flex items-center gap-2">
-          <Shield className="w-5 h-5 text-[#0057B8]" />
-          <span>لوحة التحكم الشاملة وإدارة أدوار وصلاحيات المستخدمين</span>
+          <Shield className="w-5 h-5 text-amber-600" />
+          <span>إدارة حسابات المستخدمين والاشتراكات العادية</span>
         </h2>
         <p className="text-xs text-[#6B7280] mt-1">
-          عرض وترقية المستخدمين وتعيين أدوارهم وحجب أو تفعيل الحسابات فوراً.
+          عرض المستخدمين المسجلين، التحقق من حالة العضويات، والتحكم بحجب أو تفعيل الحسابات فوراً.
         </p>
       </div>
 
@@ -355,12 +244,12 @@ export function UsersManagementPage() {
         </div>
       )}
 
-      {/* قسم الإحصائيات الذكية المبسطة */}
+      {/* Statistics Block */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm flex items-center justify-between">
           <div className="space-y-1">
-            <span className="text-[11px] font-bold text-gray-400">إجمالي الحسابات المسجلة بالنظام</span>
-            <h3 className="text-xl font-bold font-mono text-[#111827]">{totalCount} مستخدم</h3>
+            <span className="text-[11px] font-bold text-gray-400">إجمالي حسابات المستخدمين</span>
+            <h3 className="text-xl font-bold font-mono text-[#111827]">{users.length} مستخدم</h3>
           </div>
           <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-600">
             <User className="w-5 h-5" />
@@ -370,15 +259,15 @@ export function UsersManagementPage() {
         <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm flex items-center justify-between">
           <div className="space-y-1">
             <span className="text-[11px] font-bold text-gray-400">الحسابات المفلترة حالياً</span>
-            <h3 className="text-xl font-bold font-mono text-emerald-600">{filteredUsers.length} حساب</h3>
+            <h3 className="text-xl font-bold font-mono text-amber-600">{filteredUsers.length} حساب</h3>
           </div>
-          <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
+          <div className="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center text-amber-600">
             <Shield className="w-5 h-5" />
           </div>
         </div>
       </div>
 
-      {/* شريط البحث وتصفية الأدوار والتصدير */}
+      {/* Filter and Search Bar */}
       <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm flex flex-col md:flex-row items-center gap-4 justify-between">
         <div className="w-full md:w-auto flex flex-col md:flex-row items-center gap-3 flex-grow">
           <div className="relative w-full md:max-w-xs">
@@ -387,7 +276,7 @@ export function UsersManagementPage() {
               placeholder="البحث بالاسم أو البريد الإلكتروني..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              className="w-full pr-9 pl-3 py-2 bg-gray-50 border border-gray-100 text-gray-900 rounded-xl text-xs font-bold font-mono outline-none focus:border-[#0057B8] focus:bg-white placeholder:font-sans placeholder:font-normal transition-all"
+              className="w-full pr-9 pl-3 py-2 bg-gray-50 border border-gray-100 text-gray-900 rounded-xl text-xs font-bold outline-none focus:border-amber-500 focus:bg-white placeholder:font-normal transition-all"
             />
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
               <User className="w-4 h-4" />
@@ -395,15 +284,15 @@ export function UsersManagementPage() {
           </div>
 
           <div className="w-full md:w-auto flex items-center gap-2">
-            <span className="text-[11px] font-bold text-gray-400 shrink-0">تصفية الأدوار:</span>
+            <span className="text-[11px] font-bold text-gray-400 shrink-0">تصفية الحالة:</span>
             <select
-              value={roleFilter}
-              onChange={e => setRoleFilter(e.target.value)}
-              className="px-3 py-2 bg-gray-50 border border-gray-200 text-gray-900 rounded-xl text-xs font-bold font-sans outline-none cursor-pointer focus:border-[#0057B8] transition-all"
+              value={showBlockedOnly}
+              onChange={e => setShowBlockedOnly(e.target.value)}
+              className="px-3 py-2 bg-gray-50 border border-gray-200 text-gray-900 rounded-xl text-xs font-bold outline-none cursor-pointer focus:border-amber-500 transition-all font-sans"
             >
-              <option value="all">كل الصلاحيات</option>
-              <option value="admin">مدير</option>
-              <option value="user">مستخدم</option>
+              <option value="all">كل المشتركين</option>
+              <option value="active">الحسابات النشطة فقط</option>
+              <option value="blocked">الحسابات المحظورة فقط</option>
             </select>
           </div>
         </div>
@@ -413,21 +302,20 @@ export function UsersManagementPage() {
           disabled={filteredUsers.length === 0}
           className="w-full md:w-auto px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 disabled:opacity-50 text-xs font-bold rounded-xl flex items-center justify-center gap-2 cursor-pointer transition-all border border-slate-200"
         >
-          <Calendar className="w-4 h-4" />
-          <span>تصدير البيانات (CSV)</span>
+          <span>تصدير المستخدمين (CSV)</span>
         </button>
       </div>
 
       {loading ? (
         <div className="flex flex-col items-center justify-center p-12 space-y-3 bg-white border border-gray-100 rounded-2xl">
-          <Loader2 className="w-8 h-8 animate-spin text-[#0057B8]" />
-          <span className="text-xs text-gray-500 font-bold">جاري تحميل البروفايلات...</span>
+          <Loader2 className="w-8 h-8 animate-spin text-amber-600" />
+          <span className="text-xs text-gray-500 font-bold">جاري تحميل حسابات المستخدمين...</span>
         </div>
       ) : filteredUsers.length === 0 ? (
         <div className="p-12 text-center bg-white border border-gray-100 rounded-2xl space-y-3">
           <User className="w-10 h-10 text-gray-400 mx-auto animate-pulse" />
-          <h4 className="text-sm font-bold text-gray-700">لا يوجد حسابات مطابقة للبحث</h4>
-          <p className="text-xs text-gray-400">لم نتمكن من العثور على أي نتائج في الحسابات النشطة والمفلترة.</p>
+          <h4 className="text-sm font-bold text-gray-700">لا يوجد مستخدمون مطابقون</h4>
+          <p className="text-xs text-gray-400">لم نعثر على نتائج مطابقة لفلترة البحث المسجلة.</p>
         </div>
       ) : (
         <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
@@ -435,25 +323,15 @@ export function UsersManagementPage() {
             <table className="w-full text-right text-xs text-[#111827]">
               <thead className="bg-[#F8FAFC] border-b border-[#E5E7EB] text-gray-500">
                 <tr>
-                  <th className="p-4 font-bold">المستخدم / الاسم</th>
+                  <th className="p-4 font-bold">الاسم الكامل / العضو</th>
                   <th className="p-4 font-bold">البريد الإلكتروني</th>
-                  <th className="p-4 font-bold text-center">الصلاحية الحالية</th>
                   <th className="p-4 font-bold text-center">تاريخ التسجيل</th>
                   <th className="p-4 font-bold text-center">حالة الحساب</th>
-                  {isAdmin && <th className="p-4 font-bold text-center">تحديث الصلاحية والدور</th>}
-                  {isAdmin && <th className="p-4 font-bold text-center">التحكم بالحظر</th>}
+                  <th className="p-4 font-bold text-center">التحكم بالحظر</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#F1F5F9] font-semibold">
                 {filteredUsers.map(userItem => {
-                  const isOwner = userItem.email?.toLowerCase().trim() === 'admin@hesba.com';
-                  const isSelf = userItem.id === authProfile?.id;
-                  
-                  // Disable dropdown controls for Admin trying to update themselves or the primary owner
-                  const canModifyRole = isAdmin ? (!isSelf && !isOwner) : false;
-
-                  const isSuspended = userItem.status === 'suspended' || userItem.is_active === false;
-
                   return (
                     <tr key={userItem.id} className="hover:bg-slate-50/50 transition-all text-xs">
                       <td className="p-4 font-bold flex items-center gap-2.5">
@@ -463,16 +341,11 @@ export function UsersManagementPage() {
                         <span>{userItem.full_name ?? 'مستخدم غير معرّف'}</span>
                       </td>
                       <td className="p-4 text-gray-500 font-mono text-[11px] select-all">{userItem.email}</td>
-                      <td className="p-4 text-center">
-                        <span className={`inline-block px-2.5 py-0.5 rounded text-[10px] font-bold ${roleColor[userItem.role]}`}>
-                          {roleLabel[userItem.role]}
-                        </span>
-                      </td>
                       <td className="p-4 text-center text-gray-500 font-mono">
                         {new Date(userItem.created_at).toLocaleDateString('ar-SA')}
                       </td>
                       <td className="p-4 text-center">
-                        {isSuspended ? (
+                        {userItem.is_blocked ? (
                           <span className="inline-block px-2.5 py-1 bg-red-50 text-red-700 border border-red-100 rounded-lg text-[10px] font-bold">
                             محظور
                           </span>
@@ -482,48 +355,18 @@ export function UsersManagementPage() {
                           </span>
                         )}
                       </td>
-                      {isAdmin && (
-                        <td className="p-4 text-center">
-                          <div className="flex items-center justify-center gap-3">
-                            <div className="flex flex-col gap-0.5 text-[9px] text-gray-400">
-                              <span className="text-right">الدور:</span>
-                              {isOwner ? (
-                                <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-lg text-[11px] font-bold inline-block select-none whitespace-nowrap">
-                                  مدير أساسي
-                                </span>
-                              ) : (
-                                <select
-                                   value={userItem.role}
-                                   onChange={e => updateRole(userItem.id, e.target.value as any)}
-                                   disabled={!canModifyRole}
-                                   className="px-2 py-1 bg-gray-50 border border-gray-200 text-[11px] font-bold rounded-lg outline-none focus:border-[#0057B8] cursor-pointer disabled:opacity-50"
-                                >
-                                  <option value="admin">مدير</option>
-                                  <option value="user">مستخدم</option>
-                                </select>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-                      )}
-                      {isAdmin && (
-                        <td className="p-4 text-center">
-                          <button
-                            onClick={() => toggleStatus(userItem.id, userItem.status, userItem.email)}
-                            disabled={
-                              isSelf || 
-                              isOwner
-                            }
-                            className={`px-3 py-1.5 border rounded-lg text-[11px] font-bold cursor-pointer disabled:opacity-50 transition-all ${
-                              isSuspended
-                                ? 'bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700'
-                                : 'bg-[#FFF1F2] hover:bg-[#FFE4E6] border border-[#FECDD3] text-[#E11D48]'
-                            }`}
-                          >
-                            {isSuspended ? 'إلغاء الحظر' : 'حظر الحساب'}
-                          </button>
-                        </td>
-                      )}
+                      <td className="p-4 text-center">
+                        <button
+                          onClick={() => toggleBlockStatus(userItem.id, userItem.email, userItem.is_blocked)}
+                          className={`px-3 py-1.5 border rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
+                            userItem.is_blocked
+                              ? 'bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700'
+                              : 'bg-[#FFF1F2] hover:bg-[#FFE4E6] border border-[#FECDD3] text-[#E11D48]'
+                          }`}
+                        >
+                          {userItem.is_blocked ? 'إلغاء الحظر وتفعيل الحساب' : 'حظر الحساب'}
+                        </button>
+                      </td>
                     </tr>
                   );
                 })}

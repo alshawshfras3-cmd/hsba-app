@@ -1,5 +1,4 @@
-import React from 'react';
-import { useAuth } from '../../contexts/AuthContext';
+import React, { useEffect, useState } from 'react';
 import { useLocation } from '../../hooks/useLocation';
 import { ShieldAlert, Loader2 } from 'lucide-react';
 
@@ -8,8 +7,35 @@ interface GuardProps {
 }
 
 export function AdminDashboardGuard({ children }: GuardProps) {
-  const { user, profile, loading, isAdmin, signOut } = useAuth();
   const { navigate } = useLocation();
+  const [loading, setLoading] = useState(true);
+  const [isAllowed, setIsAllowed] = useState(false);
+
+  useEffect(() => {
+    try {
+      const sessionStr = sessionStorage.getItem('hesba_admin_session');
+      if (sessionStr) {
+        const session = JSON.parse(sessionStr);
+        if (session && session.isAdmin === true) {
+          setIsAllowed(true);
+        } else {
+          setIsAllowed(false);
+        }
+      } else {
+        setIsAllowed(false);
+      }
+    } catch (e) {
+      setIsAllowed(false);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!loading && !isAllowed) {
+      navigate('/admin');
+    }
+  }, [loading, isAllowed, navigate]);
 
   if (loading) {
     return (
@@ -19,18 +45,6 @@ export function AdminDashboardGuard({ children }: GuardProps) {
       </div>
     );
   }
-
-  if (!user) {
-    // If no user session, redirect to administrative login page
-    React.useEffect(() => {
-      navigate('/admin');
-    }, [navigate]);
-    return null;
-  }
-
-  // Double check role is exclusively 'admin'
-  const userRole = profile?.role || 'user';
-  const isAllowed = userRole === 'admin' || isAdmin;
 
   if (!isAllowed) {
     return (
@@ -44,18 +58,14 @@ export function AdminDashboardGuard({ children }: GuardProps) {
             <p className="text-sm font-bold text-red-600 leading-relaxed font-sans">
               غير مصرح لك بدخول لوحة التحكم.
             </p>
-            <p className="text-[11px] text-slate-400 font-medium leading-relaxed">
-              الحساب الحالي (<span className="font-mono text-slate-700 font-bold">{user?.email}</span>) لا يملك صلاحية الوصول للوحة التحكم وإجراء التغييرات.
-            </p>
           </div>
           <button
-            onClick={async () => {
-              await signOut();
+            onClick={() => {
               navigate('/admin');
             }}
             className="w-full py-3 bg-[#0057B8] text-white hover:bg-[#004bb0] text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer"
           >
-            تسجيل الخروج والدخول بحساب مشرف
+            الانتقال لتسجيل الدخول
           </button>
         </div>
       </div>

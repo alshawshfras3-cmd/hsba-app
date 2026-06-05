@@ -127,7 +127,7 @@ function AppContent() {
   }
 
   // Admin Login Section Pathway
-  if (location.pathname === '/admin') {
+  if (location.pathname === '/admin' || location.pathname === '/admin/login') {
     return <AdminLoginPage />;
   }
 

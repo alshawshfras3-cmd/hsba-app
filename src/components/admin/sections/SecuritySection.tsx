@@ -1,11 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { supabase, hasSupabaseKeys } from '../../../lib/supabase';
-import { useAuth } from '../../../contexts/AuthContext';
-import { Lock, Loader2, CheckCircle2, AlertCircle, Mail, User, ShieldAlert } from 'lucide-react';
+import { Lock, Loader2, CheckCircle2, AlertCircle, Mail, User } from 'lucide-react';
+import { getAdminCredentials, updateAdminCredentials } from '../../../lib/adminCredentials';
 
 export function SecuritySection() {
-  const { user, profile, setProfile } = useAuth();
-
   // Inputs
   const [newEmail, setNewEmail] = useState('');
   const [newUsername, setNewUsername] = useState('');
@@ -24,39 +21,19 @@ export function SecuritySection() {
   const [currentDbUsername, setCurrentDbUsername] = useState<string>('');
   const [currentDbEmail, setCurrentDbEmail] = useState<string>('');
 
+  const loadLatestDetails = async () => {
+    try {
+      const creds = await getAdminCredentials();
+      setCurrentDbUsername(creds.admin_username);
+      setCurrentDbEmail(creds.admin_email);
+    } catch (err) {
+      console.error("Error loading latest admin credentials:", err);
+    }
+  };
+
   useEffect(() => {
-    if (user) {
-      setCurrentDbEmail(user.email || '');
-    }
-    if (profile) {
-      setCurrentDbUsername(profile.username || (profile as any).full_name || 'admin');
-    }
-    
-    // Fetch latest directly from remote database to stay fresh
-    const loadLatestDetails = async () => {
-      if (!hasSupabaseKeys || !user) return;
-      try {
-        const { data, error } = await supabase
-          .from('user_profiles')
-          .select('username, email')
-          .eq('id', user.id)
-          .maybeSingle();
-
-        if (data) {
-          if (data.username) {
-            setCurrentDbUsername(data.username);
-          }
-          if (data.email) {
-            setCurrentDbEmail(data.email);
-          }
-        }
-      } catch (err) {
-        console.error("Error loading latest user profile fields:", err);
-      }
-    };
-
     loadLatestDetails();
-  }, [user, profile]);
+  }, []);
 
   const handleUpdateEmail = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,40 +48,14 @@ export function SecuritySection() {
       return;
     }
 
-    if (!hasSupabaseKeys) {
-      setTimeout(() => {
-        setEmailLoading(false);
-        setCurrentDbEmail(emailTrimmed);
-        setSuccessMsg('تم تحديث البريد الإلكتروني للمسؤول بنجاح (بيئة التجربة).');
-        setNewEmail('');
-      }, 1000);
-      return;
-    }
-
     try {
-      // 1. Update auth email in Supabase
-      const { data, error } = await supabase.auth.updateUser({
-        email: emailTrimmed,
-      });
-
-      if (error) throw error;
-
-      // 2. Also update public.user_profiles email field if possible
-      try {
-        await supabase
-          .from('user_profiles')
-          .update({ email: emailTrimmed })
-          .eq('id', user?.id || '');
-      } catch (dbErr) {
-        console.warn("Could not update email in user_profiles, typical for tight RLS, but standard auth update is set:", dbErr);
-      }
-
+      await updateAdminCredentials({ admin_email: emailTrimmed });
       setCurrentDbEmail(emailTrimmed);
-      setSuccessMsg('تم إرسال رابط تأكيد التغيير إلى البريد الإلكتروني الجديد. يرجى تأكيد الرسالة لتفعيل التغيير.');
+      setSuccessMsg('تم تحديث البريد الإلكتروني للمسؤول بنجاح ✉️');
       setNewEmail('');
     } catch (err: any) {
       console.error('Email update failure:', err);
-      setErrorMsg(err?.message || 'فشل تحديث البريد الإلكتروني، يرجى المحاولة لاحقاً.');
+      setErrorMsg(err?.message || 'فشلت عملية تحديث البريد الإلكتروني.');
     } finally {
       setEmailLoading(false);
     }
@@ -123,49 +74,14 @@ export function SecuritySection() {
       return;
     }
 
-    if (!hasSupabaseKeys) {
-      setTimeout(() => {
-        setUsernameLoading(false);
-        setCurrentDbUsername(usernameTrimmed);
-        if (profile) {
-          setProfile({ ...profile, username: usernameTrimmed } as any);
-        }
-        setSuccessMsg('تم تحديث اسم المستخدم بنجاح في بيئة التجربة.');
-        setNewUsername('');
-      }, 1000);
-      return;
-    }
-
     try {
-      // 1. Check uniqueness of username in public.user_profiles
-      const { data: existing, error: checkErr } = await supabase
-        .from('user_profiles')
-        .select('id')
-        .eq('username', usernameTrimmed)
-        .neq('id', user?.id || '')
-        .maybeSingle();
-
-      if (existing) {
-        throw new Error('اسم المستخدم هذا محجوز لحساب آخر، يرجى اختيار اسم مستخدم فريد.');
-      }
-
-      // 2. Perform the update
-      const { error: updateErr } = await supabase
-        .from('user_profiles')
-        .update({ username: usernameTrimmed })
-        .eq('id', user?.id || '');
-
-      if (updateErr) throw updateErr;
-
+      await updateAdminCredentials({ admin_username: usernameTrimmed });
       setCurrentDbUsername(usernameTrimmed);
-      if (profile) {
-        setProfile({ ...profile, username: usernameTrimmed } as any);
-      }
-      setSuccessMsg('تم تغيير وتحديث اسم المستخدم بنجاح في قاعدة البيانات.');
+      setSuccessMsg('تم تحديث اسم المستخدم بنجاح 👤');
       setNewUsername('');
     } catch (err: any) {
       console.error('Username update failure:', err);
-      setErrorMsg(err?.message || 'فشل تعديل اسم المستخدم، يرجى إعادة المحاولة.');
+      setErrorMsg(err?.message || 'فشلت عملية تحديث اسم المستخدم.');
     } finally {
       setUsernameLoading(false);
     }
@@ -189,29 +105,14 @@ export function SecuritySection() {
       return;
     }
 
-    if (!hasSupabaseKeys) {
-      setTimeout(() => {
-        setPasswordLoading(false);
-        setSuccessMsg('تم تحديث كلمة المرور الإدارية بنجاح في بيئة المعاينة (Offline Mock State).');
-        setNewPassword('');
-        setConfirmPassword('');
-      }, 1000);
-      return;
-    }
-
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword,
-      });
-
-      if (error) throw error;
-
-      setSuccessMsg('تم تغيير وتحديث كلمة المرور الخاصة بحسابك الإداري بنجاح 🔒');
+      await updateAdminCredentials({ admin_password: newPassword });
+      setSuccessMsg('تم تغيير وتحديث كلمة المرور للمسؤول بنجاح 🔒');
       setNewPassword('');
       setConfirmPassword('');
     } catch (err: any) {
-      console.error('Password reset failure:', err);
-      setErrorMsg(err?.message || 'فشل تحديث كلمة المرور، يرجى المحاولة لاحقاً.');
+      console.error('Password update failure:', err);
+      setErrorMsg(err?.message || 'فشلت عملية تحديث كلمة المرور.');
     } finally {
       setPasswordLoading(false);
     }
@@ -223,11 +124,11 @@ export function SecuritySection() {
       {/* Header Info */}
       <div>
         <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
-          <Lock className="w-5 h-5 text-[#0057B8]" />
+          <Lock className="w-5 h-5 text-amber-600" />
           <span>إعدادات الأمان وحماية الدخول</span>
         </h2>
         <p className="text-xs text-slate-500 mt-1">
-          تحديث البريد الإلكتروني، اسم المستخدم، أو كلمة المرور للمشرف الحالي لتأمين لوحة التحكم
+          تحديث البريد الإلكتروني، اسم المستخدم، أو كلمة المرور للمشرف لتأمين لوحة التحكم بشكل مستقل
         </p>
       </div>
 
@@ -251,7 +152,7 @@ export function SecuritySection() {
         {/* SECTION 1: CHANGE USERNAME */}
         <div className="bg-slate-50 border border-slate-100 p-5 rounded-2xl space-y-4">
           <div className="flex items-center gap-2 text-slate-900 pb-2 border-b border-slate-200/60">
-            <User className="w-4.5 h-4.5 text-[#0057B8]" />
+            <User className="w-4.5 h-4.5 text-amber-600" />
             <h3 className="text-xs font-bold">تغيير اسم المستخدم</h3>
           </div>
 
@@ -268,10 +169,10 @@ export function SecuritySection() {
               <input
                 type="text"
                 required
-                placeholder="أدخل اسم المستخدم الجديد"
+                placeholder="اسم المستخدم الجديد"
                 value={newUsername}
                 onChange={(e) => setNewUsername(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-slate-200 focus:border-[#0057B8] text-xs font-bold rounded-xl outline-none transition-all text-left"
+                className="w-full px-3 py-2 bg-white border border-slate-200 focus:border-amber-500 text-xs font-bold rounded-xl outline-none transition-all text-left"
                 dir="ltr"
               />
             </div>
@@ -279,7 +180,7 @@ export function SecuritySection() {
             <button
               type="submit"
               disabled={usernameLoading}
-              className="w-full h-10 bg-[#0057B8] hover:bg-[#004bb0] text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 select-none shadow-xs cursor-pointer disabled:opacity-60"
+              className="w-full h-10 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 select-none shadow-xs cursor-pointer disabled:opacity-60"
             >
               {usernameLoading ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -293,7 +194,7 @@ export function SecuritySection() {
         {/* SECTION 2: CHANGE EMAIL */}
         <div className="bg-slate-50 border border-slate-100 p-5 rounded-2xl space-y-4">
           <div className="flex items-center gap-2 text-slate-900 pb-2 border-b border-slate-200/60">
-            <Mail className="w-4.5 h-4.5 text-[#0057B8]" />
+            <Mail className="w-4.5 h-4.5 text-amber-600" />
             <h3 className="text-xs font-bold">تغيير البريد الإلكتروني</h3>
           </div>
 
@@ -310,10 +211,10 @@ export function SecuritySection() {
               <input
                 type="email"
                 required
-                placeholder="new_admin@hesba.com"
+                placeholder="البريد الإلكتروني الجديد"
                 value={newEmail}
                 onChange={(e) => setNewEmail(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-slate-200 focus:border-[#0057B8] text-xs font-bold rounded-xl outline-none transition-all text-left"
+                className="w-full px-3 py-2 bg-white border border-slate-200 focus:border-amber-500 text-xs font-bold rounded-xl outline-none transition-all text-left"
                 dir="ltr"
               />
             </div>
@@ -321,7 +222,7 @@ export function SecuritySection() {
             <button
               type="submit"
               disabled={emailLoading}
-              className="w-full h-10 bg-[#0057B8] hover:bg-[#004bb0] text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 select-none shadow-xs cursor-pointer disabled:opacity-60"
+              className="w-full h-10 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 select-none shadow-xs cursor-pointer disabled:opacity-60"
             >
               {emailLoading ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -335,7 +236,7 @@ export function SecuritySection() {
         {/* SECTION 3: CHANGE PASSWORD */}
         <div className="bg-slate-50 border border-slate-100 p-5 rounded-2xl space-y-4">
           <div className="flex items-center gap-2 text-slate-900 pb-2 border-b border-slate-200/60">
-            <Lock className="w-4.5 h-4.5 text-[#0057B8]" />
+            <Lock className="w-4.5 h-4.5 text-amber-600" />
             <h3 className="text-xs font-bold">تغيير كلمة المرور</h3>
           </div>
 
@@ -348,7 +249,7 @@ export function SecuritySection() {
                 placeholder="كلمة المرور الجديدة"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-slate-200 focus:border-[#0057B8] text-xs font-bold rounded-xl outline-none transition-all text-left"
+                className="w-full px-3 py-2 bg-white border border-slate-200 focus:border-amber-500 text-xs font-bold rounded-xl outline-none transition-all text-left"
                 dir="ltr"
               />
             </div>
@@ -361,7 +262,7 @@ export function SecuritySection() {
                 placeholder="تأكيد كلمة المرور"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-slate-200 focus:border-[#0057B8] text-xs font-bold rounded-xl outline-none transition-all text-left"
+                className="w-full px-3 py-2 bg-white border border-slate-200 focus:border-amber-500 text-xs font-bold rounded-xl outline-none transition-all text-left"
                 dir="ltr"
               />
             </div>
@@ -369,7 +270,7 @@ export function SecuritySection() {
             <button
               type="submit"
               disabled={passwordLoading}
-              className="w-full h-10 bg-[#0057B8] hover:bg-[#004bb0] text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 select-none shadow-xs cursor-pointer disabled:opacity-60"
+              className="w-full h-10 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 select-none shadow-xs cursor-pointer disabled:opacity-60"
             >
               {passwordLoading ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />

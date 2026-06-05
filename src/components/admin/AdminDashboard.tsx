@@ -2161,6 +2161,21 @@ export default function AdminDashboard() {
             <RefreshCw className="w-3.5 h-3.5 shrink-0" />
             <span>إعادة تهيئة إعدادات النظام</span>
           </button>
+          
+          <button
+            type="button"
+            onClick={() => {
+              const confirmOut = window.confirm("هل ترغب في تسجيل الخروج الآمن من لوحة تحكم معايير الحسبة؟");
+              if (confirmOut) {
+                sessionStorage.removeItem('hesba_admin_session');
+                window.location.href = '/admin';
+              }
+            }}
+            className="w-full flex items-center justify-center gap-2 mt-2 px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all border border-slate-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-500/50"
+          >
+            <Lock className="w-3.5 h-3.5 shrink-0" />
+            <span>تسجيل الخروج الآمن</span>
+          </button>
         </div>
       </aside>
 

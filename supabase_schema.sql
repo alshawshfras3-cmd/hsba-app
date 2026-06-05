@@ -466,3 +466,34 @@ UPDATE public.user_profiles
 SET role = 'user'
 WHERE role IS NULL OR role NOT IN ('admin', 'user');
 
+
+-- =========================================================================
+-- 13. جدول المستخدمين العاديين للتطبيق النظيف (app_users)
+-- =========================================================================
+create table if not exists public.app_users (
+  id uuid primary key default gen_random_uuid(),
+  full_name text,
+  email text unique,
+  phone text,
+  is_blocked boolean default false,
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now()
+);
+
+-- =========================================================================
+-- 14. جدول إعدادات دخول لوحة التحكم المستقل لمدراء المنصة (admin_settings)
+-- =========================================================================
+create table if not exists public.admin_settings (
+  id uuid primary key default gen_random_uuid(),
+  admin_username text default 'admin',
+  admin_email text default 'admin@hesba.com',
+  admin_password text default 'hesba989',
+  updated_at timestamp with time zone default now()
+);
+
+-- إدراج حساب المشرف الافتراضي عند الإنشاء في حال خلو الجدول
+insert into public.admin_settings (admin_username, admin_email, admin_password)
+select 'admin', 'admin@hesba.com', 'hesba989'
+where not exists (select 1 from public.admin_settings);
+
+
