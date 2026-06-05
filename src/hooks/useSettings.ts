@@ -110,10 +110,12 @@ export function useSettings() {
   const [settings, setSettings] = useState<Record<string, any>>(getLocalStorageOrSeedDefaults);
   const [loading, setLoading] = useState(false);
   const [initialized, setInitialized] = useState(true);
+  const [supabaseFetched, setSupabaseFetched] = useState(!hasSupabaseKeys);
 
   // Fetch all system settings from Supabase
   const fetchSettings = useCallback(async () => {
     if (!hasSupabaseKeys) {
+      setSupabaseFetched(true);
       return;
     }
 
@@ -192,6 +194,7 @@ export function useSettings() {
       }
 
       setSettings(loaded);
+      setSupabaseFetched(true);
 
       // Stage 2: Success -> save backup in "hasba_settings_cache" and remove other caches
       try {
@@ -220,6 +223,7 @@ export function useSettings() {
 
     } catch (err) {
       console.warn('Fallback settings on fetch failure in background:', err);
+      setSupabaseFetched(true);
     }
   }, []);
 
@@ -296,6 +300,7 @@ export function useSettings() {
     settings,
     loading,
     initialized,
+    supabaseFetched,
     fetchSettings,
     saveSetting,
     banks: settings.banks ?? DEFAULTS.banks,

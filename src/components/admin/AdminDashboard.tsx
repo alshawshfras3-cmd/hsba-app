@@ -2194,7 +2194,7 @@ export default function AdminDashboard() {
                   onClick={async () => {
                     try {
                       await saveChanges();
-                      showToast('تم حفظ التغييرات بنجاح', 'success');
+                      showToast('تم حفظ الإعدادات بنجاح', 'success');
                     } catch (error) {
                       console.error("Error saving modifications:", error);
                       showToast('فشل في حفظ التغييرات بقاعدة البيانات، يرجى المحاولة لاحقاً', 'refuse');
@@ -3950,26 +3950,6 @@ export default function AdminDashboard() {
             <div className="border-b border-[#F1F5F9] pb-4">
               <h2 className="text-xl font-extrabold text-[#111827]">مدد التمويل والأعمار القصوى</h2>
               <p className="text-xs text-[#6B7280] mt-1">صفحة إعداد مدد التمويل، الحدود، أنواع التقويم، وسياسة التقاعد لكل بنك موزعة حسب القطاع.</p>
-            </div>
-
-            {/* Save notice & Action */}
-            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-right">
-              <div className="flex items-start gap-2.5">
-                <span className="text-lg">⚠️</span>
-                <div>
-                  <h4 className="text-[11px] font-extrabold text-amber-900">تغييرات غير محفوظة بمدد التمويل</h4>
-                  <p className="text-[10px] text-amber-700 mt-0.5 font-medium leading-relaxed">أنت تقوم بالتعديل في الذاكرة المؤقتة (المسودة). يجب الضغط على "حفظ التغييرات" لتمريرها وقبولها في محرك التمويل.</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  showToast("تم ترسيخ وتعميد إعدادات مدد التمويل بنجاح في النظام.", "success");
-                }}
-                className="px-4.5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-[11px] font-bold rounded-xl shadow-xs transition-all shrink-0 cursor-pointer flex items-center gap-1"
-              >
-                <span>💾 حفظ التغييرات</span>
-              </button>
             </div>
 
             {/* 2. BANKS HORIZONTAL TABS */}

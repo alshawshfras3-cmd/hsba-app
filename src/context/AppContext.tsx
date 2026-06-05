@@ -499,29 +499,39 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     settings,
     loading: settingsLoading,
     initialized: settingsInitialized,
+    supabaseFetched,
   } = useSettings();
 
+  const [tiersLoaded, setTiersLoaded] = useState(false);
   const [hasSynced, setHasSynced] = useState(false);
-  const isSettingsLoading = settingsLoading || !hasSynced;
+  const isSettingsLoading = settingsLoading || !supabaseFetched || !tiersLoaded || !hasSynced;
 
   // Load housing support tiers and advance payment tiers once on mount
   useEffect(() => {
+    let active = true;
     async function loadTiers() {
       try {
         const hSupport = await fetchHousingSupportTiers();
         const aPayment = await fetchAdvancePaymentTiers();
-        setHousingSupportTiers(hSupport);
-        setAdvancePaymentTiers(aPayment);
+        if (active) {
+          setHousingSupportTiers(hSupport);
+          setAdvancePaymentTiers(aPayment);
+          setTiersLoaded(true);
+        }
       } catch (err) {
         console.error("Failed to fetch support tiers:", err);
+        if (active) {
+          setTiersLoaded(true); // force true to keep app operational
+        }
       }
     }
     loadTiers();
+    return () => { active = false; };
   }, []);
 
   // Sync settings when loaded from the useSettings hook
   useEffect(() => {
-    if (settingsInitialized && !hasSynced) {
+    if (settingsInitialized && supabaseFetched && tiersLoaded && !hasSynced) {
       const merged: AdminSettings = {
         banks: settings.banks || initialData.banks,
         products: settings.product_acceptance || initialData.products,
@@ -545,7 +555,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       applySettingsState(merged);
       setHasSynced(true);
     }
-  }, [settingsInitialized, settings, hasSynced, housingSupportTiers, advancePaymentTiers]);
+  }, [settingsInitialized, supabaseFetched, tiersLoaded, settings, hasSynced, housingSupportTiers, advancePaymentTiers]);
 
   // Synchronise path for diagnostics direct link route
   useEffect(() => {
