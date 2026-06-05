@@ -9,41 +9,5 @@ export interface DevUserProfile {
   last_login?: string | null;
 }
 
-export const devUsers: DevUserProfile[] = [
-  {
-    id: 'owner_id',
-    email: 'admin@hesba.com',
-    full_name: 'مدير المنصة',
-    role: 'admin',
-    subscription: 'enterprise',
-    created_at: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString(),
-    last_login: new Date().toISOString(),
-  },
-  {
-    id: 'manager_id_1',
-    email: 'manager@hesba.sa',
-    full_name: 'مدير الصلاحيات المساعد',
-    role: 'admin',
-    subscription: 'premium',
-    created_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-    last_login: new Date().toISOString(),
-  },
-  {
-    id: 'employee_id_1',
-    email: 'employee@hesba.sa',
-    full_name: 'الموظف الداخلي المالي',
-    role: 'user',
-    subscription: 'basic',
-    created_at: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
-    last_login: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'user_id_1',
-    email: 'user@hesba.sa',
-    full_name: 'العميل المالي المعتمد',
-    role: 'user',
-    subscription: 'free',
-    created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    last_login: null,
-  }
-];
+// Cleared of any mock/fake user profiles (manager@hesba.sa, employee@hesba.sa, user@hesba.sa)
+export const devUsers: DevUserProfile[] = [];

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase, hasSupabaseKeys, SUPABASE_TIMEOUT_MS, cleanStaleSupabaseSession } from '../lib/supabase';
-import { Shield, AlertCircle } from 'lucide-react';
+import { Shield } from 'lucide-react';
 
 export type UserRole = 'admin' | 'user';
 
@@ -11,7 +11,7 @@ interface UserProfile {
   full_name: string | null;
   avatar_url: string | null;
   role: UserRole;
-  status?: string | null;
+  is_blocked?: boolean;
 }
 
 interface AuthContextType {
@@ -46,7 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!hasSupabaseKeys) return;
     try {
       const queryPromise = supabase
-        .from('user_profiles')
+        .from('app_users')
         .select('*')
         .eq('id', userId)
         .maybeSingle();
@@ -61,13 +61,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const lowercaseEmail = (email || profileData.email || '').toLowerCase().trim();
         const isOwnerEmail = lowercaseEmail === 'admin@hesba.com';
         
-        // Block suspended users (except the protected super admin)
-        if ((profileData.status === 'suspended' || profileData.is_active === false) && !isOwnerEmail) {
+        // Block suspended/blocked users (except the protected super admin)
+        if (profileData.is_blocked === true && !isOwnerEmail) {
           setIsSuspendedUser(true);
           setProfile({
-            ...profileData,
+            id: profileData.id,
+            email: lowercaseEmail,
+            full_name: profileData.full_name,
+            avatar_url: null,
             role: 'user',
-            status: 'suspended'
+            is_blocked: true
           });
           setLoading(false);
           return;
@@ -75,31 +78,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setIsSuspendedUser(false);
         }
 
-        let targetRole = profileData.role;
-        
-        // Simplify role model to: admin or user
-        if (isOwnerEmail || targetRole === 'admin') {
-          targetRole = 'admin';
-        } else {
-          targetRole = 'user';
-        }
-        
-        // Update database if profile has outdated role
-        if (profileData.role !== targetRole) {
-          try {
-            await supabase
-              .from('user_profiles')
-              .update({ role: targetRole })
-              .eq('id', userId);
-          } catch (e) {
-            console.error("Failed to update user profile role in db:", e);
-          }
-        }
+        const targetRole = isOwnerEmail ? 'admin' : 'user';
         
         setProfile({
-          ...profileData,
+          id: profileData.id,
+          email: lowercaseEmail,
+          full_name: profileData.full_name,
+          avatar_url: null,
           role: targetRole as UserRole,
-          status: profileData.status || (profileData.is_active === false ? 'suspended' : 'active')
+          is_blocked: profileData.is_blocked === true
         });
       } else {
         throw new Error(result?.error?.message || "Profile not loaded");
@@ -109,14 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const lowercaseEmail = (email || '').toLowerCase().trim();
       const isOwnerEmail = lowercaseEmail === 'admin@hesba.com';
       
-      const suspendedMocks = JSON.parse(localStorage.getItem('hesba_suspended_mock_emails') || '[]');
-      const isSuspendedMock = suspendedMocks.includes(lowercaseEmail) && !isOwnerEmail;
-      
-      if (isSuspendedMock) {
-        setIsSuspendedUser(true);
-      } else {
-        setIsSuspendedUser(false);
-      }
+      setIsSuspendedUser(false);
 
       setProfile({
         id: userId,
@@ -124,7 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         full_name: userMetadata?.full_name || userMetadata?.username || null,
         avatar_url: userMetadata?.avatar_url || null,
         role: isOwnerEmail ? 'admin' : 'user',
-        status: isSuspendedMock ? 'suspended' : 'active'
+        is_blocked: false
       });
     }
   }
@@ -199,14 +179,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return e === 'admin@hesba.com';
   };
 
-  const isAdmin = profile?.role === 'admin' || isOwnerEmail(user?.email);
+  const isAdmin = isOwnerEmail(user?.email);
   const isOwner = isAdmin;
   const isStaff = isAdmin;
   const isCustomer = !isAdmin;
 
   const canAccessDashboard = isAdmin;
 
-  // For compatibility with any legacy code that expects legacyIsAdmin or legacyIsManager checks
+  // For compatibility with legacy checks
   const legacyIsAdmin = isAdmin;
   const legacyIsManager = isAdmin;
 
@@ -226,7 +206,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: mockEmail,
         full_name: 'مدير المنصة',
         avatar_url: null,
-        role: 'admin'
+        role: 'admin',
+        is_blocked: false
       });
       return;
     }
@@ -239,12 +220,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function signInWithEmail(email: string, password: string) {
     const emailLower = email.trim().toLowerCase();
     const isOwner = isOwnerEmail(emailLower);
-
-    // Intercept mock mode suspension
-    const suspendedMocks = JSON.parse(localStorage.getItem('hesba_suspended_mock_emails') || '[]');
-    if (suspendedMocks.includes(emailLower) && !isOwner) {
-      throw new Error("تم إيقاف هذا الحساب بواسطة الإدارة");
-    }
 
     if (!hasSupabaseKeys) {
       // Mock email password for Preview
@@ -261,7 +236,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         full_name: isOwner ? 'مدير المنصة' : emailLower.split('@')[0],
         avatar_url: null,
         role: isOwner ? 'admin' : 'user',
-        status: 'active'
+        is_blocked: false
       });
       setIsSuspendedUser(false);
       return;
@@ -274,13 +249,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (data?.user) {
       // Fetch their profile and check status immediately
       const { data: prof, error: profErr } = await supabase
-        .from('user_profiles')
-        .select('status, is_active')
+        .from('app_users')
+        .select('is_blocked')
         .eq('id', data.user.id)
         .maybeSingle();
         
       if (!profErr && prof) {
-        if ((prof.status === 'suspended' || prof.is_active === false) && !isOwner) {
+        if (prof.is_blocked === true && !isOwner) {
           await supabase.auth.signOut();
           setIsSuspendedUser(true);
           throw new Error("تم إيقاف هذا الحساب بواسطة الإدارة");
@@ -306,7 +281,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: emailLower,
         full_name: fullName,
         avatar_url: null,
-        role: isOwner ? 'admin' : 'user'
+        role: isOwner ? 'admin' : 'user',
+        is_blocked: false
       });
       return { user: mockUser, session: { access_token: 'mock_token' } };
     }
@@ -341,7 +317,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         <div className="fixed inset-0 bg-[#F8FAFC] z-[99999] flex items-center justify-center p-6 select-none" dir="rtl">
           <div className="bg-white border border-[#E2E8F0] p-8 rounded-2xl shadow-xl max-w-sm w-full text-center space-y-6">
             <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto border border-red-100 animate-pulse">
-              <Shield className="w-8 h-8 animate-bounce" />
+              <Shield className="w-8 h-8 animate-bounce block mx-auto text-red-500 mt-3.5" />
             </div>
             <div className="space-y-2">
               <h2 className="font-sans font-black text-lg text-gray-950">تم إيقاف الحساب</h2>

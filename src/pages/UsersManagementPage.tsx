@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { supabase, hasSupabaseKeys } from '../lib/supabase';
 import { Shield, User, Mail, Calendar, AlertCircle, Loader2 } from 'lucide-react';
 import { getAdminCredentials } from '../lib/adminCredentials';
-import { devUsers } from '../seeds/dev-users';
 
 type AppUser = {
   id: string;
@@ -40,29 +39,7 @@ export function UsersManagementPage() {
     }
 
     if (!hasSupabaseKeys) {
-      // Mock static data
-      const suspendedMocks = JSON.parse(localStorage.getItem('hesba_suspended_mock_emails') || '[]');
-      
-      const parsedMockUsers: AppUser[] = devUsers
-        .map(u => {
-          const emailLower = u.email.toLowerCase().trim();
-          const isBlocked = suspendedMocks.includes(emailLower);
-          return {
-            id: u.id,
-            email: u.email,
-            full_name: u.full_name,
-            phone: (u as any).phone || null,
-            is_blocked: isBlocked,
-            created_at: u.created_at || new Date().toISOString()
-          };
-        })
-        // Filter out admin users from users table
-        .filter(u => {
-          const emailLower = u.email.toLowerCase().trim();
-          return emailLower !== currentAdminEmail && emailLower !== 'admin@hesba.com' && !emailLower.includes('admin');
-        });
-
-      setUsers(parsedMockUsers);
+      setUsers([]);
       setLoading(false);
       return;
     }
@@ -74,33 +51,11 @@ export function UsersManagementPage() {
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error || !data || data.length === 0) {
+      if (error || !data) {
         if (error) {
-          console.warn("app_users select failed, falling back to static devUsers:", error.message);
-        } else {
-          console.log("app_users table has 0 users, showing pre-seeded devUsers as defaults.");
+          console.warn("app_users select failed: ", error.message);
         }
-
-        const suspendedMocks = JSON.parse(localStorage.getItem('hesba_suspended_mock_emails') || '[]');
-        const parsedMockUsers: AppUser[] = devUsers
-          .map(u => {
-            const emailLower = u.email.toLowerCase().trim();
-            const isBlocked = suspendedMocks.includes(emailLower);
-            return {
-              id: u.id,
-              email: u.email,
-              full_name: u.full_name,
-              phone: (u as any).phone || null,
-              is_blocked: isBlocked,
-              created_at: u.created_at || new Date().toISOString()
-            };
-          })
-          .filter(u => {
-            const emailLower = u.email.toLowerCase().trim();
-            return emailLower !== currentAdminEmail && emailLower !== 'admin@hesba.com' && !emailLower.includes('admin');
-          });
-
-        setUsers(parsedMockUsers);
+        setUsers([]);
       } else {
         const normalized: AppUser[] = data.map((item: any) => ({
           id: item.id,
@@ -116,52 +71,11 @@ export function UsersManagementPage() {
           return emailLower !== currentAdminEmail && emailLower !== 'admin@hesba.com';
         });
 
-        // Fallback to mock users if even database filtered result is empty to make dashboard testable
-        if (filtered.length === 0) {
-          const suspendedMocks = JSON.parse(localStorage.getItem('hesba_suspended_mock_emails') || '[]');
-          const parsedMockUsers: AppUser[] = devUsers
-            .map(u => {
-              const emailLower = u.email.toLowerCase().trim();
-              const isBlocked = suspendedMocks.includes(emailLower);
-              return {
-                id: u.id,
-                email: u.email,
-                full_name: u.full_name,
-                phone: (u as any).phone || null,
-                is_blocked: isBlocked,
-                created_at: u.created_at || new Date().toISOString()
-              };
-            })
-            .filter(u => {
-              const emailLower = u.email.toLowerCase().trim();
-              return emailLower !== currentAdminEmail && emailLower !== 'admin@hesba.com' && !emailLower.includes('admin');
-            });
-          setUsers(parsedMockUsers);
-        } else {
-          setUsers(filtered);
-        }
+        setUsers(filtered);
       }
     } catch (err: any) {
-      console.error("Error fetching users from app_users, loading devUsers:", err);
-      const suspendedMocks = JSON.parse(localStorage.getItem('hesba_suspended_mock_emails') || '[]');
-      const parsedMockUsers: AppUser[] = devUsers
-        .map(u => {
-          const emailLower = u.email.toLowerCase().trim();
-          const isBlocked = suspendedMocks.includes(emailLower);
-          return {
-            id: u.id,
-            email: u.email,
-            full_name: u.full_name,
-            phone: (u as any).phone || null,
-            is_blocked: isBlocked,
-            created_at: u.created_at || new Date().toISOString()
-          };
-        })
-        .filter(u => {
-          const emailLower = u.email.toLowerCase().trim();
-          return emailLower !== currentAdminEmail && emailLower !== 'admin@hesba.com' && !emailLower.includes('admin');
-        });
-      setUsers(parsedMockUsers);
+      console.error("Error fetching users from app_users:", err);
+      setUsers([]);
     } finally {
       setLoading(false);
     }
@@ -182,21 +96,8 @@ export function UsersManagementPage() {
     );
     if (!confirmAction) return;
 
-    const isMockUserId = userId === 'employee_id_1' || userId === 'user_id_1' || userId === 'owner_id' || userId === 'manager_id_1';
-
-    if (!hasSupabaseKeys || isMockUserId) {
-      // Offline/Mock ban storage
-      const suspendedMocks = JSON.parse(localStorage.getItem('hesba_suspended_mock_emails') || '[]');
-      let updatedMocks = [];
-      if (nextBlockedState) {
-        updatedMocks = [...suspendedMocks, emailLower];
-      } else {
-        updatedMocks = suspendedMocks.filter((e: string) => e !== emailLower);
-      }
-      localStorage.setItem('hesba_suspended_mock_emails', JSON.stringify(updatedMocks));
-      
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, is_blocked: nextBlockedState } : u));
-      alert(nextBlockedState ? 'تم حظر المستخدم بنجاح.' : 'تم إلغاء حظر المستخدم بنجاح.');
+    if (!hasSupabaseKeys) {
+      alert('لا يمكن تغيير حالة الحظر لعدم وجود ربط نشط مع Supabase.');
       return;
     }
 
@@ -214,19 +115,8 @@ export function UsersManagementPage() {
       alert(nextBlockedState ? 'تم حظر حساب المستخدم بنجاح.' : 'تم إلغاء حظر حساب المستخدم وتفعيله المباشر.');
       fetchUsersAndAdminEmail();
     } catch (err: any) {
-      console.warn('Error toggling block status in app_users, performing local toggle fallback:', err);
-      
-      const suspendedMocks = JSON.parse(localStorage.getItem('hesba_suspended_mock_emails') || '[]');
-      let updatedMocks = [];
-      if (nextBlockedState) {
-        updatedMocks = [...suspendedMocks, emailLower];
-      } else {
-        updatedMocks = suspendedMocks.filter((e: string) => e !== emailLower);
-      }
-      localStorage.setItem('hesba_suspended_mock_emails', JSON.stringify(updatedMocks));
-      
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, is_blocked: nextBlockedState } : u));
-      alert(nextBlockedState ? 'تم حظر المستخدم بنجاح (محلياً).' : 'تم إلغاء حظر المستخدم بنجاح (محلياً).');
+      console.error('Error toggling block status in app_users:', err);
+      alert('فشل تغيير حالة الحظر في قاعدة البيانات: ' + (err.message || err));
     }
   }
 
@@ -355,6 +245,12 @@ export function UsersManagementPage() {
         <div className="flex flex-col items-center justify-center p-12 space-y-3 bg-white border border-gray-100 rounded-2xl">
           <Loader2 className="w-8 h-8 animate-spin text-amber-600" />
           <span className="text-xs text-gray-500 font-bold">جاري تحميل حسابات المستخدمين...</span>
+        </div>
+      ) : users.length === 0 ? (
+        <div className="p-12 text-center bg-white border border-gray-100 rounded-2xl space-y-3">
+          <User className="w-10 h-10 text-gray-400 mx-auto animate-pulse" />
+          <h4 className="text-sm font-bold text-gray-700">لا يوجد مستخدمون مسجلون حتى الآن</h4>
+          <p className="text-xs text-gray-400">ستظهر الحسابات المسجلة تلقائياً بمجرد إنشاء مستخدمين جدد في الحاسبة.</p>
         </div>
       ) : filteredUsers.length === 0 ? (
         <div className="p-12 text-center bg-white border border-gray-100 rounded-2xl space-y-3">

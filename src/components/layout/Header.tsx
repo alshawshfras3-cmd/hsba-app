@@ -9,7 +9,6 @@ export default function Header() {
     setActiveNav, 
     hasUnsavedChanges, 
     user, 
-    userRole, 
     signOut,
     activeStepLabel,
     userSubscriptions
@@ -94,12 +93,6 @@ export default function Header() {
                 <span className="text-[10px] text-gray-700 dark:text-slate-200 font-bold block max-w-[140px] truncate leading-none font-mono" title={user.email}>
                   {user.email}
                 </span>
-                <span className={`inline-block text-[9px] font-bold px-1.5 py-0.5 mt-1 rounded leading-none ${
-                  userRole === 'admin' ? 'bg-emerald-50 text-emerald-700 border border-emerald-150/40 dark:bg-emerald-950/40 dark:text-emerald-350' :
-                  'bg-slate-100 text-[#475569] dark:bg-slate-700 dark:text-slate-300'
-                }`}>
-                  {userRole === 'admin' ? 'مدير' : 'مستخدم'}
-                </span>
               </div>
               <button
                 onClick={signOut}
@@ -176,10 +169,6 @@ export default function Header() {
                 <div className="flex justify-between text-xs font-bold text-slate-500 dark:text-slate-400">
                   <span>البريد الحالي:</span>
                   <span className="font-mono text-slate-800 dark:text-slate-200">{user?.email || 'حساب زائر'}</span>
-                </div>
-                <div className="flex justify-between text-xs font-bold text-slate-500 dark:text-slate-400">
-                  <span>صلاحية الحساب:</span>
-                  <span className="text-emerald-600 dark:text-emerald-400">{userRole === 'admin' ? 'مدير' : 'مستخدم'}</span>
                 </div>
               </div>
 

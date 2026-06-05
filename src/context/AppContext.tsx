@@ -490,8 +490,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const { user, setUser, profile, isOwner, isAdmin, isStaff, canAccessDashboard, signOut, loading: authLoading } = useAuth();
   
   const getNormalizedRole = () => {
-    let r = profile?.role || 'user';
-    if (r === 'admin' || profile?.email === 'admin@hesba.com') return 'admin';
+    if (profile?.email === 'admin@hesba.com' || user?.email === 'admin@hesba.com') return 'admin';
     return 'user';
   };
   const userRole = getNormalizedRole();

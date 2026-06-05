@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 
 export function AccountPage() {
-  const { user, userRole, signOut, userSubscriptions, refreshProfile } = useAppState();
+  const { user, signOut, userSubscriptions, refreshProfile } = useAppState();
   const { profile } = useAuth();
   const location = useLocation();
 
@@ -63,9 +63,9 @@ export function AccountPage() {
 
     try {
       if (hasSupabaseKeys && user) {
-        // Update user_profiles
+        // Update app_users
         const { error } = await supabase
-          .from('user_profiles')
+          .from('app_users')
           .update({ full_name: fullNameInput.trim() })
           .eq('id', user.id);
 
@@ -190,8 +190,8 @@ export function AccountPage() {
     }
   };
 
-  const hasAdminAccess = userRole === 'admin';
-  const displayFullName = profile?.full_name || user?.user_metadata?.full_name || user?.user_metadata?.username || (userRole === 'admin' ? 'مدير حسبة' : 'مستخدم حسبة');
+  const displayFullName = profile?.full_name || user?.user_metadata?.full_name || user?.user_metadata?.username || 'مستخدم حسبة';
+  const hasAdminAccess = user?.email?.toLowerCase().trim() === 'admin@hesba.com';
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 text-right select-none animate-fade-in text-[#1E293B] dark:text-slate-100 min-h-screen transition-colors duration-200" dir="rtl">
@@ -236,15 +236,7 @@ export function AccountPage() {
                 </span>
               </div>
 
-              <div className="bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-2xl space-y-1">
-                <span className="text-[10px] text-gray-400 dark:text-slate-400 font-bold block">مستوى الصلاحية في لوحة الإدارة:</span>
-                <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
-                  <span>{userRole === 'admin' ? 'مدير' : 'مستخدم'}</span>
-                </span>
-              </div>
-
-              <div className="bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-2xl space-y-1">
+              <div className="bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-2xl space-y-1 col-span-2">
                 <span className="text-[10px] text-gray-400 dark:text-slate-400 font-bold block">تاريخ الانتساب السحابي:</span>
                 <span className="text-xs font-extrabold text-gray-700 dark:text-slate-300 font-mono">{getCreationDate()}</span>
               </div>

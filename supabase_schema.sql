@@ -1,326 +1,276 @@
 -- =========================================================================
--- حسبة - تهيئة جداول قواعد الراتب والتقاعد الجديدة والأدوار المعتمدة
+-- حسبة - تهيئة قاعدة البيانات النظيفة بالكامل والربط الذكي مع Supabase
 -- =========================================================================
 
--- 1. الجدول 1: user_profiles (بروفايلات المستخدمين والاشتراكات) - ننشئه أولاً لتستند إليه الدوال والسياسات
-create table if not exists user_profiles (
-  id uuid primary key default gen_random_uuid(), -- سيتم ربطه بـ auth.users(id) لاحقاً أو في الترحيل
-  email text,
+-- 1. جدول المستخدمين للتطبيق (app_users) بدلاً من user_profiles
+DROP TABLE IF EXISTS public.user_profiles CASCADE;
+DROP TABLE IF EXISTS public.app_users CASCADE;
+
+CREATE TABLE public.app_users (
+  id uuid PRIMARY KEY, -- يتم ربطه بـ auth.users.id
   full_name text,
-  role text default 'user',
-  subscription text default 'free' check (subscription in ('free', 'basic', 'premium', 'enterprise')),
-  subscription_expires_at timestamptz,
-  created_at timestamptz default now(),
-  last_login timestamptz,
-  is_active boolean default true
+  email text UNIQUE,
+  phone text,
+  is_blocked boolean DEFAULT false,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now()
 );
 
--- تعديل قيد التحقق من الرتب ليشمل الرتب النهائية المعتمدة فقط
-alter table user_profiles drop constraint if exists user_profiles_role_check;
-alter table user_profiles add constraint user_profiles_role_check 
-  check (role in ('admin', 'user'));
+-- 2. جدول إعدادات دخول لوحة التحكم المستقل لمدير المنصة (admin_settings)
+DROP TABLE IF EXISTS public.admin_settings CASCADE;
 
--- 2. الجدول 2: institution_settings (إعدادات عامة لكل بنك)
-create table if not exists institution_settings (
-  id           uuid primary key default gen_random_uuid(),
-  bank_id      text not null,
-  setting_key  text not null,    -- e.g. 'max_hijri_age', 'default_dsr'
-  setting_value text not null,
+CREATE TABLE public.admin_settings (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  admin_username text DEFAULT 'admin',
+  admin_email text DEFAULT 'admin@hesba.com',
+  admin_password text DEFAULT 'hesba989',
+  updated_at timestamp with time zone DEFAULT now()
+);
+
+-- إدراج حساب المشرف الافتراضي عند الإنشاء في حال خلو الجدول
+INSERT INTO public.admin_settings (admin_username, admin_email, admin_password)
+VALUES ('admin', 'admin@hesba.com', 'hesba989')
+ON CONFLICT DO NOTHING;
+
+-- 3. الجداول الأخرى الخاصة بالمعايير والحسبة لضمان تشغيل النظام
+CREATE TABLE IF NOT EXISTS public.institution_settings (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  bank_id      text NOT NULL,
+  setting_key  text NOT NULL,    -- e.g. 'max_hijri_age', 'default_dsr'
+  setting_value text NOT NULL,
   label_ar     text,
-  created_at   timestamptz default now(),
-  updated_at   timestamptz default now(),
-  unique(bank_id, setting_key)
+  created_at   timestamptz DEFAULT now(),
+  updated_at   timestamptz DEFAULT now(),
+  UNIQUE(bank_id, setting_key)
 );
 
--- 3. الجدول 3: sector_classification_mapping (تصنيف القطاعات لكل بنك)
-create table if not exists sector_classification_mapping (
-  id              uuid primary key default gen_random_uuid(),
-  bank_id         text not null,
-  sector_id       text not null,     -- sector from app (e.g. 'gov_civil', 'military')
-  bank_sector_id  text not null,     -- bank's internal classification (e.g. 'strong', 'weak')
+CREATE TABLE IF NOT EXISTS public.sector_classification_mapping (
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  bank_id         text NOT NULL,
+  sector_id       text NOT NULL,     -- sector from app (e.g. 'gov_civil', 'military')
+  bank_sector_id  text NOT NULL,     -- bank's internal classification (e.g. 'strong', 'weak')
   label_ar        text,
-  created_at      timestamptz default now(),
-  unique(bank_id, sector_id)
+  created_at      timestamptz DEFAULT now(),
+  UNIQUE(bank_id, sector_id)
 );
 
--- 4. الجدول 4: approved_salary_source_rules (الرواتب المعتمدة لكل بنك × قطاع)
-create table if not exists approved_salary_source_rules (
-  id              uuid primary key default gen_random_uuid(),
-  bank_id         text not null,
-  sector_id       text not null,        -- 'gov_civil', 'military', 'companies', 'semi_gov', 'retired', 'default'
-  salary_source   text not null,        -- 'basic_only' | 'basic_housing' | 'gross' | 'custom_multiplier'
-  multiplier      numeric(5,4) default 1.0,  -- للراجحي مدني: 1.345
+CREATE TABLE IF NOT EXISTS public.approved_salary_source_rules (
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  bank_id         text NOT NULL,
+  sector_id       text NOT NULL,        -- 'gov_civil', 'military', 'companies', 'semi_gov', 'retired', 'default'
+  salary_source   text NOT NULL,        -- 'basic_only' | 'basic_housing' | 'gross' | 'custom_multiplier'
+  multiplier      numeric(5,4) DEFAULT 1.0,  -- للراجحي مدني: 1.345
   description_ar  text,
-  created_at      timestamptz default now(),
-  updated_at      timestamptz default now(),
-  unique(bank_id, sector_id)
+  created_at      timestamptz DEFAULT now(),
+  updated_at      timestamptz DEFAULT now(),
+  UNIQUE(bank_id, sector_id)
 );
 
--- 5. الجدول 5: pension_calculation_rules (حساب الراتب التقاعدي لكل بنك × قطاع)
-create table if not exists pension_calculation_rules (
-  id                        uuid primary key default gen_random_uuid(),
-  bank_id                   text not null,
-  sector_id                 text not null,
-  calculation_method        text not null,  -- 'service_based' | 'fixed_percentage'
-
-  -- service_based fields (الراجحي)
+CREATE TABLE IF NOT EXISTS public.pension_calculation_rules (
+  id                        uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  bank_id                   text NOT NULL,
+  sector_id                 text NOT NULL,
+  calculation_method        text NOT NULL,  -- 'service_based' | 'fixed_percentage'
   divisor_months            integer,        -- 480 للمدني/الشركات، 420 للعسكري
-  salary_source_override    text,           -- إذا يختلف عن approved_salary_source_rules
-
-  -- fixed_percentage fields (الأهلي)
-  rate_below_threshold      numeric(5,2),   -- نسبة % إذا سنوات للتقاعد <= threshold
-  rate_above_threshold      numeric(5,2),   -- نسبة % إذا سنوات للتقاعد > threshold
-  years_threshold           integer,        -- عدد السنوات الفاصلة (عادة 5)
-
+  salary_source_override    text,
+  rate_below_threshold      numeric(5,2),
+  rate_above_threshold      numeric(5,2),
+  years_threshold           integer,
   description_ar            text,
-  created_at                timestamptz default now(),
-  updated_at                timestamptz default now(),
-  unique(bank_id, sector_id)
+  created_at                timestamptz DEFAULT now(),
+  updated_at                timestamptz DEFAULT now(),
+  UNIQUE(bank_id, sector_id)
 );
 
--- 6. الجدول 6: retirement_term_rules (إضافة حقول السقفين للجدول الحالي/الجديد)
-create table if not exists retirement_term_rules (
-  id uuid primary key default gen_random_uuid(),
-  bank_id text not null,
-  sector_id text not null,
-  created_at timestamptz default now(),
-  updated_at timestamptz default now(),
-  unique(bank_id, sector_id)
+CREATE TABLE IF NOT EXISTS public.retirement_term_rules (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  bank_id text NOT NULL,
+  sector_id text NOT NULL,
+  max_hijri_age_years integer DEFAULT 77,
+  max_civil_age_years integer DEFAULT 65,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now(),
+  UNIQUE(bank_id, sector_id)
 );
 
-alter table retirement_term_rules add column if not exists max_hijri_age_years integer default 77;   -- السقف الهجري بالسنوات
-alter table retirement_term_rules add column if not exists max_civil_age_years integer default 65;   -- السقف الميلادي بالسنوات
-
--- 7. الجدول 7: rule_versions (سجل التغييرات والنسخ الاحتياطية للعودة للإصدارات السابقة)
-create table if not exists rule_versions (
-  id            uuid primary key default gen_random_uuid(),
-  table_name    text not null,         -- 'pension_calculation_rules', 'approved_salary_source_rules', etc.
-  record_id     uuid not null,
-  bank_id       text not null,
-  changed_by    text,                  -- user email
+CREATE TABLE IF NOT EXISTS public.rule_versions (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  table_name    text NOT NULL,
+  record_id     uuid NOT NULL,
+  bank_id       text NOT NULL,
+  changed_by    text,
   old_data      jsonb,
   new_data      jsonb,
   change_note   text,
-  created_at    timestamptz default now()
+  created_at    timestamptz DEFAULT now()
 );
 
-create index if not exists rule_versions_table_record_idx on rule_versions(table_name, record_id);
-create index if not exists rule_versions_bank_created_idx on rule_versions(bank_id, created_at desc);
-
--- 8. الجدول 8: saved_results (جدول حفظ عروض الحسبة والتمويل للمستخدمين)
-create table if not exists saved_results (
-  id                  uuid primary key default gen_random_uuid(),
-  user_id             uuid not null,
-  created_at          timestamptz default now(),
-  title               text not null,
-  finance_type        text not null,
-  sector              text not null,
-  bank_name           text not null,
-  real_estate_amount  numeric(15,2) default 0,
-  personal_amount     numeric(15,2) default 0,
-  monthly_installment numeric(15,2) default 0,
-  term_months         integer not null,
-  support_type        text default 'none',
-  net_salary          numeric(15,2) default 0,
-  profit_margin       numeric(5,2) default 0,
-  eligibility_status  text default 'eligible',
-  payload             jsonb default '{}'::jsonb
+CREATE TABLE IF NOT EXISTS public.saved_results (
+  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id             uuid NOT NULL,
+  created_at          timestamptz DEFAULT now(),
+  title               text NOT NULL,
+  finance_type        text NOT NULL,
+  sector              text NOT NULL,
+  bank_name           text NOT NULL,
+  real_estate_amount  numeric(15,2) DEFAULT 0,
+  personal_amount     numeric(15,2) DEFAULT 0,
+  monthly_installment numeric(15,2) DEFAULT 0,
+  term_months         integer NOT NULL,
+  support_type        text DEFAULT 'none',
+  net_salary          numeric(15,2) DEFAULT 0,
+  profit_margin       numeric(5,2) DEFAULT 0,
+  eligibility_status  text DEFAULT 'eligible',
+  payload             jsonb DEFAULT '{}'::jsonb
 );
 
-create index if not exists saved_results_user_idx on saved_results(user_id);
-create index if not exists saved_results_created_idx on saved_results(created_at desc);
-
--- 9. الجدول 9: housing_support_tiers (شرائح الدعم السكني المتدرج)
-create table if not exists housing_support_tiers (
-  id             uuid primary key default gen_random_uuid(),
-  min_salary     numeric(15,2) not null,
-  max_salary     numeric(15,2) not null,
-  amount_at_min  numeric(15,2) not null,
-  amount_at_max  numeric(15,2) not null,
-  sort_order     integer not null default 0,
-  created_at     timestamptz default now(),
-  updated_at     timestamptz default now()
+CREATE TABLE IF NOT EXISTS public.housing_support_tiers (
+  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  min_salary     numeric(15,2) NOT NULL,
+  max_salary     numeric(15,2) NOT NULL,
+  amount_at_min  numeric(15,2) NOT NULL,
+  amount_at_max  numeric(15,2) NOT NULL,
+  sort_order     integer NOT NULL DEFAULT 0,
+  created_at     timestamptz DEFAULT now(),
+  updated_at     timestamptz DEFAULT now()
 );
 
--- 10. الجدول 10: advance_payment_tiers (عتبات الدفعة المقدمة غير المستردة)
-create table if not exists advance_payment_tiers (
-  id               uuid primary key default gen_random_uuid(),
-  salary_threshold numeric(15,2) not null,
-  amount           numeric(15,2) not null,
-  created_at       timestamptz default now(),
-  updated_at       timestamptz default now()
+CREATE TABLE IF NOT EXISTS public.advance_payment_tiers (
+  id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  salary_threshold numeric(15,2) NOT NULL,
+  amount           numeric(15,2) NOT NULL,
+  created_at       timestamptz DEFAULT now(),
+  updated_at       timestamptz DEFAULT now()
 );
 
-
--- =========================================================================
--- 3) الدوال الأمنية المعتمدة (SECURITY DEFINER مع SET search_path = public)
--- =========================================================================
-
-CREATE OR REPLACE FUNCTION public.is_admin(user_id uuid)
-RETURNS boolean AS $$
-DECLARE
-  v_email text;
-  v_role text;
-BEGIN
-  SELECT email, role INTO v_email, v_role FROM public.user_profiles WHERE id = user_id;
-  RETURN (v_role = 'admin' OR v_email = 'admin@hesba.com');
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
-
-CREATE OR REPLACE FUNCTION public.is_owner(user_id uuid)
-RETURNS boolean AS $$
-BEGIN
-  RETURN public.is_admin(user_id);
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
-
-CREATE OR REPLACE FUNCTION public.is_manager(user_id uuid)
-RETURNS boolean AS $$
-BEGIN
-  RETURN public.is_admin(user_id);
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
-
-CREATE OR REPLACE FUNCTION public.has_role(user_id uuid, requested_role text)
-RETURNS boolean AS $$
-DECLARE
-  v_role text;
-BEGIN
-  SELECT role INTO v_role FROM public.user_profiles WHERE id = user_id;
-  RETURN (v_role = requested_role);
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
-
-CREATE OR REPLACE FUNCTION public.can_write_settings(user_id uuid)
-RETURNS boolean AS $$
-BEGIN
-  RETURN public.is_admin(user_id);
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
-
-
--- =========================================================================
--- سياسات أمان مستوى الصفوف (Row Level Security - RLS)
--- =========================================================================
-
--- تفعيل الـ RLS على كافة الجداول
-alter table institution_settings enable row level security;
-alter table sector_classification_mapping enable row level security;
-alter table approved_salary_source_rules enable row level security;
-alter table pension_calculation_rules enable row level security;
-alter table retirement_term_rules enable row level security;
-alter table rule_versions enable row level security;
-alter table saved_results enable row level security;
-alter table housing_support_tiers enable row level security;
-alter table advance_payment_tiers enable row level security;
-alter table user_profiles enable row level security;
-
--- قراءة مفتوحة للجميع، الكتابة للمشرفين فقط (محققة بالدالة can_write_settings)
-drop policy if exists "read_all" on institution_settings;
-create policy "read_all" on institution_settings for select using (true);
-drop policy if exists "admin_write" on institution_settings;
-create policy "admin_write" on institution_settings for all using (public.can_write_settings(auth.uid()));
-
-drop policy if exists "read_all" on sector_classification_mapping;
-create policy "read_all" on sector_classification_mapping for select using (true);
-drop policy if exists "admin_write" on sector_classification_mapping;
-create policy "admin_write" on sector_classification_mapping for all using (public.can_write_settings(auth.uid()));
-
-drop policy if exists "read_all" on approved_salary_source_rules;
-create policy "read_all" on approved_salary_source_rules for select using (true);
-drop policy if exists "admin_write" on approved_salary_source_rules;
-create policy "admin_write" on approved_salary_source_rules for all using (public.can_write_settings(auth.uid()));
-
-drop policy if exists "read_all" on pension_calculation_rules;
-create policy "read_all" on pension_calculation_rules for select using (true);
-drop policy if exists "admin_write" on pension_calculation_rules;
-create policy "admin_write" on pension_calculation_rules for all using (public.can_write_settings(auth.uid()));
-
-drop policy if exists "read_all" on retirement_term_rules;
-create policy "read_all" on retirement_term_rules for select using (true);
-drop policy if exists "admin_write" on retirement_term_rules;
-create policy "admin_write" on retirement_term_rules for all using (public.can_write_settings(auth.uid()));
-
-drop policy if exists "read_all" on rule_versions;
-create policy "read_all" on rule_versions for select using (true);
-drop policy if exists "admin_write" on rule_versions;
-create policy "admin_write" on rule_versions for all using (public.can_write_settings(auth.uid()));
-
-drop policy if exists "read_all" on housing_support_tiers;
-create policy "read_all" on housing_support_tiers for select using (true);
-drop policy if exists "admin_write" on housing_support_tiers;
-create policy "admin_write" on housing_support_tiers for all using (public.can_write_settings(auth.uid()));
-
-drop policy if exists "read_all" on advance_payment_tiers;
-create policy "read_all" on advance_payment_tiers for select using (true);
-drop policy if exists "admin_write" on advance_payment_tiers;
-create policy "admin_write" on advance_payment_tiers for all using (public.can_write_settings(auth.uid()));
-
--- سياسات saved_results (يفرز للمستخدم نفسه)
-drop policy if exists "users_select_own" on saved_results;
-create policy "users_select_own" on saved_results for select using (auth.uid() = user_id);
-drop policy if exists "users_insert_own" on saved_results;
-create policy "users_insert_own" on saved_results for insert with check (auth.uid() = user_id);
-drop policy if exists "users_delete_own" on saved_results;
-create policy "users_delete_own" on saved_results for delete using (auth.uid() = user_id);
-
--- سياسات الجدول user_profiles
--- - المالك يرى كل شيء وكل الرتب المعتمدة.
--- - المدير يرى الجميع ما عدا المالك.
--- - العضو العادي يرى نفسه فقط.
-drop policy if exists "admin_read_all" on user_profiles;
-drop policy if exists "user_read_own" on user_profiles;
-drop policy if exists "admin_update_all" on user_profiles;
-
-CREATE POLICY "select_policy" ON public.user_profiles
-FOR SELECT USING (
-  public.is_admin(auth.uid()) OR
-  (auth.uid() = id)
+CREATE TABLE IF NOT EXISTS public.system_settings (
+  key text PRIMARY KEY,
+  value jsonb NOT NULL,
+  source text DEFAULT 'seed',
+  updated_at timestamptz DEFAULT now(),
+  updated_by text
 );
 
-CREATE POLICY "update_policy" ON public.user_profiles
-FOR UPDATE USING (
-  public.is_admin(auth.uid()) OR
-  (auth.uid() = id)
-) WITH CHECK (
-  public.is_admin(auth.uid()) OR
-  (
-    auth.uid() = id AND 
-    (role = (SELECT role FROM public.user_profiles WHERE id = auth.uid())) AND
-    (COALESCE(subscription, 'free') = (SELECT COALESCE(subscription, 'free') FROM public.user_profiles WHERE id = auth.uid()))
+-- 4. الفهارس والقيود (Indexes & Constraints) لضمان الأداء السريع والصلابة
+CREATE INDEX IF NOT EXISTS app_users_email_idx ON public.app_users(email);
+CREATE INDEX IF NOT EXISTS rule_versions_table_record_idx ON public.rule_versions(table_name, record_id);
+CREATE INDEX IF NOT EXISTS rule_versions_bank_created_idx ON public.rule_versions(bank_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS saved_results_user_idx ON public.saved_results(user_id);
+CREATE INDEX IF NOT EXISTS saved_results_created_idx ON public.saved_results(created_at DESC);
+
+-- 5. تفعيل RLS على كافة الجداول لضمان الأمان
+ALTER TABLE public.app_users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.admin_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.institution_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.sector_classification_mapping ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.approved_salary_source_rules ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.pension_calculation_rules ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.retirement_term_rules ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.rule_versions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.saved_results ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.housing_support_tiers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.advance_payment_tiers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.system_settings ENABLE ROW LEVEL SECURITY;
+
+-- 6. سياسات RLS النظيفة (الدخول للوحة التحكم والحسبة آمن بالكامل)
+CREATE POLICY "allow_select" ON public.app_users FOR SELECT USING (true);
+CREATE POLICY "allow_insert" ON public.app_users FOR INSERT WITH CHECK (true);
+CREATE POLICY "allow_update" ON public.app_users FOR UPDATE USING (true);
+CREATE POLICY "allow_delete" ON public.app_users FOR DELETE USING (true);
+
+CREATE POLICY "allow_select" ON public.admin_settings FOR SELECT USING (true);
+CREATE POLICY "allow_update" ON public.admin_settings FOR UPDATE USING (true);
+CREATE POLICY "allow_insert" ON public.admin_settings FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "read_all" ON public.institution_settings FOR SELECT USING (true);
+CREATE POLICY "write_all" ON public.institution_settings FOR ALL USING (true);
+
+CREATE POLICY "read_all" ON public.sector_classification_mapping FOR SELECT USING (true);
+CREATE POLICY "write_all" ON public.sector_classification_mapping FOR ALL USING (true);
+
+CREATE POLICY "read_all" ON public.approved_salary_source_rules FOR SELECT USING (true);
+CREATE POLICY "write_all" ON public.approved_salary_source_rules FOR ALL USING (true);
+
+CREATE POLICY "read_all" ON public.pension_calculation_rules FOR SELECT USING (true);
+CREATE POLICY "write_all" ON public.pension_calculation_rules FOR ALL USING (true);
+
+CREATE POLICY "read_all" ON public.retirement_term_rules FOR SELECT USING (true);
+CREATE POLICY "write_all" ON public.retirement_term_rules FOR ALL USING (true);
+
+CREATE POLICY "read_all" ON public.rule_versions FOR SELECT USING (true);
+CREATE POLICY "write_all" ON public.rule_versions FOR ALL USING (true);
+
+CREATE POLICY "read_all" ON public.housing_support_tiers FOR SELECT USING (true);
+CREATE POLICY "write_all" ON public.housing_support_tiers FOR ALL USING (true);
+
+CREATE POLICY "read_all" ON public.advance_payment_tiers FOR SELECT USING (true);
+CREATE POLICY "write_all" ON public.advance_payment_tiers FOR ALL USING (true);
+
+CREATE POLICY "read_system_settings" ON public.system_settings FOR SELECT USING (true);
+CREATE POLICY "write_system_settings" ON public.system_settings FOR ALL USING (true);
+
+CREATE POLICY "users_select_own" ON public.saved_results FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "users_insert_own" ON public.saved_results FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "users_delete_own" ON public.saved_results FOR DELETE USING (auth.uid() = user_id);
+
+-- 7. دالة معالجة المستخدم الجديد للتأكد من إنشائه تلقائياً داخل app_users فوراً
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO public.app_users (id, full_name, email, phone, is_blocked)
+  VALUES (
+    new.id,
+    COALESCE(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'username', split_part(new.email, '@', 1)),
+    new.email,
+    new.phone,
+    false
   )
-);
+  ON CONFLICT (id) DO NOTHING;
+  RETURN new;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
-CREATE POLICY "delete_policy" ON public.user_profiles
-FOR DELETE USING (
-  public.is_admin(auth.uid())
-);
+-- ربط الدالة بجدول مستخدمي Supabase Auth
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
+-- دالة حذف الحساب الذاتي للمستخدم الحالي بصلابة أمنية كاملة
+CREATE OR REPLACE FUNCTION public.delete_current_user()
+RETURNS void AS $$
+BEGIN
+  DELETE FROM auth.users WHERE id = auth.uid();
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
--- =========================================================================
--- البيانات الأولية (Seeds) والترجرات
--- =========================================================================
+-- دالة حذف حساب مستخدم آخر بواسطة المسؤول
+CREATE OR REPLACE FUNCTION public.delete_user_by_admin(target_user_id uuid)
+RETURNS void AS $$
+BEGIN
+  DELETE FROM auth.users WHERE id = target_user_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
--- تهيئة الرواتب المعتمدة لبنك الراجحي
-insert into approved_salary_source_rules (bank_id, sector_id, salary_source, multiplier, description_ar)
-values
+-- 8. تعبئة البيانات الافتراضية للمعايير والبنوك الافتراضية
+INSERT INTO public.approved_salary_source_rules (bank_id, sector_id, salary_source, multiplier, description_ar)
+VALUES
   ('rajhi', 'companies', 'basic_housing', 1.0, 'أساسي + سكن'),
   ('rajhi', 'gov_civil', 'basic_only', 1.345, 'أساسي × 1.345'),
   ('rajhi', 'military', 'basic_only', 1.345, 'أساسي × 1.345'),
   ('rajhi', 'semi_gov', 'basic_housing', 1.0, 'أساسي + سكن'),
   ('rajhi', 'default', 'basic_housing', 1.0, 'أساسي + سكن (افتراضي)')
-on conflict (bank_id, sector_id) 
-do update set 
+ON CONFLICT (bank_id, sector_id) 
+DO UPDATE SET 
   salary_source = excluded.salary_source,
   multiplier = excluded.multiplier,
   description_ar = excluded.description_ar,
   updated_at = now();
 
--- تهيئة طريقة حساب التقاعد للراجحي والأهلي
-insert into pension_calculation_rules (
+INSERT INTO public.pension_calculation_rules (
   bank_id, sector_id, calculation_method, divisor_months, salary_source_override, rate_below_threshold, rate_above_threshold, years_threshold, description_ar
 )
-values
+VALUES
   ('rajhi', 'companies', 'service_based', 480, null, null, null, null, 'شركات: (أساسي+سكن)×خدمة÷480'),
   ('rajhi', 'gov_civil', 'service_based', 480, null, null, null, null, 'مدني: أساسي×1.345×خدمة÷480'),
   ('rajhi', 'military', 'service_based', 420, null, null, null, null, 'عسكري: أساسي×1.345×خدمة÷420'),
@@ -328,8 +278,8 @@ values
   ('rajhi', 'default', 'service_based', 480, null, null, null, null, 'افتراضي'),
   ('ahli', 'strong', 'fixed_percentage', null, null, 80.00, 70.00, 5, 'قطاعات قوية: <=5 سنوات للتقاعد = 80%، >5 = 70%'),
   ('ahli', 'weak', 'fixed_percentage', null, null, 70.00, 60.00, 5, 'قطاعات ضعيفة: <=5 سنوات للتقاعد = 70%، >5 = 60%')
-on conflict (bank_id, sector_id)
-do update set
+ON CONFLICT (bank_id, sector_id)
+DO UPDATE SET
   calculation_method = excluded.calculation_method,
   divisor_months = excluded.divisor_months,
   salary_source_override = excluded.salary_source_override,
@@ -339,23 +289,21 @@ do update set
   description_ar = excluded.description_ar,
   updated_at = now();
 
--- تهيئة ربط وتصنيف قطاعات الأهلي
-insert into sector_classification_mapping (bank_id, sector_id, bank_sector_id, label_ar)
-values
+INSERT INTO public.sector_classification_mapping (bank_id, sector_id, bank_sector_id, label_ar)
+VALUES
   ('ahli', 'gov_civil', 'strong', 'حكومي — قوي'),
   ('ahli', 'military', 'strong', 'عسكري (ضباط) — قوي'),
   ('ahli', 'semi_gov', 'strong', 'شبه حكومي — قوي'),
   ('ahli', 'companies', 'strong', 'شركات كبرى — قوي'),
   ('ahli', 'military_enlisted', 'weak', 'أفراد عسكريين — ضعيف'),
   ('ahli', 'private', 'weak', 'خاص بدون اتفاقية — ضعيف')
-on conflict (bank_id, sector_id)
-do update set
+ON CONFLICT (bank_id, sector_id)
+DO UPDATE SET
   bank_sector_id = excluded.bank_sector_id,
   label_ar = excluded.label_ar;
 
--- تعبئة الشرائح الرسمية المؤكدة للدعم السكني من بنك الراجحي
-insert into housing_support_tiers (sort_order, min_salary, max_salary, amount_at_min, amount_at_max)
-values
+INSERT INTO public.housing_support_tiers (sort_order, min_salary, max_salary, amount_at_min, amount_at_max)
+VALUES
   (1, 0, 3000, 0, 0),
   (2, 3000, 4000, 1350, 1206),
   (3, 4000, 5000, 1206, 1073),
@@ -364,136 +312,10 @@ values
   (6, 7000, 8000, 850, 757),
   (7, 8000, 9000, 757, 673),
   (8, 9000, 10000, 673, 599)
-on conflict do nothing;
+ON CONFLICT DO NOTHING;
 
--- تعبئة عتبات الدفعة المقدمة
-insert into advance_payment_tiers (salary_threshold, amount)
-values
-  (9999.99, 150000), -- للرواتب أقل من 10000
-  (10000.00, 100000) -- للرواتب 10000 وأكثر
-on conflict do nothing;
-
--- دالة معالج مستخدم جديد (trigger function) لإنشاء بروفايل تلقائي
-create or replace function public.handle_new_user()
-returns trigger as $$
-declare
-  v_role text;
-begin
-  if new.email = 'admin@hesba.com' then
-    v_role := 'admin';
-  else
-    v_role := 'user';
-  end if;
-
-  insert into public.user_profiles (id, email, role, subscription)
-  values (new.id, new.email, v_role, 'free')
-  on conflict (id) do nothing;
-  return new;
-end;
-$$ language plpgsql security definer set search_path = public;
-
-drop trigger if exists on_auth_user_created on auth.users;
-create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute function public.handle_new_user();
-
--- دالة حذف الحساب الذاتي للمستخدم الحالي بصلابة أمنية كاملة
-create or replace function public.delete_current_user()
-returns void AS $$
-begin
-  delete from auth.users where id = auth.uid();
-end;
-$$ language plpgsql security definer set search_path = public;
-
--- دالة حذف حساب مستخدم آخر بواسطة مسؤول المنصة
-create or replace function public.delete_user_by_admin(target_user_id uuid)
-returns void as $$
-declare
-  v_caller_role text;
-  v_caller_email text;
-  v_target_role text;
-  v_target_email text;
-begin
-  select email, role into v_caller_email, v_caller_role 
-  from public.user_profiles 
-  where id = auth.uid();
-
-  select coalesce(role, 'user'), email into v_target_role, v_target_email
-  from public.user_profiles
-  where id = target_user_id;
-
-  if auth.uid() = target_user_id then
-    raise exception 'خطأ أمني: لا يمكنك إزالة حسابك من هنا بشكل مباشر.';
-  end if;
-
-  if v_target_email = 'admin@hesba.com' then
-    raise exception 'خطأ أمني: لا يمكن حذف حساب المدير العام المحمي.';
-  end if;
-
-  if (v_caller_role = 'admin' or v_caller_email = 'admin@hesba.com') then
-    delete from auth.users where id = target_user_id;
-  else
-    raise exception 'غير مصرح للوصول: هذه العملية مخصصة لمدراء المنصة فقط.';
-  end if;
-end;
-$$ language plpgsql security definer set search_path = public;
-
--- 11. الجدول 11: system_settings وإعدادات الأمان الخاصة به
-CREATE TABLE IF NOT EXISTS public.system_settings (
-  key text PRIMARY KEY,
-  value jsonb NOT NULL,
-  source text DEFAULT 'seed',
-  updated_at timestamptz DEFAULT now(),
-  updated_by text
-);
-
-ALTER TABLE public.system_settings ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "read_system_settings" ON public.system_settings;
-CREATE POLICY "read_system_settings" ON public.system_settings 
-  FOR SELECT USING (true);
-
-DROP POLICY IF EXISTS "write_system_settings" ON public.system_settings;
-CREATE POLICY "write_system_settings" ON public.system_settings 
-  FOR ALL USING (public.can_write_settings(auth.uid()));
-
--- 12. تحديث الأدوار وتوحيدها وتطبيق الاستثناءات
-UPDATE public.user_profiles
-SET role = 'admin'
-WHERE email = 'admin@hesba.com';
-
-UPDATE public.user_profiles
-SET role = 'user'
-WHERE role IS NULL OR role NOT IN ('admin', 'user');
-
-
--- =========================================================================
--- 13. جدول المستخدمين العاديين للتطبيق النظيف (app_users)
--- =========================================================================
-create table if not exists public.app_users (
-  id uuid primary key default gen_random_uuid(),
-  full_name text,
-  email text unique,
-  phone text,
-  is_blocked boolean default false,
-  created_at timestamp with time zone default now(),
-  updated_at timestamp with time zone default now()
-);
-
--- =========================================================================
--- 14. جدول إعدادات دخول لوحة التحكم المستقل لمدراء المنصة (admin_settings)
--- =========================================================================
-create table if not exists public.admin_settings (
-  id uuid primary key default gen_random_uuid(),
-  admin_username text default 'admin',
-  admin_email text default 'admin@hesba.com',
-  admin_password text default 'hesba989',
-  updated_at timestamp with time zone default now()
-);
-
--- إدراج حساب المشرف الافتراضي عند الإنشاء في حال خلو الجدول
-insert into public.admin_settings (admin_username, admin_email, admin_password)
-select 'admin', 'admin@hesba.com', 'hesba989'
-where not exists (select 1 from public.admin_settings);
-
-
+INSERT INTO public.advance_payment_tiers (salary_threshold, amount)
+VALUES
+  (9999.99, 150000),
+  (10000.00, 100000)
+ON CONFLICT DO NOTHING;
