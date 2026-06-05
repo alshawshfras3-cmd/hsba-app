@@ -6,18 +6,20 @@ export interface AdminCredentials {
   admin_password: string;
 }
 
-const DEFAULT_ADMIN: AdminCredentials = {
+export const DEFAULT_ADMIN_CREDENTIALS: AdminCredentials = {
   admin_username: 'admin',
   admin_email: 'admin@hesba.com',
-  admin_password: 'hesba989'
+  admin_password: 'hesba989',
 };
+
+const DEFAULT_ADMIN = DEFAULT_ADMIN_CREDENTIALS;
 
 // Local storage key for fallback in offline/preview environments
 const ADMIN_LOCAL_STORAGE_KEY = 'hesba_admin_settings_fallback_v2';
 
 /**
  * Gets the current administrative settings either from the public.admin_settings table in Supabase
- * or from localStorage cache/defaults when offline.
+ * or from localStorage cache/defaults when offline or timed out.
  */
 export async function getAdminCredentials(): Promise<AdminCredentials> {
   const getCached = (): AdminCredentials => {
@@ -35,16 +37,27 @@ export async function getAdminCredentials(): Promise<AdminCredentials> {
   }
 
   try {
-    const { data, error } = await supabase
-      .from('admin_settings')
-      .select('admin_username, admin_email, admin_password')
-      .limit(1)
-      .maybeSingle();
+    // 5-second timeout promise
+    const timeoutPromise = new Promise<null>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error('Supabase admin settings request timed out after 5 seconds'));
+      }, 5000);
+    });
 
-    if (error) {
-      console.warn("Could not load from admin_settings table, falling back to local storage:", error.message);
-      return getCached();
-    }
+    const fetchPromise = (async () => {
+      const { data, error } = await supabase
+        .from('admin_settings')
+        .select('admin_username, admin_email, admin_password')
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        throw error;
+      }
+      return data;
+    })();
+
+    const data = await Promise.race([fetchPromise, timeoutPromise]);
 
     if (data) {
       const creds: AdminCredentials = {
@@ -59,7 +72,7 @@ export async function getAdminCredentials(): Promise<AdminCredentials> {
       return creds;
     }
   } catch (err) {
-    console.warn("Exception while loading admin settings, using local fallback:", err);
+    console.warn("Exception or timeout while loading admin settings, using local fallback:", err);
   }
 
   return getCached();

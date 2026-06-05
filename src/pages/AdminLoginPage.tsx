@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useLocation } from '../hooks/useLocation';
 import { Lock, Mail, Loader2, ShieldAlert, AlertCircle } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { getAdminCredentials } from '../lib/adminCredentials';
 
 export function AdminLoginPage() {
   const { navigate } = useLocation();
@@ -16,45 +16,41 @@ export function AdminLoginPage() {
     setErrorMsg(null);
 
     try {
-      const { data, error } = await supabase
-        .from('admin_settings')
-        .select('admin_username, admin_email, admin_password')
-        .limit(1)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Admin settings load error:', error);
-        setErrorMsg('تعذر الاتصال بإعدادات لوحة التحكم');
-        return;
-      }
-
-      if (!data) {
-        setErrorMsg('إعدادات لوحة التحكم غير موجودة');
-        return;
-      }
-
-      const cleanIdentifier = email.trim();
+      const creds = await getAdminCredentials();
+      const cleanIdentifier = email.trim().toLowerCase();
 
       const identifierOk =
-        cleanIdentifier === data.admin_email ||
-        cleanIdentifier === data.admin_username;
+        cleanIdentifier === creds.admin_email.toLowerCase() ||
+        cleanIdentifier === creds.admin_username.toLowerCase();
 
-      const passwordOk = password === data.admin_password;
+      const passwordOk = password === creds.admin_password;
 
       if (!identifierOk || !passwordOk) {
-        setErrorMsg('غير مصرح');
+        setErrorMsg('اسم المستخدم أو كلمة المرور غير صحيحة');
         return;
       }
 
-      sessionStorage.setItem('hesba_admin_session', JSON.stringify({
+      const session = {
         isAdmin: true,
         identifier: cleanIdentifier,
-        loginAt: new Date().toISOString()
-      }));
+        loginAt: new Date().toISOString(),
+      };
+
+      sessionStorage.setItem('hesba_admin_session', JSON.stringify(session));
+
+      const saved = sessionStorage.getItem('hesba_admin_session');
+      if (!saved) {
+        setErrorMsg('تعذر إنشاء جلسة لوحة التحكم');
+        return;
+      }
+
+      window.dispatchEvent(new Event('hesba-admin-session-changed'));
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       navigate('/admin/dashboard');
     } catch (err) {
-      console.error('Admin login unexpected error:', err);
+      console.error('Admin login error:', err);
       setErrorMsg('حدث خطأ أثناء تسجيل الدخول');
     } finally {
       setLoading(false);

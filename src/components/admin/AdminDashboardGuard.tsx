@@ -12,23 +12,41 @@ export function AdminDashboardGuard({ children }: GuardProps) {
   const [isAllowed, setIsAllowed] = useState(false);
 
   useEffect(() => {
-    try {
-      const sessionStr = sessionStorage.getItem('hesba_admin_session');
-      if (sessionStr) {
-        const session = JSON.parse(sessionStr);
-        if (session && session.isAdmin === true) {
-          setIsAllowed(true);
-        } else {
-          setIsAllowed(false);
+    const checkSession = () => {
+      try {
+        const sessionStr = sessionStorage.getItem('hesba_admin_session');
+
+        if (sessionStr) {
+          const session = JSON.parse(sessionStr);
+
+          if (session && session.isAdmin === true) {
+            setIsAllowed(true);
+            setLoading(false);
+            return true;
+          }
         }
-      } else {
-        setIsAllowed(false);
+      } catch (e) {
+        console.error('Invalid admin session:', e);
       }
-    } catch (e) {
-      setIsAllowed(false);
-    } finally {
-      setLoading(false);
-    }
+
+      return false;
+    };
+
+    if (checkSession()) return;
+
+    const timer = setTimeout(() => {
+      if (!checkSession()) {
+        setIsAllowed(false);
+        setLoading(false);
+      }
+    }, 200);
+
+    window.addEventListener('hesba-admin-session-changed', checkSession);
+
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('hesba-admin-session-changed', checkSession);
+    };
   }, []);
 
   useEffect(() => {
