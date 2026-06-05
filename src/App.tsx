@@ -11,42 +11,10 @@ import Header from './components/layout/Header';
 import BottomNavigation from './components/layout/BottomNavigation';
 import StepWizard from './components/calculator/StepWizard';
 import AdminDashboard from './components/admin/AdminDashboard';
-import AdminAuth from './components/admin/AdminAuth';
+import { AdminLoginPage } from './pages/AdminLoginPage';
+import { AdminDashboardGuard } from './components/admin/AdminDashboardGuard';
 import { Calculator, ShieldCheck, Mail, Phone, ExternalLink, ShieldAlert, Loader2 } from 'lucide-react';
 import { supabase, hasSupabaseKeys, cleanStaleSupabaseSession } from './lib/supabase';
-
-function AdminViewGuard() {
-  const { signOut, profile, isAdmin, user } = useAuth();
-
-  const userRole = profile?.role || 'user';
-  const isAllowed = userRole === 'admin' || isAdmin;
-
-  if (!isAllowed) {
-    return (
-      <div className="max-w-md mx-auto my-12 px-4">
-        <div className="bg-white border border-gray-100 rounded-2xl shadow-xl p-8 text-center space-y-6" dir="rtl">
-          <div className="w-14 h-14 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto">
-            <ShieldAlert className="w-8 h-8" />
-          </div>
-          <div>
-            <h3 className="font-sans font-bold text-lg text-gray-900">عذراً، الوصول غير مصرح به</h3>
-            <p className="text-xs text-gray-500 mt-2 leading-relaxed font-sans">
-              حسابك الحالي (<span className="font-mono text-gray-700 font-semibold">{user?.email}</span>) لا يملك صلاحية (مدير) المطلوبة لتسجيل دخول لوحة الإدارة. رتبتك الحالية هي: (<span className="font-bold text-red-600 font-mono">{userRole === 'admin' ? 'مدير' : 'مستخدم'}</span>). يرجى التواصل مع الإدارة.
-            </p>
-          </div>
-          <button
-            onClick={signOut}
-            className="w-full py-3 bg-[#0057B8] hover:bg-[#004bb0] text-white text-xs font-bold rounded-xl transition-all shadow-md cursor-pointer"
-          >
-            تسجيل الخروج والدخول بحساب مسؤول
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  return <AdminDashboard />;
-}
 
 function MarketingFooter() {
   return (
@@ -103,7 +71,6 @@ function MarketingFooter() {
 }
 
 function DashboardOrWizard() {
-  const { user } = useAuth();
   const location = useLocation();
 
   const footerAllowedPaths = [
@@ -128,11 +95,6 @@ function DashboardOrWizard() {
       case '/about':
       case '/about-us':
         return <AboutPage />;
-      case '/admin':
-        if (!user) {
-          return <AdminAuth />;
-        }
-        return <AdminViewGuard />;
       default:
         return <StepWizard />;
     }
@@ -161,6 +123,20 @@ function AppContent() {
         <Loader2 className="w-10 h-10 animate-spin text-[#0057B8] dark:text-[#0EA5A4]" />
         <span className="text-xs text-gray-400 dark:text-slate-400 font-bold select-none">جاري الاستعلام عن صلاحيات حسبة...</span>
       </div>
+    );
+  }
+
+  // Admin Login Section Pathway
+  if (location.pathname === '/admin') {
+    return <AdminLoginPage />;
+  }
+
+  // Admin Dashboard main protected path
+  if (location.pathname === '/admin/dashboard') {
+    return (
+      <AdminDashboardGuard>
+        <AdminDashboard />
+      </AdminDashboardGuard>
     );
   }
 

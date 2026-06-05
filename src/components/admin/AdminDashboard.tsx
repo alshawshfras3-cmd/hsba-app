@@ -18,6 +18,7 @@ import SupportSection from './sections/SupportSection';
 import { PersonalFinanceSection } from './sections/PersonalFinanceSection';
 import { UsersSection } from './sections/UsersSection';
 import { DiagnosticsSection } from './sections/DiagnosticsSection';
+import { SecuritySection } from './sections/SecuritySection';
 import { Bank, ProductAcceptance, SectorId, ProductId, MilitaryRank, MarginRule, DsrRule, CalculationStatus, PersonalFinanceRules, SupportType, TermRule } from '../../types';
 import NumericInput from '../calculator/NumericInput';
 import { 
@@ -124,7 +125,8 @@ export default function AdminDashboard() {
     { id: 'personal', label: 'عقود التمويل الشخصي', icon: Coins },
     { id: 'advanced', label: 'صفحة القواعد المتقدمة', icon: ShieldAlert },
     { id: 'diagnostics', label: 'تشخيص الحساب التفصيلي', icon: HelpCircle },
-    { id: 'users', label: 'المستخدمون والاشتراكات', icon: UserPlus }
+    { id: 'users', label: 'المستخدمون والاشتراكات', icon: UserPlus },
+    { id: 'security', label: 'الأمان ورقم المرور', icon: Lock }
   ];
 
   // Common UI State helpers
@@ -6600,6 +6602,10 @@ export default function AdminDashboard() {
 
         {adminSubPage === 'users' && (
           <UsersSection />
+        )}
+
+        {adminSubPage === 'security' && (
+          <SecuritySection />
         )}
 
         {/* Modal 1: Copy Settings Modal */}

@@ -84,20 +84,6 @@ export default function Header() {
             </button>
           )}
 
-          {userRole === 'admin' && (
-            <button
-               id="nav-admin-btn"
-               onClick={() => handleNavChange('admin')}
-               className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-sans text-xs font-bold transition-all ${
-                 location.pathname === '/admin'
-                   ? 'bg-white dark:bg-slate-900 text-[#0057B8] dark:text-white shadow-sm'
-                   : 'text-gray-500 dark:text-slate-450 hover:text-[#111827] dark:hover:text-white'
-               }`}
-             >
-               <ShieldAlert className="w-4 h-4" />
-               <span>لوحة التحكم للإدارة</span>
-             </button>
-           )}
         </div>
 
         {/* Brand Minimal Accent */}
@@ -196,43 +182,7 @@ export default function Header() {
                   <span className="text-emerald-600 dark:text-emerald-400">{userRole === 'admin' ? 'مدير' : 'مستخدم'}</span>
                 </div>
               </div>
- 
-              {/* Navigation toggles if Admin / Manager */}
-              {userRole === 'admin' && (
-                <div className="grid grid-cols-2 gap-3 pt-2">
-                  <button
-                    onClick={() => {
-                      setActiveNav('calculator');
-                      setIsMobileSettingsOpen(false);
-                      location.navigate('/');
-                    }}
-                    className={`p-3.5 rounded-xl text-center border font-bold text-xs flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
-                      location.pathname !== '/admin' 
-                        ? 'bg-[#0057B8]/10 text-[#0057B8] border-[#0057B8] dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800' 
-                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-350'
-                    }`}
-                  >
-                    <Calculator className="w-4 h-4" />
-                    <span>شاشة حاسبات العملاء</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setActiveNav('admin');
-                      setIsMobileSettingsOpen(false);
-                      location.navigate('/admin');
-                    }}
-                    className={`p-3.5 rounded-xl text-center border font-bold text-xs flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
-                      location.pathname === '/admin' 
-                        ? 'bg-[#0057B8]/10 text-[#0057B8] border-[#0057B8] dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800' 
-                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-350'
-                    }`}
-                  >
-                    <ShieldAlert className="w-4 h-4" />
-                    <span>لوحة تحكم الإشراف</span>
-                  </button>
-                </div>
-              )}
- 
+
               {/* Logout button */}
               <button
                 onClick={() => {

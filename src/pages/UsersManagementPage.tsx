@@ -463,11 +463,11 @@ export function UsersManagementPage() {
               </thead>
               <tbody className="divide-y divide-[#F1F5F9] font-semibold">
                 {filteredUsers.map(userItem => {
-                  const isUserOwner = userItem.role === 'admin' || userItem.email === 'alshawshfras3@gmail.com';
+                  const isOwner = userItem.email?.toLowerCase().trim() === 'alshawshfras3@gmail.com';
                   const isSelf = userItem.id === authProfile?.id;
                   
-                  // Disable dropdown controls for Admin trying to update themselves
-                  const canModifyRole = isAdmin ? !isSelf : false;
+                  // Disable dropdown controls for Admin trying to update themselves or the primary owner
+                  const canModifyRole = isAdmin ? (!isSelf && !isOwner) : false;
 
                   const isSuspended = userItem.status === 'suspended' || userItem.is_active === false;
 
@@ -504,9 +504,9 @@ export function UsersManagementPage() {
                           <div className="flex items-center justify-center gap-3">
                             <div className="flex flex-col gap-0.5 text-[9px] text-gray-400">
                               <span className="text-right">الدور:</span>
-                              {isUserOwner ? (
+                              {isOwner ? (
                                 <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-lg text-[11px] font-bold inline-block select-none whitespace-nowrap">
-                                  مدير
+                                  مدير أساسي
                                 </span>
                               ) : (
                                 <select
@@ -529,7 +529,7 @@ export function UsersManagementPage() {
                             onClick={() => toggleStatus(userItem.id, userItem.status, userItem.email)}
                             disabled={
                               isSelf || 
-                              isUserOwner
+                              isOwner
                             }
                             className={`px-3 py-1.5 border rounded-lg text-[11px] font-bold cursor-pointer disabled:opacity-50 transition-all ${
                               isSuspended
