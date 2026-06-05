@@ -10,6 +10,20 @@ export function AdminLoginPage() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  React.useEffect(() => {
+    const adminSession = sessionStorage.getItem('hesba_admin_session');
+    if (adminSession) {
+      try {
+        const parsed = JSON.parse(adminSession);
+        if (parsed && parsed.isAdmin) {
+          navigate('/admin/dashboard');
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }, [navigate]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);

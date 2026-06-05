@@ -178,9 +178,9 @@ export async function saveHousingSupportTiers(tiers: HousingSupportTier[]): Prom
 
       if (insertError) throw insertError;
       return true;
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failing to save housing support tiers to Supabase:", err);
-      return false;
+      throw err;
     }
   }
   return false;
@@ -218,9 +218,9 @@ export async function saveAdvancePaymentTiers(tiers: AdvancePaymentTier[]): Prom
 
       if (insertError) throw insertError;
       return true;
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failing to save advance payment tiers to Supabase:", err);
-      return false;
+      throw err;
     }
   }
   return false;

@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 
 export function AccountPage() {
-  const { user, signOut, userSubscriptions, refreshProfile } = useAppState();
+  const { user, signOut, userSubscriptions } = useAppState();
   const { profile } = useAuth();
   const location = useLocation();
 
@@ -67,11 +67,15 @@ export function AccountPage() {
 
     try {
       if (hasSupabaseKeys && user) {
-        // Update app_users
+        // Upsert app_users to create record if it doesn't exist
         const { error } = await supabase
           .from('app_users')
-          .update({ full_name: fullNameInput.trim() })
-          .eq('id', user.id);
+          .upsert({
+            id: user.id,
+            email: user.email,
+            full_name: fullNameInput.trim(),
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'id' });
 
         if (error) throw error;
         
@@ -79,10 +83,6 @@ export function AccountPage() {
         await supabase.auth.updateUser({
           data: { full_name: fullNameInput.trim() }
         });
-
-        if (refreshProfile) {
-          await refreshProfile();
-        }
 
         setProfileMessage({ type: 'success', text: 'تم تحديث الاسم الكامل بنجاح ومزامنته سحابياً!' });
       } else {
@@ -374,7 +374,15 @@ export function AccountPage() {
             {/* Admin Controls Link */}
             {hasAdminAccess ? (
               <button
-                onClick={() => { handleVibrate(); location.navigate('/admin'); }}
+                onClick={() => {
+                  handleVibrate();
+                  const adminSession = sessionStorage.getItem('hesba_admin_session');
+                  if (adminSession) {
+                    location.navigate('/admin/dashboard');
+                  } else {
+                    location.navigate('/admin');
+                  }
+                }}
                 className="w-full p-4 hover:bg-indigo-50/50 dark:hover:bg-slate-900 rounded-2xl border border-slate-150 dark:border-slate-800 transition-all flex items-center justify-between group cursor-pointer text-right"
               >
                 <div className="flex items-center gap-3">

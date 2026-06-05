@@ -21,7 +21,23 @@ export default function Header() {
     if (target === 'calculator') {
       location.navigate('/');
     } else {
-      location.navigate('/admin');
+      const adminSession = sessionStorage.getItem('hesba_admin_session');
+      let isAdminActive = false;
+      if (adminSession) {
+        try {
+          const parsed = JSON.parse(adminSession);
+          if (parsed && parsed.isAdmin) {
+            isAdminActive = true;
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+      if (isAdminActive) {
+        location.navigate('/admin/dashboard');
+      } else {
+        location.navigate('/admin');
+      }
     }
   };
 

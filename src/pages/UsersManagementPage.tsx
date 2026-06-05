@@ -76,7 +76,7 @@ export function UsersManagementPage() {
         created_at: item.created_at || new Date().toISOString()
       })).filter((u: AppUser) => {
         const emailLower = u.email.toLowerCase().trim();
-        return emailLower !== currentAdminEmail && emailLower !== 'admin@hesba.com' && !emailLower.includes('admin');
+        return emailLower !== currentAdminEmail && emailLower !== 'admin@hesba.com';
       });
 
       setUsers(filtered);
@@ -257,7 +257,9 @@ export function UsersManagementPage() {
         <div className="p-12 text-center bg-white border border-gray-100 rounded-2xl space-y-3">
           <User className="w-10 h-10 text-gray-400 mx-auto animate-pulse" />
           <h4 className="text-sm font-bold text-gray-700">لا يوجد مستخدمون مسجلون حتى الآن</h4>
-          <p className="text-xs text-gray-400">ستظهر الحسابات المسجلة تلقائياً بمجرد إنشاء مستخدمين جدد في الحاسبة.</p>
+          <p className="text-xs text-amber-600 font-bold leading-relaxed">
+            الجدول فارغ. يحتاج المستخدمون الحاليون إلى مزامنة من Supabase Auth إلى جدول app_users لإظهار حساباتهم وإحصاءاتهم في النظام بشكل سليم.
+          </p>
         </div>
       ) : filteredUsers.length === 0 ? (
         <div className="p-12 text-center bg-white border border-gray-100 rounded-2xl space-y-3">

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react';
 import {
   Bank,
   ProductAcceptance,
@@ -586,18 +586,43 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     pensionRulesLibrary,
   };
 
-  const hasUnsavedChanges = !isSettingsLoading && !deepEqual(
-    normalizeBeforeCompare(currentSettings),
-    normalizeBeforeCompare(savedSettings)
-  );
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
+  const baselineSettingsRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (isSettingsLoading) {
+      setHasUnsavedChanges(false);
+      baselineSettingsRef.current = null;
+      return;
+    }
+    const currentStr = JSON.stringify(normalizeBeforeCompare(currentSettings));
+    const savedStr = JSON.stringify(normalizeBeforeCompare(savedSettings));
+
+    if (!baselineSettingsRef.current || baselineSettingsRef.current !== savedStr) {
+      baselineSettingsRef.current = savedStr;
+    }
+
+    if (currentStr !== baselineSettingsRef.current) {
+      setHasUnsavedChanges(true);
+    } else {
+      setHasUnsavedChanges(false);
+    }
+  }, [currentSettings, savedSettings, isSettingsLoading]);
 
   const saveChanges = async () => {
     const clonedCurrent = deepClone(currentSettings);
     // Save dynamically to granular Supabase keys in system_settings table
     if (hasSupabaseKeys) {
       try {
-        await saveHousingSupportTiers(housingSupportTiers);
-        await saveAdvancePaymentTiers(advancePaymentTiers);
+        const supportTiersSaved = await saveHousingSupportTiers(housingSupportTiers);
+        if (!supportTiersSaved) {
+          throw new Error('فشل حفظ شرائح الدعم السكني في قاعدة البيانات');
+        }
+
+        const advanceTiersSaved = await saveAdvancePaymentTiers(advancePaymentTiers);
+        if (!advanceTiersSaved) {
+          throw new Error('فشل حفظ عتبات الدفعة المقدمة في قاعدة البيانات');
+        }
 
         const itemsToSave = [
           { key: 'banks', value: banks },
@@ -628,7 +653,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           if (updated_by_user) {
             payload.updated_by = updated_by_user;
           }
-          await supabase.from('system_settings').upsert(payload);
+          const { error } = await supabase.from('system_settings').upsert(payload);
+          if (error) {
+            throw error;
+          }
         }
         console.log("All settings successfully synced to granular keys in system_settings database");
 
