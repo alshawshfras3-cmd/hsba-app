@@ -19,13 +19,13 @@ const getSectorRetirementAge = (sectorId: string, defaultValue = 60, customSecto
     }
   }
   try {
-    const saved = localStorage.getItem("hasba_custom_sectors");
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed)) {
+    const cachedUnified = localStorage.getItem("hasba_settings_cache");
+    if (cachedUnified) {
+      const parsed = JSON.parse(cachedUnified);
+      if (parsed && Array.isArray(parsed.customSectors)) {
         let idToLookup = sectorId;
         if (sectorId === 'gov_civil') idToLookup = ['government', 'civilian'].join('_');
-        const matched = parsed.find(s => s.id === sectorId || s.id === idToLookup);
+        const matched = parsed.customSectors.find((s: any) => s.id === sectorId || s.id === idToLookup);
         if (matched && typeof matched.retirementAge === 'number' && matched.retirementAge > 0) {
           return matched.retirementAge;
         }

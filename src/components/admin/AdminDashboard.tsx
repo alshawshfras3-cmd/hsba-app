@@ -2176,9 +2176,14 @@ export default function AdminDashboard() {
                 <button
                   type="button"
                   id="admin-save-btn"
-                  onClick={() => {
-                    saveChanges();
-                    showToast('تم حفظ التغييرات بنجاح', 'success');
+                  onClick={async () => {
+                    try {
+                      await saveChanges();
+                      showToast('تم حفظ التغييرات بنجاح', 'success');
+                    } catch (error) {
+                      console.error("Error saving modifications:", error);
+                      showToast('فشل في حفظ التغييرات بقاعدة البيانات، يرجى المحاولة لاحقاً', 'refuse');
+                    }
                   }}
                   className="px-5 py-2 bg-[#0057B8] hover:bg-[#004bb0] text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer border border-[#0057B8]"
                 >
