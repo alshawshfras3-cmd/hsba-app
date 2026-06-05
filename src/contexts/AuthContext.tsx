@@ -45,25 +45,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function fetchProfile(userId: string, email?: string, userMetadata?: any) {
     if (!hasSupabaseKeys) return;
     try {
-      // Try app_users first, fallback to user_profiles
-      let profileData = null;
-      try {
-        const { data, error } = await supabase
-          .from('app_users')
-          .select('*')
-          .eq('id', userId)
-          .maybeSingle();
-        if (!error && data) {
-          profileData = data;
-        }
-      } catch (e) {
-        console.warn("Could not load from app_users", e);
-      }
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Profile request timed out after 3 seconds')), 3000);
+      });
 
-      if (!profileData) {
+      const fetchPromise = (async () => {
+        // Try app_users first, fallback to user_profiles
+        let profileData = null;
         try {
           const { data, error } = await supabase
-            .from('user_profiles')
+            .from('app_users')
             .select('*')
             .eq('id', userId)
             .maybeSingle();
@@ -71,9 +62,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             profileData = data;
           }
         } catch (e) {
-          console.warn("Could not load from user_profiles fallback", e);
+          console.warn("Could not load from app_users", e);
         }
-      }
+
+        if (!profileData) {
+          try {
+            const { data, error } = await supabase
+              .from('user_profiles')
+              .select('*')
+              .eq('id', userId)
+              .maybeSingle();
+            if (!error && data) {
+              profileData = data;
+            }
+          } catch (e) {
+            console.warn("Could not load from user_profiles fallback", e);
+          }
+        }
+        return profileData;
+      })();
+
+      const profileData = await Promise.race([fetchPromise, timeoutPromise]);
 
       if (profileData) {
         const lowercaseEmail = (email || profileData.email || '').toLowerCase().trim();
@@ -110,7 +119,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error("Profile not found in either app_users or user_profiles");
       }
     } catch (err) {
-      console.warn("Could not fetch profile, falling back to basic details", err);
+      console.warn("Could not fetch profile, falling back to basic details:", err);
       const lowercaseEmail = (email || '').toLowerCase().trim();
       const isOwnerEmail = lowercaseEmail === 'admin@hesba.com';
       
@@ -130,13 +139,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let active = true;
 
-    // Safety timeout: If loading takes more than 3 seconds due to any network issues, force-disable it
+    // Safety timeout: If loading takes more than 1 second due to any network issues, force-disable it (render with defaults)
     const safetyTimer = setTimeout(() => {
       if (active) {
-        console.warn("Auth initialization safety timer triggered. Forcing loading=false");
+        console.warn("Auth initialization safety timer triggered (1 second). Forcing loading=false to display UI immediately");
         setLoading(false);
       }
-    }, 3000);
+    }, 1000);
 
     if (!hasSupabaseKeys) {
       setLoading(false);
@@ -144,31 +153,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    supabase.auth.getSession().then(async ({ data, error }) => {
-      if (error) {
-        throw error;
-      }
-      const session = data?.session;
-      if (!active) return;
-      setSession(session ?? null);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        await fetchProfile(session.user.id, session.user.email, session.user.user_metadata);
-      }
-      if (active) setLoading(false);
-    }).catch(err => {
-      console.error("Error getting session on mount:", err);
-      const errMsg = String(err?.message || '').toLowerCase();
-      if (errMsg.includes('refresh token') || errMsg.includes('refresh_token') || errMsg.includes('not found') || errMsg.includes('invalid')) {
-        cleanStaleSupabaseSession();
-        if (active) {
-          setSession(null);
-          setUser(null);
-          setProfile(null);
-        }
-      }
-      if (active) setLoading(false);
+    const sessionTimeout = new Promise<{ session: any }>((resolve) => {
+      setTimeout(() => {
+        console.warn('Session fetch timed out after 3 seconds, continuing with null session fallback');
+        resolve({ session: null });
+      }, 3000);
     });
+
+    const sessionFetch = (async () => {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) throw error;
+      return data;
+    })();
+
+    Promise.race([sessionFetch, sessionTimeout])
+      .then(async (data: any) => {
+        const session = data?.session;
+        if (!active) return;
+        setSession(session ?? null);
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          await fetchProfile(session.user.id, session.user.email, session.user.user_metadata);
+        }
+        if (active) setLoading(false);
+      })
+      .catch(err => {
+        console.error("Error getting session on mount with timeout:", err);
+        const errMsg = String(err?.message || '').toLowerCase();
+        if (errMsg.includes('refresh token') || errMsg.includes('refresh_token') || errMsg.includes('not found') || errMsg.includes('invalid')) {
+          cleanStaleSupabaseSession();
+          if (active) {
+            setSession(null);
+            setUser(null);
+            setProfile(null);
+          }
+        }
+        if (active) setLoading(false);
+      });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {

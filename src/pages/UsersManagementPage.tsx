@@ -40,88 +40,50 @@ export function UsersManagementPage() {
 
     if (!hasSupabaseKeys) {
       setUsers([]);
+      setErrorMsg('مفاتيح الاتصال بقاعدة البيانات غير متوفرة');
       setLoading(false);
       return;
     }
 
     try {
-      // 1. Try to query app_users
-      let appUsersData: any[] = [];
-      try {
+      // 5-second timeout promise
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(new Error('TIMEOUT_LIMIT'));
+        }, 5000);
+      });
+
+      const fetchPromise = (async () => {
         const { data, error } = await supabase
           .from('app_users')
-          .select('*');
-        if (!error && data) {
-          appUsersData = data;
-        } else if (error) {
-          console.warn("Could not fetch from app_users, trying user_profiles fallback:", error.message);
+          .select('id, full_name, email, phone, is_blocked, created_at, updated_at')
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          throw error;
         }
-      } catch (err) {
-        console.warn("app_users fetch error:", err);
-      }
+        return data || [];
+      })();
 
-      // 2. Try to query user_profiles as fallback for legacy users
-      let userProfilesData: any[] = [];
-      try {
-        const { data, error } = await supabase
-          .from('user_profiles')
-          .select('*');
-        if (!error && data) {
-          userProfilesData = data;
-        } else if (error) {
-          console.warn("Could not fetch from user_profiles:", error.message);
-        }
-      } catch (err) {
-        console.warn("user_profiles fetch error:", err);
-      }
+      const rawData = await Promise.race([fetchPromise, timeoutPromise]);
 
-      // 3. Merge results by unique user ID to avoid duplicates
-      const mergedMap = new Map<string, AppUser>();
-
-      // Feed historical user_profiles
-      userProfilesData.forEach((item: any) => {
-        const id = item.id;
-        if (id) {
-          mergedMap.set(id, {
-            id,
-            email: item.email || '',
-            full_name: item.full_name || item.username || 'مستخدم سابق',
-            phone: item.phone || null,
-            is_blocked: item.is_blocked === true || item.role === 'suspended',
-            created_at: item.created_at || new Date().toISOString()
-          });
-        }
-      });
-
-      // Overwrite/Add newest app_users fields
-      appUsersData.forEach((item: any) => {
-        const id = item.id;
-        if (id) {
-          mergedMap.set(id, {
-            id,
-            email: item.email || '',
-            full_name: item.full_name || 'مستخدم',
-            phone: item.phone || null,
-            is_blocked: item.is_blocked === true,
-            created_at: item.created_at || new Date().toISOString()
-          });
-        }
-      });
-
-      const mergedList = Array.from(mergedMap.values());
-
-      const filtered = mergedList.filter(u => {
+      const filtered = rawData.map((item: any) => ({
+        id: item.id,
+        email: item.email || '',
+        full_name: item.full_name || 'مستخدم غير معرّف',
+        phone: item.phone || null,
+        is_blocked: item.is_blocked === true,
+        created_at: item.created_at || new Date().toISOString()
+      })).filter((u: AppUser) => {
         const emailLower = u.email.toLowerCase().trim();
         return emailLower !== currentAdminEmail && emailLower !== 'admin@hesba.com' && !emailLower.includes('admin');
       });
 
-      // Sort by created_at descending
-      filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
       setUsers(filtered);
     } catch (err: any) {
-      console.error("Error fetching users from app_users/user_profiles:", err);
+      console.error("Error fetching users from app_users:", err);
       setUsers([]);
+      setErrorMsg('تعذر تحميل المستخدمين من قاعدة البيانات');
     } finally {
       setLoading(false);
     }
@@ -148,27 +110,13 @@ export function UsersManagementPage() {
     }
 
     try {
-      // Update in app_users
-      let updatedAny = false;
-      try {
-        const { error: appErr } = await supabase
-          .from('app_users')
-          .update({ is_blocked: nextBlockedState, updated_at: new Date().toISOString() })
-          .eq('id', userId);
-        if (!appErr) updatedAny = true;
-      } catch (e) {
-        console.warn("app_users block update warning:", e);
-      }
+      const { error: appErr } = await supabase
+        .from('app_users')
+        .update({ is_blocked: nextBlockedState, updated_at: new Date().toISOString() })
+        .eq('id', userId);
 
-      // Update in user_profiles as legacy backup
-      try {
-        const { error: profErr } = await supabase
-          .from('user_profiles')
-          .update({ is_blocked: nextBlockedState })
-          .eq('id', userId);
-        if (!profErr) updatedAny = true;
-      } catch (e) {
-        console.warn("user_profiles block update warning:", e);
+      if (appErr) {
+        throw appErr;
       }
 
       alert(nextBlockedState ? 'تم حظر حساب المستخدم بنجاح.' : 'تم إلغاء حظر حساب المستخدم وتفعيله المباشر.');

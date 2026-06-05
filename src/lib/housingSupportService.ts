@@ -73,12 +73,23 @@ export function getAdvancePayment(S: number, tiers: AdvancePaymentTier[] = DEFAU
 export async function fetchHousingSupportTiers(): Promise<HousingSupportTier[]> {
   if (hasSupabaseKeys) {
     try {
-      const { data, error } = await supabase
-        .from('housing_support_tiers')
-        .select('*')
-        .order('sort_order', { ascending: true });
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Housing support tiers request timed out after 3 seconds')), 3000);
+      });
 
-      if (!error && data && data.length > 0) {
+      const fetchPromise = (async () => {
+        const { data, error } = await supabase
+          .from('housing_support_tiers')
+          .select('*')
+          .order('sort_order', { ascending: true });
+
+        if (error) throw error;
+        return data;
+      })();
+
+      const data = await Promise.race([fetchPromise, timeoutPromise]);
+
+      if (data && data.length > 0) {
         return data.map(item => ({
           id: item.id,
           min_salary: Number(item.min_salary),
@@ -101,12 +112,23 @@ export async function fetchHousingSupportTiers(): Promise<HousingSupportTier[]> 
 export async function fetchAdvancePaymentTiers(): Promise<AdvancePaymentTier[]> {
   if (hasSupabaseKeys) {
     try {
-      const { data, error } = await supabase
-        .from('advance_payment_tiers')
-        .select('*')
-        .order('salary_threshold', { ascending: true });
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Advance payment tiers request timed out after 3 seconds')), 3000);
+      });
 
-      if (!error && data && data.length > 0) {
+      const fetchPromise = (async () => {
+        const { data, error } = await supabase
+          .from('advance_payment_tiers')
+          .select('*')
+          .order('salary_threshold', { ascending: true });
+
+        if (error) throw error;
+        return data;
+      })();
+
+      const data = await Promise.race([fetchPromise, timeoutPromise]);
+
+      if (data && data.length > 0) {
         return data.map(item => ({
           id: item.id,
           salary_threshold: Number(item.salary_threshold),

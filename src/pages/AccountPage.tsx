@@ -45,11 +45,15 @@ export function AccountPage() {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState('');
 
+
+
   const handleVibrate = () => {
     if (window.navigator && window.navigator.vibrate) {
       window.navigator.vibrate(12);
     }
   };
+
+
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -336,6 +340,8 @@ export function AccountPage() {
               )}
             </form>
           </div>
+
+
 
 
         </div>

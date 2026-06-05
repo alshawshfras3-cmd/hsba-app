@@ -86,60 +86,66 @@ function mergeDsrRulesWithSeeds(existingRules: DsrRule[], seedRules: DsrRule[]) 
 }
 
 export function useSettings() {
-  const [settings, setSettings] = useState<Record<string, any>>({});
-  const [loading, setLoading] = useState(true);
-  const [initialized, setInitialized] = useState(false);
+  const getLocalStorageOrSeedDefaults = (): Record<string, any> => {
+    const loaded: Record<string, any> = {};
+    let fallbackParsed: any = null;
+    try {
+      const cachedUnified = localStorage.getItem("hasba_settings_cache");
+      if (cachedUnified) {
+        fallbackParsed = JSON.parse(cachedUnified);
+      }
+    } catch (_) {}
+
+    for (const key of Object.keys(DEFAULTS)) {
+      const cacheField = DB_TO_CACHE_KEY[key];
+      if (fallbackParsed && fallbackParsed[cacheField] !== undefined) {
+        loaded[key] = fallbackParsed[cacheField];
+      } else {
+        loaded[key] = DEFAULTS[key];
+      }
+    }
+    return loaded;
+  };
+
+  const [settings, setSettings] = useState<Record<string, any>>(getLocalStorageOrSeedDefaults);
+  const [loading, setLoading] = useState(false);
+  const [initialized, setInitialized] = useState(true);
 
   // Fetch all system settings from Supabase
   const fetchSettings = useCallback(async () => {
-    setLoading(true);
-
     if (!hasSupabaseKeys) {
-      // Local fallback: Stage 3 (cache) then Stage 4 (DEFAULTS)
-      const loaded: Record<string, any> = {};
-      let fallbackParsed: any = null;
-      try {
-        const cachedUnified = localStorage.getItem("hasba_settings_cache");
-        if (cachedUnified) {
-          fallbackParsed = JSON.parse(cachedUnified);
-        }
-      } catch (_) {}
-
-      for (const key of Object.keys(DEFAULTS)) {
-        const cacheField = DB_TO_CACHE_KEY[key];
-        if (fallbackParsed && fallbackParsed[cacheField] !== undefined) {
-          loaded[key] = fallbackParsed[cacheField];
-        } else {
-          loaded[key] = DEFAULTS[key];
-        }
-      }
-      setSettings(loaded);
-      setInitialized(true);
-      setLoading(false);
       return;
     }
 
     try {
-      // Stage 1: Read from Supabase system_settings
-      let rows: any[] = [];
-      const fetchRes = await supabase
-        .from('system_settings')
-        .select('key, value, source');
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Supabase system_settings request timed out after 3 seconds')), 3000);
+      });
 
-      if (fetchRes.error) {
-        if (fetchRes.error.code !== 'PGRST116') {
-          console.warn('Failed to fetch system_settings with source column from database, retrying with key, value only...', fetchRes.error);
-        }
-        const fbResult = await supabase
+      const fetchResPromise = (async () => {
+        let rows: any[] = [];
+        const fetchRes = await supabase
           .from('system_settings')
-          .select('key, value');
-        if (fbResult.error) {
-          throw fbResult.error;
+          .select('key, value, source');
+
+        if (fetchRes.error) {
+          if (fetchRes.error.code !== 'PGRST116') {
+            console.warn('Failed to fetch system_settings with source column from database, retrying with key, value only...', fetchRes.error);
+          }
+          const fbResult = await supabase
+            .from('system_settings')
+            .select('key, value');
+          if (fbResult.error) {
+            throw fbResult.error;
+          }
+          rows = fbResult.data || [];
+        } else {
+          rows = fetchRes.data || [];
         }
-        rows = fbResult.data || [];
-      } else {
-        rows = fetchRes.data || [];
-      }
+        return rows;
+      })();
+
+      const rows = await Promise.race([fetchResPromise, timeoutPromise]);
 
       const loaded: Record<string, any> = {};
       const presentRecords = new Map<string, { value: any, source?: string }>();
@@ -186,7 +192,6 @@ export function useSettings() {
       }
 
       setSettings(loaded);
-      setInitialized(true);
 
       // Stage 2: Success -> save backup in "hasba_settings_cache" and remove other caches
       try {
@@ -214,29 +219,7 @@ export function useSettings() {
       } catch (_) {}
 
     } catch (err) {
-      console.warn('Fallback settings on fetch failure:', err);
-      // Stage 3: failure -> read temporary cache, else Stage 4: DEFAULTS
-      const loaded: Record<string, any> = {};
-      let fallbackParsed: any = null;
-      try {
-        const cachedUnified = localStorage.getItem("hasba_settings_cache");
-        if (cachedUnified) {
-          fallbackParsed = JSON.parse(cachedUnified);
-        }
-      } catch (_) {}
-
-      for (const key of Object.keys(DEFAULTS)) {
-        const cacheField = DB_TO_CACHE_KEY[key];
-        if (fallbackParsed && fallbackParsed[cacheField] !== undefined) {
-          loaded[key] = fallbackParsed[cacheField];
-        } else {
-          loaded[key] = DEFAULTS[key];
-        }
-      }
-      setSettings(loaded);
-      setInitialized(true);
-    } finally {
-      setLoading(false);
+      console.warn('Fallback settings on fetch failure in background:', err);
     }
   }, []);
 
