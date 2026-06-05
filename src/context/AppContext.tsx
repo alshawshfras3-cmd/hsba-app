@@ -104,6 +104,7 @@ interface AppContextType {
   hasUnsavedChanges: boolean;
   saveChanges: () => void;
   cancelChanges: () => void;
+  reinitializeAllSettings: () => Promise<void>;
 
   // Supabase Auth and Roles state
   user: any;
@@ -627,6 +628,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         try {
           localStorage.setItem("hasba_settings_cache", JSON.stringify(clonedCurrent));
           localStorage.removeItem("hasba_admin_settings");
+          localStorage.removeItem("hasba_custom_sectors");
+          localStorage.removeItem("bank_sector_pension_rules");
+          localStorage.removeItem("pension_rules_library");
           
           const DEFAULTS_MAP: Record<string, any> = {
             banks: initialBanks,
@@ -667,6 +671,91 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   const cancelChanges = () => {
     applySettingsState(deepClone(savedSettings));
+  };
+
+  const reinitializeAllSettings = async () => {
+    const defaultData = getInitialSettings();
+    if (hasSupabaseKeys) {
+      try {
+        await saveHousingSupportTiers(defaultData.housingSupportTiers);
+        await saveAdvancePaymentTiers(defaultData.advancePaymentTiers);
+
+        const itemsToSave = [
+          { key: 'banks', value: defaultData.banks },
+          { key: 'product_acceptance', value: defaultData.products },
+          { key: 'military_ranks', value: defaultData.militaryRanks },
+          { key: 'salary_rules', value: defaultData.salaryRules },
+          { key: 'pension_rules', value: defaultData.pensionRules },
+          { key: 'term_rules', value: defaultData.termRules },
+          { key: 'margin_rules', value: defaultData.marginRules },
+          { key: 'dsr_rules', value: defaultData.dsrRules },
+          { key: 'support_settings', value: defaultData.supportSettings },
+          { key: 'personal_finance_rules', value: defaultData.personalRules },
+          { key: 'advanced_rules', value: defaultData.advancedRules },
+          { key: 'user_subscriptions', value: defaultData.userSubscriptions },
+          { key: 'hasba_custom_sectors', value: defaultData.customSectors },
+          { key: 'bank_sector_pension_rules', value: defaultData.bankSectorRules },
+          { key: 'pension_rules_library', value: defaultData.pensionRulesLibrary }
+        ];
+
+        const updated_by_user = user?.email || user?.id || null;
+        for (const item of itemsToSave) {
+          const payload: any = {
+            key: item.key,
+            value: item.value,
+            source: 'admin',
+            updated_at: new Date().toISOString()
+          };
+          if (updated_by_user) {
+            payload.updated_by = updated_by_user;
+          }
+          await supabase.from('system_settings').upsert(payload);
+        }
+        console.log("All settings successfully reinitialized in Supabase");
+
+        applySettingsState(defaultData);
+
+        try {
+          localStorage.setItem("hasba_settings_cache", JSON.stringify(defaultData));
+          localStorage.removeItem("hasba_admin_settings");
+          localStorage.removeItem("hasba_custom_sectors");
+          localStorage.removeItem("bank_sector_pension_rules");
+          localStorage.removeItem("pension_rules_library");
+          const DEFAULTS_MAP: Record<string, any> = {
+            banks: initialBanks,
+            margin_rules: initialMarginRules,
+            dsr_rules: initialDsrRules,
+            personal_finance_rules: initialPersonalFinanceRules,
+            product_acceptance: initialProductAcceptance,
+            military_ranks: initialMilitaryRanks,
+            pension_rules: initialPensionRules,
+            support_settings: initialSupportSettings,
+            salary_rules: initialSalaryRules,
+            term_rules: initialTermRules,
+            advanced_rules: initialAdvancedRules,
+          };
+          for (const key of Object.keys(DEFAULTS_MAP)) {
+            localStorage.removeItem(`hasba_sett_${key}`);
+          }
+        } catch (e) {
+          console.error("Error clearing caches on manual reinitialize:", e);
+        }
+      } catch (err) {
+        console.error("Failed to reinitialize settings in Supabase:", err);
+        throw err;
+      }
+    } else {
+      applySettingsState(defaultData);
+      try {
+        localStorage.setItem("hasba_settings_cache", JSON.stringify(defaultData));
+        localStorage.removeItem("hasba_admin_settings");
+        localStorage.removeItem("hasba_custom_sectors");
+        localStorage.removeItem("bank_sector_pension_rules");
+        localStorage.removeItem("pension_rules_library");
+      } catch (e) {
+        console.error("Error saving local settings:", e);
+      }
+    }
   };
 
   return (
@@ -723,6 +812,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         hasUnsavedChanges,
         saveChanges,
         cancelChanges,
+        reinitializeAllSettings,
 
         // Auth
         user,

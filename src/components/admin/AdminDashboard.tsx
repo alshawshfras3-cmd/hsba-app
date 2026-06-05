@@ -103,7 +103,7 @@ export default function AdminDashboard() {
     userSubscriptions, setUserSubscriptions,
     termRules, setTermRules,
     adminSubPage, setAdminSubPage,
-    hasUnsavedChanges, saveChanges, cancelChanges,
+    hasUnsavedChanges, saveChanges, cancelChanges, reinitializeAllSettings,
     customSectors: sectors, setCustomSectors: setSectors,
     bankSectorRules, setBankSectorRules,
     pensionRulesLibrary: libraryRules, setPensionRulesLibrary: setLibraryRules
@@ -244,12 +244,7 @@ export default function AdminDashboard() {
   const [editingLibraryRule, setEditingLibraryRule] = useState<PensionLibraryRule | null>(null);
 
   const saveLibraryRulesToStorage = (updatedRules: PensionLibraryRule[]) => {
-    try {
-      localStorage.setItem("pension_rules_library", JSON.stringify(updatedRules));
-      setLibraryRules(updatedRules);
-    } catch (e) {
-      console.error("Error saving library rules to storage", e);
-    }
+    setLibraryRules(updatedRules);
   };
 
   // --- BANK & SECTOR PENSION RULES STATE AND GENERATORS ---
@@ -397,7 +392,6 @@ export default function AdminDashboard() {
       const serializedOrig = JSON.stringify(bankSectorRules);
 
       if (serializedSync !== serializedOrig) {
-        localStorage.setItem("bank_sector_pension_rules", JSON.stringify(synchronized));
         setBankSectorRules(synchronized);
       }
     }
@@ -411,19 +405,13 @@ export default function AdminDashboard() {
       const serializedOrig = JSON.stringify(bankSectorRules);
 
       if (serializedSync !== serializedOrig) {
-        localStorage.setItem("bank_sector_pension_rules", JSON.stringify(synchronized));
         setBankSectorRules(synchronized);
       }
     }
   }, [adminSubPage, banks]);
 
   const saveBankSectorRulesToStorage = (updatedRules: BankSectorPensionRule[]) => {
-    try {
-      localStorage.setItem("bank_sector_pension_rules", JSON.stringify(updatedRules));
-      setBankSectorRules(updatedRules);
-    } catch (e) {
-      console.error("Error saving bank sector rules to storage", e);
-    }
+    setBankSectorRules(updatedRules);
   };
 
 
@@ -2139,6 +2127,31 @@ export default function AdminDashboard() {
             );
           })}
         </nav>
+        
+        <div className="mt-6 pt-4 border-t border-slate-100 px-2">
+          <button
+            type="button"
+            id="admin-reset-system-btn"
+            onClick={async () => {
+              const confirmReset = window.confirm(
+                "هل أنت متأكد من رغبتك في إعادة تهيئة إعدادات النظام؟\n\nهذا الإجراء سيقوم بحذف جميع التعديلات المحفوظة محلياً وعلى قاعدة البيانات، واستبدالها بالقيم الافتراضية للنظام فورياً."
+              );
+              if (confirmReset) {
+                try {
+                  await reinitializeAllSettings();
+                  showToast('تمت إعادة تهيئة إعدادات النظام بنجاح لجميع المدراء 🎉', 'success');
+                } catch (error) {
+                  console.error("Error during settings re-initialization:", error);
+                  showToast('فشل في إعادة تهيئة الإعدادات، يرجى المحاولة لاحقاً', 'refuse');
+                }
+              }
+            }}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold transition-all border border-red-100 cursor-pointer focus:outline-none focus:ring-2 focus:ring-red-500/50"
+          >
+            <RefreshCw className="w-3.5 h-3.5 shrink-0" />
+            <span>إعادة تهيئة إعدادات النظام</span>
+          </button>
+        </div>
       </aside>
 
       {/* 2. MAIN SUB-PAGE VIEWPORT */}

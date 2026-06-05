@@ -860,13 +860,16 @@ export function calculatePensionSalaryByRule(params: CalculateRulePensionParams)
   } else {
     try {
       if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem("bank_sector_pension_rules");
-        if (saved) {
-          assignments = JSON.parse(saved);
+        const cachedUnified = localStorage.getItem("hasba_settings_cache");
+        if (cachedUnified) {
+          const parsed = JSON.parse(cachedUnified);
+          if (parsed && Array.isArray(parsed.bankSectorRules)) {
+            assignments = parsed.bankSectorRules;
+          }
         }
       }
     } catch (e) {
-      console.error("Failed to load bank_sector_pension_rules in engine:", e);
+      console.error("Failed to load bankSectorRules from cache in engine:", e);
     }
   }
 

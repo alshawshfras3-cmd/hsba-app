@@ -191,6 +191,9 @@ export function useSettings() {
       // Stage 2: Success -> save backup in "hasba_settings_cache" and remove other caches
       try {
         localStorage.removeItem("hasba_admin_settings");
+        localStorage.removeItem("hasba_custom_sectors");
+        localStorage.removeItem("bank_sector_pension_rules");
+        localStorage.removeItem("pension_rules_library");
         Object.keys(DEFAULTS).forEach(k => {
           localStorage.removeItem(`hasba_sett_${k}`);
         });
