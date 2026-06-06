@@ -206,29 +206,22 @@ export async function fetchApprovedSalaryRules(): Promise<ApprovedSalarySourceRu
   try {
     console.log('[PENSION] START fetchApprovedSalaryRules');
     const { data, error } = await supabase
-      .from('approved_salary_source_rules')
-      .select('*');
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'app_settings')
+      .maybeSingle();
 
     if (error) throw error;
-    if (!data || data.length === 0) {
-      console.log('[SUPABASE LOAD] table=approved_salary_source_rules status=success rows=0 (using fallback)');
-      return fallbackApprovedSalaryRules;
+    if (data && data.value) {
+      const val = data.value;
+      const rules = val.approvedSalaryRules || val.approvedSalaryDbRules || [];
+      console.log(`[SUPABASE LOAD] table=approved_salary_source_rules status=success rows=${rules.length}`);
+      return rules;
     }
-
-    console.log(`[SUPABASE LOAD] table=approved_salary_source_rules status=success rows=${data.length}`);
-    return data.map((r: any) => ({
-      id: r.id,
-      bankId: r.bank_id,
-      sectorId: r.sector_id,
-      salarySource: r.salary_source,
-      multiplier: Number(r.multiplier),
-      descriptionAr: r.description_ar,
-      createdAt: r.created_at,
-      updatedAt: r.updated_at
-    }));
+    console.log('[SUPABASE LOAD] table=approved_salary_source_rules status=success key=app_settings empty/not-found');
+    return fallbackApprovedSalaryRules;
   } catch (err: any) {
     console.error(`[SUPABASE LOAD] table=approved_salary_source_rules status=error message=${err?.message || err}`);
-    console.error('Failed to fetch approved salary source rules from Supabase. Falling back.', err);
     return fallbackApprovedSalaryRules;
   }
 }
@@ -237,22 +230,42 @@ export async function saveApprovedSalaryRule(rule: ApprovedSalarySourceRule): Pr
   if (!hasSupabaseKeys) {
     return;
   }
-  const payload: any = {
-    bank_id: rule.bankId,
-    sector_id: rule.sectorId,
-    salary_source: rule.salarySource,
-    multiplier: rule.multiplier,
-    description_ar: rule.descriptionAr,
-    updated_at: new Date().toISOString()
-  };
-  if (rule.id && !rule.id.startsWith('temp_') && rule.id.length > 5) {
-    payload.id = rule.id;
-  }
-  const { error } = await supabase
-    .from('approved_salary_source_rules')
-    .upsert(payload, { onConflict: 'bank_id,sector_id' });
+  try {
+    const { data, error: selectError } = await supabase
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'app_settings')
+      .maybeSingle();
 
-  if (error) throw error;
+    if (selectError) throw selectError;
+
+    let appSettings = data?.value || {};
+    let rules: ApprovedSalarySourceRule[] = appSettings.approvedSalaryRules || appSettings.approvedSalaryDbRules || [];
+
+    const index = rules.findIndex((r: any) => r.bankId === rule.bankId && r.sectorId === rule.sectorId);
+    if (index >= 0) {
+      rules[index] = rule;
+    } else {
+      rules.push(rule);
+    }
+
+    appSettings.approvedSalaryRules = rules;
+    appSettings.approvedSalaryDbRules = rules;
+
+    const { error: upsertError } = await supabase
+      .from('system_settings')
+      .upsert({
+        key: 'app_settings',
+        value: appSettings,
+        source: 'admin',
+        updated_at: new Date().toISOString()
+      });
+
+    if (upsertError) throw upsertError;
+  } catch (err) {
+    console.error('saveApprovedSalaryRule failed:', err);
+    throw err;
+  }
 }
 
 export async function fetchPensionCalculationRules(): Promise<PensionCalculationRule[]> {
@@ -263,33 +276,22 @@ export async function fetchPensionCalculationRules(): Promise<PensionCalculation
   try {
     console.log('[PENSION] START fetchPensionCalculationRules');
     const { data, error } = await supabase
-      .from('pension_calculation_rules')
-      .select('*');
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'app_settings')
+      .maybeSingle();
 
     if (error) throw error;
-    if (!data || data.length === 0) {
-      console.log('[SUPABASE LOAD] table=pension_calculation_rules status=success rows=0 (using fallback)');
-      return fallbackPensionRules;
+    if (data && data.value) {
+      const val = data.value;
+      const rules = val.pensionDbRules || val.pensionRules || [];
+      console.log(`[SUPABASE LOAD] table=pension_calculation_rules status=success rows=${rules.length}`);
+      return rules;
     }
-
-    console.log(`[SUPABASE LOAD] table=pension_calculation_rules status=success rows=${data.length}`);
-    return data.map((r: any) => ({
-      id: r.id,
-      bankId: r.bank_id,
-      sectorId: r.sector_id,
-      calculationMethod: r.calculation_method,
-      divisorMonths: r.divisor_months,
-      salarySourceOverride: r.salary_source_override,
-      rateBelowThreshold: r.rate_below_threshold ? Number(r.rate_below_threshold) : undefined,
-      rateAboveThreshold: r.rate_above_threshold ? Number(r.rate_above_threshold) : undefined,
-      yearsThreshold: r.years_threshold,
-      descriptionAr: r.description_ar,
-      createdAt: r.created_at,
-      updatedAt: r.updated_at
-    }));
+    console.log('[SUPABASE LOAD] table=pension_calculation_rules status=success key=app_settings empty/not-found');
+    return fallbackPensionRules;
   } catch (err: any) {
     console.error(`[SUPABASE LOAD] table=pension_calculation_rules status=error message=${err?.message || err}`);
-    console.error('Failed to fetch pension calculation rules map from Supabase. Falling back.', err);
     return fallbackPensionRules;
   }
 }
@@ -298,26 +300,42 @@ export async function savePensionCalculationRule(rule: PensionCalculationRule): 
   if (!hasSupabaseKeys) {
     return;
   }
-  const payload: any = {
-    bank_id: rule.bankId,
-    sector_id: rule.sectorId,
-    calculation_method: rule.calculationMethod,
-    divisor_months: rule.divisorMonths,
-    salary_source_override: rule.salarySourceOverride,
-    rate_below_threshold: rule.rateBelowThreshold,
-    rate_above_threshold: rule.rateAboveThreshold,
-    years_threshold: rule.yearsThreshold,
-    description_ar: rule.descriptionAr,
-    updated_at: new Date().toISOString()
-  };
-  if (rule.id && !rule.id.startsWith('temp_') && rule.id.length > 5) {
-    payload.id = rule.id;
-  }
-  const { error } = await supabase
-    .from('pension_calculation_rules')
-    .upsert(payload, { onConflict: 'bank_id,sector_id' });
+  try {
+    const { data, error: selectError } = await supabase
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'app_settings')
+      .maybeSingle();
 
-  if (error) throw error;
+    if (selectError) throw selectError;
+
+    let appSettings = data?.value || {};
+    let rules: PensionCalculationRule[] = appSettings.pensionDbRules || appSettings.pensionRules || [];
+
+    const index = rules.findIndex((r: any) => r.bankId === rule.bankId && r.sectorId === rule.sectorId);
+    if (index >= 0) {
+      rules[index] = rule;
+    } else {
+      rules.push(rule);
+    }
+
+    appSettings.pensionDbRules = rules;
+    appSettings.pensionRules = rules;
+
+    const { error: upsertError } = await supabase
+      .from('system_settings')
+      .upsert({
+        key: 'app_settings',
+        value: appSettings,
+        source: 'admin',
+        updated_at: new Date().toISOString()
+      });
+
+    if (upsertError) throw upsertError;
+  } catch (err) {
+    console.error('savePensionCalculationRule failed:', err);
+    throw err;
+  }
 }
 
 export async function fetchSectorClassificationMappings(): Promise<SectorClassificationMapping[]> {
@@ -328,27 +346,22 @@ export async function fetchSectorClassificationMappings(): Promise<SectorClassif
   try {
     console.log('[PENSION] START fetchSectorClassificationMappings');
     const { data, error } = await supabase
-      .from('sector_classification_mapping')
-      .select('*');
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'app_settings')
+      .maybeSingle();
 
     if (error) throw error;
-    if (!data || data.length === 0) {
-      console.log('[SUPABASE LOAD] table=sector_classification_mapping status=success rows=0 (using fallback)');
-      return fallbackSectorMappings;
+    if (data && data.value) {
+      const val = data.value;
+      const mappings = val.sectorMappings || val.sectorClassificationMappings || [];
+      console.log(`[SUPABASE LOAD] table=sector_classification_mapping status=success rows=${mappings.length}`);
+      return mappings;
     }
-
-    console.log(`[SUPABASE LOAD] table=sector_classification_mapping status=success rows=${data.length}`);
-    return data.map((r: any) => ({
-      id: r.id,
-      bankId: r.bank_id,
-      sectorId: r.sector_id,
-      bankSectorId: r.bank_sector_id,
-      labelAr: r.label_ar,
-      createdAt: r.created_at
-    }));
+    console.log('[SUPABASE LOAD] table=sector_classification_mapping status=success key=app_settings empty/not-found');
+    return fallbackSectorMappings;
   } catch (err: any) {
     console.error(`[SUPABASE LOAD] table=sector_classification_mapping status=error message=${err?.message || err}`);
-    console.error('Failed to fetch sector mappings from Supabase. Falling back.', err);
     return fallbackSectorMappings;
   }
 }
@@ -357,20 +370,42 @@ export async function saveSectorClassificationMapping(mapping: SectorClassificat
   if (!hasSupabaseKeys) {
     return;
   }
-  const payload: any = {
-    bank_id: mapping.bankId,
-    sector_id: mapping.sectorId,
-    bank_sector_id: mapping.bankSectorId,
-    label_ar: mapping.labelAr
-  };
-  if (mapping.id && !mapping.id.startsWith('temp_') && mapping.id.length > 5) {
-    payload.id = mapping.id;
-  }
-  const { error } = await supabase
-    .from('sector_classification_mapping')
-    .upsert(payload, { onConflict: 'bank_id,sector_id' });
+  try {
+    const { data, error: selectError } = await supabase
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'app_settings')
+      .maybeSingle();
 
-  if (error) throw error;
+    if (selectError) throw selectError;
+
+    let appSettings = data?.value || {};
+    let mappings: SectorClassificationMapping[] = appSettings.sectorMappings || appSettings.sectorClassificationMappings || [];
+
+    const index = mappings.findIndex((r: any) => r.bankId === mapping.bankId && r.sectorId === mapping.sectorId);
+    if (index >= 0) {
+      mappings[index] = mapping;
+    } else {
+      mappings.push(mapping);
+    }
+
+    appSettings.sectorMappings = mappings;
+    appSettings.sectorClassificationMappings = mappings;
+
+    const { error: upsertError } = await supabase
+      .from('system_settings')
+      .upsert({
+        key: 'app_settings',
+        value: appSettings,
+        source: 'admin',
+        updated_at: new Date().toISOString()
+      });
+
+    if (upsertError) throw upsertError;
+  } catch (err) {
+    console.error('saveSectorClassificationMapping failed:', err);
+    throw err;
+  }
 }
 
 export async function fetchBankRetirementRules(): Promise<BankRetirementRule[]> {

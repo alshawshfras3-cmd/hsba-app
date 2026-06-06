@@ -35,14 +35,17 @@ export function DiagnosticsPage() {
     personalRules,
     termRules,
     bankSectorRules,
-    customSectors
+    customSectors,
+    approvedSalaryRules: contextApprovedSalaryRules,
+    pensionDbRules: contextPensionDbRules,
+    sectorMappings: contextSectorMappings
   } = useAppState();
 
   // Load custom DB rules
-  const [dbApprovedSalaryRules, setDbApprovedSalaryRules] = useState<ApprovedSalarySourceRule[]>([]);
-  const [dbPensionRules, setDbPensionRules] = useState<PensionCalculationRule[]>([]);
-  const [dbSectorMappings, setDbSectorMappings] = useState<SectorClassificationMapping[]>([]);
-  const [loadingDb, setLoadingDb] = useState(true);
+  const [dbApprovedSalaryRules, setDbApprovedSalaryRules] = useState<ApprovedSalarySourceRule[]>(contextApprovedSalaryRules || []);
+  const [dbPensionRules, setDbPensionRules] = useState<PensionCalculationRule[]>(contextPensionDbRules || []);
+  const [dbSectorMappings, setDbSectorMappings] = useState<SectorClassificationMapping[]>(contextSectorMappings || []);
+  const [loadingDb, setLoadingDb] = useState(false);
   const [isFallbackWarning, setIsFallbackWarning] = useState(false);
 
   // Form Inputs
@@ -78,50 +81,24 @@ export function DiagnosticsPage() {
   const [testResults, setTestResults] = useState<{ [key: string]: 'PASS' | 'FAIL' | null }>({});
 
   useEffect(() => {
-    async function initRules() {
-      setLoadingDb(true);
+    setLoadingDb(true);
+    const salary = contextApprovedSalaryRules || fallbackApprovedSalaryRules;
+    const pension = contextPensionDbRules || fallbackPensionRules;
+    const mappings = contextSectorMappings || fallbackSectorMappings;
 
-      let salary = [];
-      try {
-        salary = await fetchApprovedSalaryRules();
-        setDbApprovedSalaryRules(salary);
-      } catch (err) {
-        console.error('Failed loading approved salary rules in diagnostics from Supabase:', err);
-        salary = fallbackApprovedSalaryRules;
-        setDbApprovedSalaryRules(salary);
-      }
+    setDbApprovedSalaryRules(salary);
+    setDbPensionRules(pension);
+    setDbSectorMappings(mappings);
 
-      let pension = [];
-      try {
-        pension = await fetchPensionCalculationRules();
-        setDbPensionRules(pension);
-      } catch (err) {
-        console.error('Failed loading pension calc rules in diagnostics from Supabase:', err);
-        pension = fallbackPensionRules;
-        setDbPensionRules(pension);
-      }
-
-      let mappings = [];
-      try {
-        mappings = await fetchSectorClassificationMappings();
-        setDbSectorMappings(mappings);
-      } catch (err) {
-        console.error('Failed loading sector mappings in diagnostics from Supabase:', err);
-        mappings = fallbackSectorMappings;
-        setDbSectorMappings(mappings);
-      }
-
-      const isFallback = (salary === fallbackApprovedSalaryRules) ||
-                         (pension === fallbackPensionRules) ||
-                         (mappings === fallbackSectorMappings) ||
-                         (salary.length === 0) ||
-                         (pension.length === 0) ||
-                         (mappings.length === 0);
-      setIsFallbackWarning(isFallback);
-      setLoadingDb(false);
-    }
-    initRules();
-  }, []);
+    const isFallback = (salary === fallbackApprovedSalaryRules) ||
+                       (pension === fallbackPensionRules) ||
+                       (mappings === fallbackSectorMappings) ||
+                       (salary.length === 0) ||
+                       (pension.length === 0) ||
+                       (mappings.length === 0);
+    setIsFallbackWarning(isFallback);
+    setLoadingDb(false);
+  }, [contextApprovedSalaryRules, contextPensionDbRules, contextSectorMappings]);
 
   // Sync / run custom diagnostics
   const handleRunDiagnostics = () => {

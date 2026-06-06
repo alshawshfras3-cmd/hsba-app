@@ -48,6 +48,11 @@ import { useAuth } from '../contexts/AuthContext';
 import { BankSectorPensionRule, PensionLibraryRule } from '../types/pension-rules';
 import { defaultLibraryRules } from '../lib/finance-engine/pension';
 import { useSettings } from '../hooks/useSettings';
+import {
+  fallbackApprovedSalaryRules,
+  fallbackPensionRules,
+  fallbackSectorMappings
+} from '../lib/pensionDb';
 
 interface AppContextType {
   banks: Bank[];
@@ -68,6 +73,13 @@ interface AppContextType {
   setDsrRules: React.Dispatch<React.SetStateAction<DsrRule[]>>;
   supportSettings: SupportSettings;
   setSupportSettings: React.Dispatch<React.SetStateAction<SupportSettings>>;
+
+  approvedSalaryRules: any[];
+  setApprovedSalaryRules: React.Dispatch<React.SetStateAction<any[]>>;
+  pensionDbRules: any[];
+  setPensionDbRules: React.Dispatch<React.SetStateAction<any[]>>;
+  sectorMappings: any[];
+  setSectorMappings: React.Dispatch<React.SetStateAction<any[]>>;
   housingSupportTiers: HousingSupportTier[];
   setHousingSupportTiers: React.Dispatch<React.SetStateAction<HousingSupportTier[]>>;
   advancePaymentTiers: AdvancePaymentTier[];
@@ -135,6 +147,10 @@ interface AdminSettings {
   customSectors?: any[];
   bankSectorRules?: BankSectorPensionRule[];
   pensionRulesLibrary?: PensionLibraryRule[];
+  approvedSalaryRules?: any[];
+  approvedSalaryDbRules?: any[];
+  pensionDbRules?: any[];
+  sectorMappings?: any[];
 }
 
 function upgradeMarginRules(rules: MarginRule[]): MarginRule[] {
@@ -424,6 +440,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [personalRules, setPersonalRules] = useState<PersonalFinanceRules[]>(initialData.personalRules);
   const [advancedRules, setAdvancedRules] = useState<AdvancedRule[]>(initialData.advancedRules);
 
+  const [approvedSalaryRules, setApprovedSalaryRules] = useState<any[]>(fallbackApprovedSalaryRules);
+  const [pensionDbRules, setPensionDbRules] = useState<any[]>(fallbackPensionRules);
+  const [sectorMappings, setSectorMappings] = useState<any[]>(fallbackSectorMappings);
+
   const [calculationLogs, setCalculationLogs] = useState<CalculationLog[]>(initialCalculationLogs);
   const [userSubscriptions, setUserSubscriptions] = useState<UserSubscription[]>(initialData.userSubscriptions || initialUserSubscriptions);
 
@@ -463,7 +483,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     if (clonedData.customSectors) setCustomSectors(clonedData.customSectors);
     if (clonedData.bankSectorRules) setBankSectorRules(clonedData.bankSectorRules);
     if (clonedData.pensionRulesLibrary) setPensionRulesLibrary(clonedData.pensionRulesLibrary);
-
+    if (clonedData.approvedSalaryRules) setApprovedSalaryRules(clonedData.approvedSalaryRules);
+    if (clonedData.approvedSalaryDbRules) setApprovedSalaryRules(clonedData.approvedSalaryDbRules);
+    if (clonedData.pensionDbRules) setPensionDbRules(clonedData.pensionDbRules);
+    if (clonedData.sectorMappings) setSectorMappings(clonedData.sectorMappings);
+ 
     const merged: AdminSettings = {
       banks: clonedData.banks || deepClone(initialData.banks),
       products: clonedData.products || deepClone(initialData.products),
@@ -482,6 +506,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       customSectors: clonedData.customSectors || deepClone(initialData.customSectors),
       bankSectorRules: clonedData.bankSectorRules || deepClone(initialData.bankSectorRules),
       pensionRulesLibrary: clonedData.pensionRulesLibrary || deepClone(initialData.pensionRulesLibrary),
+      approvedSalaryRules: clonedData.approvedSalaryRules || clonedData.approvedSalaryDbRules || deepClone(fallbackApprovedSalaryRules),
+      pensionDbRules: clonedData.pensionDbRules || deepClone(fallbackPensionRules),
+      sectorMappings: clonedData.sectorMappings || deepClone(fallbackSectorMappings),
     };
     setSavedSettings(merged);
   };
@@ -560,6 +587,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         customSectors: settings.hasba_custom_sectors || defaultSectorsList,
         bankSectorRules: ensureBankSectorPensionRules(settings.banks || initialData.banks, settings.bank_sector_pension_rules || []),
         pensionRulesLibrary: settings.pension_rules_library || defaultLibraryRules,
+        approvedSalaryRules: settings.approvedSalaryRules || fallbackApprovedSalaryRules,
+        pensionDbRules: settings.pensionDbRules || fallbackPensionRules,
+        sectorMappings: settings.sectorMappings || fallbackSectorMappings,
       };
 
       applySettingsState(merged);
@@ -600,6 +630,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     customSectors,
     bankSectorRules,
     pensionRulesLibrary,
+    approvedSalaryRules,
+    pensionDbRules,
+    sectorMappings,
   };
 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
@@ -627,59 +660,69 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   const saveChanges = async () => {
     const clonedCurrent = deepClone(currentSettings);
-    // Save dynamically to granular Supabase keys in system_settings table
+    // Save dynamically to centralized 'app_settings' in system_settings table
     if (hasSupabaseKeys) {
       try {
-        const supportTiersSaved = await saveHousingSupportTiers(housingSupportTiers);
-        if (!supportTiersSaved) {
-          throw new Error('فشل حفظ شرائح الدعم السكني في قاعدة البيانات');
-        }
+        const currentSettingsObject = {
+          // camelCase properties
+          banks,
+          products,
+          militaryRanks,
+          salaryRules,
+          pensionRules,
+          termRules,
+          marginRules,
+          dsrRules,
+          supportSettings,
+          housingSupportTiers,
+          advancePaymentTiers,
+          personalRules,
+          advancedRules,
+          customSectors,
+          bankSectorRules,
+          pensionRulesLibrary,
+          approvedSalaryRules: currentSettings.approvedSalaryRules || currentSettings.approvedSalaryDbRules || [],
+          pensionDbRules: currentSettings.pensionDbRules || [],
+          sectorMappings: currentSettings.sectorMappings || [],
 
-        const advanceTiersSaved = await saveAdvancePaymentTiers(advancePaymentTiers);
-        if (!advanceTiersSaved) {
-          throw new Error('فشل حفظ عتبات الدفعة المقدمة في قاعدة البيانات');
-        }
-
-        const itemsToSave = [
-          { key: 'banks', value: banks },
-          { key: 'product_acceptance', value: products },
-          { key: 'military_ranks', value: militaryRanks },
-          { key: 'salary_rules', value: salaryRules },
-          { key: 'pension_rules', value: pensionRules },
-          { key: 'term_rules', value: termRules },
-          { key: 'margin_rules', value: marginRules },
-          { key: 'dsr_rules', value: dsrRules },
-          { key: 'support_settings', value: supportSettings },
-          { key: 'personal_finance_rules', value: personalRules },
-          { key: 'advanced_rules', value: advancedRules },
-          { key: 'user_subscriptions', value: userSubscriptions },
-          { key: 'hasba_custom_sectors', value: customSectors },
-          { key: 'bank_sector_pension_rules', value: bankSectorRules },
-          { key: 'pension_rules_library', value: pensionRulesLibrary }
-        ];
+          // snake_case properties for dual-support
+          margin_rules: marginRules,
+          dsr_rules: dsrRules,
+          personal_finance_rules: personalRules,
+          product_acceptance: products,
+          military_ranks: militaryRanks,
+          pension_rules: pensionRules,
+          support_settings: supportSettings,
+          salary_rules: salaryRules,
+          term_rules: termRules,
+          advanced_rules: advancedRules,
+          hasba_custom_sectors: customSectors,
+          bank_sector_pension_rules: bankSectorRules,
+          pension_rules_library: pensionRulesLibrary,
+        };
 
         const updated_by_user = user?.email || user?.id || null;
-        for (const item of itemsToSave) {
-          const payload: any = {
-            key: item.key,
-            value: item.value,
-            source: 'admin',
-            updated_at: new Date().toISOString()
-          };
-          if (updated_by_user) {
-            payload.updated_by = updated_by_user;
-          }
-          const { error } = await supabase.from('system_settings').upsert(payload);
-          if (error) {
-            throw error;
-          }
+        const payload: any = {
+          key: 'app_settings',
+          value: currentSettingsObject,
+          source: 'admin',
+          updated_at: new Date().toISOString()
+        };
+        if (updated_by_user) {
+          payload.updated_by = updated_by_user;
         }
-        console.log("All settings successfully synced to granular keys in system_settings database");
+
+        const { error } = await supabase.from('system_settings').upsert(payload);
+        if (error) {
+          throw error;
+        }
+        
+        console.log("All settings successfully synced to centralized app_settings in system_settings database");
 
         // ONLY save to unified cache on SUCCESSFUL Supabase write
         setSavedSettings(clonedCurrent);
         try {
-          localStorage.setItem("hasba_settings_cache", JSON.stringify(clonedCurrent));
+          localStorage.setItem("hasba_settings_cache", JSON.stringify(currentSettingsObject));
           localStorage.removeItem("hasba_admin_settings");
           localStorage.removeItem("hasba_custom_sectors");
           localStorage.removeItem("bank_sector_pension_rules");
@@ -697,7 +740,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
             salary_rules: initialSalaryRules,
             term_rules: initialTermRules,
             advanced_rules: initialAdvancedRules,
-            user_subscriptions: initialUserSubscriptions,
           };
           for (const key of Object.keys(DEFAULTS_MAP)) {
             localStorage.removeItem(`hasba_sett_${key}`);
@@ -706,8 +748,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           console.error("Error saving cached settings:", e);
         }
       } catch (err) {
-        console.error("Failed to save granular settings to Supabase:", err);
-        // Throw the error and DO NOT save locally as official settings truth
+        console.error("Failed to save app_settings to Supabase:", err);
         throw err;
       }
     } else {
@@ -730,46 +771,60 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     const defaultData = getInitialSettings();
     if (hasSupabaseKeys) {
       try {
-        await saveHousingSupportTiers(defaultData.housingSupportTiers);
-        await saveAdvancePaymentTiers(defaultData.advancePaymentTiers);
+        const currentSettingsObject = {
+          banks: defaultData.banks,
+          products: defaultData.products,
+          militaryRanks: defaultData.militaryRanks,
+          salaryRules: defaultData.salaryRules,
+          pensionRules: defaultData.pensionRules,
+          termRules: defaultData.termRules,
+          marginRules: defaultData.marginRules,
+          dsrRules: defaultData.dsrRules,
+          supportSettings: defaultData.supportSettings,
+          housingSupportTiers: defaultData.housingSupportTiers,
+          advancePaymentTiers: defaultData.advancePaymentTiers,
+          personalRules: defaultData.personalRules,
+          advancedRules: defaultData.advancedRules,
+          customSectors: defaultData.customSectors,
+          bankSectorRules: defaultData.bankSectorRules,
+          pensionRulesLibrary: defaultData.pensionRulesLibrary,
+          approvedSalaryRules: fallbackApprovedSalaryRules,
+          pensionDbRules: fallbackPensionRules,
+          sectorMappings: fallbackSectorMappings,
 
-        const itemsToSave = [
-          { key: 'banks', value: defaultData.banks },
-          { key: 'product_acceptance', value: defaultData.products },
-          { key: 'military_ranks', value: defaultData.militaryRanks },
-          { key: 'salary_rules', value: defaultData.salaryRules },
-          { key: 'pension_rules', value: defaultData.pensionRules },
-          { key: 'term_rules', value: defaultData.termRules },
-          { key: 'margin_rules', value: defaultData.marginRules },
-          { key: 'dsr_rules', value: defaultData.dsrRules },
-          { key: 'support_settings', value: defaultData.supportSettings },
-          { key: 'personal_finance_rules', value: defaultData.personalRules },
-          { key: 'advanced_rules', value: defaultData.advancedRules },
-          { key: 'user_subscriptions', value: defaultData.userSubscriptions },
-          { key: 'hasba_custom_sectors', value: defaultData.customSectors },
-          { key: 'bank_sector_pension_rules', value: defaultData.bankSectorRules },
-          { key: 'pension_rules_library', value: defaultData.pensionRulesLibrary }
-        ];
+          margin_rules: defaultData.marginRules,
+          dsr_rules: defaultData.dsrRules,
+          personal_finance_rules: defaultData.personalRules,
+          product_acceptance: defaultData.products,
+          military_ranks: defaultData.militaryRanks,
+          pension_rules: defaultData.pensionRules,
+          support_settings: defaultData.supportSettings,
+          salary_rules: defaultData.salaryRules,
+          term_rules: defaultData.termRules,
+          advanced_rules: defaultData.advancedRules,
+          hasba_custom_sectors: defaultData.customSectors,
+          bank_sector_pension_rules: defaultData.bankSectorRules,
+          pension_rules_library: defaultData.pensionRulesLibrary,
+        };
 
         const updated_by_user = user?.email || user?.id || null;
-        for (const item of itemsToSave) {
-          const payload: any = {
-            key: item.key,
-            value: item.value,
-            source: 'admin',
-            updated_at: new Date().toISOString()
-          };
-          if (updated_by_user) {
-            payload.updated_by = updated_by_user;
-          }
-          await supabase.from('system_settings').upsert(payload);
+        const payload: any = {
+          key: 'app_settings',
+          value: currentSettingsObject,
+          source: 'reinit',
+          updated_at: new Date().toISOString()
+        };
+        if (updated_by_user) {
+          payload.updated_by = updated_by_user;
         }
-        console.log("All settings successfully reinitialized in Supabase");
+
+        await supabase.from('system_settings').upsert(payload);
+        console.log("All settings successfully reinitialized in Supabase to default settings object");
 
         applySettingsState(defaultData);
 
         try {
-          localStorage.setItem("hasba_settings_cache", JSON.stringify(defaultData));
+          localStorage.setItem("hasba_settings_cache", JSON.stringify(currentSettingsObject));
           localStorage.removeItem("hasba_admin_settings");
           localStorage.removeItem("hasba_custom_sectors");
           localStorage.removeItem("bank_sector_pension_rules");
@@ -832,6 +887,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         setDsrRules,
         supportSettings,
         setSupportSettings,
+        approvedSalaryRules,
+        setApprovedSalaryRules,
+        pensionDbRules,
+        setPensionDbRules,
+        sectorMappings,
+        setSectorMappings,
         housingSupportTiers,
         setHousingSupportTiers,
         advancePaymentTiers,

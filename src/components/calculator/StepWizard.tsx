@@ -127,7 +127,10 @@ export default function StepWizard() {
     results,
     setResults,
     bankSectorRules,
-    customSectors
+    customSectors,
+    approvedSalaryRules: contextApprovedSalaryRules,
+    pensionDbRules: contextPensionDbRules,
+    sectorMappings: contextSectorMappings
   } = useAppState();
 
   // --- Step Form Values State ---
@@ -219,27 +222,9 @@ export default function StepWizard() {
   }, [currentStep, flow, setActiveStepLabel, results]);
 
   // Pension DB Rules States
-  const [approvedSalaryDbRules, setApprovedSalaryDbRules] = useState<ApprovedSalarySourceRule[]>(fallbackApprovedSalaryRules);
-  const [pensionDbRules, setPensionDbRules] = useState<PensionCalculationRule[]>(fallbackPensionRules);
-  const [sectorMappings, setSectorMappings] = useState<SectorClassificationMapping[]>(fallbackSectorMappings);
-
-  useEffect(() => {
-    async function loadPensionDb() {
-      try {
-        const [sal, pen, map] = await Promise.all([
-          fetchApprovedSalaryRules(),
-          fetchPensionCalculationRules(),
-          fetchSectorClassificationMappings()
-        ]);
-        setApprovedSalaryDbRules(sal);
-        setPensionDbRules(pen);
-        setSectorMappings(map);
-      } catch (err) {
-        console.error("Failed to load pension DB in StepWizard", err);
-      }
-    }
-    loadPensionDb();
-  }, []);
+  const approvedSalaryDbRules = contextApprovedSalaryRules || fallbackApprovedSalaryRules;
+  const pensionDbRules = contextPensionDbRules || fallbackPensionRules;
+  const sectorMappings = contextSectorMappings || fallbackSectorMappings;
 
   // Dynamic Pension Calculation
   const pensionCalcObj = calculatePensionSalary({

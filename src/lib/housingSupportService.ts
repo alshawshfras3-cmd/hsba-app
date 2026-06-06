@@ -75,15 +75,16 @@ export async function fetchHousingSupportTiers(): Promise<HousingSupportTier[]> 
     try {
       console.log('[SUPPORT] START fetchHousingSupportTiers');
       const { data, error } = await supabase
-        .from('housing_support_tiers')
-        .select('*')
-        .order('sort_order', { ascending: true });
+        .from('system_settings')
+        .select('value')
+        .eq('key', 'app_settings')
+        .maybeSingle();
 
       if (error) throw error;
 
-      if (data && data.length > 0) {
-        console.log(`[SUPABASE LOAD] table=housing_support_tiers status=success rows=${data.length}`);
-        return data.map(item => ({
+      if (data && data.value && Array.isArray(data.value.housingSupportTiers)) {
+        console.log(`[SUPABASE LOAD] table=housing_support_tiers status=success rows=${data.value.housingSupportTiers.length}`);
+        return data.value.housingSupportTiers.map((item: any) => ({
           id: item.id,
           min_salary: Number(item.min_salary),
           max_salary: Number(item.max_salary),
@@ -112,15 +113,16 @@ export async function fetchAdvancePaymentTiers(): Promise<AdvancePaymentTier[]> 
     try {
       console.log('[SUPPORT] START fetchAdvancePaymentTiers');
       const { data, error } = await supabase
-        .from('advance_payment_tiers')
-        .select('*')
-        .order('salary_threshold', { ascending: true });
+        .from('system_settings')
+        .select('value')
+        .eq('key', 'app_settings')
+        .maybeSingle();
 
       if (error) throw error;
 
-      if (data && data.length > 0) {
-        console.log(`[SUPABASE LOAD] table=advance_payment_tiers status=success rows=${data.length}`);
-        return data.map(item => ({
+      if (data && data.value && Array.isArray(data.value.advancePaymentTiers)) {
+        console.log(`[SUPABASE LOAD] table=advance_payment_tiers status=success rows=${data.value.advancePaymentTiers.length}`);
+        return data.value.advancePaymentTiers.map((item: any) => ({
           id: item.id,
           salary_threshold: Number(item.salary_threshold),
           amount: Number(item.amount)
@@ -139,44 +141,36 @@ export async function fetchAdvancePaymentTiers(): Promise<AdvancePaymentTier[]> 
 }
 
 /**
- * حفظ كافة شرائح الدعم السكني دفعة واحدة (مسح وإعادة كتابة أو تعديل جماعي)
+ * حفظ كافة شرائح الدعم السكني دفعة واحدة
  */
 export async function saveHousingSupportTiers(tiers: HousingSupportTier[]): Promise<boolean> {
   if (hasSupabaseKeys) {
     try {
-      // 1. حذف الشرائح القديمة
-      const { error: deleteError } = await supabase
-        .from('housing_support_tiers')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000'); // مسح شامل آمن
+      const { data, error: selectError } = await supabase
+        .from('system_settings')
+        .select('value')
+        .eq('key', 'app_settings')
+        .maybeSingle();
 
-      if (deleteError) throw deleteError;
+      if (selectError) throw selectError;
 
-      // 2. إدخال الشرائح الجديدة مع جعل معرفاتها uuid جديدة
-      const rowsToInsert = tiers.map((t, index) => {
-        const row: any = {
-          min_salary: t.min_salary,
-          max_salary: t.max_salary,
-          amount_at_min: t.amount_at_min,
-          amount_at_max: t.amount_at_max,
-          sort_order: t.sort_order || (index + 1)
-        };
-        // لا نمرر معرفات قصيرة مثل '1', '2' لقاعدة البيانات، نتركها تنشئ uuid تلقائي
-        if (t.id && t.id.length > 5) {
-          row.id = t.id;
-        }
-        return row;
-      });
+      let appSettings = data?.value || {};
+      appSettings.housingSupportTiers = tiers;
 
-      const { error: insertError } = await supabase
-        .from('housing_support_tiers')
-        .insert(rowsToInsert);
+      const { error: upsertError } = await supabase
+        .from('system_settings')
+        .upsert({
+          key: 'app_settings',
+          value: appSettings,
+          source: 'admin',
+          updated_at: new Date().toISOString()
+        });
 
-      if (insertError) throw insertError;
+      if (upsertError) throw upsertError;
       return true;
     } catch (err: any) {
-      console.error("Failing to save housing support tiers to Supabase:", err);
-      throw err;
+      console.error("Failing to save housing support tiers to Supabase app_settings:", err);
+      return false;
     }
   }
   return false;
@@ -188,35 +182,31 @@ export async function saveHousingSupportTiers(tiers: HousingSupportTier[]): Prom
 export async function saveAdvancePaymentTiers(tiers: AdvancePaymentTier[]): Promise<boolean> {
   if (hasSupabaseKeys) {
     try {
-      // 1. حذف التسهيلات السابقة للدفعة المقدمة
-      const { error: deleteError } = await supabase
-        .from('advance_payment_tiers')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
+      const { data, error: selectError } = await supabase
+        .from('system_settings')
+        .select('value')
+        .eq('key', 'app_settings')
+        .maybeSingle();
 
-      if (deleteError) throw deleteError;
+      if (selectError) throw selectError;
 
-      // 2. إدخال القيم المعدلة
-      const rowsToInsert = tiers.map(t => {
-        const row: any = {
-          salary_threshold: t.salary_threshold,
-          amount: t.amount
-        };
-        if (t.id && t.id.length > 5) {
-          row.id = t.id;
-        }
-        return row;
-      });
+      let appSettings = data?.value || {};
+      appSettings.advancePaymentTiers = tiers;
 
-      const { error: insertError } = await supabase
-        .from('advance_payment_tiers')
-        .insert(rowsToInsert);
+      const { error: upsertError } = await supabase
+        .from('system_settings')
+        .upsert({
+          key: 'app_settings',
+          value: appSettings,
+          source: 'admin',
+          updated_at: new Date().toISOString()
+        });
 
-      if (insertError) throw insertError;
+      if (upsertError) throw upsertError;
       return true;
     } catch (err: any) {
-      console.error("Failing to save advance payment tiers to Supabase:", err);
-      throw err;
+      console.error("Failing to save advance payment tiers to Supabase app_settings:", err);
+      return false;
     }
   }
   return false;
