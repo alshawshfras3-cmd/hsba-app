@@ -45,27 +45,45 @@ export function UsersManagementPage() {
       return;
     }
 
+    const targetTableName = 'app_users';
+    const demandedColumns = 'id, full_name, email, phone, is_blocked, created_at, updated_at';
+    const completeQueryRepr = `supabase.from('${targetTableName}').select('${demandedColumns}').order('created_at', { ascending: false })`;
+    const metaEnv = (import.meta as any).env || {};
+    const supabaseUrl = (metaEnv.VITE_SUPABASE_URL || '').trim();
+
+    console.log("[Supabase Diagnostic - UsersManagementPage] Starting diagnostics...");
+    console.log("1. Target Table Name:", targetTableName);
+    console.log("2. Complete Query Representation:", completeQueryRepr);
+    console.log("3. Demanded Columns:", demandedColumns);
+    console.log("4. Supabase URL in use:", supabaseUrl);
+    console.log("5. App connected to Supabase:", hasSupabaseKeys ? "YES" : "NO");
+
     try {
-      // 5-second timeout promise
+      // 30-second timeout promise (increased from 5 seconds to prevent TIMEOUT_LIMIT on cold server wakeups)
+      const TIMEOUT_LIMIT_MS = 30000;
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => {
-          reject(new Error('TIMEOUT_LIMIT'));
-        }, 5000);
+          reject(new Error(`TIMEOUT_LIMIT after ${TIMEOUT_LIMIT_MS}ms`));
+        }, TIMEOUT_LIMIT_MS);
       });
 
       const fetchPromise = (async () => {
         const { data, error } = await supabase
-          .from('app_users')
-          .select('id, full_name, email, phone, is_blocked, created_at, updated_at')
+          .from(targetTableName)
+          .select(demandedColumns)
           .order('created_at', { ascending: false });
 
         if (error) {
+          console.error("[Supabase Diagnostic - UsersManagementPage] Query failed with error:", error);
           throw error;
         }
         return data || [];
       })();
 
       const rawData = await Promise.race([fetchPromise, timeoutPromise]);
+
+      console.log("[Supabase Diagnostic - UsersManagementPage] 6. Query result count:", rawData.length);
+      console.log("[Supabase Diagnostic - UsersManagementPage] 7. Raw records loaded:", rawData);
 
       const filtered = rawData.map((item: any) => ({
         id: item.id,
@@ -80,10 +98,24 @@ export function UsersManagementPage() {
       });
 
       setUsers(filtered);
+
+      console.log(`===============================================
+[STATUS REPORT - USERS MANAGEMENT]
+- Read Status: SUCCESS
+- Number of users in app_users: ${rawData.length}
+- Number of users loaded in dashboard (filtered/excluding admin): ${filtered.length}
+===============================================`);
     } catch (err: any) {
-      console.error("Error fetching users from app_users:", err);
+      console.error("[Supabase Diagnostic - UsersManagementPage] Catch block error:", err);
       setUsers([]);
-      setErrorMsg('تعذر تحميل المستخدمين من قاعدة البيانات');
+      const errorStr = err?.message || err?.details || JSON.stringify(err);
+      setErrorMsg(`تعذر تحميل المستخدمين من قاعدة البيانات: ${errorStr}`);
+      
+      console.log(`===============================================
+[STATUS REPORT - USERS MANAGEMENT]
+- Read Status: FAILED
+- Error details: ${errorStr}
+===============================================`);
     } finally {
       setLoading(false);
     }
