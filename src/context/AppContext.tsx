@@ -718,48 +718,17 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         }
         
         console.log("All settings successfully synced to centralized app_settings in system_settings database");
+        console.log('[SETTINGS] admin saved key successfully: app_settings');
 
-        // ONLY save to unified cache on SUCCESSFUL Supabase write
+        // ONLY save snapshot state on SUCCESSFUL Supabase write
         setSavedSettings(clonedCurrent);
-        try {
-          localStorage.setItem("hasba_settings_cache", JSON.stringify(currentSettingsObject));
-          localStorage.removeItem("hasba_admin_settings");
-          localStorage.removeItem("hasba_custom_sectors");
-          localStorage.removeItem("bank_sector_pension_rules");
-          localStorage.removeItem("pension_rules_library");
-          
-          const DEFAULTS_MAP: Record<string, any> = {
-            banks: initialBanks,
-            margin_rules: initialMarginRules,
-            dsr_rules: initialDsrRules,
-            personal_finance_rules: initialPersonalFinanceRules,
-            product_acceptance: initialProductAcceptance,
-            military_ranks: initialMilitaryRanks,
-            pension_rules: initialPensionRules,
-            support_settings: initialSupportSettings,
-            salary_rules: initialSalaryRules,
-            term_rules: initialTermRules,
-            advanced_rules: initialAdvancedRules,
-          };
-          for (const key of Object.keys(DEFAULTS_MAP)) {
-            localStorage.removeItem(`hasba_sett_${key}`);
-          }
-        } catch (e) {
-          console.error("Error saving cached settings:", e);
-        }
-      } catch (err) {
+      } catch (err: any) {
         console.error("Failed to save app_settings to Supabase:", err);
         throw err;
       }
     } else {
-      // Local fallbacks
+      // Local setup fallback
       setSavedSettings(clonedCurrent);
-      try {
-        localStorage.setItem("hasba_settings_cache", JSON.stringify(clonedCurrent));
-        localStorage.removeItem("hasba_admin_settings");
-      } catch (e) {
-        console.error("Error saving local settings:", e);
-      }
     }
   };
 
@@ -822,47 +791,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         console.log("All settings successfully reinitialized in Supabase to default settings object");
 
         applySettingsState(defaultData);
-
-        try {
-          localStorage.setItem("hasba_settings_cache", JSON.stringify(currentSettingsObject));
-          localStorage.removeItem("hasba_admin_settings");
-          localStorage.removeItem("hasba_custom_sectors");
-          localStorage.removeItem("bank_sector_pension_rules");
-          localStorage.removeItem("pension_rules_library");
-          const DEFAULTS_MAP: Record<string, any> = {
-            banks: initialBanks,
-            margin_rules: initialMarginRules,
-            dsr_rules: initialDsrRules,
-            personal_finance_rules: initialPersonalFinanceRules,
-            product_acceptance: initialProductAcceptance,
-            military_ranks: initialMilitaryRanks,
-            pension_rules: initialPensionRules,
-            support_settings: initialSupportSettings,
-            salary_rules: initialSalaryRules,
-            term_rules: initialTermRules,
-            advanced_rules: initialAdvancedRules,
-          };
-          for (const key of Object.keys(DEFAULTS_MAP)) {
-            localStorage.removeItem(`hasba_sett_${key}`);
-          }
-        } catch (e) {
-          console.error("Error clearing caches on manual reinitialize:", e);
-        }
       } catch (err) {
         console.error("Failed to reinitialize settings in Supabase:", err);
         throw err;
       }
     } else {
       applySettingsState(defaultData);
-      try {
-        localStorage.setItem("hasba_settings_cache", JSON.stringify(defaultData));
-        localStorage.removeItem("hasba_admin_settings");
-        localStorage.removeItem("hasba_custom_sectors");
-        localStorage.removeItem("bank_sector_pension_rules");
-        localStorage.removeItem("pension_rules_library");
-      } catch (e) {
-        console.error("Error saving local settings:", e);
-      }
     }
   };
 

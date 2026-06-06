@@ -97,30 +97,14 @@ function mergeDsrRulesWithSeeds(existingRules: DsrRule[], seedRules: DsrRule[]) 
 export function useSettings() {
   const getLocalStorageOrSeedDefaults = (): Record<string, any> => {
     const loaded: Record<string, any> = {};
-    let fallbackParsed: any = null;
-    try {
-      const cachedUnified = localStorage.getItem("hasba_settings_cache");
-      if (cachedUnified) {
-        fallbackParsed = JSON.parse(cachedUnified);
-      }
-    } catch (_) {}
-
     for (const key of Object.keys(DEFAULTS)) {
-      const cacheField = DB_TO_CACHE_KEY[key];
-      if (fallbackParsed && fallbackParsed[cacheField] !== undefined) {
-        loaded[key] = fallbackParsed[cacheField];
-      } else {
-        loaded[key] = DEFAULTS[key];
-      }
+      loaded[key] = DEFAULTS[key];
     }
-
-    if (fallbackParsed) {
-      loaded['housingSupportTiers'] = fallbackParsed.housingSupportTiers;
-      loaded['advancePaymentTiers'] = fallbackParsed.advancePaymentTiers;
-      loaded['approvedSalaryRules'] = fallbackParsed.approvedSalaryRules;
-      loaded['pensionDbRules'] = fallbackParsed.pensionDbRules;
-      loaded['sectorMappings'] = fallbackParsed.sectorMappings;
-    }
+    loaded['housingSupportTiers'] = [...DEFAULT_HOUSING_SUPPORT_TIERS];
+    loaded['advancePaymentTiers'] = [...DEFAULT_ADVANCE_PAYMENT_TIERS];
+    loaded['approvedSalaryRules'] = fallbackApprovedSalaryRules;
+    loaded['pensionDbRules'] = fallbackPensionRules;
+    loaded['sectorMappings'] = fallbackSectorMappings;
 
     return loaded;
   };
@@ -153,9 +137,10 @@ export function useSettings() {
       let appSettingsObj: any = null;
       if (data && data.value) {
         appSettingsObj = data.value;
-        console.log('[SUPABASE LOAD] Found existing app_settings JSON in system_settings table');
+        console.log('[SETTINGS] key found in Supabase, using Supabase value: app_settings');
+        console.log('[SETTINGS] Supabase value preserved, no overwrite');
       } else {
-        console.log('[SUPABASE LOAD] app_settings not found. Initiating migration / initialization...');
+        console.log('[SETTINGS] key missing, inserting seed_initial: app_settings');
         
         // 1. Read values from old database tables with separate try-catches
         let oldTiers: any[] = [];
@@ -289,10 +274,10 @@ export function useSettings() {
 
         // 4. Save key = 'app_settings' to make it available for future loads
         try {
-          await supabase.from('system_settings').upsert({
+          await supabase.from('system_settings').insert({
             key: 'app_settings',
             value: appSettingsObj,
-            source: 'migration',
+            source: 'seed_initial',
             updated_at: new Date().toISOString()
           });
           console.log('[SUPABASE SAVE] Created consolidated app_settings from migration successfully');
@@ -328,44 +313,9 @@ export function useSettings() {
       setSettings(settingsMap);
       setSupabaseFetched(true);
 
-      // Save a backup in "hasba_settings_cache"
-      try {
-        localStorage.setItem("hasba_settings_cache", JSON.stringify(appSettingsObj));
-      } catch (_) {}
-
     } catch (err: any) {
       console.error(`[SUPABASE LOAD] table=system_settings status=error message=${err?.message || err}`);
       console.warn('Fallback settings on fetch failure in background:', err);
-      // Read fallback from LocalStorage if available
-      try {
-        const cachedUnified = localStorage.getItem("hasba_settings_cache");
-        if (cachedUnified) {
-          const cachedObj = JSON.parse(cachedUnified);
-          const settingsMap: Record<string, any> = {
-            banks: cachedObj.banks,
-            product_acceptance: cachedObj.products,
-            military_ranks: cachedObj.militaryRanks,
-            salary_rules: cachedObj.salaryRules,
-            pension_rules: cachedObj.pensionRules,
-            term_rules: cachedObj.termRules,
-            margin_rules: cachedObj.marginRules,
-            dsr_rules: cachedObj.dsrRules,
-            support_settings: cachedObj.supportSettings,
-            personal_finance_rules: cachedObj.personalRules,
-            advanced_rules: cachedObj.advancedRules,
-            hasba_custom_sectors: cachedObj.customSectors,
-            bank_sector_pension_rules: cachedObj.bankSectorRules,
-            pension_rules_library: cachedObj.pensionRulesLibrary,
-            
-            housingSupportTiers: cachedObj.housingSupportTiers,
-            advancePaymentTiers: cachedObj.advancePaymentTiers,
-            approvedSalaryRules: cachedObj.approvedSalaryRules || cachedObj.approvedSalaryDbRules,
-            pensionDbRules: cachedObj.pensionDbRules,
-            sectorMappings: cachedObj.sectorMappings,
-          };
-          setSettings(settingsMap);
-        }
-      } catch (_) {}
       setSupabaseFetched(true);
     }
   }, []);
@@ -403,10 +353,8 @@ export function useSettings() {
           source: 'admin',
           updated_at: new Date().toISOString()
         });
+        console.log('[SETTINGS] admin saved key successfully: app_settings');
       }
-
-      // Update LocalStorage cache
-      localStorage.setItem("hasba_settings_cache", JSON.stringify(appSettings));
     } catch (err) {
       console.error('saveSetting failed to update centralized app_settings:', err);
     }
