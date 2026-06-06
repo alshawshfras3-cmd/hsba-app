@@ -23,21 +23,25 @@ export function UsersManagementPage() {
   const [adminEmail, setAdminEmail] = useState('admin@hesba.com');
 
   useEffect(() => {
+    // 1. Load admin email as safe background task
+    async function loadAdminEmailBackground() {
+      try {
+        const credentials = await getAdminCredentials();
+        const currentAdminEmail = credentials.admin_email.toLowerCase().trim();
+        setAdminEmail(currentAdminEmail);
+      } catch (e) {
+        console.warn("Could not load admin credentials in background:", e);
+      }
+    }
+    loadAdminEmailBackground();
+
+    // 2. Fetch users directly
     fetchUsersAndAdminEmail();
   }, []);
 
   async function fetchUsersAndAdminEmail() {
     setLoading(true);
     setErrorMsg('');
-
-    let currentAdminEmail = 'admin@hesba.com';
-    try {
-      const credentials = await getAdminCredentials();
-      currentAdminEmail = credentials.admin_email.toLowerCase().trim();
-      setAdminEmail(currentAdminEmail);
-    } catch (e) {
-      console.warn("Could not load admin credentials:", e);
-    }
 
     if (!hasSupabaseKeys) {
       setUsers([]);
@@ -47,71 +51,66 @@ export function UsersManagementPage() {
       return;
     }
 
-    const targetTableName = 'app_users';
-    const demandedColumns = 'id, full_name, email, phone, is_blocked, status, created_at, updated_at';
     const metaEnv = (import.meta as any).env || {};
     const supabaseUrl = (metaEnv.VITE_SUPABASE_URL || '').trim();
+    const supabaseAnonKey = (metaEnv.VITE_SUPABASE_ANON_KEY || '').trim();
 
-    console.log('[USERS] START');
-    console.log(`[USERS] Query: supabase.from('${targetTableName}').select('${demandedColumns}').order('created_at', { ascending: false })`);
-    console.log(`[USERS] Requested Columns: ${demandedColumns}`);
-    console.log(`[USERS] Supabase URL prefix confirmed: "${supabaseUrl.substring(0, 30)}..."`);
+    if (!supabaseUrl || !supabaseAnonKey) {
+      setUsers([]);
+      setErrorMsg('مفاتيح الاتصال بقاعدة البيانات غير متوفرة');
+      setLoading(false);
+      return;
+    }
+
+    console.log('[USERS REST] START');
+    const url = `${supabaseUrl}/rest/v1/app_users?select=id,full_name,email,phone,is_blocked,status,created_at,updated_at&order=created_at.desc`;
+    console.log('[USERS REST] URL=' + url);
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 15000);
 
     try {
-      // Execute the clean direct select query without timeout interference
-      const { data, error } = await supabase
-        .from(targetTableName)
-        .select(demandedColumns)
-        .order('created_at', { ascending: false });
-
-      console.log('[USERS] Direct Supabase Data Response:', data);
-      console.log('[USERS] Direct Supabase Error Response:', error);
-
-      if (error) {
-        console.error(`[USERS] FAILED reason=${error.message || JSON.stringify(error)}`);
-        const fullErrStr = `Message: ${error.message || ''} | Code: ${error.code || ''} | Details: ${error.details || ''} | Hint: ${error.hint || ''}`;
-        throw new Error(fullErrStr);
-      }
-
-      const rawData = data || [];
-      console.log(`[USERS] SUCCESS rows=${rawData.length}`);
-      console.log(`[SUPABASE LOAD] table=app_users status=success rows=${rawData.length}`);
-
-      const filtered = rawData.map((item: any) => ({
-        id: item.id,
-        email: item.email || '',
-        full_name: item.full_name || 'مستخدم غير معرّف',
-        phone: item.phone || null,
-        is_blocked: item.is_blocked === true,
-        status: item.status || 'active',
-        created_at: item.created_at || new Date().toISOString()
-      })).filter((u: AppUser) => {
-        const emailLower = u.email.toLowerCase().trim();
-        return emailLower !== currentAdminEmail && emailLower !== 'admin@hesba.com';
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'apikey': supabaseAnonKey,
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+          'Accept': 'application/json'
+        },
+        signal: controller.signal
       });
 
-      setUsers(filtered);
+      const text = await response.text();
 
-      console.log(`===============================================
-[STATUS REPORT - USERS MANAGEMENT]
-- Read Status: SUCCESS
-- Number of users in app_users: ${rawData.length}
-- Number of users loaded in dashboard (filtered/excluding admin): ${filtered.length}
-===============================================`);
+      if (!response.ok) {
+        throw new Error(`REST app_users failed ${response.status}: ${text}`);
+      }
+
+      const data = text ? JSON.parse(text) : [];
+
+      console.log('[USERS REST] SUCCESS rows=' + data.length);
+
+      setUsers(
+        data.map((item: any) => ({
+          id: item.id,
+          email: item.email || '',
+          full_name: item.full_name || 'مستخدم غير معرّف',
+          phone: item.phone || null,
+          is_blocked: item.is_blocked === true,
+          status: item.status || 'active',
+          created_at: item.created_at || new Date().toISOString()
+        }))
+      );
     } catch (err: any) {
-      console.error("[Supabase Diagnostic - UsersManagementPage] Catch block error:", err);
-      const errorStr = err?.message || JSON.stringify(err);
-      console.error(`[USERS] FAILED reason=${errorStr}`);
-      console.error(`[SUPABASE LOAD] table=app_users status=error message=${errorStr}`);
+      console.error('[USERS REST] FAILED message=' + (err?.message || err));
       setUsers([]);
-      setErrorMsg(`تعذر تحميل المستخدمين من قاعدة البيانات: ${errorStr}`);
-      
-      console.log(`===============================================
-[STATUS REPORT - USERS MANAGEMENT]
-- Read Status: FAILED
-- Error details: ${errorStr}
-===============================================`);
+      setErrorMsg(
+        err?.name === 'AbortError'
+          ? 'انتهت مهلة تحميل المستخدمين بعد 15 ثانية'
+          : `تعذر تحميل المستخدمين: ${err?.message || err}`
+      );
     } finally {
+      window.clearTimeout(timer);
       setLoading(false);
     }
   }
@@ -156,6 +155,11 @@ export function UsersManagementPage() {
 
   // Filter users
   const filteredUsers = users.filter(u => {
+    const emailLower = u.email.toLowerCase().trim();
+    if (emailLower === adminEmail || emailLower === 'admin@hesba.com') {
+      return false;
+    }
+
     const matchSearch = 
       (u.full_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (u.email || '').toLowerCase().includes(searchTerm.toLowerCase());
