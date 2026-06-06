@@ -216,7 +216,9 @@ export const initialProductAcceptance: ProductAcceptance[] = [
     allowUnsupported: true,
     allowAfterRetirement: false,
     isActive: true,
-    defaultRejectionMessage: 'شركة بداية لا تقدم هذا المنتج للمتقاعدين.'
+    defaultRejectionMessage: 'شركة بداية لا تقدم هذا المنتج للمتقاعدين.',
+    supportsRealEstate: true,
+    supportsPersonal: false
   },
   {
     id: 'bidaya_pf_only',
@@ -231,8 +233,10 @@ export const initialProductAcceptance: ProductAcceptance[] = [
     allowDownpaymentSupport: false,
     allowUnsupported: true,
     allowAfterRetirement: true,
-    isActive: true,
-    defaultRejectionMessage: 'شركة بداية: التمويل الشخصي يتطلب راتباً لا يقل عن 4,000 ريال وعمر بين 18 و65 سنة.'
+    isActive: false,
+    defaultRejectionMessage: 'شركة بداية: التمويل الشخصي يتطلب راتباً لا يقل عن 4,000 ريال وعمر بين 18 و65 سنة.',
+    supportsRealEstate: true,
+    supportsPersonal: false
   },
 
   // --- AlBilad Acceptances ---

@@ -32,6 +32,7 @@ export default function TermsSection({
   const [termRuleFormMinTermMonths, setTermRuleFormMinTermMonths] = useState('60');
   const [termRuleFormIsActive, setTermRuleFormIsActive] = useState(true);
   const [termRuleFormMilitarySubType, setTermRuleFormMilitarySubType] = useState<'officer' | 'enlisted' | 'all'>('all');
+  const [termRuleFormPostRetirementMode, setTermRuleFormPostRetirementMode] = useState<'dynamic' | 'fixed'>('dynamic');
 
   return (
     <div className="space-y-6">
@@ -75,6 +76,7 @@ export default function TermsSection({
             setTermRuleFormMinTermMonths('60');
             setTermRuleFormIsActive(true);
             setTermRuleFormMilitarySubType('all');
+            setTermRuleFormPostRetirementMode('dynamic');
           }}
           className="inline-flex items-center gap-1 px-4 py-2.5 bg-[#0057B8] text-white hover:bg-[#004bb0] rounded-xl text-xs font-bold shadow-sm transition-all shrink-0 cursor-pointer"
         >
@@ -160,7 +162,11 @@ export default function TermsSection({
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-slate-600 text-xs font-mono">
                       {isMilitary ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-100 text-[10px] font-bold">ديناميكي</span>
+                        r.postRetirementMode === 'fixed' ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-100 text-[10px] font-bold">ثابت: {r.allowedMonthsAfterRetirement} شهر</span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-amber-55 text-amber-800 border border-amber-100 text-[10px] font-bold">تلقائي رتبة</span>
+                        )
                       ) : isRetired ? (
                         <span className="text-gray-400 font-sans">—</span>
                       ) : (
@@ -195,6 +201,7 @@ export default function TermsSection({
                             setTermRuleFormAllowedMonthsAfterRetirement(r.allowedMonthsAfterRetirement.toString());
                             setTermRuleFormMinTermMonths((r.minTermMonths || 60).toString());
                             setTermRuleFormIsActive(r.isActive);
+                             setTermRuleFormPostRetirementMode(r.postRetirementMode || 'dynamic');
                             setTermRuleFormMilitarySubType(r.militarySubType || 'all');
                           }}
                           className="inline-flex items-center gap-1 px-3 py-1.5 border border-[#E5E7EB] hover:border-[#0057B8] text-[#0057B8] hover:bg-[#0057B8]/5 rounded-lg transition-all font-bold text-[11px] cursor-pointer"
@@ -377,27 +384,66 @@ export default function TermsSection({
                   </div>
 
                   {/* Months After Retirement */}
+                  {termRuleFormSectorId === 'military' && (
+                    <div className="mb-3">
+                      <label className="block text-[11px] font-bold text-gray-700 mb-1">طريقة حساب أشهر ما بعد التقاعد:</label>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setTermRuleFormPostRetirementMode('dynamic')}
+                          className={`flex-1 py-2 px-1 text-xs font-bold rounded-xl border text-center transition-all cursor-pointer ${
+                            termRuleFormPostRetirementMode === 'dynamic'
+                              ? 'border-[#0057B8] bg-blue-50 text-[#0057B8] font-bold'
+                              : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                          }`}
+                        >
+                          تلقائي حسب الرتبة
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTermRuleFormPostRetirementMode('fixed')}
+                          className={`flex-1 py-2 px-1 text-xs font-bold rounded-xl border text-center transition-all cursor-pointer ${
+                            termRuleFormPostRetirementMode === 'fixed'
+                              ? 'border-[#0057B8] bg-blue-50 text-[#0057B8] font-bold'
+                              : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                          }`}
+                        >
+                          رقم ثابت من الإعدادات
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   <div>
                     <label className="block text-[11px] font-bold text-gray-700 mb-1">أشهر السماح بعد التقاعد:</label>
-                    {termRuleFormSectorId === 'military' ? (
-                      <div className="w-full bg-amber-50/70 text-right border border-amber-100 rounded-xl px-4 py-2.5 text-[10px] font-bold text-amber-805 leading-snug">
-                        🛡️ يتم حساب أشهر السماح لقطاع العسكري ديناميكياً = (أقصى عمر − سن تقاعد الرتبة) × 12.
+                    {termRuleFormSectorId === 'military' && termRuleFormPostRetirementMode === 'dynamic' ? (
+                      <div className="space-y-2">
+                        <div className="w-full bg-amber-50/70 text-right border border-amber-100 rounded-xl px-4 py-2.5 text-[10px] font-bold text-amber-805 leading-snug">
+                          🛡️ يتم حساب أشهر السماح لقطاع العسكري ديناميكياً = (أقصى عمر − سن تقاعد الرتبة) × 12.
+                        </div>
+                        <input
+                          type="text"
+                          dir="ltr"
+                          disabled
+                          value="تلقائي حسب الرتبة"
+                          className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-bold text-gray-400 bg-gray-100 text-right cursor-not-allowed"
+                        />
                       </div>
                     ) : (
                       <input
                         type="text"
                         inputMode="numeric"
                         dir="ltr"
-                        disabled={!termRuleFormAllowAfterRetirement}
+                        disabled={termRuleFormSectorId !== 'military' ? !termRuleFormAllowAfterRetirement : false}
                         value={termRuleFormAllowedMonthsAfterRetirement}
                         onChange={(e) => {
-                          if (!termRuleFormAllowAfterRetirement) return;
+                          if (termRuleFormSectorId !== 'military' && !termRuleFormAllowAfterRetirement) return;
                           const val = normalizeNumberInput(e.target.value);
                           setTermRuleFormAllowedMonthsAfterRetirement(val);
                         }}
                         placeholder="مثال: 204"
                         className={`w-full border rounded-xl px-4 py-2.5 text-xs font-bold focus:outline-none text-right font-mono ${
-                          termRuleFormAllowAfterRetirement 
+                          (termRuleFormSectorId === 'military' || termRuleFormAllowAfterRetirement)
                             ? 'bg-white border-gray-200 focus:ring-2 focus:ring-[#0057B8] text-gray-800' 
                             : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
                         }`}
@@ -474,7 +520,8 @@ export default function TermsSection({
                   const maxAgeVal = Math.round(parseNumberInput(termRuleFormMaxAgeAtEnd, 0));
                   const minTermVal = Math.round(parseNumberInput(termRuleFormMinTermMonths, 0));
                   const isMil = termRuleFormSectorId === 'military';
-                  const postRetVal = isMil ? 120 : (Math.round(parseNumberInput(termRuleFormAllowedMonthsAfterRetirement, 0)) || 0);
+                  const isFixed = isMil && termRuleFormPostRetirementMode === 'fixed';
+                  const postRetVal = (isMil && !isFixed) ? 120 : (Math.round(parseNumberInput(termRuleFormAllowedMonthsAfterRetirement, 0)) || 0);
 
                   if (isNaN(maxTermVal) || maxTermVal <= 0) {
                     alert("يرجى إدخال أقصى مدة تمويل صحيحة");
@@ -515,6 +562,7 @@ export default function TermsSection({
                       allowedMonthsAfterRetirement: termRuleFormSectorId === 'retired' ? 0 : postRetVal,
                       calendarType: termRuleFormCalendarType,
                       defaultTermMode: 'max',
+                      postRetirementMode: termRuleFormSectorId === 'military' ? termRuleFormPostRetirementMode : undefined,
                       isActive: termRuleFormIsActive
                     };
 
@@ -534,6 +582,7 @@ export default function TermsSection({
                       allowAfterRetirement: termRuleFormSectorId === 'retired' ? false : termRuleFormAllowAfterRetirement,
                       allowedMonthsAfterRetirement: termRuleFormSectorId === 'retired' ? 0 : postRetVal,
                       calendarType: termRuleFormCalendarType,
+                      postRetirementMode: termRuleFormSectorId === 'military' ? termRuleFormPostRetirementMode : undefined,
                       isActive: termRuleFormIsActive
                     };
 

@@ -42,6 +42,8 @@ export interface ProductAcceptance {
   allowAfterRetirement: boolean;
   isActive: boolean;
   defaultRejectionMessage: string;
+  supportsRealEstate?: boolean;
+  supportsPersonal?: boolean;
 }
 
 export interface Sector {
@@ -101,6 +103,7 @@ export interface TermRule {
   calendarType: CalendarType;
   minTermMonths: number;
   defaultTermMode: TermMode;
+  postRetirementMode?: 'dynamic' | 'fixed';
   isActive: boolean;
 }
 
@@ -354,6 +357,8 @@ export interface BankCalculationResult {
   diagnosticMessages: string[];
   diagnosticSteps: string[];
   isAgeLimitingFactor?: boolean;
+  personalEligible?: boolean;
+  supportsPersonal?: boolean;
 }
 
 export interface SavedResult {

@@ -36,6 +36,7 @@ export function calculateFinanceTerm(params: {
   manualTermMonths?: number;
 
   ruleSource: 'termRule' | 'bankFallback';
+  postRetirementMode?: 'dynamic' | 'fixed';
 }): ExtendedTermOutput {
   const {
     sectorId,
@@ -55,7 +56,8 @@ export function calculateFinanceTerm(params: {
 
     selectedMode,
     manualTermMonths = 300,
-    ruleSource
+    ruleSource,
+    postRetirementMode
   } = params;
 
   const today = new Date();
@@ -75,7 +77,11 @@ export function calculateFinanceTerm(params: {
   // 3. Post-retirement eligibility extension
   let monthsAfterRetirement = 0;
   if (sectorId !== 'retired' && allowAfterRetirement) {
-    monthsAfterRetirement = allowedMonthsAfterRetirement;
+    if (sectorId === 'military' && (!postRetirementMode || postRetirementMode === 'dynamic')) {
+      monthsAfterRetirement = Math.max(0, Math.round((maxAgeAtEnd - retirementAge) * 12));
+    } else {
+      monthsAfterRetirement = allowedMonthsAfterRetirement;
+    }
   }
 
   // 4. Max months permitted by the age at the end of financing

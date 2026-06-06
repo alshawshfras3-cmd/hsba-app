@@ -210,10 +210,13 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
         return;
       }
 
+      const isBidaya = formBankId === 'bidaya';
+      const actualProductId = isBidaya ? 'real_estate_only' : formProductId;
+
       const payload: ProductAcceptance = {
         id: editingProduct ? editingProduct.id : `prod_rule_${Date.now()}`,
         bankId: formBankId,
-        productId: formProductId,
+        productId: actualProductId,
         minSalary: salaryNum,
         minAge: minAgeNum,
         minServiceMonths: serviceNum,
@@ -223,7 +226,9 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
         allowedSectors: safeAllowedSectors,
         defaultRejectionMessage: formRejectionMessage,
         isActive: formIsActive,
-        allowAfterRetirement: safeAllowedSectors.includes('retired')
+        allowAfterRetirement: safeAllowedSectors.includes('retired'),
+        supportsRealEstate: isBidaya ? true : undefined,
+        supportsPersonal: isBidaya ? false : undefined
       };
 
       if (editingProduct) {
@@ -525,7 +530,13 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
                   <select
                     id="form-bank-select"
                     value={formBankId}
-                    onChange={(e) => setFormBankId(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setFormBankId(val);
+                      if (val === 'bidaya') {
+                        setFormProductId('real_estate_only');
+                      }
+                    }}
                     className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
                   >
                     {banks.map(b => (
@@ -539,13 +550,21 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
                   <label className="block text-xs font-bold text-gray-700">نوع منتج التمويل *</label>
                   <select
                     id="form-product-select"
-                    value={formProductId}
-                    onChange={(e) => setFormProductId(e.target.value as ProductId)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                    value={formBankId === 'bidaya' ? 'real_estate_only' : formProductId}
+                    onChange={(e) => {
+                      if (formBankId !== 'bidaya') {
+                        setFormProductId(e.target.value as ProductId);
+                      }
+                    }}
+                    disabled={formBankId === 'bidaya'}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0057B8] disabled:opacity-75 disabled:bg-gray-100"
                   >
-                    {productTypesList.map(pt => (
-                      <option key={pt.id} value={pt.id}>{pt.nameAr}</option>
-                    ))}
+                    {productTypesList.map(pt => {
+                      if (formBankId === 'bidaya' && pt.id !== 'real_estate_only') {
+                        return null;
+                      }
+                      return <option key={pt.id} value={pt.id}>{pt.nameAr}</option>;
+                    })}
                   </select>
                 </div>
               </div>

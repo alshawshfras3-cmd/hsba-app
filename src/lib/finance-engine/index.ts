@@ -479,7 +479,8 @@ export function calculateBanksFinancing(params: {
       minTermMonths,
       selectedMode: termMode,
       manualTermMonths,
-      ruleSource
+      ruleSource,
+      postRetirementMode: matchedTermRule?.postRetirementMode
     });
 
     // 5. Calculate Housing Support (Sakani) subsidies
@@ -532,25 +533,50 @@ export function calculateBanksFinancing(params: {
     let personalCalcMethod: 'multiplier' | 'pmt' | 'flat_rate' | undefined = undefined;
     let personalCalcResult: any = null;
 
+    const bankSupportsPersonal = !(bank.id === 'bidaya' || products.some(p => p.bankId === bank.id && p.supportsPersonal === false));
+
     if (productId === 'personal' || productId === 'personal_only' || productId === 'both' || productId === 'real_estate_with_new_personal') {
-      const personalObls = obligations;
-      const personalCalc = calculatePersonalFinance({
-        netSalary: solvedNetSalary,
-        obligations: personalObls,
-        sectorId,
-        bankId: bank.id,
-        rules: personalRules,
-        productId,
-        monthsBeforeRetirement: Math.max(0, Math.round(retirementAge * 12) - termResult.currentAgeMonths),
-        remainingMonthsToMaxAge: termResult.remainingMonthsToMaxAge
-      });
-      personalCalcResult = personalCalc;
-      personalLoanAmount = personalCalc.personalFinanceAmount;
-      personalInstallment = personalCalc.monthlyInstallment;
-      personalMonths = personalCalc.termMonths;
-      personalRepayment = personalCalc.totalRepayment;
-      personalProfit = personalCalc.profitAmount;
-      personalCalcMethod = personalCalc.calculationMethod;
+      if (bankSupportsPersonal) {
+        const personalObls = obligations;
+        const personalCalc = calculatePersonalFinance({
+          netSalary: solvedNetSalary,
+          obligations: personalObls,
+          sectorId,
+          bankId: bank.id,
+          rules: personalRules,
+          productId,
+          monthsBeforeRetirement: Math.max(0, Math.round(retirementAge * 12) - termResult.currentAgeMonths),
+          remainingMonthsToMaxAge: termResult.remainingMonthsToMaxAge
+        });
+        personalCalcResult = personalCalc;
+        personalLoanAmount = personalCalc.personalFinanceAmount;
+        personalInstallment = personalCalc.monthlyInstallment;
+        personalMonths = personalCalc.termMonths;
+        personalRepayment = personalCalc.totalRepayment;
+        personalProfit = personalCalc.profitAmount;
+        personalCalcMethod = personalCalc.calculationMethod;
+      } else {
+        // Bank does not support personal financing
+        personalCalcResult = {
+          personalFinanceAmount: 0,
+          monthlyInstallment: 0,
+          termMonths: 0,
+          totalRepayment: 0,
+          profitAmount: 0,
+          calculationMethod: undefined,
+          multiplier: undefined,
+          diagnostics: {
+            error: 'التمويل الشخصي غير متوفر لدى هذه الجهة',
+            isEligible: false
+          }
+        };
+        personalLoanAmount = 0;
+        personalInstallment = 0;
+        personalMonths = 0;
+        personalRepayment = 0;
+        personalProfit = 0;
+        personalCalcMethod = undefined;
+      }
     }
 
     // 9. Real estate calculation (incorporating dual loans constraints)
@@ -788,6 +814,8 @@ export function calculateBanksFinancing(params: {
         ...diag.messages
       ],
       isAgeLimitingFactor: termResult.isAgeLimitingFactor,
+      personalEligible: isEligible && bankSupportsPersonal,
+      supportsPersonal: bankSupportsPersonal,
       diagnosticSteps: [
         ...(supportType !== 'none' && supportResult.appliedRule ? [supportResult.appliedRule] : []),
         `[قاعدة مدة التمويل]: تم تطبيق ${isRuleApplied ? `قاعدة مخصصة لتمويل جهة الاستقطاع` : 'معايير جهة استقطاع افتراضية (Bank Fallback)'}.`,
@@ -1031,7 +1059,8 @@ export function calculateAll(params: {
     minTermMonths,
     selectedMode: 'manual',
     manualTermMonths: termYears * 12,
-    ruleSource: matchedTermRule ? 'termRule' : 'bankFallback'
+    ruleSource: matchedTermRule ? 'termRule' : 'bankFallback',
+    postRetirementMode: matchedTermRule?.postRetirementMode
   });
 
   // Calculate DSR rules

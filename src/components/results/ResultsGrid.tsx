@@ -372,7 +372,9 @@ export default function ResultsGrid({
                             {productId !== 'real_estate' && mainFinanceType !== 'real_estate_with_existing_personal' && (
                               <div className="border border-[#E5E7EB] rounded-xl p-3">
                                 <span className="text-xs text-[#6B7280] block mb-0.5">القرض الشخصي</span>
-                                <span className="font-bold text-[#111827]">{Math.round(offer.personalAmount).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال</span>
+                                <span className={offer.supportsPersonal === false ? "font-bold text-rose-600 text-xs" : "font-bold text-[#111827]"}>
+                                  {offer.supportsPersonal === false ? "غير متوفر لدى هذه الجهة" : `${Math.round(offer.personalAmount).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال`}
+                                </span>
                               </div>
                             )}
                             {mainFinanceType === 'real_estate_with_existing_personal' && (
@@ -444,7 +446,7 @@ export default function ResultsGrid({
                             </div>
                             <div className="flex justify-between items-center text-xs pl-2 text-[#4B5563]">
                               <span>└─ قسط الشخصي:</span>
-                              <span>{Math.round(offer.personalInstallmentAmount || 0).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال</span>
+                              <span>{offer.supportsPersonal === false ? "غير متوفر" : `${Math.round(offer.personalInstallmentAmount || 0).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال`}</span>
                             </div>
                             {offer.monthlyInstallmentAfterPersonal !== undefined && offer.monthlyInstallmentAfterPersonal > 0 && (
                               <div className="flex justify-between items-center text-xs border-t border-dashed border-[#E5E7EB] pt-1.5 text-[#1F2937]">
@@ -705,7 +707,9 @@ export default function ResultsGrid({
                       ) : (
                         <div>
                           <span className="text-xs text-[#6B7280] block mb-1">تمويل شخصي</span>
-                          <span className="font-bold text-[#111827]">{Math.round(selectedOffer.personalAmount).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال</span>
+                          <span className={selectedOffer.supportsPersonal === false ? "font-bold text-rose-600 text-xs" : "font-bold text-[#111827]"}>
+                            {selectedOffer.supportsPersonal === false ? "غير متوفر لدى هذه الجهة" : `${Math.round(selectedOffer.personalAmount).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال`}
+                          </span>
                         </div>
                       )}
                       <div>

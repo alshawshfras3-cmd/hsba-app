@@ -446,6 +446,7 @@ export default function AdminDashboard() {
   const [termRuleFormMinTermMonths, setTermRuleFormMinTermMonths] = useState('60');
   const [termRuleFormIsActive, setTermRuleFormIsActive] = useState(true);
   const [termRuleFormMilitarySubType, setTermRuleFormMilitarySubType] = useState<'officer' | 'enlisted' | 'all'>('all');
+  const [termRuleFormPostRetirementMode, setTermRuleFormPostRetirementMode] = useState<'dynamic' | 'fixed'>('dynamic');
 
   // Dynamic institution management states
   const [isInstitutionModalOpen, setIsInstitutionModalOpen] = useState(false);
@@ -4014,6 +4015,7 @@ export default function AdminDashboard() {
                   setTermRuleFormAllowedMonthsAfterRetirement('204');
                   setTermRuleFormMinTermMonths('60');
                   setTermRuleFormIsActive(true);
+                   setTermRuleFormPostRetirementMode('dynamic');
                 }}
                 className="inline-flex items-center gap-1 px-4 py-2 bg-[#0057B8] text-white hover:bg-[#004bb0] rounded-xl text-xs font-bold shadow-sm transition-all shrink-0 cursor-pointer"
               >
@@ -4081,7 +4083,7 @@ export default function AdminDashboard() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap font-mono text-slate-700">{r.maxTermMonths} شهر</td>
                           <td className="px-6 py-4 whitespace-nowrap font-mono text-slate-700">{r.maxAgeAtEnd} سنة</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-slate-600 text-xs">
+                          <td className="px-6 py-4 whitespace-nowrap text-slate-600 text-xs text-right">
                             {r.calendarType === 'hijri' ? 'هجري' : 'ميلادي'}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
@@ -4099,7 +4101,11 @@ export default function AdminDashboard() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-slate-600 text-xs font-mono">
                             {isMilitary ? (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-100 text-[10px] font-bold">ديناميكي</span>
+                              r.postRetirementMode === 'fixed' ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-100 text-[10px] font-bold">ثابت: {r.allowedMonthsAfterRetirement} شهر</span>
+                              ) : (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-amber-55 text-amber-800 border border-amber-100 text-[10px] font-bold">تلقائي رتبة</span>
+                              )
                             ) : isRetired ? (
                               <span className="text-gray-400 font-sans">—</span>
                             ) : (
@@ -4135,6 +4141,7 @@ export default function AdminDashboard() {
                                   setTermRuleFormMinTermMonths((r.minTermMonths || 60).toString());
                                   setTermRuleFormIsActive(r.isActive);
                                   setTermRuleFormMilitarySubType(r.militarySubType || 'all');
+                                  setTermRuleFormPostRetirementMode(r.postRetirementMode || 'dynamic');
                                 }}
                                 className="inline-flex items-center gap-1 px-3 py-1.5 border border-[#E5E7EB] hover:border-[#0057B8] text-[#0057B8] hover:bg-[#0057B8]/5 rounded-lg transition-all font-bold text-[11px] cursor-pointer"
                               >
@@ -4259,7 +4266,7 @@ export default function AdminDashboard() {
                           onClick={() => setTermRuleFormCalendarType('hijri')}
                           className={`flex-1 py-2 px-1 text-xs font-bold rounded-xl border text-center transition-all cursor-pointer ${
                             termRuleFormCalendarType === 'hijri'
-                              ? 'border-[#0057B8] bg-[#0057B8]/5 text-[#0057B8] font-bold font-bold'
+                              ? 'border-[#0057B8] bg-[#0057B8]/5 text-[#0057B8]'
                               : 'border-gray-200 text-gray-500 hover:bg-gray-50'
                           }`}
                         >
@@ -4270,7 +4277,7 @@ export default function AdminDashboard() {
                           onClick={() => setTermRuleFormCalendarType('gregorian')}
                           className={`flex-1 py-2 px-1 text-xs font-bold rounded-xl border text-center transition-all cursor-pointer ${
                             termRuleFormCalendarType === 'gregorian'
-                              ? 'border-[#0057B8] bg-[#0057B8]/5 text-[#0057B8] font-bold font-bold'
+                              ? 'border-[#0057B8] bg-[#0057B8]/5 text-[#0057B8]'
                               : 'border-gray-200 text-gray-500 hover:bg-gray-50'
                           }`}
                         >
@@ -4288,7 +4295,7 @@ export default function AdminDashboard() {
                             <button
                               type="button"
                               onClick={() => setTermRuleFormAllowAfterRetirement(true)}
-                              className={`flex-1 py-2 px-1 text-xs font-bold rounded-xl border text-center transition-all cursor-pointer ${
+                              className={`flex-1 py-1.5 px-1 text-[11px] font-bold rounded-xl border text-center transition-all cursor-pointer ${
                                 termRuleFormAllowAfterRetirement
                                   ? 'border-emerald-600 bg-emerald-50 text-emerald-800 font-bold'
                                   : 'border-gray-200 text-gray-500 hover:bg-gray-50'
@@ -4302,9 +4309,9 @@ export default function AdminDashboard() {
                                 setTermRuleFormAllowAfterRetirement(false);
                                 setTermRuleFormAllowedMonthsAfterRetirement('0');
                               }}
-                              className={`flex-1 py-2 px-1 text-xs font-bold rounded-xl border text-center transition-all cursor-pointer ${
+                              className={`flex-1 py-1.5 px-1 text-[11px] font-bold rounded-xl border text-center transition-all cursor-pointer ${
                                 !termRuleFormAllowAfterRetirement
-                                  ? 'border-rose-600 bg-rose-50 text-rose-800 font-bold'
+                                  ? 'border-[#EF4444] bg-[#FEF2F2] text-[#B91C1C]'
                                   : 'border-gray-200 text-gray-500 hover:bg-gray-50'
                               }`}
                             >
@@ -4313,28 +4320,68 @@ export default function AdminDashboard() {
                           </div>
                         </div>
 
-                        {/* Months After Retirement (Hidden/Note if military) */}
+                        {/* Months After Retirement */}
+                        {termRuleFormSectorId === 'military' && (
+                          <div className="mb-3">
+                            <label className="block text-[11px] font-bold text-gray-700 mb-1">طريقة حساب أشهر ما بعد التقاعد:</label>
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setTermRuleFormPostRetirementMode('dynamic')}
+                                className={`flex-1 py-1.5 px-1 text-[11px] font-bold rounded-xl border text-center transition-all cursor-pointer ${
+                                  termRuleFormPostRetirementMode === 'dynamic'
+                                    ? 'border-[#0057B8] bg-blue-50 text-[#0057B8] font-bold'
+                                    : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                                }`}
+                              >
+                                تلقائي حسب الرتبة
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setTermRuleFormPostRetirementMode('fixed')}
+                                className={`flex-1 py-1.5 px-1 text-[11px] font-bold rounded-xl border text-center transition-all cursor-pointer ${
+                                  termRuleFormPostRetirementMode === 'fixed'
+                                    ? 'border-[#0057B8] bg-blue-50 text-[#0057B8] font-bold'
+                                    : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                                }`}
+                              >
+                                رقم ثابت من الإعدادات
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
                         <div>
                           <label className="block text-[11px] font-bold text-gray-700 mb-1">أشهر السماح بعد التقاعد:</label>
-                          {(termRuleFormSectorId === 'military') ? (
-                            <div className="w-full bg-amber-50/70 text-right border border-amber-100 rounded-xl px-4 py-2.5 text-2xs font-extrabold text-amber-800 leading-snug">
-                              🛡️ يتم حساب أشهر السماح لقطاع العسكري ديناميكياً = (أقصى عمر − سن تقاعد الرتبة) × 12.
+                          {termRuleFormSectorId === 'military' && termRuleFormPostRetirementMode === 'dynamic' ? (
+                            <div className="space-y-2">
+                              <div className="w-full bg-amber-50/70 text-right border border-amber-100 rounded-xl px-4 py-2.5 text-[10px] font-bold text-amber-805 leading-snug">
+                                🛡️ يتم حساب أشهر السماح لقطاع العسكري ديناميكياً = (أقصى عمر − سن تقاعد الرتبة) × 12.
+                              </div>
+                              <input
+                                type="text"
+                                dir="ltr"
+                                disabled
+                                value="تلقائي حسب الرتبة"
+                                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-bold text-gray-400 bg-gray-100 text-right cursor-not-allowed"
+                              />
                             </div>
                           ) : (
                             <input
                               type="text"
                               inputMode="numeric"
-                              disabled={!termRuleFormAllowAfterRetirement}
+                              dir="ltr"
+                              disabled={termRuleFormSectorId !== 'military' ? !termRuleFormAllowAfterRetirement : false}
                               value={termRuleFormAllowedMonthsAfterRetirement}
                               onChange={(e) => {
-                                if (!termRuleFormAllowAfterRetirement) return;
+                                if (termRuleFormSectorId !== 'military' && !termRuleFormAllowAfterRetirement) return;
                                 const val = e.target.value.replace(/[^0-9]/g, '');
                                 setTermRuleFormAllowedMonthsAfterRetirement(val);
                               }}
                               placeholder="مثال: 204"
-                              className={`w-full border rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none text-right font-mono ${
-                                termRuleFormAllowAfterRetirement 
-                                  ? 'bg-white border-gray-200 focus:ring-2 focus:ring-[#0057B8]' 
+                              className={`w-full border rounded-xl px-4 py-2.5 text-xs font-bold focus:outline-none text-right font-mono ${
+                                (termRuleFormSectorId === 'military' || termRuleFormAllowAfterRetirement)
+                                  ? 'bg-white border-gray-200 focus:ring-2 focus:ring-[#0057B8] text-gray-800' 
                                   : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
                               }`}
                             />
@@ -4409,7 +4456,8 @@ export default function AdminDashboard() {
                         const maxAgeVal = parseInt(termRuleFormMaxAgeAtEnd, 10);
                         const minTermVal = parseInt(termRuleFormMinTermMonths, 10);
                         const isMil = termRuleFormSectorId === 'military';
-                        const postRetVal = isMil ? 120 : (parseInt(termRuleFormAllowedMonthsAfterRetirement, 10) || 0);
+                        const isFixed = isMil && termRuleFormPostRetirementMode === 'fixed';
+                        const postRetVal = (isMil && !isFixed) ? 120 : (parseInt(termRuleFormAllowedMonthsAfterRetirement, 10) || 0);
 
                         if (isNaN(maxTermVal) || maxTermVal <= 0) {
                           alert("يرجى إدخال أقصى مدة تمويل صحيحة");
@@ -4450,6 +4498,7 @@ export default function AdminDashboard() {
                             allowedMonthsAfterRetirement: termRuleFormSectorId === 'retired' ? 0 : postRetVal,
                             calendarType: termRuleFormCalendarType,
                             defaultTermMode: 'max',
+                            postRetirementMode: termRuleFormSectorId === 'military' ? termRuleFormPostRetirementMode : undefined,
                             isActive: termRuleFormIsActive
                           };
 
@@ -4469,6 +4518,7 @@ export default function AdminDashboard() {
                             allowAfterRetirement: termRuleFormSectorId === 'retired' ? false : termRuleFormAllowAfterRetirement,
                             allowedMonthsAfterRetirement: termRuleFormSectorId === 'retired' ? 0 : postRetVal,
                             calendarType: termRuleFormCalendarType,
+                            postRetirementMode: termRuleFormSectorId === 'military' ? termRuleFormPostRetirementMode : undefined,
                             isActive: termRuleFormIsActive
                           };
 
