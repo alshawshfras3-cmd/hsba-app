@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS public.app_users (
   email text UNIQUE,
   phone text,
   is_blocked boolean DEFAULT false,
+  status text DEFAULT 'active',
+  last_login_at timestamptz,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now()
 );
@@ -95,3 +97,10 @@ BEGIN
   DELETE FROM auth.users WHERE id = auth.uid();
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+-- ضمان إنشاء الأعمدة تدريجياً دون الحاجة لإسقاط الجدول القديم
+ALTER TABLE public.app_users ADD COLUMN IF NOT EXISTS full_name text;
+ALTER TABLE public.app_users ADD COLUMN IF NOT EXISTS phone text;
+ALTER TABLE public.app_users ADD COLUMN IF NOT EXISTS status text DEFAULT 'active';
+ALTER TABLE public.app_users ADD COLUMN IF NOT EXISTS last_login_at timestamptz;
+ALTER TABLE public.app_users ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();

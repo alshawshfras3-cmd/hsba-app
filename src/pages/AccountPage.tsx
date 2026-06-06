@@ -53,6 +53,36 @@ export function AccountPage() {
     }
   };
 
+  React.useEffect(() => {
+    async function checkAndCreateProfile() {
+      if (!hasSupabaseKeys || !user) return;
+      try {
+        const { data, error } = await supabase
+          .from('app_users')
+          .select('id')
+          .eq('id', user.id)
+          .maybeSingle();
+        
+        if (error || !data) {
+          console.log("No profile in app_users, creating automatically for user:", user.email);
+          await supabase
+            .from('app_users')
+            .upsert({
+              id: user.id,
+              email: user.email?.toLowerCase().trim() || '',
+              full_name: user?.user_metadata?.full_name || '',
+              phone: user?.user_metadata?.phone || '',
+              status: 'active',
+              updated_at: new Date().toISOString()
+            }, { onConflict: 'id' });
+        }
+      } catch (err) {
+        console.error("Error auto-checking user profile in AccountPage:", err);
+      }
+    }
+    checkAndCreateProfile();
+  }, [user]);
+
 
 
   const handleUpdateProfile = async (e: React.FormEvent) => {

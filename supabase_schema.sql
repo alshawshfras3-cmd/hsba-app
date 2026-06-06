@@ -12,6 +12,8 @@ CREATE TABLE public.app_users (
   email text UNIQUE,
   phone text,
   is_blocked boolean DEFAULT false,
+  status text DEFAULT 'active',
+  last_login_at timestamp with time zone,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now()
 );
@@ -319,3 +321,11 @@ VALUES
   (9999.99, 150000),
   (10000.00, 100000)
 ON CONFLICT DO NOTHING;
+
+-- ضمان إنشاء الأعمدة تدريجياً دون الحاجة لإسقاط الجدول القديم
+ALTER TABLE public.app_users ADD COLUMN IF NOT EXISTS full_name text;
+ALTER TABLE public.app_users ADD COLUMN IF NOT EXISTS phone text;
+ALTER TABLE public.app_users ADD COLUMN IF NOT EXISTS status text DEFAULT 'active';
+ALTER TABLE public.app_users ADD COLUMN IF NOT EXISTS last_login_at timestamptz;
+ALTER TABLE public.app_users ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
+

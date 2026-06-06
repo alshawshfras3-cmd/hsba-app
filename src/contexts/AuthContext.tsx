@@ -52,6 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const fetchPromise = (async () => {
         // Try app_users first, fallback to user_profiles
         let profileData = null;
+        let foundInAppUsers = false;
         try {
           const { data, error } = await supabase
             .from('app_users')
@@ -60,6 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             .maybeSingle();
           if (!error && data) {
             profileData = data;
+            foundInAppUsers = true;
           }
         } catch (e) {
           console.warn("Could not load from app_users", e);
@@ -79,6 +81,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.warn("Could not load from user_profiles fallback", e);
           }
         }
+
+        // If not found in app_users, perform a self-healing upsert instantly to synchronize
+        if (!foundInAppUsers) {
+          try {
+            const emailValue = email?.toLowerCase().trim() || profileData?.email?.toLowerCase().trim() || '';
+            const fullNameDesc = profileData?.full_name || profileData?.username || userMetadata?.full_name || userMetadata?.username || '';
+            const phoneValue = profileData?.phone || userMetadata?.phone || '';
+
+            const { data: upsertedData, error: upsertErr } = await supabase
+              .from('app_users')
+              .upsert({
+                id: userId,
+                email: emailValue,
+                full_name: fullNameDesc,
+                phone: phoneValue,
+                status: 'active',
+                last_login_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              }, {
+                onConflict: 'id'
+              })
+              .select()
+              .maybeSingle();
+
+            if (!upsertErr && upsertedData) {
+              profileData = upsertedData;
+            }
+          } catch (createErr) {
+            console.error("Auto-creation of app_users failed inside fetchProfile:", createErr);
+          }
+        }
+
         return profileData;
       })();
 
@@ -286,6 +320,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) throw error;
 
     if (data?.user) {
+      // Upsert into app_users immediately upon successful login!
+      try {
+        const { error: profileError } = await supabase
+          .from('app_users')
+          .upsert({
+            id: data.user.id,
+            email: data.user.email?.toLowerCase().trim() || emailLower,
+            full_name: data.user.user_metadata?.full_name || '',
+            phone: data.user.user_metadata?.phone || '',
+            status: 'active',
+            last_login_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'id'
+          });
+        if (profileError) {
+          console.error('Failed to upsert user profile on sign in:', profileError);
+        }
+      } catch (err) {
+        console.error('Failed to run sign in profile sync logic:', err);
+      }
+
       // Fetch their profile and check status immediately across both tables
       let isBlocked = false;
       try {
@@ -347,6 +403,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       options: { data: { full_name: fullName } }
     });
     if (error) throw error;
+
+    if (data?.user) {
+      try {
+        const { error: profileError } = await supabase
+          .from('app_users')
+          .upsert({
+            id: data.user.id,
+            email: data.user.email?.toLowerCase().trim() || email.toLowerCase().trim(),
+            full_name: fullName || data.user.user_metadata?.full_name || '',
+            phone: data.user.user_metadata?.phone || '',
+            status: 'active',
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'id'
+          });
+
+        if (profileError) {
+          console.error('Failed to create app_users profile:', profileError);
+        }
+      } catch (err) {
+        console.error('Failed to run profile upsert logic after sign up:', err);
+      }
+    }
     return data;
   }
 

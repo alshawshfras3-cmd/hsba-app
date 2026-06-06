@@ -253,12 +253,24 @@ export function UsersManagementPage() {
           <Loader2 className="w-8 h-8 animate-spin text-amber-600" />
           <span className="text-xs text-gray-500 font-bold">جاري تحميل حسابات المستخدمين...</span>
         </div>
+      ) : errorMsg ? (
+        <div className="p-12 text-center bg-white border border-red-100 rounded-2xl space-y-4">
+          <AlertCircle className="w-10 h-10 text-red-500 mx-auto" />
+          <h4 className="text-sm font-bold text-red-700">تعذر تحميل المستخدمين من قاعدة البيانات</h4>
+          <p className="text-xs text-gray-500">{errorMsg}</p>
+          <button
+            onClick={fetchUsersAndAdminEmail}
+            className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl cursor-pointer transition-all mx-auto block"
+          >
+            إعادة المحاولة
+          </button>
+        </div>
       ) : users.length === 0 ? (
         <div className="p-12 text-center bg-white border border-gray-100 rounded-2xl space-y-3">
           <User className="w-10 h-10 text-gray-400 mx-auto animate-pulse" />
-          <h4 className="text-sm font-bold text-gray-700">لا يوجد مستخدمون مسجلون حتى الآن</h4>
+          <h4 className="text-sm font-bold text-gray-700">لا يوجد مستخدمون في جدول app_users حتى الآن</h4>
           <p className="text-xs text-amber-600 font-bold leading-relaxed">
-            الجدول فارغ. يحتاج المستخدمون الحاليون إلى مزامنة من Supabase Auth إلى جدول app_users لإظهار حساباتهم وإحصاءاتهم في النظام بشكل سليم.
+            لا يوجد مستخدمون في جدول app_users حتى الآن. سيتم إنشاء المستخدمين تلقائيًا عند التسجيل أو تسجيل الدخول.
           </p>
         </div>
       ) : filteredUsers.length === 0 ? (
