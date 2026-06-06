@@ -549,20 +549,32 @@ export default function AdminDashboard() {
   useEffect(() => {
     async function loadDbRules() {
       setDbRulesLoading(true);
+
+      let salaryData = [];
       try {
-        const [salaryData, pensionData, mappingsData] = await Promise.all([
-          fetchApprovedSalaryRules(),
-          fetchPensionCalculationRules(),
-          fetchSectorClassificationMappings()
-        ]);
+        salaryData = await fetchApprovedSalaryRules();
         setApprovedSalaryDbRules(salaryData);
+      } catch (err) {
+        console.error("Failed loading approved salary rules from Supabase:", err);
+      }
+
+      let pensionData = [];
+      try {
+        pensionData = await fetchPensionCalculationRules();
         setPensionDbRules(pensionData);
+      } catch (err) {
+        console.error("Failed loading pension calculation rules from Supabase:", err);
+      }
+
+      let mappingsData = [];
+      try {
+        mappingsData = await fetchSectorClassificationMappings();
         setSectorMappings(mappingsData);
       } catch (err) {
-        console.error("Failed loading database rules", err);
-      } finally {
-        setDbRulesLoading(false);
+        console.error("Failed loading sector classification mappings from Supabase:", err);
       }
+
+      setDbRulesLoading(false);
     }
     loadDbRules();
   }, []);

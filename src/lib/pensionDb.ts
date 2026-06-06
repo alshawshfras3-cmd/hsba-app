@@ -200,16 +200,22 @@ export function combineToRetirementRules(
 
 export async function fetchApprovedSalaryRules(): Promise<ApprovedSalarySourceRule[]> {
   if (!hasSupabaseKeys) {
+    console.log('[SUPABASE LOAD] table=approved_salary_source_rules status=offline (no keys)');
     return fallbackApprovedSalaryRules;
   }
   try {
+    console.log('[PENSION] START fetchApprovedSalaryRules');
     const { data, error } = await supabase
       .from('approved_salary_source_rules')
       .select('*');
 
     if (error) throw error;
-    if (!data || data.length === 0) return fallbackApprovedSalaryRules;
+    if (!data || data.length === 0) {
+      console.log('[SUPABASE LOAD] table=approved_salary_source_rules status=success rows=0 (using fallback)');
+      return fallbackApprovedSalaryRules;
+    }
 
+    console.log(`[SUPABASE LOAD] table=approved_salary_source_rules status=success rows=${data.length}`);
     return data.map((r: any) => ({
       id: r.id,
       bankId: r.bank_id,
@@ -220,7 +226,8 @@ export async function fetchApprovedSalaryRules(): Promise<ApprovedSalarySourceRu
       createdAt: r.created_at,
       updatedAt: r.updated_at
     }));
-  } catch (err) {
+  } catch (err: any) {
+    console.error(`[SUPABASE LOAD] table=approved_salary_source_rules status=error message=${err?.message || err}`);
     console.error('Failed to fetch approved salary source rules from Supabase. Falling back.', err);
     return fallbackApprovedSalaryRules;
   }
@@ -250,16 +257,22 @@ export async function saveApprovedSalaryRule(rule: ApprovedSalarySourceRule): Pr
 
 export async function fetchPensionCalculationRules(): Promise<PensionCalculationRule[]> {
   if (!hasSupabaseKeys) {
+    console.log('[SUPABASE LOAD] table=pension_calculation_rules status=offline (no keys)');
     return fallbackPensionRules;
   }
   try {
+    console.log('[PENSION] START fetchPensionCalculationRules');
     const { data, error } = await supabase
       .from('pension_calculation_rules')
       .select('*');
 
     if (error) throw error;
-    if (!data || data.length === 0) return fallbackPensionRules;
+    if (!data || data.length === 0) {
+      console.log('[SUPABASE LOAD] table=pension_calculation_rules status=success rows=0 (using fallback)');
+      return fallbackPensionRules;
+    }
 
+    console.log(`[SUPABASE LOAD] table=pension_calculation_rules status=success rows=${data.length}`);
     return data.map((r: any) => ({
       id: r.id,
       bankId: r.bank_id,
@@ -274,7 +287,8 @@ export async function fetchPensionCalculationRules(): Promise<PensionCalculation
       createdAt: r.created_at,
       updatedAt: r.updated_at
     }));
-  } catch (err) {
+  } catch (err: any) {
+    console.error(`[SUPABASE LOAD] table=pension_calculation_rules status=error message=${err?.message || err}`);
     console.error('Failed to fetch pension calculation rules map from Supabase. Falling back.', err);
     return fallbackPensionRules;
   }
@@ -308,16 +322,22 @@ export async function savePensionCalculationRule(rule: PensionCalculationRule): 
 
 export async function fetchSectorClassificationMappings(): Promise<SectorClassificationMapping[]> {
   if (!hasSupabaseKeys) {
+    console.log('[SUPABASE LOAD] table=sector_classification_mapping status=offline (no keys)');
     return fallbackSectorMappings;
   }
   try {
+    console.log('[PENSION] START fetchSectorClassificationMappings');
     const { data, error } = await supabase
       .from('sector_classification_mapping')
       .select('*');
 
     if (error) throw error;
-    if (!data || data.length === 0) return fallbackSectorMappings;
+    if (!data || data.length === 0) {
+      console.log('[SUPABASE LOAD] table=sector_classification_mapping status=success rows=0 (using fallback)');
+      return fallbackSectorMappings;
+    }
 
+    console.log(`[SUPABASE LOAD] table=sector_classification_mapping status=success rows=${data.length}`);
     return data.map((r: any) => ({
       id: r.id,
       bankId: r.bank_id,
@@ -326,7 +346,8 @@ export async function fetchSectorClassificationMappings(): Promise<SectorClassif
       labelAr: r.label_ar,
       createdAt: r.created_at
     }));
-  } catch (err) {
+  } catch (err: any) {
+    console.error(`[SUPABASE LOAD] table=sector_classification_mapping status=error message=${err?.message || err}`);
     console.error('Failed to fetch sector mappings from Supabase. Falling back.', err);
     return fallbackSectorMappings;
   }

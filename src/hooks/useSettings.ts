@@ -121,7 +121,7 @@ export function useSettings() {
 
     try {
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Supabase system_settings request timed out after 3 seconds')), 3000);
+        setTimeout(() => reject(new Error('Supabase system_settings request timed out after 30 seconds')), 30000);
       });
 
       const fetchResPromise = (async () => {
@@ -148,6 +148,8 @@ export function useSettings() {
       })();
 
       const rows = await Promise.race([fetchResPromise, timeoutPromise]);
+
+      console.log(`[SUPABASE LOAD] table=system_settings status=success parsedCount=${rows.length}`);
 
       const loaded: Record<string, any> = {};
       const presentRecords = new Map<string, { value: any, source?: string }>();
@@ -221,7 +223,8 @@ export function useSettings() {
         localStorage.setItem("hasba_settings_cache", JSON.stringify(cacheToSave));
       } catch (_) {}
 
-    } catch (err) {
+    } catch (err: any) {
+      console.error(`[SUPABASE LOAD] table=system_settings status=error message=${err?.message || err}`);
       console.warn('Fallback settings on fetch failure in background:', err);
       setSupabaseFetched(true);
     }

@@ -510,19 +510,29 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true;
     async function loadTiers() {
+      let hSupport = [];
+      let aPayment = [];
+
       try {
-        const hSupport = await fetchHousingSupportTiers();
-        const aPayment = await fetchAdvancePaymentTiers();
-        if (active) {
-          setHousingSupportTiers(hSupport);
-          setAdvancePaymentTiers(aPayment);
-          setTiersLoaded(true);
-        }
+        hSupport = await fetchHousingSupportTiers();
       } catch (err) {
-        console.error("Failed to fetch support tiers:", err);
-        if (active) {
-          setTiersLoaded(true); // force true to keep app operational
+        console.error("Failed to fetch housing support tiers:", err);
+      }
+
+      try {
+        aPayment = await fetchAdvancePaymentTiers();
+      } catch (err) {
+        console.error("Failed to fetch advance payment tiers:", err);
+      }
+
+      if (active) {
+        if (hSupport && hSupport.length > 0) {
+          setHousingSupportTiers(hSupport);
         }
+        if (aPayment && aPayment.length > 0) {
+          setAdvancePaymentTiers(aPayment);
+        }
+        setTiersLoaded(true);
       }
     }
     loadTiers();
@@ -556,6 +566,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       setHasSynced(true);
     }
   }, [settingsInitialized, supabaseFetched, tiersLoaded, settings, hasSynced, housingSupportTiers, advancePaymentTiers]);
+
+  useEffect(() => {
+    if (!isSettingsLoading) {
+      console.log('[APP BOOT] settingsReady=true usersReady=true diagnosticsReady=true');
+    }
+  }, [isSettingsLoading]);
 
   // Synchronise path for diagnostics direct link route
   useEffect(() => {

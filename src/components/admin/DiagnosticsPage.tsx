@@ -9,7 +9,10 @@ import {
 import { 
   fetchApprovedSalaryRules, 
   fetchPensionCalculationRules, 
-  fetchSectorClassificationMappings 
+  fetchSectorClassificationMappings,
+  fallbackApprovedSalaryRules,
+  fallbackPensionRules,
+  fallbackSectorMappings
 } from '../../lib/pensionDb';
 import { 
   ApprovedSalarySourceRule, 
@@ -40,6 +43,7 @@ export function DiagnosticsPage() {
   const [dbPensionRules, setDbPensionRules] = useState<PensionCalculationRule[]>([]);
   const [dbSectorMappings, setDbSectorMappings] = useState<SectorClassificationMapping[]>([]);
   const [loadingDb, setLoadingDb] = useState(true);
+  const [isFallbackWarning, setIsFallbackWarning] = useState(false);
 
   // Form Inputs
   const [selectedBankId, setSelectedBankId] = useState('rajhi');
@@ -75,20 +79,46 @@ export function DiagnosticsPage() {
 
   useEffect(() => {
     async function initRules() {
+      setLoadingDb(true);
+
+      let salary = [];
       try {
-        const [salary, pension, mappings] = await Promise.all([
-          fetchApprovedSalaryRules(),
-          fetchPensionCalculationRules(),
-          fetchSectorClassificationMappings()
-        ]);
+        salary = await fetchApprovedSalaryRules();
         setDbApprovedSalaryRules(salary);
-        setDbPensionRules(pension);
-        setDbSectorMappings(mappings);
-      } catch (e) {
-        console.error('Failed to load deep diagnostics rules from Supabase', e);
-      } finally {
-        setLoadingDb(false);
+      } catch (err) {
+        console.error('Failed loading approved salary rules in diagnostics from Supabase:', err);
+        salary = fallbackApprovedSalaryRules;
+        setDbApprovedSalaryRules(salary);
       }
+
+      let pension = [];
+      try {
+        pension = await fetchPensionCalculationRules();
+        setDbPensionRules(pension);
+      } catch (err) {
+        console.error('Failed loading pension calc rules in diagnostics from Supabase:', err);
+        pension = fallbackPensionRules;
+        setDbPensionRules(pension);
+      }
+
+      let mappings = [];
+      try {
+        mappings = await fetchSectorClassificationMappings();
+        setDbSectorMappings(mappings);
+      } catch (err) {
+        console.error('Failed loading sector mappings in diagnostics from Supabase:', err);
+        mappings = fallbackSectorMappings;
+        setDbSectorMappings(mappings);
+      }
+
+      const isFallback = (salary === fallbackApprovedSalaryRules) ||
+                         (pension === fallbackPensionRules) ||
+                         (mappings === fallbackSectorMappings) ||
+                         (salary.length === 0) ||
+                         (pension.length === 0) ||
+                         (mappings.length === 0);
+      setIsFallbackWarning(isFallback);
+      setLoadingDb(false);
     }
     initRules();
   }, []);
@@ -452,6 +482,18 @@ export function DiagnosticsPage() {
           </button>
         </div>
       </div>
+
+      {isFallbackWarning && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3" id="fallback-warning-box">
+          <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div>
+            <h4 className="text-xs font-bold text-amber-800 text-right">تم تنشيط القواعد الاحتياطية لتشخيص الحساب</h4>
+            <p className="text-[11px] text-amber-700 mt-1 leading-relaxed text-right">
+              تعذر تحميل القواعد من Supabase، تم استخدام القواعد الافتراضية مؤقتًا المعرّفة محليًا داخل التطبيق للسماح بتشغيل المحاكي والتشخيص بنجاح. يمكنك استعراض وتحليل العمليات الائتمانية والتقاعدية الآن بشكل سليم.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column: Input Form & Test Suite */}

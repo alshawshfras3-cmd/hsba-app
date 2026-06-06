@@ -73,23 +73,16 @@ export function getAdvancePayment(S: number, tiers: AdvancePaymentTier[] = DEFAU
 export async function fetchHousingSupportTiers(): Promise<HousingSupportTier[]> {
   if (hasSupabaseKeys) {
     try {
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Housing support tiers request timed out after 3 seconds')), 3000);
-      });
+      console.log('[SUPPORT] START fetchHousingSupportTiers');
+      const { data, error } = await supabase
+        .from('housing_support_tiers')
+        .select('*')
+        .order('sort_order', { ascending: true });
 
-      const fetchPromise = (async () => {
-        const { data, error } = await supabase
-          .from('housing_support_tiers')
-          .select('*')
-          .order('sort_order', { ascending: true });
-
-        if (error) throw error;
-        return data;
-      })();
-
-      const data = await Promise.race([fetchPromise, timeoutPromise]);
+      if (error) throw error;
 
       if (data && data.length > 0) {
+        console.log(`[SUPABASE LOAD] table=housing_support_tiers status=success rows=${data.length}`);
         return data.map(item => ({
           id: item.id,
           min_salary: Number(item.min_salary),
@@ -98,10 +91,15 @@ export async function fetchHousingSupportTiers(): Promise<HousingSupportTier[]> 
           amount_at_max: Number(item.amount_at_max),
           sort_order: Number(item.sort_order)
         }));
+      } else {
+        console.log(`[SUPABASE LOAD] table=housing_support_tiers status=success rows=0`);
       }
-    } catch (e) {
+    } catch (e: any) {
+      console.error(`[SUPABASE LOAD] table=housing_support_tiers status=error message=${e?.message || e}`);
       console.warn("Could not load housing_support_tiers from database. Defaulting to state seeds.", e);
     }
+  } else {
+    console.log(`[SUPABASE LOAD] table=housing_support_tiers status=offline (no keys)`);
   }
   return [...DEFAULT_HOUSING_SUPPORT_TIERS];
 }
@@ -112,32 +110,30 @@ export async function fetchHousingSupportTiers(): Promise<HousingSupportTier[]> 
 export async function fetchAdvancePaymentTiers(): Promise<AdvancePaymentTier[]> {
   if (hasSupabaseKeys) {
     try {
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Advance payment tiers request timed out after 3 seconds')), 3000);
-      });
+      console.log('[SUPPORT] START fetchAdvancePaymentTiers');
+      const { data, error } = await supabase
+        .from('advance_payment_tiers')
+        .select('*')
+        .order('salary_threshold', { ascending: true });
 
-      const fetchPromise = (async () => {
-        const { data, error } = await supabase
-          .from('advance_payment_tiers')
-          .select('*')
-          .order('salary_threshold', { ascending: true });
-
-        if (error) throw error;
-        return data;
-      })();
-
-      const data = await Promise.race([fetchPromise, timeoutPromise]);
+      if (error) throw error;
 
       if (data && data.length > 0) {
+        console.log(`[SUPABASE LOAD] table=advance_payment_tiers status=success rows=${data.length}`);
         return data.map(item => ({
           id: item.id,
           salary_threshold: Number(item.salary_threshold),
           amount: Number(item.amount)
         }));
+      } else {
+        console.log(`[SUPABASE LOAD] table=advance_payment_tiers status=success rows=0`);
       }
-    } catch (e) {
+    } catch (e: any) {
+      console.error(`[SUPABASE LOAD] table=advance_payment_tiers status=error message=${e?.message || e}`);
       console.warn("Could not load advance_payment_tiers from database. Defaulting to state seeds.", e);
     }
+  } else {
+    console.log(`[SUPABASE LOAD] table=advance_payment_tiers status=offline (no keys)`);
   }
   return [...DEFAULT_ADVANCE_PAYMENT_TIERS];
 }

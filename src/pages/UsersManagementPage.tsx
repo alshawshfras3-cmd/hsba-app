@@ -9,6 +9,7 @@ type AppUser = {
   full_name: string | null;
   phone?: string | null;
   is_blocked: boolean;
+  status?: string | null;
   created_at: string;
 };
 
@@ -41,49 +42,40 @@ export function UsersManagementPage() {
     if (!hasSupabaseKeys) {
       setUsers([]);
       setErrorMsg('مفاتيح الاتصال بقاعدة البيانات غير متوفرة');
+      console.log('[SUPABASE LOAD] table=app_users status=offline (no keys)');
       setLoading(false);
       return;
     }
 
     const targetTableName = 'app_users';
-    const demandedColumns = 'id, full_name, email, phone, is_blocked, created_at, updated_at';
-    const completeQueryRepr = `supabase.from('${targetTableName}').select('${demandedColumns}').order('created_at', { ascending: false })`;
+    const demandedColumns = 'id, full_name, email, phone, is_blocked, status, created_at, updated_at';
     const metaEnv = (import.meta as any).env || {};
     const supabaseUrl = (metaEnv.VITE_SUPABASE_URL || '').trim();
 
-    console.log("[Supabase Diagnostic - UsersManagementPage] Starting diagnostics...");
-    console.log("1. Target Table Name:", targetTableName);
-    console.log("2. Complete Query Representation:", completeQueryRepr);
-    console.log("3. Demanded Columns:", demandedColumns);
-    console.log("4. Supabase URL in use:", supabaseUrl);
-    console.log("5. App connected to Supabase:", hasSupabaseKeys ? "YES" : "NO");
+    console.log('[USERS] START');
+    console.log(`[USERS] Query: supabase.from('${targetTableName}').select('${demandedColumns}').order('created_at', { ascending: false })`);
+    console.log(`[USERS] Requested Columns: ${demandedColumns}`);
+    console.log(`[USERS] Supabase URL prefix confirmed: "${supabaseUrl.substring(0, 30)}..."`);
 
     try {
-      // 30-second timeout promise (increased from 5 seconds to prevent TIMEOUT_LIMIT on cold server wakeups)
-      const TIMEOUT_LIMIT_MS = 30000;
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => {
-          reject(new Error(`TIMEOUT_LIMIT after ${TIMEOUT_LIMIT_MS}ms`));
-        }, TIMEOUT_LIMIT_MS);
-      });
+      // Execute the clean direct select query without timeout interference
+      const { data, error } = await supabase
+        .from(targetTableName)
+        .select(demandedColumns)
+        .order('created_at', { ascending: false });
 
-      const fetchPromise = (async () => {
-        const { data, error } = await supabase
-          .from(targetTableName)
-          .select(demandedColumns)
-          .order('created_at', { ascending: false });
+      console.log('[USERS] Direct Supabase Data Response:', data);
+      console.log('[USERS] Direct Supabase Error Response:', error);
 
-        if (error) {
-          console.error("[Supabase Diagnostic - UsersManagementPage] Query failed with error:", error);
-          throw error;
-        }
-        return data || [];
-      })();
+      if (error) {
+        console.error(`[USERS] FAILED reason=${error.message || JSON.stringify(error)}`);
+        const fullErrStr = `Message: ${error.message || ''} | Code: ${error.code || ''} | Details: ${error.details || ''} | Hint: ${error.hint || ''}`;
+        throw new Error(fullErrStr);
+      }
 
-      const rawData = await Promise.race([fetchPromise, timeoutPromise]);
-
-      console.log("[Supabase Diagnostic - UsersManagementPage] 6. Query result count:", rawData.length);
-      console.log("[Supabase Diagnostic - UsersManagementPage] 7. Raw records loaded:", rawData);
+      const rawData = data || [];
+      console.log(`[USERS] SUCCESS rows=${rawData.length}`);
+      console.log(`[SUPABASE LOAD] table=app_users status=success rows=${rawData.length}`);
 
       const filtered = rawData.map((item: any) => ({
         id: item.id,
@@ -91,6 +83,7 @@ export function UsersManagementPage() {
         full_name: item.full_name || 'مستخدم غير معرّف',
         phone: item.phone || null,
         is_blocked: item.is_blocked === true,
+        status: item.status || 'active',
         created_at: item.created_at || new Date().toISOString()
       })).filter((u: AppUser) => {
         const emailLower = u.email.toLowerCase().trim();
@@ -107,8 +100,10 @@ export function UsersManagementPage() {
 ===============================================`);
     } catch (err: any) {
       console.error("[Supabase Diagnostic - UsersManagementPage] Catch block error:", err);
+      const errorStr = err?.message || JSON.stringify(err);
+      console.error(`[USERS] FAILED reason=${errorStr}`);
+      console.error(`[SUPABASE LOAD] table=app_users status=error message=${errorStr}`);
       setUsers([]);
-      const errorStr = err?.message || err?.details || JSON.stringify(err);
       setErrorMsg(`تعذر تحميل المستخدمين من قاعدة البيانات: ${errorStr}`);
       
       console.log(`===============================================

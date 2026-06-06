@@ -23,6 +23,15 @@ const safeKey = hasSupabaseKeys ? supabaseAnonKey : 'eyJhbGciOiJIUzI1NiIsInR5cCI
 
 export const supabase = createClient(safeUrl, safeKey);
 
+// Log URL prefix for verification
+if (hasSupabaseKeys) {
+  const match = supabaseUrl.match(/^https:\/\/(.*?)\.supabase\.(co|net)/);
+  const prefix = match ? match[1] : supabaseUrl.substring(0, 25);
+  console.log(`[SUPABASE CONNECT] URL prefix confirmed: "${prefix}" (expected: "yeppasileupalanwxzzm")`);
+} else {
+  console.log('[SUPABASE CONNECT] Running in offline fallback mode (missing/placeholder keys)');
+}
+
 export function cleanStaleSupabaseSession() {
   try {
     if (typeof window !== 'undefined') {
