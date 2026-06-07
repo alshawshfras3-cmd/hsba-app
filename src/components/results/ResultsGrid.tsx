@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { BankCalculationResult, ProductId } from '../../types';
 import { 
   Building2, CheckCircle, XCircle, AlertTriangle, ArrowLeftRight, Clock, Percent, ListCollapse,
-  Download, HelpCircle, Activity, Info, Users, ChevronDown, Award, Bookmark
+  Download, HelpCircle, Activity, Info, Users, ChevronDown, Award, Bookmark, Copy
 } from 'lucide-react';
 import { useAppState } from '../../context/AppContext';
 import { saveCalculationResult } from '../../lib/savedResultsService';
@@ -42,6 +42,74 @@ export default function ResultsGrid({
 
   const currentSub = userSubscriptions?.find(sub => sub.email === user?.email);
   const isSubscribed = true;
+
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'refuse' } | null>(null);
+
+  const handleCopyText = async (offer: BankCalculationResult, e: React.MouseEvent) => {
+    e.stopPropagation(); // prevent modal opening!
+
+    const isApp = offer.status === 'approved';
+    const isWarn = offer.status === 'warning';
+    const isRej = offer.status === 'rejected';
+
+    const statusAr = isApp ? 'مقبول' : isWarn ? 'مقبول بتحفظ' : 'غير مقبول';
+
+    const termText = mainFinanceType === 'personal_only' 
+      ? 'مدة التمويل الشخصي: 5 سنوات (60 شهراً)' 
+      : `مدة التمويل العقاري: ${Math.floor(offer.termMonths / 12)} سنة${Math.round(offer.termMonths % 12) > 0 ? ` و ${Math.round(offer.termMonths % 12)} أشهر` : ''}`;
+
+    const formatNum = (num: number) => Math.round(num).toLocaleString('en-US');
+
+    const totalAmount = mainFinanceType === 'personal_only' 
+      ? offer.personalAmount 
+      : mainFinanceType === 'real_estate_with_existing_personal'
+      ? offer.realEstateAmount
+      : offer.totalPurchasingPower;
+
+    let lines: string[] = [];
+
+    lines.push(`البنك: ${offer.bankName}`);
+    lines.push(`الحالة: ${statusAr}`);
+    lines.push(termText);
+    lines.push(''); // empty line
+
+    lines.push(`إجمالي التمويل المتاح: ${formatNum(totalAmount)} ريال`);
+
+    if (productId !== 'personal') {
+      lines.push(`القرض العقاري: ${formatNum(offer.realEstateAmount)} ريال`);
+    }
+    if (productId !== 'real_estate' && mainFinanceType !== 'real_estate_with_existing_personal' && offer.supportsPersonal !== false) {
+      lines.push(`القرض الشخصي: ${formatNum(offer.personalAmount)} ريال`);
+    }
+
+    lines.push(''); // empty line
+
+    if (mainFinanceType === 'personal_only') {
+      lines.push(`قسط التمويل الشخصي: ${formatNum(offer.monthlyInstallmentBeforeRetirement)} ريال`);
+    } else if (productId === 'both') {
+      lines.push(`القسط الشهري الإجمالي: ${formatNum(offer.monthlyInstallmentBeforeRetirement)} ريال`);
+      lines.push(`├─ قسط العقاري: ${formatNum(offer.realEstateInstallmentOnly || 0)} ريال`);
+      lines.push(`└─ قسط الشخصي: ${offer.supportsPersonal === false ? "غير متوفر" : `${formatNum(offer.personalInstallmentAmount || 0)} ريال`}`);
+    } else {
+      lines.push(`قسط التمويل العقاري: ${formatNum(offer.monthlyInstallmentBeforeRetirement)} ريال`);
+    }
+
+    if (offer.monthlyInstallmentAfterRetirement > 0) {
+      lines.push(`القسط التقاعدي العقاري: ${formatNum(offer.monthlyInstallmentAfterRetirement)} ريال / شهر`);
+    }
+
+    lines.push(`هامش الربح السنوي: ${offer.annualMargin}%`);
+
+    const textToCopy = lines.join('\n');
+
+    try {
+      await navigator.clipboard.writeText(textToCopy);
+      setToast({ message: 'تم نسخ الحسبة بنجاح', type: 'success' });
+      setTimeout(() => setToast(null), 3000);
+    } catch (err: any) {
+      console.error('Failed to copy calculation:', err);
+    }
+  };
 
   const toggleCardExpansion = (bankId: string, e: React.MouseEvent) => {
     e.stopPropagation(); // prevent modal opening!
@@ -515,6 +583,14 @@ export default function ResultsGrid({
                   >
                     <Bookmark className="w-3.5 h-3.5 shrink-0" />
                     <span>حفظ النتيجة</span>
+                  </button>
+
+                  <button 
+                    onClick={(e) => handleCopyText(offer, e)}
+                    className="flex-1 text-center py-2.5 rounded-xl border border-slate-200 hover:border-slate-300 text-slate-700 font-bold text-[11px] transition-all hover:bg-slate-50 cursor-pointer flex items-center justify-center gap-1 select-none"
+                  >
+                    <Copy className="w-3.5 h-3.5 shrink-0" />
+                    <span>نسخ الحسبة</span>
                   </button>
                 </div>
               </div>
@@ -1106,6 +1182,23 @@ export default function ResultsGrid({
             </div>
 
           </div>
+        </div>
+      )}
+
+      {/* Floating Success Toast notification */}
+      {toast && (
+        <div className="fixed bottom-5 right-5 z-50 bg-emerald-50 border border-emerald-200 text-emerald-800 shadow-xl rounded-2xl px-5 py-4 max-w-sm flex items-center justify-between gap-3 animate-slide-up" dir="rtl">
+          <div className="flex items-center gap-2">
+            <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0" />
+            <span className="text-xs font-bold font-sans">{toast.message}</span>
+          </div>
+          <button 
+            type="button" 
+            onClick={() => setToast(null)} 
+            className="font-extrabold text-[#6B7280] hover:text-[#111827] text-md px-1 cursor-pointer select-none"
+          >
+            ×
+          </button>
         </div>
       )}
     </div>
