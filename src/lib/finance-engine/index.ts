@@ -110,6 +110,22 @@ export const BANK_DEFAULT_LIMITS: Record<string, {
   alarabi: { maxTermMonths: 360, maxAgeAtEnd: 70, monthsAfterRetirement: 180, allowAfterRetirement: true, calendarType: 'gregorian' },
 };
 
+export function isProductEnabledForBank(bank: Bank, prodId: ProductId): boolean {
+  if (prodId === 'personal_only' || prodId === 'personal') {
+    return bank.personalFinanceEnabled !== false;
+  }
+  if (prodId === 'real_estate' || prodId === 'real_estate_only') {
+    return bank.realEstateFinanceEnabled !== false;
+  }
+  if (prodId === 'real_estate_with_new_personal' || prodId === 'both') {
+    return bank.combinedFinanceEnabled !== false;
+  }
+  if (prodId === 'real_estate_with_existing_personal' || prodId === 'real_estate_with_personal_existing') {
+    return bank.existingPersonalFinanceEnabled !== false;
+  }
+  return true;
+}
+
 export function getMatchedTermRule(params: {
   bankId: string;
   sectorId: SectorId;
@@ -339,9 +355,9 @@ export function calculateBanksFinancing(params: {
     );
   }
 
-  // Filter active target banks
+  // Filter active target banks  - exclude ones that don't support the selected product if querying all
   const targetBanks = selectedBankId === 'all'
-    ? banks.filter(b => b.isActive)
+    ? banks.filter(b => b.isActive && isProductEnabledForBank(b, productId))
     : banks.filter(b => b.id === selectedBankId && b.isActive);
 
   const results: BankCalculationResult[] = [];
@@ -533,7 +549,7 @@ export function calculateBanksFinancing(params: {
     let personalCalcMethod: 'multiplier' | 'pmt' | 'flat_rate' | undefined = undefined;
     let personalCalcResult: any = null;
 
-    const bankSupportsPersonal = !(bank.id === 'bidaya' || products.some(p => p.bankId === bank.id && p.supportsPersonal === false));
+    const bankSupportsPersonal = bank.personalFinanceEnabled !== false;
 
     if (productId === 'personal' || productId === 'personal_only' || productId === 'both' || productId === 'real_estate_with_new_personal') {
       if (bankSupportsPersonal) {
@@ -698,6 +714,45 @@ export function calculateBanksFinancing(params: {
       }
     }
 
+    // Real Estate and Personal Financing Limits Capping
+    const minRE = bank.minRealEstateAmount !== undefined ? bank.minRealEstateAmount : 100000;
+    const maxRE = bank.maxRealEstateAmount !== undefined ? bank.maxRealEstateAmount : 10000000;
+    const minPF = bank.minPersonalAmount !== undefined ? bank.minPersonalAmount : 10000;
+    const maxPF = bank.maxPersonalAmount !== undefined ? bank.maxPersonalAmount : 2000000;
+
+    const hasRealEstate = (productId === 'real_estate' || productId === 'real_estate_only' || productId === 'both' || productId === 'real_estate_with_new_personal' || productId === 'real_estate_with_existing_personal' || productId === 'real_estate_with_personal_existing');
+    const hasPersonal = (productId === 'personal' || productId === 'personal_only' || productId === 'both' || productId === 'real_estate_with_new_personal');
+
+    if (hasRealEstate && reLoanAmount > maxRE) {
+      const ratio = maxRE / reLoanAmount;
+      reLoanAmount = maxRE;
+      installmentBefore = Math.round(installmentBefore * ratio);
+      installmentAfter = Math.round(installmentAfter * ratio);
+      realEstateStage1 = Math.round(realEstateStage1 * ratio);
+      realEstateStage2 = Math.round(realEstateStage2 * ratio);
+      realEstateStage3 = Math.round(realEstateStage3 * ratio);
+      purchasingPower = reLoanAmount + (supportType === 'downpayment' ? supportResult.downPaymentSupport : 0);
+      
+      if (productId === 'both' || productId === 'real_estate_with_new_personal') {
+        totalInstallmentStage1 = installmentBefore + personalInstallment;
+      } else {
+        totalInstallmentStage1 = installmentBefore;
+      }
+      totalInstallmentStage2 = installmentAfter;
+    }
+
+    if (hasPersonal && personalLoanAmount > maxPF) {
+      const pRatio = maxPF / personalLoanAmount;
+      personalLoanAmount = maxPF;
+      personalInstallment = Math.round(personalInstallment * pRatio);
+      if (productId === 'both' || productId === 'real_estate_with_new_personal') {
+        totalInstallmentStage1 = installmentBefore + personalInstallment;
+      } else if (productId === 'personal' || productId === 'personal_only') {
+        totalInstallmentStage1 = personalInstallment;
+      }
+      personalInstallmentDisplay = personalInstallment;
+    }
+
     // 10. Diagnostics analysis and eligibility checks
     const diag = runDiagnostics({
       bankName: bank.nameAr,
@@ -727,7 +782,24 @@ export function calculateBanksFinancing(params: {
       diag.messages.unshift(personalCalcResult.diagnostics.error);
     }
 
-    const isEligible = diag.status !== 'rejected';
+    const isProductSupported = isProductEnabledForBank(bank, productId);
+    if (!isProductSupported) {
+      diag.status = 'rejected';
+      diag.messages.unshift('المنتج المطلوب غير مفعّل لدى هذه الجهة.');
+    }
+
+    // Financing Limits Rejection Checks
+    if (isProductSupported && diag.status !== 'rejected') {
+      if (hasRealEstate && reLoanAmount < minRE) {
+        diag.status = 'rejected';
+        diag.messages.unshift(`مرفوض — الحد الأدنى للتمويل ${minRE.toLocaleString('ar-SA')} ريال`);
+      } else if (hasPersonal && personalLoanAmount < minPF) {
+        diag.status = 'rejected';
+        diag.messages.unshift(`مرفوض — الحد الأدنى للتمويل ${minPF.toLocaleString('ar-SA')} ريال`);
+      }
+    }
+
+    const isEligible = diag.status !== 'rejected' && isProductSupported;
 
     if (productId !== 'both' && productId !== 'real_estate_with_new_personal' && productId !== 'real_estate_with_personal_existing' && productId !== 'real_estate_with_existing_personal') {
       totalInstallmentStage1 = isEligible ? (isPersonalOnly ? personalInstallment : installmentBefore) : 0;

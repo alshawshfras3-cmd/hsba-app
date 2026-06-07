@@ -15,7 +15,15 @@ export const initialBanks: Bank[] = [
     monthsAfterRetirement: 180,
     allowAfterRetirement: true,
     displayOrder: 1,
-    internalNotes: 'متوافق مع الشريعة الإسلامية بالكامل لعقود الإجارة والمرابحة.'
+    internalNotes: 'متوافق مع الشريعة الإسلامية بالكامل لعقود الإجارة والمرابحة.',
+    realEstateFinanceEnabled: true,
+    personalFinanceEnabled: true,
+    combinedFinanceEnabled: true,
+    existingPersonalFinanceEnabled: true,
+    minRealEstateAmount: 100000,
+    maxRealEstateAmount: 10000000,
+    minPersonalAmount: 10000,
+    maxPersonalAmount: 2000000
   },
   {
     id: 'rajhi',
@@ -31,7 +39,15 @@ export const initialBanks: Bank[] = [
     monthsAfterRetirement: 265,
     allowAfterRetirement: true,
     displayOrder: 2,
-    internalNotes: 'أكبر محفظة تمويل عقاري في المملكة.'
+    internalNotes: 'أكبر محفظة تمويل عقاري في المملكة.',
+    realEstateFinanceEnabled: true,
+    personalFinanceEnabled: true,
+    combinedFinanceEnabled: true,
+    existingPersonalFinanceEnabled: true,
+    minRealEstateAmount: 100000,
+    maxRealEstateAmount: 10000000,
+    minPersonalAmount: 10000,
+    maxPersonalAmount: 2000000
   },
   {
     id: 'alinma',
@@ -47,7 +63,15 @@ export const initialBanks: Bank[] = [
     monthsAfterRetirement: 0,
     allowAfterRetirement: false,
     displayOrder: 3,
-    internalNotes: 'أسرع موافقات ائتمانية على مستوى البنوك.'
+    internalNotes: 'أسرع موافقات ائتمانية على مستوى البنوك.',
+    realEstateFinanceEnabled: true,
+    personalFinanceEnabled: true,
+    combinedFinanceEnabled: true,
+    existingPersonalFinanceEnabled: true,
+    minRealEstateAmount: 100000,
+    maxRealEstateAmount: 10000000,
+    minPersonalAmount: 10000,
+    maxPersonalAmount: 2000000
   },
   {
     id: 'fransi',
@@ -63,7 +87,15 @@ export const initialBanks: Bank[] = [
     monthsAfterRetirement: 73,
     allowAfterRetirement: true,
     displayOrder: 4,
-    internalNotes: 'يركز على قطاع الموظفين الحكوميين والشركات الكبرى.'
+    internalNotes: 'يركز على قطاع الموظفين الحكوميين والشركات الكبرى.',
+    realEstateFinanceEnabled: true,
+    personalFinanceEnabled: true,
+    combinedFinanceEnabled: true,
+    existingPersonalFinanceEnabled: true,
+    minRealEstateAmount: 100000,
+    maxRealEstateAmount: 10000000,
+    minPersonalAmount: 10000,
+    maxPersonalAmount: 2000000
   },
   {
     id: 'bidaya',
@@ -79,7 +111,15 @@ export const initialBanks: Bank[] = [
     monthsAfterRetirement: 0,
     allowAfterRetirement: false,
     displayOrder: 5,
-    internalNotes: 'شركة تمويل عقاري غير مصرفية برعاية حكومية.'
+    internalNotes: 'شركة تمويل عقاري غير مصرفية برعاية حكومية.',
+    realEstateFinanceEnabled: true,
+    personalFinanceEnabled: false,
+    combinedFinanceEnabled: false,
+    existingPersonalFinanceEnabled: false,
+    minRealEstateAmount: 300000,
+    maxRealEstateAmount: 5000000,
+    minPersonalAmount: 10000,
+    maxPersonalAmount: 1500000
   },
   {
     id: 'albilad',
@@ -95,7 +135,15 @@ export const initialBanks: Bank[] = [
     monthsAfterRetirement: 180,
     allowAfterRetirement: true,
     displayOrder: 6,
-    internalNotes: 'حلول تمويل عقاري بصيغ متعددة.'
+    internalNotes: 'حلول تمويل عقاري بصيغ متعددة.',
+    realEstateFinanceEnabled: true,
+    personalFinanceEnabled: true,
+    combinedFinanceEnabled: true,
+    existingPersonalFinanceEnabled: true,
+    minRealEstateAmount: 100000,
+    maxRealEstateAmount: 10000000,
+    minPersonalAmount: 10000,
+    maxPersonalAmount: 2000000
   },
   {
     id: 'alarabi',
@@ -111,6 +159,14 @@ export const initialBanks: Bank[] = [
     monthsAfterRetirement: 180,
     allowAfterRetirement: true,
     displayOrder: 7,
-    internalNotes: 'عروض منافسة لهوامش الأرباح العقارية.'
+    internalNotes: 'عروض منافسة لهوامش الأرباح العقارية.',
+    realEstateFinanceEnabled: true,
+    personalFinanceEnabled: true,
+    combinedFinanceEnabled: true,
+    existingPersonalFinanceEnabled: true,
+    minRealEstateAmount: 100000,
+    maxRealEstateAmount: 10000000,
+    minPersonalAmount: 10000,
+    maxPersonalAmount: 2000000
   }
 ];

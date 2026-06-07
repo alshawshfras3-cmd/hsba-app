@@ -25,6 +25,14 @@ export interface Bank {
   allowAfterRetirement: boolean;
   displayOrder: number;
   internalNotes?: string;
+  realEstateFinanceEnabled?: boolean;
+  personalFinanceEnabled?: boolean;
+  combinedFinanceEnabled?: boolean;
+  existingPersonalFinanceEnabled?: boolean;
+  minRealEstateAmount?: number;
+  maxRealEstateAmount?: number;
+  minPersonalAmount?: number;
+  maxPersonalAmount?: number;
 }
 
 export interface ProductAcceptance {

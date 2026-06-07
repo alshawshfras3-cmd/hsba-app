@@ -2241,6 +2241,7 @@ export default function AdminDashboard() {
         {adminSubPage === 'products' && (
           <ProductsSection
             banks={banks}
+            setBanks={setBanks}
             products={products}
             setProducts={setProducts}
             showToast={showToast}

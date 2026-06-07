@@ -20,6 +20,7 @@ const sectorsList = [
 
 interface ProductsSectionProps {
   banks: Bank[];
+  setBanks: React.Dispatch<React.SetStateAction<Bank[]>>;
   products: ProductAcceptance[];
   setProducts: React.Dispatch<React.SetStateAction<ProductAcceptance[]>>;
   showToast: (msg: string, type: 'success' | 'refuse') => void;
@@ -27,10 +28,25 @@ interface ProductsSectionProps {
 
 export const ProductsSection: React.FC<ProductsSectionProps> = ({
   banks,
+  setBanks,
   products,
   setProducts,
   showToast
 }) => {
+  const toggleBankProductMode = (field: 'realEstateFinanceEnabled' | 'personalFinanceEnabled' | 'combinedFinanceEnabled' | 'existingPersonalFinanceEnabled', checked: boolean) => {
+    if (filterBank === 'all') return;
+    setBanks(prev => prev.map(b => b.id === filterBank ? { ...b, [field]: checked } : b));
+    showToast('تم تحديث إعدادات المنتج للجهة بنجاح. تذكر حفظ التغييرات من الشريط أسفل الصفحة.', 'success');
+  };
+
+  const updateBankLimit = (bankId: string, field: 'minRealEstateAmount' | 'maxRealEstateAmount' | 'minPersonalAmount' | 'maxPersonalAmount', valStr: string) => {
+    const clean = normalizeNumberInput(valStr);
+    const parsed = clean === '' ? undefined : parseNumberInput(clean);
+    setBanks(prev => prev.map(b => b.id === bankId ? { ...b, [field]: parsed } : b));
+  };
+
+  const [activeSubTab, setActiveSubTab] = useState<'rules' | 'limits'>('rules');
+
   const [filterBank, setFilterBank] = useState<string>('all');
   const [filterProductType, setFilterProductType] = useState<string>('all');
   const [filterActiveStatus, setFilterActiveStatus] = useState<string>('all');
@@ -210,13 +226,10 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
         return;
       }
 
-      const isBidaya = formBankId === 'bidaya';
-      const actualProductId = isBidaya ? 'real_estate_only' : formProductId;
-
       const payload: ProductAcceptance = {
         id: editingProduct ? editingProduct.id : `prod_rule_${Date.now()}`,
         bankId: formBankId,
-        productId: actualProductId,
+        productId: formProductId,
         minSalary: salaryNum,
         minAge: minAgeNum,
         minServiceMonths: serviceNum,
@@ -227,8 +240,8 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
         defaultRejectionMessage: formRejectionMessage,
         isActive: formIsActive,
         allowAfterRetirement: safeAllowedSectors.includes('retired'),
-        supportsRealEstate: isBidaya ? true : undefined,
-        supportsPersonal: isBidaya ? false : undefined
+        supportsRealEstate: (formProductId === 'real_estate_only' || formProductId === 'real_estate_with_new_personal' || formProductId === 'real_estate_with_existing_personal') ? true : undefined,
+        supportsPersonal: (formProductId === 'personal_only') ? true : undefined
       };
 
       if (editingProduct) {
@@ -268,14 +281,42 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
             إدارة منتجات البنوك وشروط قبول العملاء حسب الراتب والعمر والخدمة والدعم.
           </p>
         </div>
+        {activeSubTab === 'rules' && (
+          <button
+            type="button"
+            id="btn-add-product-rule"
+            onClick={openAddProductModal}
+            className="inline-flex items-center gap-2 bg-[#0057B8] hover:bg-[#00418A] text-white px-5 py-2.5 rounded-xl font-bold text-xs transition-all shadow-sm shadow-[#0057B8]/20 self-start sm:self-auto cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>إضافة قاعدة قبول</span>
+          </button>
+        )}
+      </div>
+
+      {/* Section Sub-Tabs */}
+      <div className="flex bg-white p-1 rounded-2xl border border-gray-100 shadow-sm font-sans">
         <button
           type="button"
-          id="btn-add-product-rule"
-          onClick={openAddProductModal}
-          className="inline-flex items-center gap-2 bg-[#0057B8] hover:bg-[#00418A] text-white px-5 py-2.5 rounded-xl font-bold text-xs transition-all shadow-sm shadow-[#0057B8]/20 self-start sm:self-auto cursor-pointer"
+          onClick={() => setActiveSubTab('rules')}
+          className={`flex-1 text-center py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+            activeSubTab === 'rules'
+              ? 'bg-[#0057B8] text-white shadow-sm'
+              : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50/50'
+          }`}
         >
-          <Plus className="w-4 h-4" />
-          <span>إضافة قاعدة قبول</span>
+          📋 قواعد القبول والمنتجات
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('limits')}
+          className={`flex-1 text-center py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+            activeSubTab === 'limits'
+              ? 'bg-[#0057B8] text-white shadow-sm'
+              : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50/50'
+          }`}
+        >
+          💰 حدود مبالغ التمويل
         </button>
       </div>
 
@@ -308,6 +349,86 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
             </button>
           );
         })}
+      </div>
+
+      {activeSubTab === 'rules' ? (
+        <>
+          {/* Product Types Configuration for the selected bank */}
+          <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-4">
+        {filterBank === 'all' ? (
+          <div className="text-center py-2 text-gray-500 font-bold text-xs flex items-center justify-center gap-1.5 font-sans">
+            💡 <span className="text-slate-500">اختر جهة تمويل معينة من القائمة أعلاه لتتمكن من إدارة وتفعيل أنواع التمويلات والمنتجات المدعومة لها بشكل كامل.</span>
+          </div>
+        ) : (
+          (() => {
+            const bankObj = banks.find(b => b.id === filterBank);
+            if (!bankObj) return null;
+            return (
+              <div className="space-y-4 font-sans">
+                <div className="flex items-center gap-2 border-b border-gray-100 pb-2.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#0057B8] animate-pulse"></span>
+                  <h3 className="text-xs font-bold text-gray-800">
+                    أنواع المنتجات المتاحة لـ <span className="text-[#0057B8] font-black">{bankObj.nameAr}</span>
+                  </h3>
+                </div>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 pt-1">
+                  <label className="flex items-center gap-3.5 p-3.5 rounded-xl border border-gray-150 hover:bg-slate-50/50 cursor-pointer transition-all select-none">
+                    <input 
+                      type="checkbox"
+                      checked={bankObj.realEstateFinanceEnabled !== false}
+                      onChange={(e) => toggleBankProductMode('realEstateFinanceEnabled', e.target.checked)}
+                      className="w-4 h-4 rounded text-[#0057B8] focus:ring-[#0057B8] accent-[#0057B8] cursor-pointer"
+                    />
+                    <div className="space-y-0.5">
+                      <span className="text-xs font-bold text-gray-800 block">تمويل عقاري</span>
+                      <span className="text-[10px] text-gray-400 font-medium">realEstateFinance</span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-center gap-3.5 p-3.5 rounded-xl border border-gray-150 hover:bg-slate-50/50 cursor-pointer transition-all select-none">
+                    <input 
+                      type="checkbox"
+                      checked={bankObj.personalFinanceEnabled === true}
+                      onChange={(e) => toggleBankProductMode('personalFinanceEnabled', e.target.checked)}
+                      className="w-4 h-4 rounded text-[#0057B8] focus:ring-[#0057B8] accent-[#0057B8] cursor-pointer"
+                    />
+                    <div className="space-y-0.5">
+                      <span className="text-xs font-bold text-gray-800 block">تمويل شخصي</span>
+                      <span className="text-[10px] text-gray-400 font-medium">personalFinance</span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-center gap-3.5 p-3.5 rounded-xl border border-gray-150 hover:bg-slate-50/50 cursor-pointer transition-all select-none">
+                    <input 
+                      type="checkbox"
+                      checked={bankObj.combinedFinanceEnabled === true}
+                      onChange={(e) => toggleBankProductMode('combinedFinanceEnabled', e.target.checked)}
+                      className="w-4 h-4 rounded text-[#0057B8] focus:ring-[#0057B8] accent-[#0057B8] cursor-pointer"
+                    />
+                    <div className="space-y-0.5">
+                      <span className="text-xs font-bold text-gray-800 block">تمويل عقاري + شخصي (جديد)</span>
+                      <span className="text-[10px] text-gray-400 font-medium">combinedFinance</span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-center gap-3.5 p-3.5 rounded-xl border border-gray-150 hover:bg-slate-50/50 cursor-pointer transition-all select-none">
+                    <input 
+                      type="checkbox"
+                      checked={bankObj.existingPersonalFinanceEnabled !== false}
+                      onChange={(e) => toggleBankProductMode('existingPersonalFinanceEnabled', e.target.checked)}
+                      className="w-4 h-4 rounded text-[#0057B8] focus:ring-[#0057B8] accent-[#0057B8] cursor-pointer"
+                    />
+                    <div className="space-y-0.5">
+                      <span className="text-xs font-bold text-gray-800 block">عقاري مع شخصي قائم</span>
+                      <span className="text-[10px] text-gray-400 font-medium">existingPersonal</span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            );
+          })()
+        )}
       </div>
 
       {/* Filters Bar */}
@@ -493,6 +614,260 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
           </table>
         </div>
       </div>
+        </>
+      ) : (
+        /* Financing Limits Section */
+        <div className="space-y-6 animate-fadeIn font-sans">
+          {/* Description Card */}
+          <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl flex items-start gap-3">
+            <span className="text-xl">⚠️</span>
+            <div className="space-y-1 text-right">
+              <h4 className="text-xs font-bold text-amber-900">تعليمات حدود التمويل</h4>
+              <p className="text-[11px] text-amber-700 leading-relaxed font-semibold">
+                القيم المدخلة هنا تطبق فوراً في المحرك لحظر العمليات خارج النطاق وتعديل أقصى تمويل تلقائياً. 
+                يتم تقليص التمويل وسقف الدفعات تلقائياً إذا تجاوز المحسوب الحد الأقصى، بينما يتم رفض العملية وإظهار رسالة عدم الأهلية إذا قل المحسوب عن الحد الأدنى. تذكر الضغط على زر حفظ التغييرات من الشريط أسفل الصفحة لاعتماد التغييرات في النظام وسحابة Supabase.
+              </p>
+            </div>
+          </div>
+
+          {filterBank === 'all' ? (
+            /* Table of all banks bounds */
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center flex-row-reverse w-full">
+                <h3 className="text-xs font-extrabold text-slate-800 flex items-center gap-1.5">
+                  📊 حدود التمويل لكافة الجهات
+                </h3>
+                <span className="text-[10px] text-gray-400 font-bold bg-gray-200/60 px-2 py-0.5 rounded-lg">
+                  عدد الجهات: {banks.length}
+                </span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-right text-xs text-[#111827] min-w-[900px]">
+                  <thead className="bg-[#F8FAFC] text-gray-500 border-b border-gray-100 uppercase font-bold tracking-wider">
+                    <tr>
+                      <th className="p-4 font-bold text-right">الجهة التمويلية</th>
+                      <th className="p-4 font-bold text-center">التمويل العقاري (الحد الأدنى)</th>
+                      <th className="p-4 font-bold text-center">التمويل العقاري (الحد الأقصى)</th>
+                      <th className="p-4 font-bold text-center">التمويل الشخصي (الحد الأدنى)</th>
+                      <th className="p-4 font-bold text-center">التمويل الشخصي (الحد الأقصى)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {banks.map((b) => {
+                      const reEnabled = b.realEstateFinanceEnabled !== false;
+                      const peEnabled = b.personalFinanceEnabled === true;
+                      return (
+                        <tr key={b.id} className="hover:bg-slate-50/30 transition-colors">
+                          <td className="p-4 font-bold whitespace-nowrap">
+                            <div className="flex items-center gap-2">
+                              <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: b.logoColor || '#0057B8' }}></span>
+                              <div>
+                                <span className="block text-gray-800">{b.nameAr}</span>
+                                <span className="text-[9px] text-gray-400 font-mono block uppercase">{b.id}</span>
+                              </div>
+                            </div>
+                          </td>
+                          
+                          {/* RE Min */}
+                          <td className="p-4">
+                            <div className="space-y-1">
+                              <input
+                                type="text"
+                                disabled={!reEnabled}
+                                value={b.minRealEstateAmount !== undefined ? b.minRealEstateAmount : ''}
+                                placeholder={reEnabled ? "مثال: 300000" : "المنتج غير مفعل"}
+                                onChange={(e) => updateBankLimit(b.id, 'minRealEstateAmount', e.target.value)}
+                                className="w-full text-center bg-gray-50/50 border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold font-mono focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#0057B8] disabled:opacity-50"
+                              />
+                              {reEnabled && b.minRealEstateAmount ? (
+                                <div className="text-[10px] text-emerald-600 font-extrabold block text-center">
+                                  {(b.minRealEstateAmount).toLocaleString('ar-SA')} ريال
+                                </div>
+                              ) : null}
+                            </div>
+                          </td>
+
+                          {/* RE Max */}
+                          <td className="p-4">
+                            <div className="space-y-1">
+                              <input
+                                type="text"
+                                disabled={!reEnabled}
+                                value={b.maxRealEstateAmount !== undefined ? b.maxRealEstateAmount : ''}
+                                placeholder={reEnabled ? "مثال: 5000000" : "المنتج غير مفعل"}
+                                onChange={(e) => updateBankLimit(b.id, 'maxRealEstateAmount', e.target.value)}
+                                className="w-full text-center bg-gray-50/50 border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold font-mono focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#0057B8] disabled:opacity-50"
+                              />
+                              {reEnabled && b.maxRealEstateAmount ? (
+                                <div className="text-[10px] text-indigo-600 font-extrabold block text-center">
+                                  {(b.maxRealEstateAmount).toLocaleString('ar-SA')} ريال
+                                </div>
+                              ) : null}
+                            </div>
+                          </td>
+
+                          {/* PF Min */}
+                          <td className="p-4">
+                            <div className="space-y-1">
+                              <input
+                                type="text"
+                                disabled={!peEnabled}
+                                value={b.minPersonalAmount !== undefined ? b.minPersonalAmount : ''}
+                                placeholder={peEnabled ? "مثال: 10000" : "المنتج غير مفعل"}
+                                onChange={(e) => updateBankLimit(b.id, 'minPersonalAmount', e.target.value)}
+                                className="w-full text-center bg-gray-50/50 border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold font-mono focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#0057B8] disabled:opacity-50"
+                              />
+                              {peEnabled && b.minPersonalAmount ? (
+                                <div className="text-[10px] text-emerald-600 font-extrabold block text-center">
+                                  {(b.minPersonalAmount).toLocaleString('ar-SA')} ريال
+                                </div>
+                              ) : null}
+                            </div>
+                          </td>
+
+                          {/* PF Max */}
+                          <td className="p-4">
+                            <div className="space-y-1">
+                              <input
+                                type="text"
+                                disabled={!peEnabled}
+                                value={b.maxPersonalAmount !== undefined ? b.maxPersonalAmount : ''}
+                                placeholder={peEnabled ? "مثال: 2000000" : "المنتج غير مفعل"}
+                                onChange={(e) => updateBankLimit(b.id, 'maxPersonalAmount', e.target.value)}
+                                className="w-full text-center bg-gray-50/50 border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold font-mono focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#0057B8] disabled:opacity-50"
+                              />
+                              {peEnabled && b.maxPersonalAmount ? (
+                                <div className="text-[10px] text-indigo-600 font-extrabold block text-center">
+                                  {(b.maxPersonalAmount).toLocaleString('ar-SA')} ريال
+                                </div>
+                              ) : null}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            /* Single bank detail bounds card */
+            (() => {
+              const bankObj = banks.find(b => b.id === filterBank);
+              if (!bankObj) return null;
+              const reEnabled = bankObj.realEstateFinanceEnabled !== false;
+              const peEnabled = bankObj.personalFinanceEnabled === true;
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 leading-relaxed">
+                  {/* Real Estate bounds card */}
+                  <div className={`p-6 rounded-3xl border transition-all ${reEnabled ? 'bg-white border-gray-100 shadow-sm' : 'bg-gray-50 border-gray-200 opacity-75'}`}>
+                    <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4 flex-row-reverse w-full">
+                      <div className="flex items-center gap-2 flex-row-reverse">
+                        <span className="text-xl">🏠</span>
+                        <div className="space-y-0.5 text-right">
+                          <h3 className="text-xs font-bold text-gray-800">حدود التمويل العقاري</h3>
+                          <p className="text-[10px] text-gray-400 font-semibold">للجهة: {bankObj.nameAr}</p>
+                        </div>
+                      </div>
+                      {!reEnabled && <span className="bg-red-50 text-red-600 px-2.5 py-1 rounded-lg text-[10px] font-extrabold">المنتج معطل</span>}
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1.5 text-right">
+                          <label className="block text-xs font-bold text-gray-700">الحد الأدنى للتمويل العقاري</label>
+                          <input
+                            type="text"
+                            disabled={!reEnabled}
+                            value={bankObj.minRealEstateAmount !== undefined ? bankObj.minRealEstateAmount : ''}
+                            onChange={(e) => updateBankLimit(bankObj.id, 'minRealEstateAmount', e.target.value)}
+                            placeholder={reEnabled ? "مثال: 300000" : "المنتج غير مفعل لـ هذه الجهة"}
+                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-bold font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0057B8] disabled:opacity-50 text-center"
+                          />
+                          {reEnabled && bankObj.minRealEstateAmount ? (
+                            <span className="text-[10px] text-emerald-600 font-extrabold block text-center mt-1">
+                              {(bankObj.minRealEstateAmount).toLocaleString('ar-SA')} ريال
+                            </span>
+                          ) : null}
+                        </div>
+
+                        <div className="space-y-1.5 text-right">
+                          <label className="block text-xs font-bold text-gray-700">الحد الأقصى للتمويل العقاري</label>
+                          <input
+                            type="text"
+                            disabled={!reEnabled}
+                            value={bankObj.maxRealEstateAmount !== undefined ? bankObj.maxRealEstateAmount : ''}
+                            onChange={(e) => updateBankLimit(bankObj.id, 'maxRealEstateAmount', e.target.value)}
+                            placeholder={reEnabled ? "مثال: 5000000" : "المنتج غير مفعل لـ هذه الجهة"}
+                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-bold font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0057B8] disabled:opacity-50 text-center"
+                          />
+                          {reEnabled && bankObj.maxRealEstateAmount ? (
+                            <span className="text-[10px] text-indigo-600 font-extrabold block text-center mt-1">
+                              {(bankObj.maxRealEstateAmount).toLocaleString('ar-SA')} ريال
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Personal bounds card */}
+                  <div className={`p-6 rounded-3xl border transition-all ${peEnabled ? 'bg-white border-gray-100 shadow-sm' : 'bg-gray-50 border-gray-200 opacity-75'}`}>
+                    <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4 flex-row-reverse w-full">
+                      <div className="flex items-center gap-2 flex-row-reverse">
+                        <span className="text-xl">💳</span>
+                        <div className="space-y-0.5 text-right">
+                          <h3 className="text-xs font-bold text-gray-800">حدود التمويل الشخصي</h3>
+                          <p className="text-[10px] text-gray-400 font-semibold">للجهة: {bankObj.nameAr}</p>
+                        </div>
+                      </div>
+                      {!peEnabled && <span className="bg-red-50 text-red-600 px-2.5 py-1 rounded-lg text-[10px] font-extrabold">المنتج معطل</span>}
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1.5 text-right">
+                          <label className="block text-xs font-bold text-gray-700">الحد الأدنى للتمويل الشخصي</label>
+                          <input
+                            type="text"
+                            disabled={!peEnabled}
+                            value={bankObj.minPersonalAmount !== undefined ? bankObj.minPersonalAmount : ''}
+                            onChange={(e) => updateBankLimit(bankObj.id, 'minPersonalAmount', e.target.value)}
+                            placeholder={peEnabled ? "مثال: 10000" : "المنتج غير مفعل لـ هذه الجهة"}
+                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-bold font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0057B8] disabled:opacity-50 text-center"
+                          />
+                          {peEnabled && bankObj.minPersonalAmount ? (
+                            <span className="text-[10px] text-emerald-600 font-extrabold block text-center mt-1">
+                              {(bankObj.minPersonalAmount).toLocaleString('ar-SA')} ريال
+                            </span>
+                          ) : null}
+                        </div>
+
+                        <div className="space-y-1.5 text-right">
+                          <label className="block text-xs font-bold text-gray-700">الحد الأقصى للتمويل الشخصي</label>
+                          <input
+                            type="text"
+                            disabled={!peEnabled}
+                            value={bankObj.maxPersonalAmount !== undefined ? bankObj.maxPersonalAmount : ''}
+                            onChange={(e) => updateBankLimit(bankObj.id, 'maxPersonalAmount', e.target.value)}
+                            placeholder={peEnabled ? "مثال: 2000000" : "المنتج غير مفعل لـ هذه الجهة"}
+                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-bold font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0057B8] disabled:opacity-50 text-center"
+                          />
+                          {peEnabled && bankObj.maxPersonalAmount ? (
+                            <span className="text-[10px] text-indigo-600 font-extrabold block text-center mt-1">
+                              {(bankObj.maxPersonalAmount).toLocaleString('ar-SA')} ريال
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()
+          )}
+        </div>
+      )}
 
       {/* PRODUCT DRAWER/MODAL POPUP */}
       {isProductModalOpen && (
@@ -533,8 +908,17 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
                     onChange={(e) => {
                       const val = e.target.value;
                       setFormBankId(val);
-                      if (val === 'bidaya') {
-                        setFormProductId('real_estate_only');
+                      const targetBank = banks.find(b => b.id === val);
+                      if (targetBank) {
+                        if (targetBank.realEstateFinanceEnabled !== false) {
+                          setFormProductId('real_estate_only');
+                        } else if (targetBank.personalFinanceEnabled === true) {
+                          setFormProductId('personal_only');
+                        } else if (targetBank.combinedFinanceEnabled === true) {
+                          setFormProductId('real_estate_with_new_personal');
+                        } else if (targetBank.existingPersonalFinanceEnabled !== false) {
+                          setFormProductId('real_estate_with_existing_personal');
+                        }
                       }
                     }}
                     className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
@@ -550,18 +934,19 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
                   <label className="block text-xs font-bold text-gray-700">نوع منتج التمويل *</label>
                   <select
                     id="form-product-select"
-                    value={formBankId === 'bidaya' ? 'real_estate_only' : formProductId}
+                    value={formProductId}
                     onChange={(e) => {
-                      if (formBankId !== 'bidaya') {
-                        setFormProductId(e.target.value as ProductId);
-                      }
+                      setFormProductId(e.target.value as ProductId);
                     }}
-                    disabled={formBankId === 'bidaya'}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0057B8] disabled:opacity-75 disabled:bg-gray-100"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
                   >
                     {productTypesList.map(pt => {
-                      if (formBankId === 'bidaya' && pt.id !== 'real_estate_only') {
-                        return null;
+                      const targetBank = banks.find(b => b.id === formBankId);
+                      if (targetBank) {
+                        if (pt.id === 'real_estate_only' && targetBank.realEstateFinanceEnabled === false) return null;
+                        if (pt.id === 'personal_only' && targetBank.personalFinanceEnabled === false) return null;
+                        if (pt.id === 'real_estate_with_new_personal' && targetBank.combinedFinanceEnabled === false) return null;
+                        if (pt.id === 'real_estate_with_existing_personal' && targetBank.existingPersonalFinanceEnabled === false) return null;
                       }
                       return <option key={pt.id} value={pt.id}>{pt.nameAr}</option>;
                     })}

@@ -138,6 +138,22 @@ export function useSettings() {
       if (data && data.value) {
         appSettingsObj = data.value;
         console.log('[SETTINGS] key found in Supabase, using Supabase value: app_settings');
+        if (appSettingsObj && appSettingsObj.banks && Array.isArray(appSettingsObj.banks)) {
+          appSettingsObj.banks = appSettingsObj.banks.map((b: any) => {
+            const seedBank = initialBanks.find(sb => sb.id === b.id);
+            return {
+              ...b,
+              realEstateFinanceEnabled: b.realEstateFinanceEnabled !== undefined ? b.realEstateFinanceEnabled : (seedBank?.realEstateFinanceEnabled !== undefined ? seedBank.realEstateFinanceEnabled : true),
+              personalFinanceEnabled: b.personalFinanceEnabled !== undefined ? b.personalFinanceEnabled : (seedBank?.personalFinanceEnabled !== undefined ? seedBank.personalFinanceEnabled : (b.id !== 'bidaya')),
+              combinedFinanceEnabled: b.combinedFinanceEnabled !== undefined ? b.combinedFinanceEnabled : (seedBank?.combinedFinanceEnabled !== undefined ? seedBank.combinedFinanceEnabled : (b.id !== 'bidaya')),
+              existingPersonalFinanceEnabled: b.existingPersonalFinanceEnabled !== undefined ? b.existingPersonalFinanceEnabled : (seedBank?.existingPersonalFinanceEnabled !== undefined ? seedBank.existingPersonalFinanceEnabled : true),
+              minRealEstateAmount: b.minRealEstateAmount !== undefined ? b.minRealEstateAmount : (seedBank?.minRealEstateAmount !== undefined ? seedBank.minRealEstateAmount : 100000),
+              maxRealEstateAmount: b.maxRealEstateAmount !== undefined ? b.maxRealEstateAmount : (seedBank?.maxRealEstateAmount !== undefined ? seedBank.maxRealEstateAmount : 10000000),
+              minPersonalAmount: b.minPersonalAmount !== undefined ? b.minPersonalAmount : (seedBank?.minPersonalAmount !== undefined ? seedBank.minPersonalAmount : 10000),
+              maxPersonalAmount: b.maxPersonalAmount !== undefined ? b.maxPersonalAmount : (seedBank?.maxPersonalAmount !== undefined ? seedBank.maxPersonalAmount : 2000000),
+            };
+          });
+        }
         console.log('[SETTINGS] Supabase value preserved, no overwrite');
       } else {
         console.log('[SETTINGS] key missing, inserting seed_initial: app_settings');
