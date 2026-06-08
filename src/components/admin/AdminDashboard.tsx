@@ -776,7 +776,6 @@ export default function AdminDashboard() {
     30: '5.25'
   });
   const [localSectorExceptions, setLocalSectorExceptions] = useState<Record<string, string>>({
-    all: '0',
     gov_civil: '0',
     military: '0',
     semi_gov: '0',
@@ -785,6 +784,7 @@ export default function AdminDashboard() {
     retired: '0'
   });
   const [illustrativeYear, setIllustrativeYear] = useState<number>(25);
+  const [previewSector, setPreviewSector] = useState<string>('gov_civil');
   const [localCalcMethod, setLocalCalcMethod] = useState<'linear' | 'fixed'>('fixed');
 
   // Copy-from states for Cloning inside the same bank & cross-bank
@@ -860,11 +860,11 @@ export default function AdminDashboard() {
 
     // Synchronize sector exceptions
     const normSupport = selectedMarginSupport === 'down_payment' ? 'downpayment' : selectedMarginSupport;
-    const sectorsList = ['all', 'gov_civil', 'military', 'semi_gov', 'companies', 'private', 'retired'];
+    const sectorsList = ['gov_civil', 'military', 'semi_gov', 'companies', 'private', 'retired'];
     const initialExceptions: Record<string, string> = {};
 
     sectorsList.forEach(secId => {
-      const exRule = marginRules.find(r =>
+       const exRule = marginRules.find(r =>
         r.bankId === selectedMarginBank &&
         (r.productType === selectedMarginProduct || r.productId === selectedMarginProduct) &&
         (r.supportType === normSupport || r.supportType === 'all') &&
@@ -1005,7 +1005,7 @@ export default function AdminDashboard() {
 
     // Now, save sector exceptions!
     const newExceptionRules: MarginRule[] = [];
-    ['all', 'gov_civil', 'military', 'semi_gov', 'companies', 'private', 'retired'].forEach(secId => {
+    ['gov_civil', 'military', 'semi_gov', 'companies', 'private', 'retired'].forEach(secId => {
       const parsedBps = parseInt(sectorExceptionsRecord[secId] || '0', 10);
       productIdsToFilter.forEach(pId => {
         newExceptionRules.push({
@@ -1098,7 +1098,7 @@ export default function AdminDashboard() {
 
     const targetSourceSupport = cloningFromSupport === 'down_payment' ? 'downpayment' : cloningFromSupport;
     const sourceExceptions: Record<string, string> = {};
-    const sectorsList = ['all', 'gov_civil', 'military', 'semi_gov', 'companies', 'private', 'retired'];
+    const sectorsList = ['gov_civil', 'military', 'semi_gov', 'companies', 'private', 'retired'];
     sectorsList.forEach(secId => {
       const exRule = marginRules.find(r =>
         r.bankId === cloningFromBank &&
@@ -4879,7 +4879,7 @@ export default function AdminDashboard() {
                     {selectedMarginSupport === 'none' ? 'غير مدعوم' : selectedMarginSupport === 'monthly' ? 'دعم شهري' : 'دعم دفعة'}
                     {(selectedMarginSupport !== 'none') && ` (${selectedMarginSalaryTier === 'below_25000' ? 'فئة راتب أقل من 25 ألف' : 'فئة راتب 25 ألف فأكثر'})`}
                   </h3>
-                  <p className="text-[11px] text-[#6B7280] mt-0.5">تهيئة الهوامش البنكية الأساسية بالتوازي مع نسب الخصم الاستثنائية للقطاعات المعتمدة.</p>
+                  <p className="text-[11px] text-[#6B7280] mt-0.5">شاشة تهيئة هوامش الأرباح البنكية واستثناءات القطاعات المعتمدة.</p>
                 </div>
               </div>
 
@@ -4894,11 +4894,13 @@ export default function AdminDashboard() {
                 
                 {/* 1. Base Margins Table */}
                 <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs font-extrabold text-slate-700">📊 جدول الهوامش الأساسية (Base Margin %)</span>
+                  <div className="flex justify-between items-center border-b border-gray-100 pb-2">
+                    <span className="text-xs font-extrabold text-slate-800 font-sans flex items-center gap-1.55">
+                      📊 هوامش التمويل الأساسية
+                    </span>
                   </div>
                   
-                  <div className="overflow-x-auto border border-gray-200 rounded-xl max-h-[500px] overflow-y-auto">
+                  <div className="overflow-x-auto border border-gray-200 rounded-xl max-h-[400px] overflow-y-auto">
                     <table className="min-w-full divide-y divide-gray-200 text-right">
                       <thead className="bg-[#F8FAFC] text-slate-500 font-bold text-xs font-sans sticky top-0">
                         <tr>
@@ -4911,7 +4913,7 @@ export default function AdminDashboard() {
                           ? Array.from({ length: 26 }, (_, i) => 5 + i)
                           : [5, 10, 15, 20, 25, 30]
                         ).map((year) => {
-                          const label = year <= 10 ? `${year} سنوات` : `${year} سنة`;
+                          const label = year === 5 || year === 10 ? `${year} سنوات` : `${year} سنة`;
                           return (
                             <tr key={year} className="hover:bg-slate-50 transition-colors">
                               <td className="px-4 py-2 whitespace-nowrap text-right font-bold text-slate-800 font-sans">
@@ -4945,36 +4947,22 @@ export default function AdminDashboard() {
 
                 {/* 2. Sector Exceptions Table */}
                 <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs font-extrabold text-amber-700">🛡️ جدول استثناءات القطاعات (Sector Exceptions)</span>
-                    <div className="flex items-center gap-1.5 text-xs font-sans">
-                      <span className="text-slate-500 font-bold">مدة التوضيح:</span>
-                      <select
-                        value={illustrativeYear}
-                        onChange={(e) => setIllustrativeYear(parseInt(e.target.value, 10))}
-                        className="bg-slate-50 border border-gray-300 rounded-lg px-2 py-0.5 text-xs font-bold font-sans cursor-pointer text-right"
-                      >
-                        {[5, 10, 15, 20, 25, 30].map(y => (
-                          <option key={y} value={y}>
-                            {y === 5 || y === 10 ? `${y} سنوات` : `${y} سنة`}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                  <div className="flex justify-between items-center border-b border-gray-100 pb-2">
+                    <span className="text-xs font-extrabold text-slate-850 font-sans flex items-center gap-1.5">
+                      🛡️ استثناءات القطاعات
+                    </span>
                   </div>
 
                   <div className="overflow-x-auto border border-gray-200 rounded-xl">
                     <table className="min-w-full divide-y divide-gray-200 text-right">
                       <thead className="bg-[#F8FAFC] text-slate-500 font-bold text-xs font-sans">
                         <tr>
-                          <th scope="col" className="px-4 py-3 text-right">القطاع المهني</th>
-                          <th scope="col" className="px-4 py-3 text-right text-amber-600 font-extrabold">الاستثناء Exception Bps</th>
-                          <th scope="col" className="px-4 py-3 text-right text-emerald-600 font-extrabold">الهامش التوضيحي ({illustrativeYear} سنة)</th>
+                          <th scope="col" className="px-4 py-3 text-right">القطاع</th>
+                          <th scope="col" className="px-4 py-3 text-right text-amber-600 font-extrabold">نسبة الاستثناء Bps</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200 bg-white text-xs font-semibold text-gray-700">
                         {[
-                          { id: 'all', nameAr: 'عام / جميع القطاعات' },
                           { id: 'gov_civil', nameAr: 'حكومي مدني' },
                           { id: 'military', nameAr: 'عسكري' },
                           { id: 'semi_gov', nameAr: 'شبه حكومي' },
@@ -4982,16 +4970,12 @@ export default function AdminDashboard() {
                           { id: 'private', nameAr: 'قطاع خاص' },
                           { id: 'retired', nameAr: 'متقاعد' }
                         ].map((item) => {
-                          const parsedBase = parseFloat(localMargins[illustrativeYear] || '0');
-                          const parsedEx = parseInt(localSectorExceptions[item.id] || '0', 10);
-                          const finalVal = !isNaN(parsedBase) ? Number((parsedBase - (parsedEx / 100)).toFixed(3)) : null;
-
                           return (
                             <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                              <td className="px-4 py-2.5 whitespace-nowrap text-right font-bold text-slate-800 font-sans">
+                              <td className="px-4 py-3.5 whitespace-nowrap text-right font-bold text-slate-800 font-sans">
                                 {item.nameAr}
                               </td>
-                              <td className="px-4 py-2.5 whitespace-nowrap text-right">
+                              <td className="px-4 py-3.5 whitespace-nowrap text-right">
                                 <div className="relative max-w-[150px] inline-block w-full">
                                   <input
                                     type="text"
@@ -5007,19 +4991,125 @@ export default function AdminDashboard() {
                                   />
                                 </div>
                               </td>
-                              <td className="px-4 py-2.5 whitespace-nowrap text-right font-mono font-bold text-xs text-emerald-600">
-                                {finalVal !== null ? `${finalVal.toFixed(3)}%` : '—'}
-                              </td>
                             </tr>
                           );
                         })}
                       </tbody>
                     </table>
                   </div>
-                  
-                  <p className="text-[10px] text-[#6B7280] leading-normal font-sans mt-2">
-                    * الاستثناء (Exception Bps) يحفظ بشكل عام ومستقل لكل قطاع، ويتم خصمه مباشرة من هامش السنة المحددة عند تفعيل الحسبة.
-                  </p>
+                </div>
+
+                {/* 3. Preview Section */}
+                <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-5 space-y-4 col-span-1 lg:col-span-2">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div className="space-y-0.5">
+                      <span className="text-xs font-extrabold text-[#0057B8] font-sans block">🔎 معاينة الهامش التوضيحي</span>
+                      <p className="text-[10px] text-[#6B7280]">
+                        معلومات معاينة أثر الاستثناء المهني على هامش التمويل الأساسي للمدة المحددة.
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3">
+                      {/* Select Year */}
+                      <div className="flex items-center gap-1.5 text-xs">
+                        <span className="text-slate-600 font-bold">مدة التوضيح:</span>
+                        <select
+                          value={illustrativeYear}
+                          onChange={(e) => setIllustrativeYear(parseInt(e.target.value, 10))}
+                          className="bg-white border border-gray-300 rounded-xl px-2.5 py-1 text-xs font-bold font-sans cursor-pointer text-right min-w-[95px]"
+                        >
+                          {(selectedMarginInputMode === 'yearly'
+                            ? Array.from({ length: 26 }, (_, i) => 5 + i)
+                            : [5, 10, 15, 20, 25, 30]
+                          ).map(y => (
+                            <option key={y} value={y}>
+                              {y === 5 || y === 10 ? `${y} سنوات` : `${y} سنة`}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Select Sector */}
+                      <div className="flex items-center gap-1.5 text-xs font-sans">
+                        <span className="text-slate-600 font-bold">القطاع:</span>
+                        <select
+                          value={previewSector}
+                          onChange={(e) => setPreviewSector(e.target.value)}
+                          className="bg-white border border-gray-300 rounded-xl px-2.5 py-1 text-xs font-bold font-sans cursor-pointer text-right min-w-[120px]"
+                        >
+                          {[
+                            { id: 'gov_civil', nameAr: 'حكومي مدني' },
+                            { id: 'military', nameAr: 'عسكري' },
+                            { id: 'semi_gov', nameAr: 'شبه حكومي' },
+                            { id: 'companies', nameAr: 'موظف شركات' },
+                            { id: 'private', nameAr: 'قطاع خاص' },
+                            { id: 'retired', nameAr: 'متقاعد' }
+                          ].map(sec => (
+                            <option key={sec.id} value={sec.id}>{sec.nameAr}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Mathematical visual card */}
+                  {(() => {
+                    const parsedBase = parseFloat(localMargins[illustrativeYear] || '0');
+                    const parsedEx = parseInt(localSectorExceptions[previewSector] || '0', 10);
+                    const finalVal = !isNaN(parsedBase) ? Number((parsedBase - (parsedEx / 100)).toFixed(3)) : 0;
+                    
+                    return (
+                      <div className="bg-white rounded-xl border border-gray-150 p-4">
+                        <div className="grid grid-cols-1 md:grid-cols-5 gap-3 items-center text-center font-sans">
+                          {/* Base Margin */}
+                          <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-0.5">
+                            <span className="block text-[9px] font-bold text-slate-500">الهامش الأساسي ({illustrativeYear} سنة)</span>
+                            <span className="block text-base font-extrabold text-[#0057B8] font-mono leading-none">
+                              {!isNaN(parsedBase) && parsedBase > 0 ? `${parsedBase.toFixed(2)}%` : '0.00%'}
+                            </span>
+                          </div>
+
+                          {/* Operator '-' */}
+                          <div className="text-slate-400 font-extrabold text-xs font-sans">
+                            {parsedEx >= 0 ? ' مطروحاً منه استثناء القطاع ' : ' مضافاً إليه الاستثناء '}
+                          </div>
+
+                          {/* Sector Exception */}
+                          <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl space-y-0.5">
+                            <span className="block text-[9px] font-bold text-amber-700">الاستثناء ({
+                              [
+                                { id: 'gov_civil', nameAr: 'حكومي مدني' },
+                                { id: 'military', nameAr: 'عسكري' },
+                                { id: 'semi_gov', nameAr: 'شبه حكومي' },
+                                { id: 'companies', nameAr: 'موظف شركات' },
+                                { id: 'private', nameAr: 'قطاع خاص' },
+                                { id: 'retired', nameAr: 'متقاعد' }
+                              ].find(s => s.id === previewSector)?.nameAr
+                            })</span>
+                            <span className="block text-base font-extrabold text-amber-600 font-mono leading-none">
+                              {parsedEx} Bps ({Math.abs(parsedEx / 100).toFixed(2)}%)
+                            </span>
+                          </div>
+
+                          {/* Operator '=' */}
+                          <div className="text-slate-400 font-extrabold text-xs font-sans">
+                            يساوي الهامش النهائي (=)
+                          </div>
+
+                          {/* Final Margin */}
+                          <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl space-y-0.5">
+                            <span className="block text-[9px] font-bold text-emerald-800">الهامش النهائي المعاير</span>
+                            <span className="block text-base font-extrabold text-emerald-600 font-mono leading-none">
+                              {finalVal.toFixed(3)}%
+                            </span>
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-[#6B7280] mt-3 leading-relaxed text-right font-sans">
+                          * الهامش النهائي = الهامش الأساسي للسنوات {parsedEx >= 0 ? 'مطروحاً' : 'مضافاً'} منه استثناء القطاع. يتم تطبيقه في الحسبة آلياً ولا يظهر مباشرة للعميل.
+                        </p>
+                      </div>
+                    );
+                  })()}
                 </div>
 
               </div>
