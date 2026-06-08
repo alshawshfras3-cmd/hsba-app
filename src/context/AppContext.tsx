@@ -454,7 +454,20 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [activeNav, setActiveNav] = useState<'calculator' | 'admin'>('calculator');
   const [adminSubPage, setAdminSubPage] = useState<string>('banks');
   const [activeStepLabel, setActiveStepLabel] = useState<string>('نوع الحسبة');
-  const [currentStep, setCurrentStep] = useState<number>(1);
+  const [currentStep, setCurrentStep] = useState<number>(() => {
+    try {
+      const raw = localStorage.getItem('hesba_calculator_draft');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed.currentStep === 'number') {
+          return parsed.currentStep;
+        }
+      }
+    } catch (e) {
+      console.error("Error setting initial step from draft in AppContext:", e);
+    }
+    return 1;
+  });
   const [results, setResults] = useState<any[] | null>(null);
   const [isMobileSettingsOpen, setIsMobileSettingsOpen] = useState<boolean>(false);
 

@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { normalizeNumberInput } from '../../lib/number-input';
 
 interface NumericInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'value'> {
-  value: number;
-  onChange: (val: number) => void;
+  value: number | '';
+  onChange: (val: number | '') => void;
   allowDecimals?: boolean;
   min?: number;
   max?: number;
@@ -25,7 +25,7 @@ export default function NumericInput({
 
   // Sync with parent value if it changes externally
   useEffect(() => {
-    if (value === 0) {
+    if (value === 0 || value === '') {
       if (localVal !== '') setLocalVal('');
     } else {
       const parsedLocal = parseFloat(localVal.replace(/,/g, ''));
@@ -72,7 +72,7 @@ export default function NumericInput({
     setLocalVal(sanitized);
 
     if (sanitized === '' || sanitized === '.') {
-      onChange(0);
+      onChange('');
     } else {
       let parsed = allowDecimals ? parseFloat(sanitized) : parseInt(sanitized, 10);
       if (!isNaN(parsed)) {
@@ -96,7 +96,7 @@ export default function NumericInput({
         onChange(min);
       } else {
         setLocalVal('');
-        onChange(0);
+        onChange('');
       }
       return;
     }
