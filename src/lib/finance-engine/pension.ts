@@ -280,7 +280,6 @@ export function normalizeSectorId(sectorId: string): string {
     'military_individual': 'military',
     'military_enlisted':   'military',
     'military_officer':    'military',
-    'private':             'companies', // private mapped to companies
     'retired':             'retired',
   };
   return map[sectorId] || sectorId;

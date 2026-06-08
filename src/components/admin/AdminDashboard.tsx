@@ -793,14 +793,7 @@ export default function AdminDashboard() {
     25: '4.95',
     30: '5.25'
   });
-  const [localSectorExceptions, setLocalSectorExceptions] = useState<Record<string, string>>({
-    gov_civil: '0',
-    military: '0',
-    semi_gov: '0',
-    companies: '0',
-    private: '0',
-    retired: '0'
-  });
+  const [localSectorExceptions, setLocalSectorExceptions] = useState<Record<string, string>>({});
   const [illustrativeYear, setIllustrativeYear] = useState<number>(25);
   const [previewSector, setPreviewSector] = useState<string>('gov_civil');
   const [localCalcMethod, setLocalCalcMethod] = useState<'linear' | 'fixed'>('fixed');
@@ -877,7 +870,7 @@ export default function AdminDashboard() {
     setSelectedMarginInputMode(inputMode);
 
     // Synchronize sector exceptions (bank level only)
-    const sectorsList = ['gov_civil', 'military', 'semi_gov', 'companies', 'private', 'retired'];
+    const sectorsList = (sectors || []).map(s => s.id);
     const initialExceptions: Record<string, string> = {};
 
     sectorsList.forEach(secId => {
@@ -1017,7 +1010,8 @@ export default function AdminDashboard() {
 
     // Now, save sector exceptions!
     const newExceptionRules: MarginRule[] = [];
-    ['gov_civil', 'military', 'semi_gov', 'companies', 'private', 'retired'].forEach(secId => {
+    (sectors || []).forEach(sec => {
+      const secId = sec.id;
       const parsedBps = parseInt(sectorExceptionsRecord[secId] || '0', 10);
       newExceptionRules.push({
         id: `exception_${selectedMarginBank}_${secId}`,
@@ -1158,7 +1152,8 @@ export default function AdminDashboard() {
     }
 
     const newExceptionRules: MarginRule[] = [];
-    ['gov_civil', 'military', 'semi_gov', 'companies', 'private', 'retired'].forEach(secId => {
+    (sectors || []).forEach(sec => {
+      const secId = sec.id;
       const parsedBps = parseInt(sectorExceptionsRecord[secId] || '0', 10);
       newExceptionRules.push({
         id: `exception_${targetBank}_${secId}`,
@@ -1240,7 +1235,7 @@ export default function AdminDashboard() {
 
     const targetSourceSupport = cloningFromSupport === 'down_payment' ? 'downpayment' : cloningFromSupport;
     const sourceExceptions: Record<string, string> = {};
-    const sectorsList = ['gov_civil', 'military', 'semi_gov', 'companies', 'private', 'retired'];
+    const sectorsList = (sectors || []).map(s => s.id);
     sectorsList.forEach(secId => {
       const exRule = marginRules.find(r =>
         r.bankId === cloningFromBank &&
@@ -4784,6 +4779,7 @@ export default function AdminDashboard() {
             marginRules={marginRules}
             setMarginRules={setMarginRules}
             showToast={showToast}
+            sectors={sectors}
           />
         )}
 

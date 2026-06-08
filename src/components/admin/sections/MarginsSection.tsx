@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Copy } from 'lucide-react';
-import { Bank, ProductId, SupportType, SectorId, MarginRule } from '../../../types';
+import { Bank, ProductId, SupportType, SectorId, MarginRule, Sector } from '../../../types';
 import { calculateMargin } from '../../../lib/finance-engine/margin';
 
 interface MarginsSectionProps {
@@ -8,6 +8,7 @@ interface MarginsSectionProps {
   marginRules: MarginRule[];
   setMarginRules: React.Dispatch<React.SetStateAction<MarginRule[]>>;
   showToast: (msg: string, type: 'success' | 'refuse') => void;
+  sectors: Sector[];
 }
 
 const productTypesList = [
@@ -16,23 +17,17 @@ const productTypesList = [
   { id: 'real_estate_with_existing_personal', nameAr: 'عقاري مع شخصي قائم' }
 ];
 
-const sectorsList = [
-  { id: 'gov_civil', nameAr: 'حكومي مدني' },
-  { id: 'military', nameAr: 'عسكري' },
-  { id: 'semi_gov', nameAr: 'شبه حكومي' },
-  { id: 'companies', nameAr: 'موظف شركات' },
-  { id: 'private', nameAr: 'قطاع خاص' },
-  { id: 'retired', nameAr: 'متقاعد' }
-];
-
 const yearsList = [5, 10, 15, 20, 25, 30];
 
 export const MarginsSection: React.FC<MarginsSectionProps> = ({
   banks,
   marginRules,
   setMarginRules,
-  showToast
+  showToast,
+  sectors
 }) => {
+  const sectorsList = (sectors || []).map(sec => ({ id: sec.id, nameAr: sec.nameAr }));
+
   // 1. Selector States (Active single configuration)
   const [selectedBank, setSelectedBank] = useState<string>(banks[0]?.id || 'alahli');
   const [selectedProduct, setSelectedProduct] = useState<ProductId>('real_estate_only');
@@ -43,14 +38,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
 
   // 2. Local inputs for Edit Grid
   const [localMargins, setLocalMargins] = useState<Record<number, string>>({});
-  const [localSectorExceptions, setLocalSectorExceptions] = useState<Record<string, string>>({
-    gov_civil: '0',
-    military: '0',
-    semi_gov: '0',
-    companies: '0',
-    private: '0',
-    retired: '0'
-  });
+  const [localSectorExceptions, setLocalSectorExceptions] = useState<Record<string, string>>({});
 
   // Auxiliary UI States
   const [showCloneCard, setShowCloneCard] = useState(false);
