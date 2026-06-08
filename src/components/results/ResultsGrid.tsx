@@ -457,6 +457,12 @@ export default function ResultsGrid({
                                 <span className="font-bold text-[#0EA5A4]">{Math.round(offer.housingSupportAmount).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال{offer.supportType === 'monthly' ? ' / شهر' : ''}</span>
                               </div>
                             )}
+                            {offer.etizazAmount !== undefined && offer.etizazAmount > 0 && (
+                              <div className="col-span-2 bg-indigo-50 border border-indigo-100 rounded-xl p-3 flex justify-between items-center text-xs">
+                                <span className="text-indigo-700 font-bold">دعم اعتزاز للعسكريين:</span>
+                                <span className="font-bold text-indigo-700">{Math.round(offer.etizazAmount).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال</span>
+                              </div>
+                            )}
                           </>
                         )}
                       </div>
@@ -792,6 +798,12 @@ export default function ResultsGrid({
                         <span className="text-xs text-[#6B7280] block mb-1">{selectedOffer?.supportType === 'monthly' ? 'الدعم الشهري' : 'دعم الدفعة'}</span>
                         <span className="font-bold text-[#0EA5A4]">{Math.round(selectedOffer.housingSupportAmount).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال{selectedOffer.supportType === 'monthly' ? ' / شهر' : ''}</span>
                       </div>
+                      {selectedOffer.etizazAmount !== undefined && selectedOffer.etizazAmount > 0 && (
+                        <div>
+                          <span className="text-xs text-[#6B7280] block mb-1">دعم اعتزاز للعسكريين</span>
+                          <span className="font-bold text-indigo-700">{Math.round(selectedOffer.etizazAmount).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال</span>
+                        </div>
+                      )}
                       <div>
                         <span className="text-xs text-[#6B7280] block mb-1">هامش الربح العقاري</span>
                         <span className="font-bold text-indigo-700">{selectedOffer.annualMargin}%</span>

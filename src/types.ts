@@ -367,6 +367,7 @@ export interface BankCalculationResult {
   isAgeLimitingFactor?: boolean;
   personalEligible?: boolean;
   supportsPersonal?: boolean;
+  etizazAmount?: number;
 }
 
 export interface SavedResult {

@@ -181,6 +181,8 @@ export default function StepWizard() {
   const [termMode, setTermMode] = useState<TermMode>('max');
   const [manualTermYears, setManualTermYears] = useState<number>(25);
 
+  const [isEtizazEligible, setIsEtizazEligible] = useState<'yes' | 'no'>('no');
+
   const [existingMonthlyObligations, setExistingMonthlyObligations] = useState<number>(0);
   const [obligationRemainingMonths, setObligationRemainingMonths] = useState<number>(0);
 
@@ -425,6 +427,7 @@ export default function StepWizard() {
     const calcParams = {
       sectorId: effectiveSectorId,
       militarySubType: ((effectiveSectorId === 'military' || sectorId === 'military') ? ((militarySubtype === 'officer' || militaryType === 'officer') ? 'military_officer' : 'military_individual') : undefined) as 'military_officer' | 'military_individual' | undefined,
+      etizazAmount: ((effectiveSectorId === 'military' || sectorId === 'military') && isEtizazEligible === 'yes') ? 160000 : 0,
       productId,
       birthYear,
       birthMonth,
@@ -790,6 +793,31 @@ export default function StepWizard() {
                             </option>
                           ))}
                       </select>
+                    </div>
+                  </div>
+
+                  {/* هل العميل مؤهل لدعم اعتزاز؟ */}
+                  <div className="border-t border-gray-150 pt-4 space-y-2">
+                    <label className="block text-xs font-bold text-gray-700">هل العميل مؤهل لدعم اعتزاز؟</label>
+                    <div className="flex gap-3 max-w-xs">
+                      {[
+                        { id: 'no', label: 'لا' },
+                        { id: 'yes', label: 'نعم' }
+                      ].map((opt) => (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          id={`etizaz-opt-${opt.id}`}
+                          onClick={() => setIsEtizazEligible(opt.id as 'yes' | 'no')}
+                          className={`flex-1 py-2 px-4 rounded-xl text-xs font-bold transition-all border text-center cursor-pointer ${
+                            isEtizazEligible === opt.id
+                              ? 'bg-[#0057B8] text-white border-[#0057B8] shadow-xs'
+                              : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
                     </div>
                   </div>
 

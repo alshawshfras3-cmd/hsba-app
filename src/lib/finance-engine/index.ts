@@ -237,6 +237,7 @@ export function calculateBanksFinancing(params: {
   sectorId: SectorId;
   productId: ProductId;
   militarySubType?: 'military_officer' | 'military_individual';
+  etizazAmount?: number;
   
   birthYear: number;
   birthMonth: number;
@@ -286,6 +287,7 @@ export function calculateBanksFinancing(params: {
     sectorId,
     productId,
     militarySubType,
+    etizazAmount = 0,
     
     birthYear,
     birthMonth,
@@ -835,7 +837,8 @@ export function calculateBanksFinancing(params: {
       personalAmount: isEligible ? personalLoanAmount : 0,
       housingSupportAmount: isEligible ? (supportType === 'downpayment' ? supportResult.downPaymentSupport : supportResult.monthlySupport) : 0,
       supportType: supportType,
-      totalPurchasingPower: isEligible ? (isPersonalOnly ? personalLoanAmount : (purchasingPower + personalLoanAmount)) : 0,
+      totalPurchasingPower: isEligible ? (isPersonalOnly ? personalLoanAmount : (purchasingPower + personalLoanAmount + etizazAmount)) : 0,
+      etizazAmount: isEligible ? etizazAmount : 0,
       monthlyInstallmentBeforeRetirement: totalInstallmentStage1,
       monthlyInstallmentAfterRetirement: isEligible ? (isPersonalOnly ? 0 : installmentAfter) : 0,
       monthlyInstallmentAfterPersonal: totalInstallmentStage2,
