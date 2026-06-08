@@ -6,7 +6,7 @@ import { convertHijriToGregorian } from '../../lib/date-utils';
 import { SectorId, ProductId, SupportType, TermMode, BankCalculationResult } from '../../types';
 import { 
   Home, User, Coins, Briefcase, Calendar, Scale,
-  ChevronLeft, ChevronRight, HelpCircle, AlertCircle, Info, Calculator
+  ChevronLeft, ChevronRight, HelpCircle, AlertCircle, Info, Calculator, Trash2
 } from 'lucide-react';
 import ResultsGrid from '../results/ResultsGrid';
 import NumericInput from './NumericInput';
@@ -106,6 +106,21 @@ export const customMilitaryRanks = [
   }))
 ];
 
+const getDraftValue = <T,>(key: string, defaultValue: T): T => {
+  try {
+    const raw = localStorage.getItem('hesba_calculator_draft');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && parsed[key] !== undefined) {
+        return parsed[key];
+      }
+    }
+  } catch (e) {
+    console.error("Error loading draft key:", key, e);
+  }
+  return defaultValue;
+};
+
 export default function StepWizard() {
   const {
     banks,
@@ -134,21 +149,21 @@ export default function StepWizard() {
   } = useAppState();
 
   // --- Step Form Values State ---
-  const [mainFinanceType, setMainFinanceType] = useState<'real_estate' | 'personal_only' | 'real_estate_with_existing_personal'>('real_estate');
-  const [realEstateSubType, setRealEstateSubType] = useState<'real_estate_only' | 'real_estate_with_new_personal'>('real_estate_only');
-  const [customerStatus, setCustomerStatus] = useState<'active_employee' | 'retired'>('active_employee');
+  const [mainFinanceType, setMainFinanceType] = useState<'real_estate' | 'personal_only' | 'real_estate_with_existing_personal' | ''>(() => getDraftValue('mainFinanceType', ''));
+  const [realEstateSubType, setRealEstateSubType] = useState<'real_estate_only' | 'real_estate_with_new_personal' | ''>(() => getDraftValue('realEstateSubType', 'real_estate_only'));
+  const [customerStatus, setCustomerStatus] = useState<'active_employee' | 'retired' | ''>(() => getDraftValue('customerStatus', 'active_employee'));
 
-  const [productId, setProductId] = useState<ProductId>('real_estate');
-  const [sectorId, setSectorId] = useState<SectorId>('gov_civil');
-  const [militaryType, setMilitaryType] = useState<'officer' | 'individual' | ''>('');
-  const [rankId, setRankId] = useState<string>('jundi');
+  const [productId, setProductId] = useState<ProductId | ''>(() => getDraftValue('productId', ''));
+  const [sectorId, setSectorId] = useState<SectorId | ''>(() => getDraftValue('sectorId', ''));
+  const [militaryType, setMilitaryType] = useState<'officer' | 'individual' | ''>(() => getDraftValue('militaryType', ''));
+  const [rankId, setRankId] = useState<string>(() => getDraftValue('rankId', ''));
 
   // New prompt requirements states
-  const [sector, setSector] = useState<string>('gov_civil');
-  const [militarySubtype, setMilitarySubtype] = useState<'officer' | 'enlisted' | ''>('');
-  const [militaryRank, setMilitaryRank] = useState<string>('');
-  const [retirementAge, setRetirementAge] = useState<number>(60);
-  const [ahliGroup, setAhliGroup] = useState<'A' | 'B' | ''>('');
+  const [sector, setSector] = useState<string>(() => getDraftValue('sector', ''));
+  const [militarySubtype, setMilitarySubtype] = useState<'officer' | 'enlisted' | ''>(() => getDraftValue('militarySubtype', ''));
+  const [militaryRank, setMilitaryRank] = useState<string>(() => getDraftValue('militaryRank', ''));
+  const [retirementAge, setRetirementAge] = useState<number>(() => getDraftValue('retirementAge', 60));
+  const [ahliGroup, setAhliGroup] = useState<'A' | 'B' | ''>(() => getDraftValue('ahliGroup', ''));
 
   const effectiveSectorId = (sectorId as string) === 'gov_civil'
     ? 'gov_civil' as SectorId
@@ -157,40 +172,190 @@ export default function StepWizard() {
         : sectorId);
 
   // Dates
-  const [birthYear, setBirthYear] = useState<number>(1990);
-  const [birthMonth, setBirthMonth] = useState<number>(1);
-  const [birthDay, setBirthDay] = useState<number>(1);
-  const [birthCalendar, setBirthCalendar] = useState<'gregorian' | 'hijri'>('gregorian');
+  const [birthYear, setBirthYear] = useState<number>(() => getDraftValue('birthYear', 0));
+  const [birthMonth, setBirthMonth] = useState<number>(() => getDraftValue('birthMonth', 0));
+  const [birthDay, setBirthDay] = useState<number>(() => getDraftValue('birthDay', 1));
+  const [birthCalendar, setBirthCalendar] = useState<'gregorian' | 'hijri'>(() => getDraftValue('birthCalendar', 'gregorian'));
 
-  const [appointmentYear, setAppointmentYear] = useState<number>(2015);
-  const [appointmentMonth, setAppointmentMonth] = useState<number>(1);
-  const [appointmentDay, setAppointmentDay] = useState<number>(1);
-  const [appointmentCalendar, setAppointmentCalendar] = useState<'gregorian' | 'hijri'>('gregorian');
+  const [appointmentYear, setAppointmentYear] = useState<number>(() => getDraftValue('appointmentYear', 0));
+  const [appointmentMonth, setAppointmentMonth] = useState<number>(() => getDraftValue('appointmentMonth', 0));
+  const [appointmentDay, setAppointmentDay] = useState<number>(() => getDraftValue('appointmentDay', 1));
+  const [appointmentCalendar, setAppointmentCalendar] = useState<'gregorian' | 'hijri'>(() => getDraftValue('appointmentCalendar', 'gregorian'));
 
   // Salary
-  const [salaryMode, setSalaryMode] = useState<'direct' | 'details'>('details');
-  const [directNetSalary, setDirectNetSalary] = useState<number>(12000);
-  const [directPensionSalary, setDirectPensionSalary] = useState<number>(8000);
-  const [basicSalary, setBasicSalary] = useState<number>(9000);
-  const [housingAllowance, setHousingAllowance] = useState<number>(2250);
-  const [otherAllowances, setOtherAllowances] = useState<number>(1500);
+  const [salaryMode, setSalaryMode] = useState<'direct' | 'details'>(() => getDraftValue('salaryMode', 'details'));
+  const [directNetSalary, setDirectNetSalary] = useState<number>(() => getDraftValue('directNetSalary', 0));
+  const [directPensionSalary, setDirectPensionSalary] = useState<number>(() => getDraftValue('directPensionSalary', 0));
+  const [basicSalary, setBasicSalary] = useState<number>(() => getDraftValue('basicSalary', 0));
+  const [housingAllowance, setHousingAllowance] = useState<number>(() => getDraftValue('housingAllowance', 0));
+  const [otherAllowances, setOtherAllowances] = useState<number>(() => getDraftValue('otherAllowances', 0));
 
   // Finance details
-  const [supportType, setSupportType] = useState<SupportType>('none');
-  const [selectedBankId, setSelectedBankId] = useState<string>('all');
-  const [termMode, setTermMode] = useState<TermMode>('max');
-  const [manualTermYears, setManualTermYears] = useState<number>(25);
+  const [supportType, setSupportType] = useState<SupportType | ''>(() => getDraftValue('supportType', ''));
+  const [selectedBankId, setSelectedBankId] = useState<string>(() => getDraftValue('selectedBankId', ''));
+  const [termMode, setTermMode] = useState<TermMode>(() => getDraftValue('termMode', 'max'));
+  const [manualTermYears, setManualTermYears] = useState<number>(() => getDraftValue('manualTermYears', 25));
 
-  const [isEtizazEligible, setIsEtizazEligible] = useState<'yes' | 'no'>('no');
+  const [isEtizazEligible, setIsEtizazEligible] = useState<'yes' | 'no'>(() => getDraftValue('isEtizazEligible', 'no'));
 
-  const [existingMonthlyObligations, setExistingMonthlyObligations] = useState<number>(0);
-  const [obligationRemainingMonths, setObligationRemainingMonths] = useState<number>(0);
+  const [existingMonthlyObligations, setExistingMonthlyObligations] = useState<number>(() => getDraftValue('existingMonthlyObligations', 0));
+  const [obligationRemainingMonths, setObligationRemainingMonths] = useState<number>(() => getDraftValue('obligationRemainingMonths', 0));
 
   // Validation errors
   const [errors, setErrors] = useState<string[]>([]);
 
   // Compute live local calculated Net salary to aid real-time UI display
-  const [localCalculatedNet, setLocalCalculatedNet] = useState(12000);
+  const [localCalculatedNet, setLocalCalculatedNet] = useState(0);
+
+  // Load draft values into AppContext's currentStep or results if they exist on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('hesba_calculator_draft');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed) {
+          if (parsed.currentStep !== undefined) {
+            setCurrentStep(parsed.currentStep);
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Error setting initial step from draft:", e);
+    }
+  }, []);
+
+  // Save Draft to localStorage on state changes
+  useEffect(() => {
+    const draft = {
+      mainFinanceType,
+      realEstateSubType,
+      customerStatus,
+      productId,
+      sectorId,
+      militaryType,
+      rankId,
+      sector,
+      militarySubtype,
+      militaryRank,
+      retirementAge,
+      ahliGroup,
+      birthYear,
+      birthMonth,
+      birthDay,
+      birthCalendar,
+      appointmentYear,
+      appointmentMonth,
+      appointmentDay,
+      appointmentCalendar,
+      salaryMode,
+      directNetSalary,
+      directPensionSalary,
+      basicSalary,
+      housingAllowance,
+      otherAllowances,
+      supportType,
+      selectedBankId,
+      termMode,
+      manualTermYears,
+      isEtizazEligible,
+      existingMonthlyObligations,
+      obligationRemainingMonths,
+      currentStep
+    };
+    try {
+      localStorage.setItem('hesba_calculator_draft', JSON.stringify(draft));
+    } catch (e) {
+      console.error("Error writing draft to localStorage:", e);
+    }
+  }, [
+    mainFinanceType,
+    realEstateSubType,
+    customerStatus,
+    productId,
+    sectorId,
+    militaryType,
+    rankId,
+    sector,
+    militarySubtype,
+    militaryRank,
+    retirementAge,
+    ahliGroup,
+    birthYear,
+    birthMonth,
+    birthDay,
+    birthCalendar,
+    appointmentYear,
+    appointmentMonth,
+    appointmentDay,
+    appointmentCalendar,
+    salaryMode,
+    directNetSalary,
+    directPensionSalary,
+    basicSalary,
+    housingAllowance,
+    otherAllowances,
+    supportType,
+    selectedBankId,
+    termMode,
+    manualTermYears,
+    isEtizazEligible,
+    existingMonthlyObligations,
+    obligationRemainingMonths,
+    currentStep
+  ]);
+
+  const clearAndResetCalculator = () => {
+    // 1. Clear state
+    setMainFinanceType('');
+    setRealEstateSubType('real_estate_only');
+    setCustomerStatus('active_employee');
+    setProductId('');
+    setSectorId('');
+    setMilitaryType('');
+    setRankId('');
+    setSector('');
+    setMilitarySubtype('');
+    setMilitaryRank('');
+    setRetirementAge(60);
+    setAhliGroup('');
+    
+    setBirthYear(0);
+    setBirthMonth(0);
+    setBirthDay(1);
+    setBirthCalendar('gregorian');
+    
+    setAppointmentYear(0);
+    setAppointmentMonth(0);
+    setAppointmentDay(1);
+    setAppointmentCalendar('gregorian');
+    
+    setSalaryMode('details');
+    setDirectNetSalary(0);
+    setDirectPensionSalary(0);
+    setBasicSalary(0);
+    setHousingAllowance(0);
+    setOtherAllowances(0);
+    
+    setSupportType('');
+    setSelectedBankId('');
+    setTermMode('max');
+    setManualTermYears(25);
+    setIsEtizazEligible('no');
+    
+    setExistingMonthlyObligations(0);
+    setObligationRemainingMonths(0);
+    
+    setErrors([]);
+    setResults(null);
+    setCurrentStep(1);
+    
+    // 2. Clear localStorage draft
+    try {
+      localStorage.removeItem('hesba_calculator_draft');
+    } catch (e) {
+      console.error("Error removing draft from localStorage:", e);
+    }
+  };
 
   // Dynamic step structure definition
   type StepId = 
@@ -230,14 +395,14 @@ export default function StepWizard() {
 
   // Dynamic Pension Calculation
   const pensionCalcObj = calculatePensionSalary({
-    sectorId: effectiveSectorId,
+    sectorId: effectiveSectorId || 'gov_civil',
     basicSalary: effectiveSectorId === 'retired' ? 0 : (salaryMode === 'details' ? basicSalary : directNetSalary),
-    birthYear,
-    birthMonth,
+    birthYear: birthYear || 1990,
+    birthMonth: birthMonth || 1,
     birthDay: 1,
     birthCalendar,
-    appointmentYear: effectiveSectorId === 'retired' ? undefined : appointmentYear,
-    appointmentMonth: effectiveSectorId === 'retired' ? undefined : appointmentMonth,
+    appointmentYear: (effectiveSectorId === 'retired' || !appointmentYear) ? undefined : appointmentYear,
+    appointmentMonth: (effectiveSectorId === 'retired' || !appointmentMonth) ? undefined : appointmentMonth,
     appointmentDay: 1,
     appointmentCalendar: effectiveSectorId === 'retired' ? undefined : appointmentCalendar,
     directPensionSalary: effectiveSectorId === 'retired' ? directPensionSalary : undefined
@@ -245,7 +410,7 @@ export default function StepWizard() {
 
   // حساب تقدير الراتب التقاعدي الحقيقي المتوافق مع البنك والقطاع والخرائط والقوانين
   const targetBankIdForPensionEstimate = selectedBankId && selectedBankId !== 'all' ? selectedBankId : 'rajhi';
-  const liveApprovedSalaryRule = getApprovedSalaryRule(targetBankIdForPensionEstimate, effectiveSectorId, approvedSalaryDbRules);
+  const liveApprovedSalaryRule = getApprovedSalaryRule(targetBankIdForPensionEstimate, effectiveSectorId || 'gov_civil', approvedSalaryDbRules);
   const liveApprovedSalary = effectiveSectorId === 'retired'
     ? (directPensionSalary || 0)
     : (salaryMode === 'details'
@@ -258,14 +423,14 @@ export default function StepWizard() {
         : (directNetSalary || 0)
       );
 
-  const liveRetirementAgeRule = pensionRules.find(r => r.sectorId === effectiveSectorId) || pensionRules.find(r => r.sectorId === sectorId);
+  const liveRetirementAgeRule = pensionRules.find(r => r.sectorId === (effectiveSectorId || 'gov_civil')) || pensionRules.find(r => r.sectorId === (sectorId || 'gov_civil'));
   const isMilitary = effectiveSectorId === 'military' || sector === 'military' || (sectorId as string) === 'military';
   const liveRetirementAge = isMilitary
     ? (militaryRanks.find(r => r.id === rankId)?.retirementAge || retirementAge || 44)
     : (liveRetirementAgeRule?.retirementAge || 60);
 
   const liveYearsToRetirement = Math.max(0, liveRetirementAge - (pensionCalcObj.currentAgeMonths / 12));
-  const livePensionRule = getPensionRule(targetBankIdForPensionEstimate, effectiveSectorId, pensionDbRules, sectorMappings);
+  const livePensionRule = getPensionRule(targetBankIdForPensionEstimate, effectiveSectorId || 'gov_civil', pensionDbRules, sectorMappings);
 
   const liveCalculatedPensionObj = effectiveSectorId === 'retired'
     ? { pension: directPensionSalary || 0 }
@@ -291,7 +456,7 @@ export default function StepWizard() {
       setObligationRemainingMonths(0);
       if (realEstateSubType === 'real_estate_only') {
         setProductId('real_estate');
-      } else {
+      } else if (realEstateSubType === 'real_estate_with_new_personal') {
         setProductId('both');
       }
     }
@@ -333,8 +498,16 @@ export default function StepWizard() {
     const stepErrors: string[] = [];
     const stepId = flow[stepNumber - 1];
 
+    if (stepId === 'main_type') {
+      if (!mainFinanceType) {
+        stepErrors.push('يرجى تحديد نوع الحسبة المطلوبة للمتابعة.');
+      }
+    }
+
     if (stepId === 'personal_info') {
-      if (sectorId === 'military' && !militaryType) {
+      if (!sectorId) {
+        stepErrors.push('يرجى اختيار القطاع المهني لجهة العمل.');
+      } else if (sectorId === 'military' && !militaryType) {
         stepErrors.push('حدد نوع العسكري لأن بعض البنوك تختلف بين الضباط والأفراد.');
       }
 
@@ -395,7 +568,16 @@ export default function StepWizard() {
     }
 
     if (stepId === 'finance_options') {
+      if (!selectedBankId) {
+        stepErrors.push('يرجى اختيار جهة التمويل المفضلة أو مقارنة جميع الجهات.');
+      }
       if (mainFinanceType !== 'personal_only') {
+        if (!productId) {
+          stepErrors.push('يرجى تحديد نوع منتج التمويل العقاري المطلوب.');
+        }
+        if (!supportType) {
+          stepErrors.push('يرجى تحديد نوع الدعم السكني المطلوب (مستحق أو غير مدعوم).');
+        }
         if (termMode === 'manual') {
           if (!manualTermYears || manualTermYears < 1 || manualTermYears > 30) {
             stepErrors.push('يرجى إدخال مدة تمويل مستهدفة صحيحة بين 1 و 30 سنة.');
@@ -1124,6 +1306,7 @@ export default function StepWizard() {
                       onChange={(e) => setSelectedBankId(e.target.value)}
                       className="w-full bg-slate-50 border border-gray-200 rounded-xl px-4 py-3.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-[#0057B8] focus:border-transparent cursor-pointer font-sans text-gray-800"
                     >
+                      <option value="">-- يرجى اختيار جهة التمويل --</option>
                       <option value="all">جميع جهات التمويل النشطة المتاحة (مقارنة العروض)</option>
                       {banks.filter(b => b.isActive).map(bank => (
                         <option key={bank.id} value={bank.id}>{bank.nameAr}</option>
@@ -1309,6 +1492,7 @@ export default function StepWizard() {
                     onChange={(e) => setSelectedBankId(e.target.value)}
                     className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] focus:border-transparent cursor-pointer font-sans"
                   >
+                    <option value="">-- يرجى اختيار جهة التمويل --</option>
                     <option value="all">جميع جهات التمويل النشطة المتاحة (مقارنة العروض)</option>
                     {banks.filter(b => b.isActive).map(bank => (
                       <option key={bank.id} value={bank.id}>{bank.nameAr}</option>
