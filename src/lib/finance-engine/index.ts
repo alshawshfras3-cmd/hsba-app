@@ -900,6 +900,10 @@ export function calculateBanksFinancing(params: {
         `[مدة التمويل]: المدة الكلية: ${termResult.totalMonths} شهر (${termResult.totalYears} سنة) منها ${termResult.monthsBeforeRetirement} شهر قبل التقاعد و ${termResult.monthsAfterRetirement} شخر بعد التقاعد.`,
         ...(termResult.reductionReason ? [`[سبب تقليص المدة]: ${termResult.reductionReason}`] : []),
         `[هامش الفائدة المطبق]: ${marginResult.bankName || bank.nameAr} — ${marginResult.productName} — ${marginResult.supportName} — فئة الراتب المستخدمة: ${marginResult.salaryTier === 'below_25000' ? 'أقل من 25,000' : marginResult.salaryTier === 'above_or_equal_25000' ? '25,000 فأكثر' : 'لا ينطبق'} — سنة الهامش المستخدمة: سنة ${marginResult.selectedMarginYear} — الهامش السنوي المستخدم: ${marginResult.annualMargin}% — مصدر الهامش من الإعدادات: ${marginResult.ruleUsed}`,
+        ...(productId !== 'personal' && productId !== 'personal_only' ? [
+          `[تفاصيل استثناء الهامش]: الهامش الأساسي من الجدول (Base Margin): ${(marginResult.baseMargin ? marginResult.baseMargin * 100 : marginResult.annualMargin).toFixed(2)}% | نسبة الاستثناء (Exception Bps): ${marginResult.exceptionBps ?? 0} نقطة أساس | الهامش النهائي المستخدم (Final Margin): ${marginResult.annualMargin.toFixed(3)}%`,
+          `[طريقة حساب التمويل العقاري]: التمويل العقاري = مجموع التدفق النقدي للأقساط ÷ (1 + الهامش النهائي × عدد السنوات)`
+        ] : []),
         ...diag.calculationSteps
       ]
     });

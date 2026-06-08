@@ -153,16 +153,31 @@ export function calculateMargin(params: {
   }
 
   // Round margin to 3 decimal places
-  annualMargin = Number(annualMargin.toFixed(3));
+  const baseMarginPercent = Number(annualMargin.toFixed(3));
+
+  // Determine if it is a real estate product and calculate exception adjustments
+  const isRealEstate = normProduct !== 'personal' && normProduct !== 'personal_only';
+  const matchedRule = rules.find(
+    r => termMonths >= r.fromTermMonths && termMonths <= r.toTermMonths
+  );
+  const exceptionBps = (isRealEstate && matchedRule) ? (matchedRule.exceptionBps ?? 0) : 0;
+  const finalMarginPercent = Number((baseMarginPercent - (exceptionBps / 100)).toFixed(3));
+
+  let finalRuleUsed = ruleUsed;
+  if (isRealEstate && exceptionBps !== 0) {
+    finalRuleUsed += ` (تم تطبيق استثناء بمقدار ${exceptionBps} نقطة أساس، الهامش النهائي: ${finalMarginPercent.toFixed(3)}%)`;
+  }
 
   return {
-    annualMargin,
+    annualMargin: finalMarginPercent,
     marginType,
-    ruleUsed,
+    ruleUsed: finalRuleUsed,
     salaryTier,
     selectedMarginYear,
     bankName: bankNameAr,
     productName: productNameAr,
-    supportName: supportNameAr
+    supportName: supportNameAr,
+    baseMargin: Number((baseMarginPercent / 100).toFixed(6)),
+    exceptionBps
   };
 }

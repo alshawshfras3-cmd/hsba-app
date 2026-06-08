@@ -136,6 +136,8 @@ export interface MarginRule {
   year?: number;
   termMonths?: number;
   annualMargin?: number;
+  exceptionBps?: number;
+  baseMargin?: number;
 }
 
 export interface DsrRule {
@@ -276,6 +278,8 @@ export interface MarginOutput {
   bankName?: string;
   productName?: string;
   supportName?: string;
+  baseMargin?: number;
+  exceptionBps?: number;
 }
 
 export interface PersonalFinanceOutput {
