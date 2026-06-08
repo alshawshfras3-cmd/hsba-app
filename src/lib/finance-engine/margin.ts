@@ -37,21 +37,16 @@ export function calculateMargin(params: {
   let selectedMarginYear = Math.round(termMonths / 12);
   selectedMarginYear = Math.min(Math.max(selectedMarginYear, 5), 30);
 
-  // Filter margins for the current bank and product
+  // Filter base rules (which are our margin rules across years, sectorId is 'all')
   let rules = marginRules.filter(
     r => r.bankId === bankId &&
          r.productId === normProduct &&
          (r.supportType === 'all' || r.supportType === normSupport) &&
-         (r.sectorId === 'all' || r.sectorId === sectorId) &&
+         (r.sectorId === 'all' || !r.sectorId) &&
          r.isActive &&
-         (!r.salaryTier || r.salaryTier === 'not_applicable' || r.salaryTier === salaryTier)
+         (!r.salaryTier || r.salaryTier === 'not_applicable' || r.salaryTier === salaryTier) &&
+         !r.isExceptionOnly
   );
-
-  // If alignment with a specific sectorId is found, prioritize specific sector rules over general 'all' ones.
-  const specificSectorRules = rules.filter(r => r.sectorId === sectorId);
-  if (specificSectorRules.length > 0) {
-    rules = specificSectorRules;
-  }
 
   // If we have rules that explicitly specify our target salaryTier, prioritize them
   const specificRules = rules.filter(r => r.salaryTier === salaryTier);
@@ -64,7 +59,8 @@ export function calculateMargin(params: {
     rules = marginRules.filter(
       r => r.bankId === 'all' &&
            r.productId === normProduct &&
-           r.isActive
+           r.isActive &&
+           !r.isExceptionOnly
     );
   }
 
@@ -163,10 +159,16 @@ export function calculateMargin(params: {
 
   // Determine if it is a real estate product and calculate exception adjustments
   const isRealEstate = normProduct !== 'personal' && normProduct !== 'personal_only';
-  const matchedRule = rules.find(
-    r => termMonths >= r.fromTermMonths && termMonths <= r.toTermMonths
+  // Find the sector exception rule matching bank + sector + product + support
+  const matchedExceptionRule = marginRules.find(
+    r => r.bankId === bankId &&
+         r.sectorId === sectorId &&
+         (r.productId === normProduct || r.productType === normProduct) &&
+         (r.supportType === normSupport || r.supportType === 'all') &&
+         r.exceptionBps !== undefined &&
+         r.isActive !== false
   );
-  const exceptionBps = (isRealEstate && matchedRule) ? (matchedRule.exceptionBps ?? 0) : 0;
+  const exceptionBps = isRealEstate && matchedExceptionRule ? (matchedExceptionRule.exceptionBps ?? 0) : 0;
   const finalMarginPercent = Number((baseMarginPercent - (exceptionBps / 100)).toFixed(3));
 
   let finalRuleUsed = ruleUsed;

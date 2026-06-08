@@ -775,7 +775,16 @@ export default function AdminDashboard() {
     25: '4.95',
     30: '5.25'
   });
-  const [localExceptionBps, setLocalExceptionBps] = useState<Record<number, string>>({});
+  const [localSectorExceptions, setLocalSectorExceptions] = useState<Record<string, string>>({
+    all: '0',
+    gov_civil: '0',
+    military: '0',
+    semi_gov: '0',
+    companies: '0',
+    private: '0',
+    retired: '0'
+  });
+  const [illustrativeYear, setIllustrativeYear] = useState<number>(25);
   const [localCalcMethod, setLocalCalcMethod] = useState<'linear' | 'fixed'>('fixed');
 
   // Copy-from states for Cloning inside the same bank & cross-bank
@@ -796,13 +805,13 @@ export default function AdminDashboard() {
       r.bankId === selectedMarginBank && 
       (r.productType === selectedMarginProduct || r.productId === selectedMarginProduct || (selectedMarginProduct === 'real_estate_only' && r.productId === 'real_estate')) && 
       (r.supportType === selectedMarginSupport || r.supportType === 'all') &&
-      (r.sectorId || 'all') === selectedMarginSector &&
-      (r.salaryTier === selectedMarginSalaryTier || (!r.salaryTier && selectedMarginSalaryTier === 'not_applicable'))
+      (r.sectorId || 'all') === 'all' &&
+      (r.salaryTier === selectedMarginSalaryTier || (!r.salaryTier && selectedMarginSalaryTier === 'not_applicable')) &&
+      !r.isExceptionOnly
     );
 
     const yearsList = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30];
     const initialMargins: Record<number, string> = {};
-    const initialExceptionBps: Record<number, string> = {};
 
     const hasRules = relevantRules.length > 0;
 
@@ -810,9 +819,7 @@ export default function AdminDashboard() {
       const rY = relevantRules.find(r => r.year === year || r.toTermMonths === year * 12);
       if (rY) {
         initialMargins[year] = (rY.annualMargin !== undefined ? rY.annualMargin : (rY.baseMargin !== undefined ? Number((rY.baseMargin * 100).toFixed(3)) : rY.endMargin)).toString();
-        initialExceptionBps[year] = (rY.exceptionBps !== undefined ? rY.exceptionBps : 0).toString();
       } else {
-        initialExceptionBps[year] = '0';
         const isStandardYear = [5, 10, 15, 20, 25, 30].includes(year);
         if (!hasRules && isStandardYear) {
           if (year === 5) initialMargins[year] = '3.80';
@@ -848,12 +855,35 @@ export default function AdminDashboard() {
     }
 
     setLocalMargins(initialMargins);
-    setLocalExceptionBps(initialExceptionBps);
     setLocalCalcMethod(method);
     setSelectedMarginInputMode(inputMode);
-  }, [selectedMarginBank, selectedMarginProduct, selectedMarginSupport, selectedMarginSalaryTier, selectedMarginSector, marginRules]);
 
-  const updateGlobalRulesFromLocal = (marginsRecord: Record<number, string>, exceptionsRecord: Record<number, string>, method: 'linear' | 'fixed', inputMode: 'yearly' | 'key_points') => {
+    // Synchronize sector exceptions
+    const normSupport = selectedMarginSupport === 'down_payment' ? 'downpayment' : selectedMarginSupport;
+    const sectorsList = ['all', 'gov_civil', 'military', 'semi_gov', 'companies', 'private', 'retired'];
+    const initialExceptions: Record<string, string> = {};
+
+    sectorsList.forEach(secId => {
+      const exRule = marginRules.find(r =>
+        r.bankId === selectedMarginBank &&
+        (r.productType === selectedMarginProduct || r.productId === selectedMarginProduct) &&
+        (r.supportType === normSupport || r.supportType === 'all') &&
+        r.sectorId === secId &&
+        r.exceptionBps !== undefined &&
+        (r.isExceptionOnly === true || (r.fromTermMonths === 0 && r.toTermMonths === 9999))
+      );
+      initialExceptions[secId] = exRule && exRule.exceptionBps !== undefined ? exRule.exceptionBps.toString() : '0';
+    });
+
+    setLocalSectorExceptions(initialExceptions);
+  }, [selectedMarginBank, selectedMarginProduct, selectedMarginSupport, selectedMarginSalaryTier, marginRules]);
+
+  const updateGlobalRulesFromLocal = (
+    marginsRecord: Record<number, string>, 
+    sectorExceptionsRecord: Record<string, string>, 
+    method: 'linear' | 'fixed', 
+    inputMode: 'yearly' | 'key_points'
+  ) => {
     const productIdsToFilter = [selectedMarginProduct];
     if (selectedMarginProduct === 'real_estate_with_new_personal') {
       productIdsToFilter.push('real_estate');
@@ -867,12 +897,20 @@ export default function AdminDashboard() {
     const normSupport = selectedMarginSupport === 'down_payment' ? 'downpayment' : selectedMarginSupport;
 
     const remainingRules = marginRules.filter(r => {
-      const matchesTarget = r.bankId === selectedMarginBank &&
-                            productIdsToFilter.includes(r.productId) &&
-                            (r.supportType === normSupport || r.supportType === 'all') &&
-                            (r.sectorId || 'all') === selectedMarginSector &&
-                            (r.salaryTier === selectedMarginSalaryTier || (!r.salaryTier && selectedMarginSalaryTier === 'not_applicable'));
-      return !matchesTarget;
+      const isBaseForCombo = r.bankId === selectedMarginBank &&
+                             productIdsToFilter.includes(r.productId) &&
+                             (r.supportType === normSupport || r.supportType === 'all') &&
+                             (r.sectorId || 'all') === 'all' &&
+                             (r.salaryTier === selectedMarginSalaryTier || (!r.salaryTier && selectedMarginSalaryTier === 'not_applicable')) &&
+                             !r.isExceptionOnly;
+
+      const isExceptionForCombo = r.bankId === selectedMarginBank &&
+                                  productIdsToFilter.includes(r.productId) &&
+                                  (r.supportType === normSupport || r.supportType === 'all') &&
+                                  r.exceptionBps !== undefined &&
+                                  (r.isExceptionOnly === true || (r.fromTermMonths === 0 && r.toTermMonths === 9999));
+
+      return !isBaseForCombo && !isExceptionForCombo;
     });
 
     const newRulesForThisCombo: MarginRule[] = [];
@@ -888,128 +926,144 @@ export default function AdminDashboard() {
 
     filledYears.sort((a, b) => a - b);
 
-    if (filledYears.length === 0) {
-      setMarginRules([...remainingRules]);
-      return;
+    if (filledYears.length > 0) {
+      productIdsToFilter.forEach(pId => {
+        const definitions: Array<{ from: number, to: number, start: number, end: number, calcType: 'fixed' | 'linear', yearPoint: number }> = [];
+
+        for (let i = 0; i < filledYears.length; i++) {
+          const currentYear = filledYears[i];
+          const currentMarginStr = marginsRecord[currentYear];
+          const currentMarginVal = parseFloat(currentMarginStr) || 0;
+
+          if (i === 0) {
+            definitions.push({
+              from: 0,
+              to: currentYear * 12,
+              start: currentMarginVal,
+              end: currentMarginVal,
+              calcType: 'fixed' as const,
+              yearPoint: currentYear
+            });
+          } else {
+            const prevYear = filledYears[i - 1];
+            const prevMarginStr = marginsRecord[prevYear];
+            const prevMarginVal = parseFloat(prevMarginStr) || 0;
+
+            const fromMonths = prevYear * 12 + 1;
+            const toMonths = currentYear * 12;
+
+            definitions.push({
+              from: fromMonths,
+              to: toMonths,
+              start: method === 'fixed' ? currentMarginVal : prevMarginVal,
+              end: currentMarginVal,
+              calcType: method,
+              yearPoint: currentYear
+            });
+          }
+        }
+
+        const lastYear = filledYears[filledYears.length - 1];
+        const lastMarginStr = marginsRecord[lastYear];
+        const lastMarginVal = parseFloat(lastMarginStr) || 0;
+        definitions.push({
+          from: lastYear * 12 + 1,
+          to: 9999,
+          start: lastMarginVal,
+          end: lastMarginVal,
+          calcType: 'fixed' as const,
+          yearPoint: lastYear
+        });
+
+        definitions.forEach((def, index) => {
+          newRulesForThisCombo.push({
+            id: `gen_margin_${selectedMarginBank}_${pId}_${normSupport}_${selectedMarginSalaryTier}_t${def.from}_${def.to}_${index}`,
+            bankId: selectedMarginBank,
+            productId: pId as ProductId,
+            supportType: normSupport as any,
+            sectorId: 'all',
+            fromTermMonths: def.from,
+            toTermMonths: def.to,
+            startMargin: def.start,
+            endMargin: def.end,
+            calcType: def.calcType,
+            isActive: true,
+            salaryTier: selectedMarginSalaryTier,
+
+            productType: selectedMarginProduct,
+            marginInputMode: inputMode,
+            calculationMethod: method,
+            year: def.yearPoint,
+            termMonths: def.to === 9999 ? (def.yearPoint * 12) : def.to,
+            annualMargin: def.end,
+            exceptionBps: 0,
+            baseMargin: Number((def.end / 100).toFixed(6))
+          });
+        });
+      });
     }
 
-    productIdsToFilter.forEach(pId => {
-      const definitions: Array<{ from: number, to: number, start: number, end: number, calcType: 'fixed' | 'linear', yearPoint: number, exceptionBps: number }> = [];
-
-      for (let i = 0; i < filledYears.length; i++) {
-        const currentYear = filledYears[i];
-        const currentMarginStr = marginsRecord[currentYear];
-        const currentMarginVal = parseFloat(currentMarginStr) || 0;
-        const currentExceptionStr = exceptionsRecord[currentYear] || '0';
-        const currentExceptionVal = parseFloat(currentExceptionStr) || 0;
-
-        if (i === 0) {
-          definitions.push({
-            from: 0,
-            to: currentYear * 12,
-            start: currentMarginVal,
-            end: currentMarginVal,
-            calcType: 'fixed' as const,
-            yearPoint: currentYear,
-            exceptionBps: currentExceptionVal
-          });
-        } else {
-          const prevYear = filledYears[i - 1];
-          const prevMarginStr = marginsRecord[prevYear];
-          const prevMarginVal = parseFloat(prevMarginStr) || 0;
-
-          const fromMonths = prevYear * 12 + 1;
-          const toMonths = currentYear * 12;
-
-          definitions.push({
-            from: fromMonths,
-            to: toMonths,
-            start: method === 'fixed' ? currentMarginVal : prevMarginVal,
-            end: currentMarginVal,
-            calcType: method,
-            yearPoint: currentYear,
-            exceptionBps: currentExceptionVal
-          });
-        }
-      }
-
-      const lastYear = filledYears[filledYears.length - 1];
-      const lastMarginStr = marginsRecord[lastYear];
-      const lastMarginVal = parseFloat(lastMarginStr) || 0;
-      const lastExceptionStr = exceptionsRecord[lastYear] || '0';
-      const lastExceptionVal = parseFloat(lastExceptionStr) || 0;
-      definitions.push({
-        from: lastYear * 12 + 1,
-        to: 9999,
-        start: lastMarginVal,
-        end: lastMarginVal,
-        calcType: 'fixed' as const,
-        yearPoint: lastYear,
-        exceptionBps: lastExceptionVal
-      });
-
-      definitions.forEach((def, index) => {
-        newRulesForThisCombo.push({
-          id: `gen_margin_${selectedMarginBank}_${pId}_${normSupport}_${selectedMarginSalaryTier}_t${def.from}_${def.to}_${index}`,
+    // Now, save sector exceptions!
+    const newExceptionRules: MarginRule[] = [];
+    ['all', 'gov_civil', 'military', 'semi_gov', 'companies', 'private', 'retired'].forEach(secId => {
+      const parsedBps = parseInt(sectorExceptionsRecord[secId] || '0', 10);
+      productIdsToFilter.forEach(pId => {
+        newExceptionRules.push({
+          id: `exception_${selectedMarginBank}_${secId}_${pId}_${normSupport}`,
           bankId: selectedMarginBank,
+          sectorId: secId as SectorId,
           productId: pId as ProductId,
           supportType: normSupport as any,
-          sectorId: selectedMarginSector,
-          fromTermMonths: def.from,
-          toTermMonths: def.to,
-          startMargin: def.start,
-          endMargin: def.end,
-          calcType: def.calcType,
+          fromTermMonths: 0,
+          toTermMonths: 9999,
+          startMargin: 0,
+          endMargin: 0,
+          calcType: 'fixed',
           isActive: true,
-          salaryTier: selectedMarginSalaryTier,
-
+          isExceptionOnly: true,
+          exceptionBps: parsedBps,
           productType: selectedMarginProduct,
-          marginInputMode: inputMode,
-          calculationMethod: method,
-          year: def.yearPoint,
-          termMonths: def.to === 9999 ? (def.yearPoint * 12) : def.to,
-          annualMargin: def.end,
-          exceptionBps: def.exceptionBps,
-          baseMargin: Number((def.end / 100).toFixed(6))
+          salaryTier: selectedMarginSalaryTier
         });
       });
     });
 
-    setMarginRules([...remainingRules, ...newRulesForThisCombo]);
+    setMarginRules([...remainingRules, ...newRulesForThisCombo, ...newExceptionRules]);
   };
 
   const handleMarginLocalChange = (year: number, value: string) => {
     setLocalMargins(prev => ({ ...prev, [year]: value }));
   };
 
-  const handleExceptionLocalChange = (year: number, value: string) => {
-    setLocalExceptionBps(prev => ({ ...prev, [year]: value }));
+  const handleSectorExceptionLocalChange = (secId: string, value: string) => {
+    setLocalSectorExceptions(prev => ({ ...prev, [secId]: value }));
   };
 
   const handleSaveMargins = () => {
-    updateGlobalRulesFromLocal(localMargins, localExceptionBps, localCalcMethod, selectedMarginInputMode);
-    showToast("تم حفظ وتطبيق إعدادات الهوامش على الحسبة", "success");
+    updateGlobalRulesFromLocal(localMargins, localSectorExceptions, localCalcMethod, selectedMarginInputMode);
+    showToast("تم حفظ وتطبيق إعدادات الهوامش واستثناءات القطاعات بنجاح", "success");
   };
 
   const handleCloneLocal = () => {
     if (cloningFromBank === selectedMarginBank &&
         cloningFromProduct === selectedMarginProduct &&
         cloningFromSupport === selectedMarginSupport &&
-        cloningFromSector === selectedMarginSector &&
         cloningFromSalaryTier === selectedMarginSalaryTier) {
       showToast("لا يمكن النسخ من وإلى نفس الحالة الحالية تماماً.", "refuse");
       return;
     }
 
-    const confirmCopy = window.confirm("سيتم استبدال قيم الجدول الحالي بقيم الجدول المصدر المحدد الحفظ التلقائي سيطبق. هل أنت متأكد؟");
+    const confirmCopy = window.confirm("سيتم استبدال قيم الجدول الحالي وقيم استثناءات القطاعات بقيم الحالة المصدر المحددة. هل أنت متأكد؟");
     if (!confirmCopy) return;
 
+    // Fetch base rules from the source
     const sourceRules = marginRules.filter(r => 
       r.bankId === cloningFromBank && 
       (r.productType === cloningFromProduct || r.productId === cloningFromProduct || (cloningFromProduct === 'real_estate_only' && r.productId === 'real_estate')) && 
       (r.supportType === cloningFromSupport || r.supportType === 'all') &&
-      (r.sectorId || 'all') === cloningFromSector &&
-      (r.salaryTier === cloningFromSalaryTier || (!r.salaryTier && cloningFromSalaryTier === 'not_applicable'))
+      (r.sectorId || 'all') === 'all' &&
+      (r.salaryTier === cloningFromSalaryTier || (!r.salaryTier && cloningFromSalaryTier === 'not_applicable')) &&
+      !r.isExceptionOnly
     );
 
     let method: 'linear' | 'fixed' = 'fixed';
@@ -1036,21 +1090,34 @@ export default function AdminDashboard() {
 
     const yearsList = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30];
     const newCopiedMargins: Record<number, string> = {};
-    const newCopiedExceptionBps: Record<number, string> = {};
 
     yearsList.forEach(year => {
       const rY = sourceRules.find(r => r.year === year || r.toTermMonths === year * 12);
       newCopiedMargins[year] = rY ? (rY.annualMargin !== undefined ? rY.annualMargin : rY.endMargin).toString() : '';
-      newCopiedExceptionBps[year] = rY ? (rY.exceptionBps !== undefined ? rY.exceptionBps : 0).toString() : '0';
+    });
+
+    const targetSourceSupport = cloningFromSupport === 'down_payment' ? 'downpayment' : cloningFromSupport;
+    const sourceExceptions: Record<string, string> = {};
+    const sectorsList = ['all', 'gov_civil', 'military', 'semi_gov', 'companies', 'private', 'retired'];
+    sectorsList.forEach(secId => {
+      const exRule = marginRules.find(r =>
+        r.bankId === cloningFromBank &&
+        (r.productType === cloningFromProduct || r.productId === cloningFromProduct) &&
+        (r.supportType === targetSourceSupport || r.supportType === 'all') &&
+        r.sectorId === secId &&
+        r.exceptionBps !== undefined &&
+        (r.isExceptionOnly === true || (r.fromTermMonths === 0 && r.toTermMonths === 9999))
+      );
+      sourceExceptions[secId] = exRule && exRule.exceptionBps !== undefined ? exRule.exceptionBps.toString() : '0';
     });
 
     setLocalMargins(newCopiedMargins);
-    setLocalExceptionBps(newCopiedExceptionBps);
+    setLocalSectorExceptions(sourceExceptions);
     setLocalCalcMethod(method);
     setSelectedMarginInputMode(inputMode);
 
-    updateGlobalRulesFromLocal(newCopiedMargins, newCopiedExceptionBps, method, inputMode);
-    showToast("تم استنساخ الجدول بنجاح وتحديث المسودة الحالية.", "success");
+    updateGlobalRulesFromLocal(newCopiedMargins, sourceExceptions, method, inputMode);
+    showToast("تم استنساخ الجدول والاستثناءات بنجاح وتحديث المسودة الحالية.", "success");
   };
 
   // --- DSR Rules States & Management ---
@@ -4697,41 +4764,9 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* ثالثاً: القطاع المهني */}
+              {/* ثالثاً: فئة الراتب */}
               <div className="space-y-2">
-                <span className="block text-xs font-extrabold text-[#0057B8] font-sans">ثالثاً: القطاع</span>
-                <div className="flex flex-wrap gap-2 font-sans">
-                  {[
-                    { id: 'all', nameAr: 'كل القطاعات' },
-                    { id: 'gov_civil', nameAr: 'حكومي مدني' },
-                    { id: 'military', nameAr: 'عسكري' },
-                    { id: 'semi_gov', nameAr: 'شبه حكومي' },
-                    { id: 'companies', nameAr: 'موظف شركات' },
-                    { id: 'private', nameAr: 'قطاع خاص' },
-                    { id: 'retired', nameAr: 'متقاعد' }
-                  ].map((s) => {
-                    const isSelected = selectedMarginSector === s.id;
-                    return (
-                      <button
-                        key={s.id}
-                        type="button"
-                        onClick={() => setSelectedMarginSector(s.id as any)}
-                        className={`px-4 py-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                          isSelected
-                            ? 'bg-[#0057B8] border-[#0057B8] text-white shadow-xs font-extrabold'
-                            : 'bg-white border-gray-200 text-gray-600 hover:bg-slate-50'
-                        }`}
-                      >
-                        {s.nameAr}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* رابعاً: فئة الراتب */}
-              <div className="space-y-2">
-                <span className="block text-xs font-extrabold text-[#0057B8] font-sans">رابعاً: فئة الراتب</span>
+                <span className="block text-xs font-extrabold text-[#0057B8] font-sans">ثالثاً: فئة الراتب</span>
                 {selectedMarginSupport === 'none' ? (
                   <div className="bg-slate-50 border border-slate-250 text-slate-500 rounded-xl px-4 py-3 text-xs font-semibold max-w-md font-sans">
                     🔒 فئة الراتب غير مطبقة لغير المدعوم ويتم تطبيق جدول عام لكافة الرواتب.
@@ -4833,7 +4868,7 @@ export default function AdminDashboard() {
 
             </div>
 
-            {/* Active Margins Configuration Table */}
+            {/* Active Margins & Exceptions Configuration */}
             <div className="bg-white border border-[#E5E7EB] rounded-2xl p-6 shadow-xs space-y-6">
               {/* Table Headline */}
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-[#F1F5F9] pb-4 gap-4">
@@ -4841,16 +4876,10 @@ export default function AdminDashboard() {
                   <h3 className="text-sm font-extrabold text-[#111827] font-sans">
                     {formBanksList.find(b => b.id === selectedMarginBank)?.nameAr || selectedMarginBank} — {' '}
                     {selectedMarginProduct === 'real_estate_only' ? 'عقاري فقط' : selectedMarginProduct === 'real_estate_with_new_personal' ? 'عقاري + شخصي جديد' : 'عقاري مع شخصي قائم'} — {' '}
-                    {selectedMarginSupport === 'none' ? 'غير مدعوم' : selectedMarginSupport === 'monthly' ? 'دعم شهري' : 'دعم دفعة'} — {' '}
-                    {selectedMarginSector === 'all' ? 'كل القطاعات' :
-                     selectedMarginSector === 'gov_civil' ? 'حكومي مدني' :
-                     selectedMarginSector === 'military' ? 'عسكري' :
-                     selectedMarginSector === 'semi_gov' ? 'شبه حكومي' :
-                     selectedMarginSector === 'companies' ? 'موظف شركات' :
-                     selectedMarginSector === 'private' ? 'قطاع خاص' : 'متقاعد'}
+                    {selectedMarginSupport === 'none' ? 'غير مدعوم' : selectedMarginSupport === 'monthly' ? 'دعم شهري' : 'دعم دفعة'}
                     {(selectedMarginSupport !== 'none') && ` (${selectedMarginSalaryTier === 'below_25000' ? 'فئة راتب أقل من 25 ألف' : 'فئة راتب 25 ألف فأكثر'})`}
                   </h3>
-                  <p className="text-[11px] text-[#6B7280] mt-0.5">جدول هوامش الفوائد والنسب السنوية المعتمدة.</p>
+                  <p className="text-[11px] text-[#6B7280] mt-0.5">تهيئة الهوامش البنكية الأساسية بالتوازي مع نسب الخصم الاستثنائية للقطاعات المعتمدة.</p>
                 </div>
               </div>
 
@@ -4860,74 +4889,137 @@ export default function AdminDashboard() {
                 </div>
               )}
 
-              {/* Input Grid Table */}
-              <div className="overflow-x-auto border border-gray-200 rounded-xl">
-                <table className="min-w-full divide-y divide-gray-200 text-right">
-                  <thead className="bg-[#F8FAFC] text-slate-500 font-bold text-xs font-sans">
-                    <tr>
-                      <th scope="col" className="px-6 py-3.5 text-right w-[20%]">مدة التمويل بالسنوات</th>
-                      <th scope="col" className="px-6 py-3.5 text-right w-[25%] font-extrabold text-[#0057B8]">هامش الجدول Base Margin %</th>
-                      <th scope="col" className="px-6 py-3.5 text-right w-[25%] text-amber-600 font-extrabold">نسبة الاستثناء Exception Bps</th>
-                      <th scope="col" className="px-6 py-3.5 text-right w-[30%] text-emerald-600 font-extrabold">الهامش النهائي Final Margin %</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200 bg-white text-xs font-semibold text-gray-700">
-                    {(selectedMarginInputMode === 'yearly'
-                      ? Array.from({ length: 26 }, (_, i) => 5 + i)
-                      : [5, 10, 15, 20, 25, 30]
-                    ).map((year) => {
-                      const label = year <= 10 ? `${year} سنوات` : `${year} سنة`;
-                      const baseMarginVal = parseFloat(localMargins[year] || '');
-                      const exceptionBpsVal = parseFloat(localExceptionBps[year] || '0');
-                      const finalMarginVal = !isNaN(baseMarginVal) ? Number((baseMarginVal - (exceptionBpsVal / 100)).toFixed(3)) : null;
-
-                      return (
-                        <tr key={year} className="hover:bg-slate-50 transition-colors">
-                          <td className="px-6 py-4 whitespace-nowrap text-right font-bold text-slate-800 font-sans">
-                            {label}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right">
-                            <div className="relative max-w-[180px] inline-block w-full">
-                              <input
-                                type="text"
-                                inputMode="decimal"
-                                value={localMargins[year] ?? ''}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  if (val === '' || /^[0-9]*\.?[0-9]*$/.test(val)) {
-                                    handleMarginLocalChange(year, val);
-                                  }
-                                }}
-                                className="bg-white border border-gray-300 rounded-xl pl-8 pr-4 py-2 w-full text-xs font-bold font-mono focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-left"
-                                placeholder="0.00"
-                              />
-                              <span className="absolute left-3 top-2 text-xs text-gray-400 font-bold font-sans">%</span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right">
-                            <div className="relative max-w-[180px] inline-block w-full">
-                              <input
-                                type="text"
-                                inputMode="numeric"
-                                value={localExceptionBps[year] ?? ''}
-                                onChange={(e) => {
-                                  let valStr = e.target.value;
-                                  valStr = valStr.replace(/[^0-9-]/g, '');
-                                  handleExceptionLocalChange(year, valStr);
-                                }}
-                                className="bg-white border border-gray-300 rounded-xl px-4 py-2 w-full text-xs font-bold font-mono focus:outline-none focus:ring-2 focus:ring-amber-500 text-left"
-                                placeholder="0"
-                              />
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right font-mono font-bold text-xs text-emerald-600">
-                            {finalMarginVal !== null ? `${finalMarginVal.toFixed(3)}%` : '—'}
-                          </td>
+              {/* Responsive Grid Panel */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                
+                {/* 1. Base Margins Table */}
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-extrabold text-slate-700">📊 جدول الهوامش الأساسية (Base Margin %)</span>
+                  </div>
+                  
+                  <div className="overflow-x-auto border border-gray-200 rounded-xl max-h-[500px] overflow-y-auto">
+                    <table className="min-w-full divide-y divide-gray-200 text-right">
+                      <thead className="bg-[#F8FAFC] text-slate-500 font-bold text-xs font-sans sticky top-0">
+                        <tr>
+                          <th scope="col" className="px-4 py-3 text-right">مدة التمويل بالسنوات</th>
+                          <th scope="col" className="px-4 py-3 text-right font-extrabold text-[#0057B8]">هامش الجدول Base Margin %</th>
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 bg-white text-xs font-semibold text-gray-700">
+                        {(selectedMarginInputMode === 'yearly'
+                          ? Array.from({ length: 26 }, (_, i) => 5 + i)
+                          : [5, 10, 15, 20, 25, 30]
+                        ).map((year) => {
+                          const label = year <= 10 ? `${year} سنوات` : `${year} سنة`;
+                          return (
+                            <tr key={year} className="hover:bg-slate-50 transition-colors">
+                              <td className="px-4 py-2 whitespace-nowrap text-right font-bold text-slate-800 font-sans">
+                                {label}
+                              </td>
+                              <td className="px-4 py-2 whitespace-nowrap text-right">
+                                <div className="relative max-w-[150px] inline-block w-full">
+                                  <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={localMargins[year] ?? ''}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      if (val === '' || /^[0-9]*\.?[0-9]*$/.test(val)) {
+                                        handleMarginLocalChange(year, val);
+                                      }
+                                    }}
+                                    className="bg-white border border-gray-300 rounded-xl pl-8 pr-4 py-1.5 w-full text-xs font-bold font-mono focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-left"
+                                    placeholder="0.00"
+                                  />
+                                  <span className="absolute left-3 top-1.5 text-xs text-gray-400 font-bold font-sans">%</span>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* 2. Sector Exceptions Table */}
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-extrabold text-amber-700">🛡️ جدول استثناءات القطاعات (Sector Exceptions)</span>
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <span className="text-slate-500 font-sans font-bold">مدة التوضيح:</span>
+                      <select
+                        value={illustrativeYear}
+                        onChange={(e) => setIllustrativeYear(parseInt(e.target.value, 15))}
+                        className="bg-slate-50 border border-gray-300 rounded-lg px-2 py-0.5 text-xs font-bold font-sans cursor-pointer text-right"
+                      >
+                        {[5, 10, 15, 20, 25, 30].map(y => (
+                          <option key={y} value={y}>{y} سنة</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto border border-gray-200 rounded-xl">
+                    <table className="min-w-full divide-y divide-gray-200 text-right">
+                      <thead className="bg-[#F8FAFC] text-slate-500 font-bold text-xs font-sans">
+                        <tr>
+                          <th scope="col" className="px-4 py-3 text-right">القطاع المهني</th>
+                          <th scope="col" className="px-4 py-3 text-right text-amber-600 font-extrabold">الاستثناء Exception Bps</th>
+                          <th scope="col" className="px-4 py-3 text-right text-emerald-600 font-extrabold">الهامش التوضيحي ({illustrativeYear} سنة)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 bg-white text-xs font-semibold text-gray-700">
+                        {[
+                          { id: 'all', nameAr: 'عام / جميع القطاعات' },
+                          { id: 'gov_civil', nameAr: 'حكومي مدني' },
+                          { id: 'military', nameAr: 'عسكري' },
+                          { id: 'semi_gov', nameAr: 'شبه حكومي' },
+                          { id: 'companies', nameAr: 'موظف شركات' },
+                          { id: 'private', nameAr: 'قطاع خاص' },
+                          { id: 'retired', nameAr: 'متقاعد' }
+                        ].map((item) => {
+                          const parsedBase = parseFloat(localMargins[illustrativeYear] || '0');
+                          const parsedEx = parseInt(localSectorExceptions[item.id] || '0', 10);
+                          const finalVal = !isNaN(parsedBase) ? Number((parsedBase - (parsedEx / 100)).toFixed(3)) : null;
+
+                          return (
+                            <tr key={item.id} className="hover:bg-slate-50 transition-colors">
+                              <td className="px-4 py-2.5 whitespace-nowrap text-right font-bold text-slate-800 font-sans">
+                                {item.nameAr}
+                              </td>
+                              <td className="px-4 py-2.5 whitespace-nowrap text-right">
+                                <div className="relative max-w-[150px] inline-block w-full">
+                                  <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={localSectorExceptions[item.id] ?? '0'}
+                                    onChange={(e) => {
+                                      let valStr = e.target.value;
+                                      valStr = valStr.replace(/[^0-9-]/g, '');
+                                      handleSectorExceptionLocalChange(item.id, valStr);
+                                    }}
+                                    className="bg-white border border-gray-300 rounded-xl px-4 py-1.5 w-full text-xs font-bold font-mono focus:outline-none focus:ring-2 focus:ring-amber-500 text-left"
+                                    placeholder="0"
+                                  />
+                                </div>
+                              </td>
+                              <td className="px-4 py-2.5 whitespace-nowrap text-right font-mono font-bold text-xs text-emerald-600">
+                                {finalVal !== null ? `${finalVal.toFixed(3)}%` : '—'}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  
+                  <p className="text-[10px] text-[#6B7280] leading-normal font-sans mt-2">
+                    * الاستثناء (Exception Bps) يحفظ بشكل عام ومستقل لكل قطاع، ويتم خصمه مباشرة من هامش السنة المحددة عند تفعيل الحسبة.
+                  </p>
+                </div>
+
               </div>
 
               {/* Save Button Action */}

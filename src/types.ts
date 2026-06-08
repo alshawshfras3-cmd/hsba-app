@@ -139,6 +139,7 @@ export interface MarginRule {
   annualMargin?: number;
   exceptionBps?: number;
   baseMargin?: number;
+  isExceptionOnly?: boolean;
 }
 
 export interface DsrRule {
