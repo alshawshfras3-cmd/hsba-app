@@ -4947,15 +4947,17 @@ export default function AdminDashboard() {
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <span className="text-xs font-extrabold text-amber-700">🛡️ جدول استثناءات القطاعات (Sector Exceptions)</span>
-                    <div className="flex items-center gap-1.5 text-xs">
-                      <span className="text-slate-500 font-sans font-bold">مدة التوضيح:</span>
+                    <div className="flex items-center gap-1.5 text-xs font-sans">
+                      <span className="text-slate-500 font-bold">مدة التوضيح:</span>
                       <select
                         value={illustrativeYear}
-                        onChange={(e) => setIllustrativeYear(parseInt(e.target.value, 15))}
+                        onChange={(e) => setIllustrativeYear(parseInt(e.target.value, 10))}
                         className="bg-slate-50 border border-gray-300 rounded-lg px-2 py-0.5 text-xs font-bold font-sans cursor-pointer text-right"
                       >
                         {[5, 10, 15, 20, 25, 30].map(y => (
-                          <option key={y} value={y}>{y} سنة</option>
+                          <option key={y} value={y}>
+                            {y === 5 || y === 10 ? `${y} سنوات` : `${y} سنة`}
+                          </option>
                         ))}
                       </select>
                     </div>
