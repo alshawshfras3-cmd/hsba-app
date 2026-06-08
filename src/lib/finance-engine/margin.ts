@@ -47,6 +47,12 @@ export function calculateMargin(params: {
          (!r.salaryTier || r.salaryTier === 'not_applicable' || r.salaryTier === salaryTier)
   );
 
+  // If alignment with a specific sectorId is found, prioritize specific sector rules over general 'all' ones.
+  const specificSectorRules = rules.filter(r => r.sectorId === sectorId);
+  if (specificSectorRules.length > 0) {
+    rules = specificSectorRules;
+  }
+
   // If we have rules that explicitly specify our target salaryTier, prioritize them
   const specificRules = rules.filter(r => r.salaryTier === salaryTier);
   if (specificRules.length > 0) {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bank, ProductId, SupportType, MarginRule } from '../../../types';
+import { Bank, ProductId, SupportType, MarginRule, SectorId } from '../../../types';
 import { normalizeNumberInput, parseNumberInput } from '../../../lib/number-input';
 import { Search, Filter } from 'lucide-react';
 
@@ -32,11 +32,13 @@ export default function MarginsSection({
   const [selectedMarginBank, setSelectedMarginBank] = useState<string>('alahli');
   const [selectedMarginProduct, setSelectedMarginProduct] = useState<ProductId>('real_estate_only');
   const [selectedMarginSupport, setSelectedMarginSupport] = useState<SupportType>('none');
+  const [selectedMarginSector, setSelectedMarginSector] = useState<'all' | SectorId>('all');
   const [selectedMarginSalaryTier, setSelectedMarginSalaryTier] = useState<'below_25000' | 'above_or_equal_25000' | 'not_applicable'>('not_applicable');
   const [selectedMarginInputMode, setSelectedMarginInputMode] = useState<'yearly' | 'key_points'>('key_points');
 
   // Filters for ALL Margin Rules List
   const [listFilterBank, setListFilterBank] = useState<string>('all');
+  const [listFilterSector, setListFilterSector] = useState<string>('all');
   const [listFilterProduct, setListFilterProduct] = useState<string>('all');
   const [listFilterSupport, setListFilterSupport] = useState<string>('all');
   const [listFilterException, setListFilterException] = useState<string>('all'); // 'all', 'has_exception', 'no_exception'
@@ -66,11 +68,13 @@ export default function MarginsSection({
   const [cloningFromBank, setCloningFromBank] = useState<string>('alahli');
   const [cloningFromProduct, setCloningFromProduct] = useState<ProductId>('real_estate_only');
   const [cloningFromSupport, setCloningFromSupport] = useState<SupportType>('none');
+  const [cloningFromSector, setCloningFromSector] = useState<'all' | SectorId>('all');
   const [cloningFromSalaryTier, setCloningFromSalaryTier] = useState<'below_25000' | 'above_or_equal_25000' | 'not_applicable'>('not_applicable');
 
   useEffect(() => {
     setCloningFromBank(selectedMarginBank);
-  }, [selectedMarginBank]);
+    setCloningFromSector(selectedMarginSector);
+  }, [selectedMarginBank, selectedMarginSector]);
 
   // Synchronize local states when selection changes or marginRules are canceled/refreshed
   useEffect(() => {
@@ -78,6 +82,7 @@ export default function MarginsSection({
       r.bankId === selectedMarginBank && 
       (r.productType === selectedMarginProduct || r.productId === selectedMarginProduct || (selectedMarginProduct === 'real_estate_only' && r.productId === 'real_estate')) && 
       (r.supportType === selectedMarginSupport || r.supportType === 'all') &&
+      r.sectorId === selectedMarginSector &&
       (r.salaryTier === selectedMarginSalaryTier || (!r.salaryTier && selectedMarginSalaryTier === 'not_applicable'))
     );
 
@@ -132,7 +137,7 @@ export default function MarginsSection({
     setLocalExceptionBps(initialExceptionBps);
     setLocalCalcMethod(method);
     setSelectedMarginInputMode(inputMode);
-  }, [selectedMarginBank, selectedMarginProduct, selectedMarginSupport, selectedMarginSalaryTier, marginRules]);
+  }, [selectedMarginBank, selectedMarginProduct, selectedMarginSupport, selectedMarginSector, selectedMarginSalaryTier, marginRules]);
 
   const updateGlobalRulesFromLocal = (marginsRecord: Record<number, string>, exceptionsRecord: Record<number, string>, method: 'linear' | 'fixed', inputMode: 'yearly' | 'key_points') => {
     const productIdsToFilter = [selectedMarginProduct];
@@ -151,6 +156,7 @@ export default function MarginsSection({
       const matchesTarget = r.bankId === selectedMarginBank &&
                             productIdsToFilter.includes(r.productId) &&
                             (r.supportType === normSupport || r.supportType === 'all') &&
+                            r.sectorId === selectedMarginSector &&
                             (r.salaryTier === selectedMarginSalaryTier || (!r.salaryTier && selectedMarginSalaryTier === 'not_applicable'));
       return !matchesTarget;
     });
@@ -211,7 +217,7 @@ export default function MarginsSection({
           year: def.yearPoint,
           termMonths: def.to === 9999 ? (def.yearPoint * 12) : def.to,
           annualMargin: def.end,
-          sectorId: 'all',
+          sectorId: selectedMarginSector,
           startMargin: def.start,
           endMargin: def.end,
           calcType: method,
@@ -242,6 +248,7 @@ export default function MarginsSection({
     if (cloningFromBank === selectedMarginBank &&
         cloningFromProduct === selectedMarginProduct &&
         cloningFromSupport === selectedMarginSupport &&
+        cloningFromSector === selectedMarginSector &&
         cloningFromSalaryTier === selectedMarginSalaryTier) {
       showToast("لا يمكن النسخ من وإلى نفس الحالة الحالية تماماً.", "refuse");
       return;
@@ -254,6 +261,7 @@ export default function MarginsSection({
       r.bankId === cloningFromBank && 
       (r.productType === cloningFromProduct || r.productId === cloningFromProduct || (cloningFromProduct === 'real_estate_only' && r.productId === 'real_estate')) && 
       (r.supportType === cloningFromSupport || r.supportType === 'all') &&
+      r.sectorId === cloningFromSector &&
       (r.salaryTier === cloningFromSalaryTier || (!r.salaryTier && cloningFromSalaryTier === 'not_applicable'))
     );
 
@@ -424,9 +432,41 @@ export default function MarginsSection({
           </div>
         </div>
 
+        {/* القطاع المهني */}
+        <div className="space-y-2">
+          <span className="block text-xs font-extrabold text-[#0057B8] font-sans">ثالثاً: القطاع</span>
+          <div className="flex flex-wrap gap-2 font-sans">
+            {[
+              { id: 'all', nameAr: 'كل القطاعات' },
+              { id: 'gov_civil', nameAr: 'حكومي' },
+              { id: 'military', nameAr: 'عسكري' },
+              { id: 'semi_gov', nameAr: 'شبه حكومي' },
+              { id: 'companies', nameAr: 'موظف شركات' },
+              { id: 'private', nameAr: 'قطاع خاص' },
+              { id: 'retired', nameAr: 'متقاعد' }
+            ].map((s) => {
+              const isSelected = selectedMarginSector === s.id;
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setSelectedMarginSector(s.id as any)}
+                  className={`px-4 py-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                    isSelected
+                      ? 'bg-[#0057B8] border-[#0057B8] text-white shadow-xs font-extrabold'
+                      : 'bg-white border-gray-200 text-gray-600 hover:bg-slate-50'
+                  }`}
+                >
+                  {s.nameAr}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* فئة الراتب */}
         <div className="space-y-2">
-          <span className="block text-xs font-extrabold text-[#0057B8] font-sans">ثالثاً: فئة الراتب</span>
+          <span className="block text-xs font-extrabold text-[#0057B8] font-sans">رابعاً: فئة الراتب</span>
           {selectedMarginSupport === 'none' ? (
             <div className="bg-slate-50 border border-slate-200 text-slate-550 rounded-xl px-4 py-3 text-xs font-semibold max-w-md font-sans">
               🔒 فئة الراتب غير مطبقة لغير المدعوم ويتم تطبيق جدول عام لكافة الرواتب.
@@ -636,7 +676,7 @@ export default function MarginsSection({
           يتيح لك نسخ الهوامش وطرق الحساب والمدد المعتمدة من أي جدول أو بنك آخر وتطبيقها فورياً على المسودة الحالية.
         </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 items-end text-xs font-bold text-gray-700 font-sans">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 items-end text-xs font-bold text-gray-700 font-sans">
           {/* Bank */}
           <div>
             <label className="block text-slate-500 mb-1.5 font-sans">البنك المصدر:</label>
@@ -647,6 +687,28 @@ export default function MarginsSection({
             >
               {formBanksList.map(b => (
                 <option key={b.id} value={b.id}>{b.nameAr}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Sector */}
+          <div>
+            <label className="block text-slate-500 mb-1.5 font-sans">القطاع المصدر:</label>
+            <select
+              value={cloningFromSector}
+              onChange={(e) => setCloningFromSector(e.target.value as any)}
+              className="w-full bg-white border border-gray-250 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-800 cursor-pointer text-right outline-none"
+            >
+              {[
+                { id: 'all', nameAr: 'كل القطاعات' },
+                { id: 'gov_civil', nameAr: 'حكومي' },
+                { id: 'military', nameAr: 'عسكري' },
+                { id: 'semi_gov', nameAr: 'شبه حكومي' },
+                { id: 'companies', nameAr: 'موظف شركات' },
+                { id: 'private', nameAr: 'قطاع خاص' },
+                { id: 'retired', nameAr: 'متقاعد' }
+              ].map(sec => (
+                <option key={sec.id} value={sec.id}>{sec.nameAr}</option>
               ))}
             </select>
           </div>
@@ -731,7 +793,7 @@ export default function MarginsSection({
         </div>
 
         {/* Filters Controls Panel */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 bg-slate-50 p-4 rounded-xl text-xs font-bold text-gray-700 font-sans">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 bg-slate-50 p-4 rounded-xl text-xs font-bold text-gray-700 font-sans">
           {/* bank filter */}
           <div>
             <label className="block text-slate-500 mb-1.5 font-sans">تصفية حسب البنك:</label>
@@ -744,6 +806,24 @@ export default function MarginsSection({
               {formBanksList.map(b => (
                 <option key={b.id} value={b.id}>{b.nameAr}</option>
               ))}
+            </select>
+          </div>
+
+          {/* Sector filter */}
+          <div>
+            <label className="block text-slate-500 mb-1.5 font-sans">تصفية حسب القطاع:</label>
+            <select
+              value={listFilterSector}
+              onChange={(e) => setListFilterSector(e.target.value)}
+              className="w-full bg-white border border-gray-200 rounded-lg px-2 py-2 text-xs font-semibold text-gray-800 cursor-pointer outline-none"
+            >
+              <option value="all">كافة القطاعات (الكل)</option>
+              <option value="gov_civil">حكومي</option>
+              <option value="military">عسكري</option>
+              <option value="semi_gov">شبه حكومي</option>
+              <option value="companies">موظف شركات</option>
+              <option value="private">قطاع خاص</option>
+              <option value="retired">متقاعد</option>
             </select>
           </div>
 
@@ -837,6 +917,8 @@ export default function MarginsSection({
                 const sortedAndFiltered = marginRules.filter(r => {
                   if (listFilterBank !== 'all' && r.bankId !== listFilterBank) return false;
                   
+                  if (listFilterSector !== 'all' && r.sectorId !== listFilterSector) return false;
+
                   if (listFilterProduct !== 'all') {
                     if (listFilterProduct === 'real_estate_only' && r.productId !== 'real_estate' && r.productType !== 'real_estate_only') return false;
                     if (listFilterProduct === 'real_estate_with_new_personal' && r.productId !== 'both' && r.productType !== 'real_estate_with_new_personal') return false;
@@ -878,7 +960,14 @@ export default function MarginsSection({
 
                 return sortedAndFiltered.slice(0, displayRulesLimit).map((rule) => {
                   const bankName = banks.find(b => b.id === rule.bankId)?.nameAr || rule.bankId;
-                  const sectorLabel = rule.sectorId === 'all' ? 'كافة القطاعات' : rule.sectorId;
+                  
+                  let sectorLabel = 'كافة القطاعات';
+                  if (rule.sectorId === 'gov_civil') sectorLabel = 'حكومي';
+                  else if (rule.sectorId === 'military') sectorLabel = 'عسكري';
+                  else if (rule.sectorId === 'semi_gov') sectorLabel = 'شبه حكومي';
+                  else if (rule.sectorId === 'companies') sectorLabel = 'موظف شركات';
+                  else if (rule.sectorId === 'private') sectorLabel = 'قطاع خاص';
+                  else if (rule.sectorId === 'retired') sectorLabel = 'متقاعد';
                   
                   // Product Label
                   let productLabel = '';

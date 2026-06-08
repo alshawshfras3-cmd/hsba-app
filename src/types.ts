@@ -3,6 +3,7 @@ export type SectorId =
   | 'military'           // عسكري
   | 'semi_gov'           // شبه حكومي — سن تقاعد ثابت
   | 'companies'          // موظف شركات — سن تقاعد ثابت
+  | 'private'            // قطاع خاص
   | 'retired';           // متقاعد
 export type CalendarType = 'hijri' | 'gregorian';
 export type ProductId = 'real_estate' | 'personal' | 'both' | 'real_estate_with_personal_existing' | 'real_estate_only' | 'personal_only' | 'real_estate_with_new_personal' | 'real_estate_with_existing_personal';
