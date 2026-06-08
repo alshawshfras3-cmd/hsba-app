@@ -47,7 +47,7 @@ import { supabase, hasSupabaseKeys } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { BankSectorPensionRule, PensionLibraryRule } from '../types/pension-rules';
 import { defaultLibraryRules } from '../lib/finance-engine/pension';
-import { useSettings } from '../hooks/useSettings';
+import { useSettings, normalizeDsrRules } from '../hooks/useSettings';
 import {
   fallbackApprovedSalaryRules,
   fallbackPensionRules,
@@ -590,7 +590,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         pensionRules: settings.pension_rules || initialData.pensionRules,
         termRules: settings.term_rules || initialData.termRules,
         marginRules: upgradeMarginRules(settings.margin_rules || []),
-        dsrRules: settings.dsr_rules || initialData.dsrRules,
+        dsrRules: normalizeDsrRules(settings.dsr_rules || initialData.dsrRules),
         supportSettings: settings.support_settings || initialData.supportSettings,
         housingSupportTiers: housingSupportTiers.length > 0 ? housingSupportTiers : initialData.housingSupportTiers,
         advancePaymentTiers: advancePaymentTiers.length > 0 ? advancePaymentTiers : initialData.advancePaymentTiers,

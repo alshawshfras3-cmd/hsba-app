@@ -221,7 +221,7 @@ export async function fetchApprovedSalaryRules(): Promise<ApprovedSalarySourceRu
     console.log('[SUPABASE LOAD] table=approved_salary_source_rules status=success key=app_settings empty/not-found');
     return fallbackApprovedSalaryRules;
   } catch (err: any) {
-    console.error(`[SUPABASE LOAD] table=approved_salary_source_rules status=error message=${err?.message || err}`);
+    console.warn(`[SUPABASE LOAD] table=approved_salary_source_rules status=fallback-loaded message=${err?.message || err}`);
     return fallbackApprovedSalaryRules;
   }
 }
@@ -291,7 +291,7 @@ export async function fetchPensionCalculationRules(): Promise<PensionCalculation
     console.log('[SUPABASE LOAD] table=pension_calculation_rules status=success key=app_settings empty/not-found');
     return fallbackPensionRules;
   } catch (err: any) {
-    console.error(`[SUPABASE LOAD] table=pension_calculation_rules status=error message=${err?.message || err}`);
+    console.warn(`[SUPABASE LOAD] table=pension_calculation_rules status=fallback-loaded message=${err?.message || err}`);
     return fallbackPensionRules;
   }
 }
@@ -361,7 +361,7 @@ export async function fetchSectorClassificationMappings(): Promise<SectorClassif
     console.log('[SUPABASE LOAD] table=sector_classification_mapping status=success key=app_settings empty/not-found');
     return fallbackSectorMappings;
   } catch (err: any) {
-    console.error(`[SUPABASE LOAD] table=sector_classification_mapping status=error message=${err?.message || err}`);
+    console.warn(`[SUPABASE LOAD] table=sector_classification_mapping status=fallback-loaded message=${err?.message || err}`);
     return fallbackSectorMappings;
   }
 }

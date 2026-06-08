@@ -81,6 +81,39 @@ function getDsrRuleKey(rule: DsrRule): string {
   ].join('|');
 }
 
+export function normalizeDsrRules(rules: DsrRule[]): DsrRule[] {
+  const map = new Map<string, DsrRule>();
+
+  for (const rule of rules || []) {
+    const normalizedProductType =
+      rule.productType === 'personal_only'
+        ? 'personal_only'
+        : 'real_estate_only';
+
+    const normalizedSupportType =
+      (rule.supportType as string) === 'downpayment'
+        ? 'down_payment'
+        : rule.supportType;
+
+    const key = [
+      rule.bankId,
+      normalizedProductType,
+      normalizedSupportType,
+      rule.customerStage
+    ].join('|');
+
+    if (!map.has(key)) {
+      map.set(key, {
+        ...rule,
+        productType: normalizedProductType as any,
+        supportType: normalizedSupportType as any
+      });
+    }
+  }
+
+  return Array.from(map.values());
+}
+
 function mergeDsrRulesWithSeeds(existingRules: DsrRule[], seedRules: DsrRule[]) {
   const existingArray = Array.isArray(existingRules) ? existingRules : [];
   const seedArray = Array.isArray(seedRules) ? seedRules : [];
@@ -137,57 +170,7 @@ export function useSettings() {
       let appSettingsObj: any = null;
       if (data && data.value) {
         appSettingsObj = data.value;
-        console.log('[SETTINGS] key found in Supabase, using Supabase value: app_settings');
-        if (appSettingsObj && appSettingsObj.banks && Array.isArray(appSettingsObj.banks)) {
-          appSettingsObj.banks = appSettingsObj.banks.map((b: any) => {
-            const seedBank = initialBanks.find(sb => sb.id === b.id);
-            return {
-              ...b,
-              realEstateFinanceEnabled: b.realEstateFinanceEnabled !== undefined ? b.realEstateFinanceEnabled : (seedBank?.realEstateFinanceEnabled !== undefined ? seedBank.realEstateFinanceEnabled : true),
-              personalFinanceEnabled: b.personalFinanceEnabled !== undefined ? b.personalFinanceEnabled : (seedBank?.personalFinanceEnabled !== undefined ? seedBank.personalFinanceEnabled : (b.id !== 'bidaya')),
-              combinedFinanceEnabled: b.combinedFinanceEnabled !== undefined ? b.combinedFinanceEnabled : (seedBank?.combinedFinanceEnabled !== undefined ? seedBank.combinedFinanceEnabled : (b.id !== 'bidaya')),
-              existingPersonalFinanceEnabled: b.existingPersonalFinanceEnabled !== undefined ? b.existingPersonalFinanceEnabled : (seedBank?.existingPersonalFinanceEnabled !== undefined ? seedBank.existingPersonalFinanceEnabled : true),
-              minRealEstateAmount: b.minRealEstateAmount !== undefined ? b.minRealEstateAmount : (seedBank?.minRealEstateAmount !== undefined ? seedBank.minRealEstateAmount : 100000),
-              maxRealEstateAmount: b.maxRealEstateAmount !== undefined ? b.maxRealEstateAmount : (seedBank?.maxRealEstateAmount !== undefined ? seedBank.maxRealEstateAmount : 10000000),
-              minPersonalAmount: b.minPersonalAmount !== undefined ? b.minPersonalAmount : (seedBank?.minPersonalAmount !== undefined ? seedBank.minPersonalAmount : 10000),
-              maxPersonalAmount: b.maxPersonalAmount !== undefined ? b.maxPersonalAmount : (seedBank?.maxPersonalAmount !== undefined ? seedBank.maxPersonalAmount : 2000000),
-            };
-          });
-        }
-
-        // Merge missing DSR Rules from defaults
-        const supabaseRules = (appSettingsObj.dsrRules ?? []) as any[];
-        const seedRules = DEFAULTS.dsr_rules as any[];
-
-        if (!Array.isArray(supabaseRules) || supabaseRules.length === 0) {
-          appSettingsObj.dsrRules = seedRules;
-          try {
-            await supabase.from('system_settings').upsert({
-              key: 'app_settings',
-              value: appSettingsObj,
-              source: data.source ?? 'seed_initial',
-              updated_at: new Date().toISOString()
-            });
-          } catch (_) {}
-        } else {
-          const existingIds = new Set(supabaseRules.map((r: any) => r.id));
-          const missing = seedRules.filter((r: any) => !existingIds.has(r.id));
-
-          if (missing.length > 0) {
-            const merged = [...supabaseRules, ...missing];
-            appSettingsObj.dsrRules = merged;
-            try {
-              await supabase.from('system_settings').upsert({
-                key: 'app_settings',
-                value: appSettingsObj,
-                source: data.source ?? 'seed_initial',
-                updated_at: new Date().toISOString()
-              });
-            } catch (_) {}
-          }
-        }
-
-        console.log('[SETTINGS] Supabase value preserved, no overwrite');
+        console.log('[SETTINGS] key found in Supabase, using Supabase value: app_settings (source of truth)');
       } else {
         console.log('[SETTINGS] key missing, inserting seed_initial: app_settings');
         
@@ -306,7 +289,7 @@ export function useSettings() {
           pensionRules: oldSettingsData['pension_rules'] || DEFAULTS['pension_rules'],
           termRules: oldSettingsData['term_rules'] || DEFAULTS['term_rules'],
           marginRules: oldSettingsData['margin_rules'] || DEFAULTS['margin_rules'],
-          dsrRules: oldSettingsData['dsr_rules'] || DEFAULTS['dsr_rules'],
+          dsrRules: normalizeDsrRules(oldSettingsData['dsr_rules'] || DEFAULTS['dsr_rules']),
           supportSettings: oldSettingsData['support_settings'] || DEFAULTS['support_settings'],
           housingSupportTiers: oldTiers.length > 0 ? oldTiers : [...DEFAULT_HOUSING_SUPPORT_TIERS],
           advancePaymentTiers: oldAdvance.length > 0 ? oldAdvance : [...DEFAULT_ADVANCE_PAYMENT_TIERS],
@@ -344,7 +327,7 @@ export function useSettings() {
         pension_rules: appSettingsObj.pensionRules,
         term_rules: appSettingsObj.termRules,
         margin_rules: appSettingsObj.marginRules,
-        dsr_rules: appSettingsObj.dsrRules,
+        dsr_rules: normalizeDsrRules(appSettingsObj.dsrRules),
         support_settings: appSettingsObj.supportSettings,
         personal_finance_rules: appSettingsObj.personalRules,
         advanced_rules: appSettingsObj.advancedRules,
@@ -363,7 +346,7 @@ export function useSettings() {
       setSupabaseFetched(true);
 
     } catch (err: any) {
-      console.error(`[SUPABASE LOAD] table=system_settings status=error message=${err?.message || err}`);
+      console.warn(`[SUPABASE LOAD] table=system_settings status=fallback-loaded message=${err?.message || err}`);
       console.warn('Fallback settings on fetch failure in background:', err);
       setSupabaseFetched(true);
     }
@@ -418,7 +401,7 @@ export function useSettings() {
     saveSetting,
     banks: settings.banks ?? DEFAULTS.banks,
     marginRules: settings.margin_rules ?? DEFAULTS.margin_rules,
-    dsrRules: settings.dsr_rules ?? DEFAULTS.dsr_rules,
+    dsrRules: normalizeDsrRules(settings.dsr_rules ?? DEFAULTS.dsr_rules),
     personalRules: settings.personal_finance_rules ?? DEFAULTS.personal_finance_rules,
     products: settings.product_acceptance ?? DEFAULTS.product_acceptance,
     militaryRanks: (settings.military_ranks && Array.isArray(settings.military_ranks) && settings.military_ranks.length > 0 && settings.military_ranks.every((r: any) => r.hasOwnProperty('sectorScope') && r.sectorScope)) ? settings.military_ranks : DEFAULTS.military_ranks,

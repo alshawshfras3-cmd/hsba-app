@@ -96,7 +96,7 @@ export async function fetchHousingSupportTiers(): Promise<HousingSupportTier[]> 
         console.log(`[SUPABASE LOAD] table=housing_support_tiers status=success rows=0`);
       }
     } catch (e: any) {
-      console.error(`[SUPABASE LOAD] table=housing_support_tiers status=error message=${e?.message || e}`);
+      console.warn(`[SUPABASE LOAD] table=housing_support_tiers status=fallback-loaded message=${e?.message || e}`);
       console.warn("Could not load housing_support_tiers from database. Defaulting to state seeds.", e);
     }
   } else {
@@ -131,7 +131,7 @@ export async function fetchAdvancePaymentTiers(): Promise<AdvancePaymentTier[]> 
         console.log(`[SUPABASE LOAD] table=advance_payment_tiers status=success rows=0`);
       }
     } catch (e: any) {
-      console.error(`[SUPABASE LOAD] table=advance_payment_tiers status=error message=${e?.message || e}`);
+      console.warn(`[SUPABASE LOAD] table=advance_payment_tiers status=fallback-loaded message=${e?.message || e}`);
       console.warn("Could not load advance_payment_tiers from database. Defaulting to state seeds.", e);
     }
   } else {

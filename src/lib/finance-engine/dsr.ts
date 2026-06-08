@@ -4,12 +4,6 @@ export function mapProductIdToType(productId: string): 'real_estate_only' | 'rea
   if (productId === 'personal' || productId === 'personal_only') {
     return 'personal_only';
   }
-  if (productId === 'both' || productId === 'real_estate_with_new_personal') {
-    return 'real_estate_with_new_personal';
-  }
-  if (productId === 'real_estate_with_personal_existing' || productId === 'real_estate_with_existing_personal') {
-    return 'real_estate_with_existing_personal';
-  }
   return 'real_estate_only';
 }
 
