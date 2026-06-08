@@ -353,133 +353,55 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
 
       {activeSubTab === 'rules' ? (
         <>
-          {/* Product Types Configuration for the selected bank */}
-          <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-4">
-        {filterBank === 'all' ? (
-          <div className="text-center py-2 text-gray-500 font-bold text-xs flex items-center justify-center gap-1.5 font-sans">
-            💡 <span className="text-slate-500">اختر جهة تمويل معينة من القائمة أعلاه لتتمكن من إدارة وتفعيل أنواع التمويلات والمنتجات المدعومة لها بشكل كامل.</span>
+          {/* Filters Bar */}
+          <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {/* Filter Product Type */}
+            <div className="space-y-1.5 font-sans">
+              <label className="block text-xs font-bold text-gray-600">نوع المنتج:</label>
+              <select
+                id="filter-product-select"
+                value={filterProductType}
+                onChange={(e) => setFilterProductType(e.target.value)}
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+              >
+                <option value="all">كل المنتجات</option>
+                {productTypesList.map(type => (
+                  <option key={type.id} value={type.id}>{type.nameAr}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Filter Active Status */}
+            <div className="space-y-1.5 font-sans">
+              <label className="block text-xs font-bold text-gray-600">الحالة:</label>
+              <select
+                id="filter-status-select"
+                value={filterActiveStatus}
+                onChange={(e) => setFilterActiveStatus(e.target.value)}
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+              >
+                <option value="all">كل الحالات</option>
+                <option value="active">مفعل فقط</option>
+                <option value="inactive">غير مفعل</option>
+              </select>
+            </div>
+
+            {/* Filter Support Type */}
+            <div className="space-y-1.5 font-sans">
+              <label className="block text-xs font-bold text-gray-600">نوع الدعم المسموح:</label>
+              <select
+                id="filter-support-select"
+                value={filterSupport}
+                onChange={(e) => setFilterSupport(e.target.value)}
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+              >
+                <option value="all">كل قنوات الدعم</option>
+                <option value="none">غير مدعوم متاح</option>
+                <option value="monthly">دعم شهري متاح</option>
+                <option value="downpayment">دعم دفعة متاح</option>
+              </select>
+            </div>
           </div>
-        ) : (
-          (() => {
-            const bankObj = banks.find(b => b.id === filterBank);
-            if (!bankObj) return null;
-            return (
-              <div className="space-y-4 font-sans">
-                <div className="flex items-center gap-2 border-b border-gray-100 pb-2.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#0057B8] animate-pulse"></span>
-                  <h3 className="text-xs font-bold text-gray-800">
-                    أنواع المنتجات المتاحة لـ <span className="text-[#0057B8] font-black">{bankObj.nameAr}</span>
-                  </h3>
-                </div>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 pt-1">
-                  <label className="flex items-center gap-3.5 p-3.5 rounded-xl border border-gray-150 hover:bg-slate-50/50 cursor-pointer transition-all select-none">
-                    <input 
-                      type="checkbox"
-                      checked={bankObj.realEstateFinanceEnabled !== false}
-                      onChange={(e) => toggleBankProductMode('realEstateFinanceEnabled', e.target.checked)}
-                      className="w-4 h-4 rounded text-[#0057B8] focus:ring-[#0057B8] accent-[#0057B8] cursor-pointer"
-                    />
-                    <div className="space-y-0.5">
-                      <span className="text-xs font-bold text-gray-800 block">تمويل عقاري</span>
-                      <span className="text-[10px] text-gray-400 font-medium">realEstateFinance</span>
-                    </div>
-                  </label>
-
-                  <label className="flex items-center gap-3.5 p-3.5 rounded-xl border border-gray-150 hover:bg-slate-50/50 cursor-pointer transition-all select-none">
-                    <input 
-                      type="checkbox"
-                      checked={bankObj.personalFinanceEnabled === true}
-                      onChange={(e) => toggleBankProductMode('personalFinanceEnabled', e.target.checked)}
-                      className="w-4 h-4 rounded text-[#0057B8] focus:ring-[#0057B8] accent-[#0057B8] cursor-pointer"
-                    />
-                    <div className="space-y-0.5">
-                      <span className="text-xs font-bold text-gray-800 block">تمويل شخصي</span>
-                      <span className="text-[10px] text-gray-400 font-medium">personalFinance</span>
-                    </div>
-                  </label>
-
-                  <label className="flex items-center gap-3.5 p-3.5 rounded-xl border border-gray-150 hover:bg-slate-50/50 cursor-pointer transition-all select-none">
-                    <input 
-                      type="checkbox"
-                      checked={bankObj.combinedFinanceEnabled === true}
-                      onChange={(e) => toggleBankProductMode('combinedFinanceEnabled', e.target.checked)}
-                      className="w-4 h-4 rounded text-[#0057B8] focus:ring-[#0057B8] accent-[#0057B8] cursor-pointer"
-                    />
-                    <div className="space-y-0.5">
-                      <span className="text-xs font-bold text-gray-800 block">تمويل عقاري + شخصي (جديد)</span>
-                      <span className="text-[10px] text-gray-400 font-medium">combinedFinance</span>
-                    </div>
-                  </label>
-
-                  <label className="flex items-center gap-3.5 p-3.5 rounded-xl border border-gray-150 hover:bg-slate-50/50 cursor-pointer transition-all select-none">
-                    <input 
-                      type="checkbox"
-                      checked={bankObj.existingPersonalFinanceEnabled !== false}
-                      onChange={(e) => toggleBankProductMode('existingPersonalFinanceEnabled', e.target.checked)}
-                      className="w-4 h-4 rounded text-[#0057B8] focus:ring-[#0057B8] accent-[#0057B8] cursor-pointer"
-                    />
-                    <div className="space-y-0.5">
-                      <span className="text-xs font-bold text-gray-800 block">عقاري مع شخصي قائم</span>
-                      <span className="text-[10px] text-gray-400 font-medium">existingPersonal</span>
-                    </div>
-                  </label>
-                </div>
-              </div>
-            );
-          })()
-        )}
-      </div>
-
-      {/* Filters Bar */}
-      <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {/* Filter Product Type */}
-        <div className="space-y-1.5 font-sans">
-          <label className="block text-xs font-bold text-gray-600">نوع المنتج:</label>
-          <select
-            id="filter-product-select"
-            value={filterProductType}
-            onChange={(e) => setFilterProductType(e.target.value)}
-            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
-          >
-            <option value="all">كل المنتجات</option>
-            {productTypesList.map(type => (
-              <option key={type.id} value={type.id}>{type.nameAr}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Filter Active Status */}
-        <div className="space-y-1.5 font-sans">
-          <label className="block text-xs font-bold text-gray-600">الحالة:</label>
-          <select
-            id="filter-status-select"
-            value={filterActiveStatus}
-            onChange={(e) => setFilterActiveStatus(e.target.value)}
-            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
-          >
-            <option value="all">كل الحالات</option>
-            <option value="active">مفعل فقط</option>
-            <option value="inactive">غير مفعل</option>
-          </select>
-        </div>
-
-        {/* Filter Support Type */}
-        <div className="space-y-1.5 font-sans">
-          <label className="block text-xs font-bold text-gray-600">نوع الدعم المسموح:</label>
-          <select
-            id="filter-support-select"
-            value={filterSupport}
-            onChange={(e) => setFilterSupport(e.target.value)}
-            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
-          >
-            <option value="all">كل قنوات الدعم</option>
-            <option value="none">غير مدعوم متاح</option>
-            <option value="monthly">دعم شهري متاح</option>
-            <option value="downpayment">دعم دفعة متاح</option>
-          </select>
-        </div>
-      </div>
 
       {/* Rules Table */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
