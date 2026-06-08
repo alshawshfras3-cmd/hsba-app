@@ -9,6 +9,7 @@ import {
 
 import { BanksSection } from './sections/BanksSection';
 import { ProductsSection } from './sections/ProductsSection';
+import { MarginsSection } from './sections/MarginsSection';
 import { SectorsSection } from './sections/SectorsSection';
 import PensionSection from './sections/PensionSection';
 import TermsSection from './sections/TermsSection';
@@ -750,6 +751,23 @@ export default function AdminDashboard() {
 
   // Filter margins
   const [filterMarginBank, setFilterMarginBank] = useState('all');
+  const [filterMarginProduct, setFilterMarginProduct] = useState('all');
+  const [filterMarginSupport, setFilterMarginSupport] = useState('all');
+  const [filterMarginActiveStatus, setFilterMarginActiveStatus] = useState('all');
+
+  // Modal / Form state for Add/Edit margin
+  const [isMarginModalOpen, setIsMarginModalOpen] = useState(false);
+  const [editingMarginCombo, setEditingMarginCombo] = useState<any>(null);
+  const [formMarginBankId, setFormMarginBankId] = useState('alahli');
+  const [formMarginProductId, setFormMarginProductId] = useState<ProductId>('real_estate_only');
+  const [formMarginSupportType, setFormMarginSupportType] = useState<SupportType>('none');
+  const [formMarginSalaryTier, setFormMarginSalaryTier] = useState<'below_25000' | 'above_or_equal_25000' | 'not_applicable'>('not_applicable');
+  const [formMarginSectorId, setFormMarginSectorId] = useState('gov_civil');
+  const [formMarginYear, setFormMarginYear] = useState<number>(25);
+  const [formMarginBase, setFormMarginBase] = useState('');
+  const [formMarginException, setFormMarginException] = useState('');
+  const [formMarginIsActive, setFormMarginIsActive] = useState(true);
+  const [formMarginError, setFormMarginError] = useState('');
 
   // --- Bank Margin Rules States & Management ---
   const [selectedMarginBank, setSelectedMarginBank] = useState<string>('alahli');
@@ -1024,6 +1042,162 @@ export default function AdminDashboard() {
           exceptionBps: parsedBps,
           productType: selectedMarginProduct,
           salaryTier: selectedMarginSalaryTier
+        });
+      });
+    });
+
+    setMarginRules([...remainingRules, ...newRulesForThisCombo, ...newExceptionRules]);
+  };
+
+  const updateGlobalRulesForCombo = (
+    targetBank: string,
+    targetProduct: ProductId,
+    targetSupport: SupportType,
+    targetSalaryTier: 'below_25000' | 'above_or_equal_25000' | 'not_applicable',
+    marginsRecord: Record<number, string>, 
+    sectorExceptionsRecord: Record<string, string>, 
+    method: 'linear' | 'fixed', 
+    inputMode: 'yearly' | 'key_points'
+  ) => {
+    const productIdsToFilter = [targetProduct];
+    if (targetProduct === 'real_estate_with_new_personal') {
+      productIdsToFilter.push('real_estate');
+      productIdsToFilter.push('both');
+    } else if (targetProduct === 'real_estate_with_existing_personal') {
+      productIdsToFilter.push('real_estate_with_personal_existing');
+    } else if (targetProduct === 'real_estate_only') {
+      productIdsToFilter.push('real_estate');
+    }
+
+    const normSupport = (targetSupport as string) === 'down_payment' || targetSupport === 'downpayment' ? 'downpayment' : targetSupport;
+
+    const remainingRules = marginRules.filter(r => {
+      const isBaseForCombo = r.bankId === targetBank &&
+                             productIdsToFilter.includes(r.productId) &&
+                             (r.supportType === normSupport || r.supportType === 'all') &&
+                             (r.sectorId || 'all') === 'all' &&
+                             (r.salaryTier === targetSalaryTier || (!r.salaryTier && targetSalaryTier === 'not_applicable')) &&
+                             !r.isExceptionOnly;
+
+      const isExceptionForCombo = r.bankId === targetBank &&
+                                  productIdsToFilter.includes(r.productId) &&
+                                  (r.supportType === normSupport || r.supportType === 'all') &&
+                                  r.exceptionBps !== undefined &&
+                                  r.sectorId !== 'all' &&
+                                  (r.isExceptionOnly === true || (r.fromTermMonths === 0 && r.toTermMonths === 9999));
+
+      return !isBaseForCombo && !isExceptionForCombo;
+    });
+
+    const newRulesForThisCombo: MarginRule[] = [];
+    
+    const yearsToSave = inputMode === 'yearly'
+      ? Array.from({ length: 26 }, (_, i) => 5 + i)
+      : [5, 10, 15, 20, 25, 30];
+      
+    const filledYears = yearsToSave.filter(year => {
+      const val = marginsRecord[year];
+      return val !== undefined && val !== '' && !isNaN(parseFloat(val)) && parseFloat(val) > 0;
+    });
+
+    filledYears.sort((a, b) => a - b);
+
+    if (filledYears.length > 0) {
+      productIdsToFilter.forEach(pId => {
+        const definitions: Array<{ from: number, to: number, start: number, end: number, calcType: 'fixed' | 'linear', yearPoint: number }> = [];
+
+        for (let i = 0; i < filledYears.length; i++) {
+          const currentYear = filledYears[i];
+          const currentMarginStr = marginsRecord[currentYear];
+          const currentMarginVal = parseFloat(currentMarginStr) || 0;
+
+          if (i === 0) {
+            definitions.push({
+              from: 0,
+              to: currentYear * 12,
+              start: currentMarginVal,
+              end: currentMarginVal,
+              calcType: 'fixed' as const,
+              yearPoint: currentYear
+            });
+          } else {
+            const prevYear = filledYears[i - 1];
+            const prevMarginStr = marginsRecord[prevYear];
+            const prevMarginVal = parseFloat(prevMarginStr) || 0;
+
+            const fromMonths = prevYear * 12 + 1;
+            const toMonths = currentYear * 12;
+
+            definitions.push({
+              from: fromMonths,
+              to: toMonths,
+              start: method === 'fixed' ? currentMarginVal : prevMarginVal,
+              end: currentMarginVal,
+              calcType: method,
+              yearPoint: currentYear
+            });
+          }
+        }
+
+        const lastYear = filledYears[filledYears.length - 1];
+        const lastMarginStr = marginsRecord[lastYear];
+        const lastMarginVal = parseFloat(lastMarginStr) || 0;
+        definitions.push({
+          from: lastYear * 12 + 1,
+          to: 9999,
+          start: lastMarginVal,
+          end: lastMarginVal,
+          calcType: 'fixed' as const,
+          yearPoint: lastYear
+        });
+
+        definitions.forEach((def, index) => {
+          newRulesForThisCombo.push({
+            id: `gen_margin_${targetBank}_${pId}_${normSupport}_${targetSalaryTier}_t${def.from}_${def.to}_${index}`,
+            bankId: targetBank,
+            productId: pId as ProductId,
+            supportType: normSupport as any,
+            sectorId: 'all',
+            fromTermMonths: def.from,
+            toTermMonths: def.to,
+            startMargin: def.start,
+            endMargin: def.end,
+            calcType: def.calcType,
+            isActive: true,
+            salaryTier: targetSalaryTier,
+            productType: targetProduct as any,
+            marginInputMode: inputMode,
+            calculationMethod: method,
+            year: def.yearPoint,
+            termMonths: def.to === 9999 ? (def.yearPoint * 12) : def.to,
+            annualMargin: def.end,
+            exceptionBps: 0,
+            baseMargin: Number((def.end / 100).toFixed(6))
+          });
+        });
+      });
+    }
+
+    const newExceptionRules: MarginRule[] = [];
+    ['gov_civil', 'military', 'semi_gov', 'companies', 'private', 'retired'].forEach(secId => {
+      const parsedBps = parseInt(sectorExceptionsRecord[secId] || '0', 10);
+      productIdsToFilter.forEach(pId => {
+        newExceptionRules.push({
+          id: `exception_${targetBank}_${secId}_${pId}_${normSupport}`,
+          bankId: targetBank,
+          sectorId: secId as SectorId,
+          productId: pId as ProductId,
+          supportType: normSupport as any,
+          fromTermMonths: 0,
+          toTermMonths: 9999,
+          startMargin: 0,
+          endMargin: 0,
+          calcType: 'fixed',
+          isActive: true,
+          isExceptionOnly: true,
+          exceptionBps: parsedBps,
+          productType: targetProduct as any,
+          salaryTier: targetSalaryTier
         });
       });
     });
@@ -4638,11 +4812,19 @@ export default function AdminDashboard() {
 
         {/* VIEW 7: MARGINS - GRID & INTERPOLATION */}
         {adminSubPage === 'margins' && (
+          <MarginsSection
+            banks={banks}
+            marginRules={marginRules}
+            setMarginRules={setMarginRules}
+            showToast={showToast}
+          />
+        )}
+        {adminSubPage === 'margins' && false && (
           <div className="space-y-6">
             {/* Header */}
             <div className="border-b border-[#F1F5F9] pb-4">
               <h2 className="text-xl font-extrabold text-[#111827]">هوامش الأرباح البنكية</h2>
-              <p className="text-xs text-[#6B7280] mt-1">إدارة هوامش التمويل حسب البنك والمنتج ونوع الدعم والمدة.</p>
+              <p className="text-xs text-[#6B7280] mt-1 font-sans">إدارة هوامش التمويل حسب البنك والمنتج ونوع الدعم والمدة.</p>
             </div>
 
             {/* Quick Actions Bar */}
