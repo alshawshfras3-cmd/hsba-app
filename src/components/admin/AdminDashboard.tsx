@@ -876,19 +876,16 @@ export default function AdminDashboard() {
     setLocalCalcMethod(method);
     setSelectedMarginInputMode(inputMode);
 
-    // Synchronize sector exceptions
-    const normSupport = selectedMarginSupport === 'down_payment' ? 'downpayment' : selectedMarginSupport;
+    // Synchronize sector exceptions (bank level only)
     const sectorsList = ['gov_civil', 'military', 'semi_gov', 'companies', 'private', 'retired'];
     const initialExceptions: Record<string, string> = {};
 
     sectorsList.forEach(secId => {
        const exRule = marginRules.find(r =>
         r.bankId === selectedMarginBank &&
-        (r.productType === selectedMarginProduct || r.productId === selectedMarginProduct) &&
-        (r.supportType === normSupport || r.supportType === 'all') &&
         r.sectorId === secId &&
         r.exceptionBps !== undefined &&
-        (r.isExceptionOnly === true || (r.fromTermMonths === 0 && r.toTermMonths === 9999))
+        r.isExceptionOnly === true
       );
       initialExceptions[secId] = exRule && exRule.exceptionBps !== undefined ? exRule.exceptionBps.toString() : '0';
     });
@@ -923,10 +920,7 @@ export default function AdminDashboard() {
                              !r.isExceptionOnly;
 
       const isExceptionForCombo = r.bankId === selectedMarginBank &&
-                                  productIdsToFilter.includes(r.productId) &&
-                                  (r.supportType === normSupport || r.supportType === 'all') &&
-                                  r.exceptionBps !== undefined &&
-                                  (r.isExceptionOnly === true || (r.fromTermMonths === 0 && r.toTermMonths === 9999));
+                                  r.isExceptionOnly === true;
 
       return !isBaseForCombo && !isExceptionForCombo;
     });
@@ -1025,25 +1019,14 @@ export default function AdminDashboard() {
     const newExceptionRules: MarginRule[] = [];
     ['gov_civil', 'military', 'semi_gov', 'companies', 'private', 'retired'].forEach(secId => {
       const parsedBps = parseInt(sectorExceptionsRecord[secId] || '0', 10);
-      productIdsToFilter.forEach(pId => {
-        newExceptionRules.push({
-          id: `exception_${selectedMarginBank}_${secId}_${pId}_${normSupport}`,
-          bankId: selectedMarginBank,
-          sectorId: secId as SectorId,
-          productId: pId as ProductId,
-          supportType: normSupport as any,
-          fromTermMonths: 0,
-          toTermMonths: 9999,
-          startMargin: 0,
-          endMargin: 0,
-          calcType: 'fixed',
-          isActive: true,
-          isExceptionOnly: true,
-          exceptionBps: parsedBps,
-          productType: selectedMarginProduct,
-          salaryTier: selectedMarginSalaryTier
-        });
-      });
+      newExceptionRules.push({
+        id: `exception_${selectedMarginBank}_${secId}`,
+        bankId: selectedMarginBank,
+        sectorId: secId as SectorId,
+        isActive: true,
+        isExceptionOnly: true,
+        exceptionBps: parsedBps
+      } as any);
     });
 
     setMarginRules([...remainingRules, ...newRulesForThisCombo, ...newExceptionRules]);
@@ -1080,11 +1063,7 @@ export default function AdminDashboard() {
                              !r.isExceptionOnly;
 
       const isExceptionForCombo = r.bankId === targetBank &&
-                                  productIdsToFilter.includes(r.productId) &&
-                                  (r.supportType === normSupport || r.supportType === 'all') &&
-                                  r.exceptionBps !== undefined &&
-                                  r.sectorId !== 'all' &&
-                                  (r.isExceptionOnly === true || (r.fromTermMonths === 0 && r.toTermMonths === 9999));
+                                  r.isExceptionOnly === true;
 
       return !isBaseForCombo && !isExceptionForCombo;
     });
@@ -1181,25 +1160,14 @@ export default function AdminDashboard() {
     const newExceptionRules: MarginRule[] = [];
     ['gov_civil', 'military', 'semi_gov', 'companies', 'private', 'retired'].forEach(secId => {
       const parsedBps = parseInt(sectorExceptionsRecord[secId] || '0', 10);
-      productIdsToFilter.forEach(pId => {
-        newExceptionRules.push({
-          id: `exception_${targetBank}_${secId}_${pId}_${normSupport}`,
-          bankId: targetBank,
-          sectorId: secId as SectorId,
-          productId: pId as ProductId,
-          supportType: normSupport as any,
-          fromTermMonths: 0,
-          toTermMonths: 9999,
-          startMargin: 0,
-          endMargin: 0,
-          calcType: 'fixed',
-          isActive: true,
-          isExceptionOnly: true,
-          exceptionBps: parsedBps,
-          productType: targetProduct as any,
-          salaryTier: targetSalaryTier
-        });
-      });
+      newExceptionRules.push({
+        id: `exception_${targetBank}_${secId}`,
+        bankId: targetBank,
+        sectorId: secId as SectorId,
+        isActive: true,
+        isExceptionOnly: true,
+        exceptionBps: parsedBps
+      } as any);
     });
 
     setMarginRules([...remainingRules, ...newRulesForThisCombo, ...newExceptionRules]);
@@ -5269,7 +5237,7 @@ export default function AdminDashboard() {
                               ].find(s => s.id === previewSector)?.nameAr
                             })</span>
                             <span className="block text-base font-extrabold text-amber-600 font-mono leading-none">
-                              {parsedEx} Bps ({Math.abs(parsedEx / 100).toFixed(2)}%)
+                              {parsedEx} Bps ({(parsedEx >= 0 ? parsedEx / 100 : -parsedEx / 100).toFixed(2)}%)
                             </span>
                           </div>
 

@@ -159,12 +159,10 @@ export function calculateMargin(params: {
 
   // Determine if it is a real estate product and calculate exception adjustments
   const isRealEstate = normProduct !== 'personal' && normProduct !== 'personal_only';
-  // Find the sector exception rule matching bank + sector + product + support
+  // Find the sector exception rule matching bank + sector only (independent of product/support)
   const matchedExceptionRule = marginRules.find(
     r => r.bankId === bankId &&
          r.sectorId === sectorId &&
-         (r.productId === normProduct || r.productType === normProduct) &&
-         (r.supportType === normSupport || r.supportType === 'all') &&
          r.exceptionBps !== undefined &&
          r.isActive !== false
   );

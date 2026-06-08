@@ -101,11 +101,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                              !r.isExceptionOnly;
 
       const isExceptionForCombo = r.bankId === targetBank &&
-                                  productIdsToFilter.includes(r.productId) &&
-                                  (r.supportType === normSupport || r.supportType === 'all') &&
-                                  r.exceptionBps !== undefined &&
-                                  r.sectorId !== 'all' &&
-                                  (r.isExceptionOnly === true || (r.fromTermMonths === 0 && r.toTermMonths === 9999));
+                                  r.isExceptionOnly === true;
 
       return !isBaseForCombo && !isExceptionForCombo;
     });
@@ -199,25 +195,14 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     sectorsList.forEach(secObj => {
       const secId = secObj.id;
       const parsedBps = parseInt(sectorExceptionsRecord[secId] || '0', 10);
-      productIdsToFilter.forEach(pId => {
-        newExceptionRules.push({
-          id: `exception_${targetBank}_${secId}_${pId}_${normSupport}`,
-          bankId: targetBank,
-          sectorId: secId as SectorId,
-          productId: pId as ProductId,
-          supportType: normSupport as any,
-          fromTermMonths: 0,
-          toTermMonths: 9999,
-          startMargin: 0,
-          endMargin: 0,
-          calcType: 'fixed',
-          isActive: true,
-          isExceptionOnly: true,
-          exceptionBps: parsedBps,
-          productType: targetProduct as any,
-          salaryTier: targetSalaryTier
-        });
-      });
+      newExceptionRules.push({
+        id: `exception_${targetBank}_${secId}`,
+        bankId: targetBank,
+        sectorId: secId as SectorId,
+        isActive: true,
+        isExceptionOnly: true,
+        exceptionBps: parsedBps
+      } as any);
     });
 
     setMarginRules([...remainingRules, ...newRulesForThisCombo, ...newExceptionRules]);
@@ -395,10 +380,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
         const secId = secObj.id;
         const match = marginRules.find(r => 
           r.bankId === formBankId &&
-          productIdsToFilter.includes(r.productId) &&
-          (r.supportType === normSupport || r.supportType === 'all') &&
           r.sectorId === secId &&
-          (r.salaryTier === formSalaryTier || (!r.salaryTier && formSalaryTier === 'not_applicable')) &&
           r.isExceptionOnly === true
         );
         exceptionDict[secId] = match && match.exceptionBps !== undefined ? match.exceptionBps.toString() : '0';
@@ -460,10 +442,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
           const secId = secObj.id;
           const match = marginRules.find(r => 
             r.bankId === row.bankId &&
-            productIdsToFilter.includes(r.productId) &&
-            (r.supportType === normSupport || r.supportType === 'all') &&
             r.sectorId === secId &&
-            (r.salaryTier === row.salaryTier || (!r.salaryTier && row.salaryTier === 'not_applicable')) &&
             r.isExceptionOnly === true
           );
           exceptionDict[secId] = match && match.exceptionBps !== undefined ? match.exceptionBps.toString() : '0';
@@ -515,6 +494,56 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
         showToast('حدث خطأ أثناء عملية الاستنساخ.', 'refuse');
       }
     }
+  };
+
+  // Local state for standalone sector exceptions in the current selected bank
+  const [localSectorExceptions, setLocalSectorExceptions] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (filterMarginBank !== 'all') {
+      const initialExceptions: Record<string, string> = {};
+      sectorsList.forEach(sec => {
+        const exRule = marginRules.find(r =>
+          r.bankId === filterMarginBank &&
+          r.sectorId === sec.id &&
+          r.exceptionBps !== undefined &&
+          r.isExceptionOnly === true
+        );
+        initialExceptions[sec.id] = exRule && exRule.exceptionBps !== undefined ? exRule.exceptionBps.toString() : '0';
+      });
+      setLocalSectorExceptions(initialExceptions);
+    } else {
+      setLocalSectorExceptions({});
+    }
+  }, [filterMarginBank, marginRules]);
+
+  const handleSaveBankExceptions = () => {
+    if (filterMarginBank === 'all') return;
+
+    // Filter out previous bank exceptions of this bank
+    const remainingRules = marginRules.filter(r =>
+      !(r.bankId === filterMarginBank && r.isExceptionOnly === true)
+    );
+
+    const newExceptionRules: MarginRule[] = [];
+    sectorsList.forEach(sec => {
+      let valStr = localSectorExceptions[sec.id] || '0';
+      if (valStr === '-' || !valStr) {
+        valStr = '0';
+      }
+      const parsedBps = parseInt(valStr, 10) || 0;
+      newExceptionRules.push({
+        id: `exception_${filterMarginBank}_${sec.id}`,
+        bankId: filterMarginBank,
+        sectorId: sec.id as SectorId,
+        isActive: true,
+        isExceptionOnly: true,
+        exceptionBps: parsedBps
+      } as any);
+    });
+
+    setMarginRules([...remainingRules, ...newExceptionRules]);
+    showToast('تم حفظ استثناءات القطاعات للبنك بنجاح!', 'success');
   };
 
   return (
@@ -624,6 +653,54 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
           );
         })}
       </div>
+
+      {/* Standalone Bank Sector Exceptions Card */}
+      {filterMarginBank !== 'all' && (
+        <div className="bg-white p-6 rounded-2xl border border-gray-150 shadow-sm space-y-4 animate-in fade-in duration-200 text-right font-sans">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-gray-100 pb-3 gap-2">
+            <h3 className="text-sm font-extrabold text-slate-850 flex items-center gap-2">
+              🛡️ استثناءات قطاعات القطاع المهني لجهة التمويل: <span className="text-[#0057B8]">{(banks.find(b => b.id === filterMarginBank)?.nameAr) || filterMarginBank}</span>
+            </h3>
+            <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-lg">
+              * الاستثناء يدخل كنقاط أساس Bps (مثال: -192 لرفع الهامش بنسبة 1.92٪، أو 100 لتخفيض الهامش بنسبة 1.00٪)
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            {sectorsList.map((sec) => {
+              return (
+                <div key={sec.id} className="bg-slate-50 border border-slate-150 p-4 rounded-xl space-y-2 flex flex-col justify-between">
+                  <label className="block text-xs font-bold text-slate-700 text-center">{sec.nameAr}</label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={localSectorExceptions[sec.id] ?? '0'}
+                      onChange={(e) => {
+                        let valStr = e.target.value;
+                        valStr = valStr.replace(/[^0-9-]/g, ''); // Keep numbers and minus sign only
+                        setLocalSectorExceptions(prev => ({ ...prev, [sec.id]: valStr }));
+                      }}
+                      className="bg-white border border-gray-300 rounded-xl px-2 py-2 w-full text-center text-xs font-bold font-mono focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-slate-800"
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="flex justify-end pt-3 border-t border-gray-100">
+            <button
+              type="button"
+              onClick={handleSaveBankExceptions}
+              className="px-6 py-2.5 bg-[#0057B8] hover:bg-[#004bb0] text-white rounded-xl text-xs font-extrabold transition-all shadow-md shadow-[#0057B8]/20 cursor-pointer flex items-center gap-1.5"
+            >
+              💾 حفظ استثناءات القطاعات للبنك الحالي
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Filters Bar */}
       <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm grid grid-cols-1 sm:grid-cols-3 gap-4 text-right">

@@ -148,6 +148,15 @@ export default function StepWizard() {
     sectorMappings: contextSectorMappings
   } = useAppState();
 
+  const bankOrder = ['alahli', 'rajhi', 'alinma', 'fransi', 'bidaya', 'albilad', 'alarabi'];
+  const sortedActiveBanks = [...banks.filter(b => b.isActive)].sort((a, b) => {
+    const indexA = bankOrder.indexOf(a.id);
+    const indexB = bankOrder.indexOf(b.id);
+    const priorityA = indexA === -1 ? 999 : indexA;
+    const priorityB = indexB === -1 ? 999 : indexB;
+    return priorityA - priorityB;
+  });
+
   // --- Step Form Values State ---
   const [mainFinanceType, setMainFinanceType] = useState<'real_estate' | 'personal_only' | 'real_estate_with_existing_personal' | ''>(() => getDraftValue('mainFinanceType', ''));
   const [realEstateSubType, setRealEstateSubType] = useState<'real_estate_only' | 'real_estate_with_new_personal' | ''>(() => getDraftValue('realEstateSubType', 'real_estate_only'));
@@ -192,7 +201,10 @@ export default function StepWizard() {
 
   // Finance details
   const [supportType, setSupportType] = useState<SupportType | ''>(() => getDraftValue<SupportType | ''>('supportType', ''));
-  const [selectedBankId, setSelectedBankId] = useState<string>(() => getDraftValue<string>('selectedBankId', ''));
+  const [selectedBankId, setSelectedBankId] = useState<string>(() => {
+    const val = getDraftValue<string>('selectedBankId', 'all');
+    return val || 'all';
+  });
   const [termMode, setTermMode] = useState<TermMode>(() => getDraftValue<TermMode>('termMode', 'max'));
   const [manualTermYears, setManualTermYears] = useState<number | ''>(() => getDraftValue<number | ''>('manualTermYears', ''));
 
@@ -1309,9 +1321,8 @@ export default function StepWizard() {
                       onChange={(e) => setSelectedBankId(e.target.value)}
                       className="w-full bg-slate-50 border border-gray-200 rounded-xl px-4 py-3.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-[#0057B8] focus:border-transparent cursor-pointer font-sans text-gray-800"
                     >
-                      <option value="">-- يرجى اختيار جهة التمويل --</option>
                       <option value="all">جميع جهات التمويل النشطة المتاحة (مقارنة العروض)</option>
-                      {banks.filter(b => b.isActive).map(bank => (
+                      {sortedActiveBanks.map(bank => (
                         <option key={bank.id} value={bank.id}>{bank.nameAr}</option>
                       ))}
                     </select>
@@ -1495,9 +1506,8 @@ export default function StepWizard() {
                     onChange={(e) => setSelectedBankId(e.target.value)}
                     className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] focus:border-transparent cursor-pointer font-sans"
                   >
-                    <option value="">-- يرجى اختيار جهة التمويل --</option>
                     <option value="all">جميع جهات التمويل النشطة المتاحة (مقارنة العروض)</option>
-                    {banks.filter(b => b.isActive).map(bank => (
+                    {sortedActiveBanks.map(bank => (
                       <option key={bank.id} value={bank.id}>{bank.nameAr}</option>
                     ))}
                   </select>
