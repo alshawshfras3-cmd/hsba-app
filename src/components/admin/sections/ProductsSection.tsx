@@ -33,12 +33,6 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
   setProducts,
   showToast
 }) => {
-  const toggleBankProductMode = (field: 'realEstateFinanceEnabled' | 'personalFinanceEnabled' | 'combinedFinanceEnabled' | 'existingPersonalFinanceEnabled', checked: boolean) => {
-    if (filterBank === 'all') return;
-    setBanks(prev => prev.map(b => b.id === filterBank ? { ...b, [field]: checked } : b));
-    showToast('تم تحديث إعدادات المنتج للجهة بنجاح. تذكر حفظ التغييرات من الشريط أسفل الصفحة.', 'success');
-  };
-
   const updateBankLimit = (bankId: string, field: 'minRealEstateAmount' | 'maxRealEstateAmount' | 'minPersonalAmount' | 'maxPersonalAmount', valStr: string) => {
     const clean = normalizeNumberInput(valStr);
     const parsed = clean === '' ? undefined : parseNumberInput(clean);
@@ -828,20 +822,7 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
                     id="form-bank-select"
                     value={formBankId}
                     onChange={(e) => {
-                      const val = e.target.value;
-                      setFormBankId(val);
-                      const targetBank = banks.find(b => b.id === val);
-                      if (targetBank) {
-                        if (targetBank.realEstateFinanceEnabled !== false) {
-                          setFormProductId('real_estate_only');
-                        } else if (targetBank.personalFinanceEnabled === true) {
-                          setFormProductId('personal_only');
-                        } else if (targetBank.combinedFinanceEnabled === true) {
-                          setFormProductId('real_estate_with_new_personal');
-                        } else if (targetBank.existingPersonalFinanceEnabled !== false) {
-                          setFormProductId('real_estate_with_existing_personal');
-                        }
-                      }
+                      setFormBankId(e.target.value);
                     }}
                     className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
                   >
@@ -862,16 +843,9 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
                     }}
                     className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
                   >
-                    {productTypesList.map(pt => {
-                      const targetBank = banks.find(b => b.id === formBankId);
-                      if (targetBank) {
-                        if (pt.id === 'real_estate_only' && targetBank.realEstateFinanceEnabled === false) return null;
-                        if (pt.id === 'personal_only' && targetBank.personalFinanceEnabled === false) return null;
-                        if (pt.id === 'real_estate_with_new_personal' && targetBank.combinedFinanceEnabled === false) return null;
-                        if (pt.id === 'real_estate_with_existing_personal' && targetBank.existingPersonalFinanceEnabled === false) return null;
-                      }
-                      return <option key={pt.id} value={pt.id}>{pt.nameAr}</option>;
-                    })}
+                    {productTypesList.map(pt => (
+                      <option key={pt.id} value={pt.id}>{pt.nameAr}</option>
+                    ))}
                   </select>
                 </div>
               </div>
