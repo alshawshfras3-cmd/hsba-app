@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, ToggleRight, ToggleLeft, Trash2, Loader2, Copy, History } from 'lucide-react';
+import { Copy } from 'lucide-react';
 import { Bank, ProductId, SupportType, SectorId, MarginRule } from '../../../types';
 import { calculateMargin } from '../../../lib/finance-engine/margin';
 
@@ -33,43 +33,125 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
   setMarginRules,
   showToast
 }) => {
-  // Filtering States
-  const [filterMarginBank, setFilterMarginBank] = useState<string>('all');
-  const [filterMarginProduct, setFilterMarginProduct] = useState<string>('all');
-  const [filterMarginSupport, setFilterMarginSupport] = useState<string>('all');
-  const [filterMarginActiveStatus, setFilterMarginActiveStatus] = useState<string>('all');
+  // 1. Selector States (Active single configuration)
+  const [selectedBank, setSelectedBank] = useState<string>(banks[0]?.id || 'alahli');
+  const [selectedProduct, setSelectedProduct] = useState<ProductId>('real_estate_only');
+  const [selectedSupport, setSelectedSupport] = useState<SupportType>('none');
+  const [selectedSalaryTier, setSelectedSalaryTier] = useState<'below_25000' | 'above_or_equal_25000' | 'not_applicable'>('not_applicable');
+  const [selectedYearsMode, setSelectedYearsMode] = useState<'yearly' | 'key_points'>('key_points');
+  const [selectedCalcMethod, setSelectedCalcMethod] = useState<'linear' | 'fixed'>('fixed');
 
-  // Modal State
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingCombo, setEditingCombo] = useState<any>(null); // null means adding
+  // 2. Local inputs for Edit Grid
+  const [localMargins, setLocalMargins] = useState<Record<number, string>>({});
+  const [localSectorExceptions, setLocalSectorExceptions] = useState<Record<string, string>>({
+    gov_civil: '0',
+    military: '0',
+    semi_gov: '0',
+    companies: '0',
+    private: '0',
+    retired: '0'
+  });
 
-  // Modal Form States
-  const [formBankId, setFormBankId] = useState('alahli');
-  const [formProductId, setFormProductId] = useState<ProductId>('real_estate_only');
-  const [formSupportType, setFormSupportType] = useState<SupportType>('none');
-  const [formSalaryTier, setFormSalaryTier] = useState<'below_25000' | 'above_or_equal_25000' | 'not_applicable'>('not_applicable');
-  const [formSectorId, setFormSectorId] = useState('gov_civil');
-  const [formYear, setFormYear] = useState<number>(25);
-  const [formBaseMargin, setFormBaseMargin] = useState('');
-  const [formExceptionBps, setFormExceptionBps] = useState('0');
-  const [formError, setFormError] = useState('');
-  const [formIsActive, setFormIsActive] = useState(true);
-
-  // Handle support/salary-tier dependencies
-  useEffect(() => {
-    if (formSupportType === 'none') {
-      setFormSalaryTier('not_applicable');
-    } else if (formSalaryTier === 'not_applicable') {
-      setFormSalaryTier('below_25000');
-    }
-  }, [formSupportType]);
-
-  // Clone State
+  // Auxiliary UI States
   const [showCloneCard, setShowCloneCard] = useState(false);
   const [cloneFromBank, setCloneFromBank] = useState('alahli');
   const [cloneToBank, setCloneToBank] = useState('rajhi');
+  const [showGeneralLogs, setShowGeneralLogs] = useState(false);
 
-  // Parameterized database saver to match exact core rules compatibility
+  // Auto handle support and salary tier dependencies
+  useEffect(() => {
+    if (selectedSupport === 'none') {
+      setSelectedSalaryTier('not_applicable');
+    } else if (selectedSalaryTier === 'not_applicable') {
+      setSelectedSalaryTier('below_25000');
+    }
+  }, [selectedSupport]);
+
+  // Synchronize local states when selection changes or marginRules are updated
+  useEffect(() => {
+    if (!selectedBank) return;
+
+    const normSupport = (selectedSupport as string) === 'down_payment' || selectedSupport === 'downpayment' ? 'downpayment' : selectedSupport;
+
+    const productIdsToFilter = [selectedProduct];
+    if (selectedProduct === 'real_estate_with_new_personal') {
+      productIdsToFilter.push('real_estate' as any, 'both' as any);
+    } else if (selectedProduct === 'real_estate_with_existing_personal') {
+      productIdsToFilter.push('real_estate_with_personal_existing' as any);
+    } else if (selectedProduct === 'real_estate_only') {
+      productIdsToFilter.push('real_estate' as any);
+    }
+
+    const relevantRules = marginRules.filter(r => 
+      r.bankId === selectedBank && 
+      (r.productId === selectedProduct || r.productType === selectedProduct || productIdsToFilter.includes(r.productId)) && 
+      (r.supportType === normSupport || r.supportType === 'all') &&
+      (!r.isExceptionOnly) &&
+      (r.salaryTier === selectedSalaryTier || (!r.salaryTier && selectedSalaryTier === 'not_applicable'))
+    );
+
+    const yearsListFull = Array.from({ length: 26 }, (_, i) => 5 + i);
+    const initialMargins: Record<number, string> = {};
+    const hasRules = relevantRules.length > 0;
+
+    yearsListFull.forEach(year => {
+      const rY = relevantRules.find(r => r.year === year || r.toTermMonths === year * 12);
+      if (rY) {
+        initialMargins[year] = (rY.annualMargin !== undefined ? rY.annualMargin : (rY.baseMargin !== undefined ? Number((rY.baseMargin * 100).toFixed(3)) : rY.endMargin)).toString();
+      } else {
+        const isStandardYear = [5, 10, 15, 20, 25, 30].includes(year);
+        if (!hasRules && isStandardYear) {
+          if (year === 5) initialMargins[year] = '3.80';
+          else if (year === 10) initialMargins[year] = '3.98';
+          else if (year === 15) initialMargins[year] = '4.25';
+          else if (year === 20) initialMargins[year] = '4.60';
+          else if (year === 25) initialMargins[year] = '4.95';
+          else if (year === 30) initialMargins[year] = '5.25';
+        } else {
+          initialMargins[year] = '';
+        }
+      }
+    });
+
+    let method: 'linear' | 'fixed' = 'fixed';
+    const foundMethodRule = relevantRules.find(r => r.calculationMethod || r.calcType);
+    if (foundMethodRule) {
+      method = (foundMethodRule.calculationMethod || foundMethodRule.calcType) as any;
+    }
+
+    let inputMode: 'yearly' | 'key_points' = 'key_points';
+    const foundInputModeRule = relevantRules.find(r => r.marginInputMode);
+    if (foundInputModeRule) {
+      inputMode = foundInputModeRule.marginInputMode;
+    } else {
+      const hasIntermediate = relevantRules.some(r => {
+        const y = r.year || (r.toTermMonths / 12);
+        return y !== undefined && ![5, 10, 15, 20, 25, 30].includes(y);
+      });
+      if (hasIntermediate) {
+        inputMode = 'yearly';
+      }
+    }
+
+    setLocalMargins(initialMargins);
+    setSelectedCalcMethod(method);
+    setSelectedYearsMode(inputMode);
+
+    // Synchronize sector exceptions (bank level only)
+    const initialExceptions: Record<string, string> = {};
+    sectorsList.forEach(sec => {
+      const exRule = marginRules.find(r =>
+        r.bankId === selectedBank &&
+        r.sectorId === sec.id &&
+        r.isExceptionOnly === true
+      );
+      initialExceptions[sec.id] = exRule && exRule.exceptionBps !== undefined ? exRule.exceptionBps.toString() : '0';
+    });
+    setLocalSectorExceptions(initialExceptions);
+
+  }, [selectedBank, selectedProduct, selectedSupport, selectedSalaryTier, marginRules]);
+
+  // Database updater to match exact core rules compatibility
   const updateGlobalRulesForCombo = (
     targetBank: string,
     targetProduct: ProductId,
@@ -82,8 +164,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
   ) => {
     const productIdsToFilter = [targetProduct];
     if (targetProduct === 'real_estate_with_new_personal') {
-      productIdsToFilter.push('real_estate' as any);
-      productIdsToFilter.push('both' as any);
+      productIdsToFilter.push('real_estate' as any, 'both' as any);
     } else if (targetProduct === 'real_estate_with_existing_personal') {
       productIdsToFilter.push('real_estate_with_personal_existing' as any);
     } else if (targetProduct === 'real_estate_only') {
@@ -107,7 +188,11 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     });
 
     const newRulesForThisCombo: MarginRule[] = [];
-    const filledYears = yearsList.filter(year => {
+    const yearsToExtract = inputMode === 'yearly'
+      ? Array.from({ length: 26 }, (_, i) => 5 + i)
+      : [5, 10, 15, 20, 25, 30];
+
+    const filledYears = yearsToExtract.filter(year => {
       const val = marginsRecord[year];
       return val !== undefined && val !== '' && !isNaN(parseFloat(val)) && parseFloat(val) > 0;
     });
@@ -208,263 +293,23 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     setMarginRules([...remainingRules, ...newRulesForThisCombo, ...newExceptionRules]);
   };
 
-  // Compile combined flat row configs
-  const getFilteredMarginRows = () => {
-    const list: any[] = [];
-    const targetBanks = banks.map(b => b.id);
-
-    targetBanks.forEach(bId => {
-      if (filterMarginBank !== 'all' && bId !== filterMarginBank) return;
-
-      productTypesList.forEach(pObj => {
-        const pId = pObj.id as ProductId;
-        if (filterMarginProduct !== 'all' && pId !== filterMarginProduct) return;
-
-        const supports: SupportType[] = ['none', 'monthly', 'downpayment'];
-        supports.forEach(sId => {
-          if (filterMarginSupport !== 'all' && sId !== filterMarginSupport) return;
-
-          const tiers: Array<'not_applicable' | 'below_25000' | 'above_or_equal_25000'> = sId === 'none'
-            ? ['not_applicable']
-            : ['below_25000', 'above_or_equal_25000'];
-
-          tiers.forEach(tier => {
-            // Check if any rule exists for this combination
-            const relevantRules = marginRules.filter(r => 
-              r.bankId === bId &&
-              (r.productId === pId || r.productType === pId || (pId === 'real_estate_only' && r.productId === 'real_estate')) &&
-              (r.supportType === sId || r.supportType === 'all') &&
-              (r.salaryTier === tier || (!r.salaryTier && tier === 'not_applicable'))
-            );
-
-            if (relevantRules.length === 0) return;
-
-            sectorsList.forEach(sec => {
-              yearsList.forEach(year => {
-                const result = calculateMargin({
-                  bankId: bId,
-                  productId: pId,
-                  supportType: sId,
-                  sectorId: sec.id as SectorId,
-                  termMonths: year * 12,
-                  marginRules,
-                  netSalary: tier === 'below_25000' ? 20000 : tier === 'above_or_equal_25000' ? 30000 : undefined
-                });
-
-                // Read active state
-                const matchedBaseRule = relevantRules.find(r => 
-                  (r.sectorId === 'all' || !r.sectorId) &&
-                  !r.isExceptionOnly &&
-                  (r.year === year || r.toTermMonths === year * 12)
-                );
-                const isActive = matchedBaseRule ? matchedBaseRule.isActive !== false : true;
-
-                if (filterMarginActiveStatus === 'active' && !isActive) return;
-                if (filterMarginActiveStatus === 'inactive' && isActive) return;
-
-                list.push({
-                  id: `combo_${bId}_${pId}_${sId}_${tier}_${sec.id}_${year}`,
-                  bankId: bId,
-                  productId: pId,
-                  supportType: sId,
-                  salaryTier: tier,
-                  sectorId: sec.id,
-                  sectorNameAr: sec.nameAr,
-                  year: year,
-                  baseMargin: result.baseMargin !== undefined ? (result.baseMargin * 100) : result.annualMargin,
-                  exceptionBps: result.exceptionBps,
-                  finalMarginSec: result.annualMargin,
-                  isActive: isActive
-                });
-              });
-            });
-          });
-        });
-      });
-    });
-
-    return list;
-  };
-
-  // Open edit modal
-  const openEditMarginModal = (row: any) => {
-    setEditingCombo(row);
-    setFormBankId(row.bankId);
-    setFormProductId(row.productId);
-    setFormSupportType(row.supportType);
-    setFormSalaryTier(row.salaryTier);
-    setFormSectorId(row.sectorId);
-    setFormYear(row.year);
-    setFormBaseMargin(String(row.baseMargin));
-    setFormExceptionBps(String(row.exceptionBps));
-    setFormIsActive(row.isActive);
-    setFormError('');
-    setIsModalOpen(true);
-  };
-
-  // Open add modal
-  const openAddMarginModal = () => {
-    setEditingCombo(null);
-    setFormBankId(filterMarginBank !== 'all' ? filterMarginBank : 'alahli');
-    setFormProductId(filterMarginProduct !== 'all' ? filterMarginProduct as any : 'real_estate_only');
-    setFormSupportType(filterMarginSupport !== 'all' ? filterMarginSupport as any : 'none');
-    setFormSalaryTier('not_applicable');
-    setFormSectorId('gov_civil');
-    setFormYear(25);
-    setFormBaseMargin('');
-    setFormExceptionBps('0');
-    setFormIsActive(true);
-    setFormError('');
-    setIsModalOpen(true);
-  };
-
-  // Save Modal Action
-  const saveMarginRule = () => {
+  // Main save action for basic margins + exceptions
+  const handleSaveConfig = () => {
     try {
-      if (!formBankId) {
-        setFormError('يرجى اختيار البنك.');
-        return;
-      }
-      if (!formProductId) {
-        setFormError('يرجى اختيار نوع المنتج.');
-        return;
-      }
-      if (formBaseMargin === '') {
-        setFormError('يرجى إدخال هامش الجدول %.');
-        return;
-      }
-      const baseVal = parseFloat(formBaseMargin);
-      if (isNaN(baseVal) || baseVal < 0) {
-        setFormError('يرجى إدخال نسبة مئوية صحيحة لهامش الجدول (مثال: 4.35).');
-        return;
-      }
-      let cleanExBps = formExceptionBps;
-      if (cleanExBps === '-' || !cleanExBps) {
-        cleanExBps = '0';
-      }
-      const exBps = Number(cleanExBps);
-      if (isNaN(exBps)) {
-        setFormError('يرجى إدخال قيمة صحيحة للنسبة الاستثنائية Bps.');
-        return;
-      }
-
-      const productIdsToFilter = [formProductId];
-      if (formProductId === 'real_estate_with_new_personal') {
-        productIdsToFilter.push('real_estate' as any, 'both' as any);
-      } else if (formProductId === 'real_estate_with_existing_personal') {
-        productIdsToFilter.push('real_estate_with_personal_existing' as any);
-      } else if (formProductId === 'real_estate_only') {
-        productIdsToFilter.push('real_estate' as any);
-      }
-
-      const normSupport = formSupportType === 'down_payment' ? 'downpayment' : formSupportType;
-
-      // Extract existing years configuration for this combo
-      const baseMarginsDict: Record<number, string> = {};
-      yearsList.forEach(y => {
-        const match = marginRules.find(r => 
-          r.bankId === formBankId && 
-          productIdsToFilter.includes(r.productId) && 
-          (r.supportType === normSupport || r.supportType === 'all') &&
-          (r.salaryTier === formSalaryTier || (!r.salaryTier && formSalaryTier === 'not_applicable')) &&
-          (r.year === y || r.toTermMonths === y * 12) &&
-          !r.isExceptionOnly
-        );
-        baseMarginsDict[y] = match ? (match.annualMargin !== undefined ? match.annualMargin : match.endMargin).toString() : '';
-      });
-      baseMarginsDict[formYear] = String(baseVal);
-
-      // Extract existing exceptions
-      const exceptionDict: Record<string, string> = {};
-      sectorsList.forEach(secObj => {
-        const secId = secObj.id;
-        const match = marginRules.find(r => 
-          r.bankId === formBankId &&
-          r.sectorId === secId &&
-          r.isExceptionOnly === true
-        );
-        exceptionDict[secId] = match && match.exceptionBps !== undefined ? match.exceptionBps.toString() : '0';
-      });
-      exceptionDict[formSectorId] = String(exBps);
-
-      // Save!
       updateGlobalRulesForCombo(
-        formBankId,
-        formProductId,
-        formSupportType,
-        formSalaryTier,
-        baseMarginsDict,
-        exceptionDict,
-        'fixed',
-        'key_points'
+        selectedBank,
+        selectedProduct,
+        selectedSupport,
+        selectedSalaryTier,
+        localMargins,
+        localSectorExceptions,
+        selectedCalcMethod,
+        selectedYearsMode
       );
-
-      showToast(editingCombo ? 'تم تعديل الهامش وقاعدة الاستثناء بنجاح!' : 'تم إضافة الهامش الجديد بنجاح!', 'success');
-      setIsModalOpen(false);
-      setEditingCombo(null);
+      showToast('تم حفظ وتطبيق الإعدادات للمنتج واستثناءات القطاعات بنجاح!', 'success');
     } catch (e) {
       console.error(e);
-      setFormError('حدث خطأ مباغت أثناء الحفظ.');
-    }
-  };
-
-  // Delete/Clear combo values
-  const deleteMarginRow = (row: any) => {
-    if (window.confirm('هل أنت متأكد من رغبتك في حذف قاعدة هذا الهامش والاستثناء؟ سيتم تصفير القيم وإعادة تعيين الهامش.')) {
-      try {
-        const productIdsToFilter = [row.productId];
-        if (row.productId === 'real_estate_with_new_personal') {
-          productIdsToFilter.push('real_estate' as any, 'both' as any);
-        } else if (row.productId === 'real_estate_with_existing_personal') {
-          productIdsToFilter.push('real_estate_with_personal_existing' as any);
-        } else if (row.productId === 'real_estate_only') {
-          productIdsToFilter.push('real_estate' as any);
-        }
-
-        const normSupport = row.supportType === 'down_payment' ? 'downpayment' : row.supportType;
-
-        const baseMarginsDict: Record<number, string> = {};
-        yearsList.forEach(y => {
-          const match = marginRules.find(r => 
-            r.bankId === row.bankId && 
-            productIdsToFilter.includes(r.productId) && 
-            (r.supportType === normSupport || r.supportType === 'all') &&
-            (r.salaryTier === row.salaryTier || (!r.salaryTier && row.salaryTier === 'not_applicable')) &&
-            (r.year === y || r.toTermMonths === y * 12) &&
-            !r.isExceptionOnly
-          );
-          baseMarginsDict[y] = match ? (match.annualMargin !== undefined ? match.annualMargin : match.endMargin).toString() : '';
-        });
-        baseMarginsDict[row.year] = ''; // clear
-
-        const exceptionDict: Record<string, string> = {};
-        sectorsList.forEach(secObj => {
-          const secId = secObj.id;
-          const match = marginRules.find(r => 
-            r.bankId === row.bankId &&
-            r.sectorId === secId &&
-            r.isExceptionOnly === true
-          );
-          exceptionDict[secId] = match && match.exceptionBps !== undefined ? match.exceptionBps.toString() : '0';
-        });
-        exceptionDict[row.sectorId] = '0'; // clear exception Bps
-
-        updateGlobalRulesForCombo(
-          row.bankId,
-          row.productId,
-          row.supportType,
-          row.salaryTier,
-          baseMarginsDict,
-          exceptionDict,
-          'fixed',
-          'key_points'
-        );
-
-        showToast('تم تصفير الهامش والاستثناء وتحديث القواعد بنجاح.', 'success');
-      } catch (e) {
-        console.error(e);
-        showToast('فشل تصفير القيم.', 'refuse');
-      }
+      showToast('حدث خطأ أثناء حفظ أو تطبيق البيانات.', 'refuse');
     }
   };
 
@@ -496,90 +341,108 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     }
   };
 
-  // Local state for standalone sector exceptions in the current selected bank
-  const [localSectorExceptions, setLocalSectorExceptions] = useState<Record<string, string>>({});
+  // Compile combined flat row configs for general log reviewing
+  const getFilteredMarginRows = () => {
+    const list: any[] = [];
+    const targetBanks = banks.map(b => b.id);
 
-  useEffect(() => {
-    if (filterMarginBank !== 'all') {
-      const initialExceptions: Record<string, string> = {};
-      sectorsList.forEach(sec => {
-        const exRule = marginRules.find(r =>
-          r.bankId === filterMarginBank &&
-          r.sectorId === sec.id &&
-          r.exceptionBps !== undefined &&
-          r.isExceptionOnly === true
-        );
-        initialExceptions[sec.id] = exRule && exRule.exceptionBps !== undefined ? exRule.exceptionBps.toString() : '0';
+    targetBanks.forEach(bId => {
+      if (selectedBank && bId !== selectedBank) return;
+
+      productTypesList.forEach(pObj => {
+        const pId = pObj.id as ProductId;
+        if (selectedProduct && pId !== selectedProduct) return;
+
+        const supports: SupportType[] = ['none', 'monthly', 'downpayment'];
+        supports.forEach(sId => {
+          if (selectedSupport && sId !== selectedSupport) return;
+
+          const tiers: Array<'not_applicable' | 'below_25000' | 'above_or_equal_25000'> = sId === 'none'
+            ? ['not_applicable']
+            : ['below_25000', 'above_or_equal_25000'];
+
+          tiers.forEach(tier => {
+            if (sId !== 'none' && selectedSalaryTier !== tier) return;
+
+            const relevantRules = marginRules.filter(r => 
+              r.bankId === bId &&
+              (r.productId === pId || r.productType === pId || (pId === 'real_estate_only' && r.productId === 'real_estate')) &&
+              (r.supportType === sId || r.supportType === 'all') &&
+              (r.salaryTier === tier || (!r.salaryTier && tier === 'not_applicable'))
+            );
+
+            if (relevantRules.length === 0) return;
+
+            sectorsList.forEach(sec => {
+              const yearsToIterate = selectedYearsMode === 'key_points' ? [5, 10, 15, 20, 25, 30] : Array.from({ length: 26 }, (_, i) => 5 + i);
+              yearsToIterate.forEach(year => {
+                const result = calculateMargin({
+                  bankId: bId,
+                  productId: pId,
+                  supportType: sId,
+                  sectorId: sec.id as SectorId,
+                  termMonths: year * 12,
+                  marginRules,
+                  netSalary: tier === 'below_25000' ? 20000 : tier === 'above_or_equal_25000' ? 30000 : undefined
+                });
+
+                const matchedBaseRule = relevantRules.find(r => 
+                  (r.sectorId === 'all' || !r.sectorId) &&
+                  !r.isExceptionOnly &&
+                  (r.year === year || r.toTermMonths === year * 12)
+                );
+                const isActive = matchedBaseRule ? matchedBaseRule.isActive !== false : true;
+
+                list.push({
+                  id: `combo_${bId}_${pId}_${sId}_${tier}_${sec.id}_${year}`,
+                  bankId: bId,
+                  productId: pId,
+                  supportType: sId,
+                  salaryTier: tier,
+                  sectorId: sec.id,
+                  sectorNameAr: sec.nameAr,
+                  year: year,
+                  baseMargin: result.baseMargin !== undefined ? (result.baseMargin * 100) : result.annualMargin,
+                  exceptionBps: result.exceptionBps,
+                  finalMarginSec: result.annualMargin,
+                  isActive: isActive
+                });
+              });
+            });
+          });
+        });
       });
-      setLocalSectorExceptions(initialExceptions);
-    } else {
-      setLocalSectorExceptions({});
-    }
-  }, [filterMarginBank, marginRules]);
-
-  const handleSaveBankExceptions = () => {
-    if (filterMarginBank === 'all') return;
-
-    // Filter out previous bank exceptions of this bank
-    const remainingRules = marginRules.filter(r =>
-      !(r.bankId === filterMarginBank && r.isExceptionOnly === true)
-    );
-
-    const newExceptionRules: MarginRule[] = [];
-    sectorsList.forEach(sec => {
-      let valStr = localSectorExceptions[sec.id] || '0';
-      if (valStr === '-' || !valStr) {
-        valStr = '0';
-      }
-      const parsedBps = parseInt(valStr, 10) || 0;
-      newExceptionRules.push({
-        id: `exception_${filterMarginBank}_${sec.id}`,
-        bankId: filterMarginBank,
-        sectorId: sec.id as SectorId,
-        isActive: true,
-        isExceptionOnly: true,
-        exceptionBps: parsedBps
-      } as any);
     });
 
-    setMarginRules([...remainingRules, ...newExceptionRules]);
-    showToast('تم حفظ استثناءات القطاعات للبنك بنجاح!', 'success');
+    return list;
   };
 
   return (
     <div className="space-y-6" dir="rtl">
       
-      {/* Header Section */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+      {/* 1. Header Section */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm text-right">
         <div className="space-y-1 text-right">
-          <h2 className="text-xl font-bold text-gray-900">هوامش الأرباح البنكية</h2>
-          <p className="text-xs text-gray-500">
-            شاشة إدارة هوامش الأرباح التمويلية الأساسية واستثناءات القطاعات في جدول مركزي واحد موحد.
+          <h2 className="text-xl font-bold text-gray-900 font-sans">هوامش الأرباح البنكية</h2>
+          <p className="text-xs text-gray-500 font-sans">
+            جهة سهلة ومباشرة لإعداد هوامش التمويل الأساسية ومزامنة كافة استثناءات القطاعات.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 font-sans">
           <button
             type="button"
             onClick={() => setShowCloneCard(!showCloneCard)}
-            className="inline-flex items-center gap-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-gray-700 px-4 py-2.5 rounded-xl font-bold text-xs transition-all self-start sm:self-auto cursor-pointer"
+            className="inline-flex items-center gap-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-gray-700 px-4 py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer"
           >
             <Copy className="w-4 h-4" />
             <span>نسخ إعدادات بنك</span>
-          </button>
-          <button
-            type="button"
-            onClick={openAddMarginModal}
-            className="inline-flex items-center gap-2 bg-[#0057B8] hover:bg-[#00418A] text-white px-5 py-2.5 rounded-xl font-bold text-xs transition-all shadow-sm shadow-[#0057B8]/20 self-start sm:self-auto cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>إضافة هامش جديد</span>
           </button>
         </div>
       </div>
 
       {/* Clone Quick Actions Block */}
       {showCloneCard && (
-        <div className="bg-slate-50 border border-slate-150 rounded-2xl p-5 space-y-4 animate-in fade-in duration-200 text-right">
+        <div className="bg-slate-50 border border-slate-150 rounded-2xl p-5 space-y-4 animate-in fade-in duration-200 text-right font-sans">
           <h4 className="font-bold text-slate-800 text-xs">📋 استنساخ ومزامنة هوامش جهة تمويلية كاملة</h4>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
@@ -587,7 +450,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
               <select
                 value={cloneFromBank}
                 onChange={(e) => setCloneFromBank(e.target.value)}
-                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 outline-none focus:ring-1 focus:ring-[#0057B8]"
+                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-705 outline-none focus:ring-1 focus:ring-[#0057B8]"
               >
                 {banks.map(b => (
                   <option key={b.id} value={b.id}>{b.nameAr}</option>
@@ -599,7 +462,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
               <select
                 value={cloneToBank}
                 onChange={(e) => setCloneToBank(e.target.value)}
-                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 outline-none focus:ring-1 focus:ring-[#0057B8]"
+                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-705 outline-none focus:ring-1 focus:ring-[#0057B8]"
               >
                 {banks.map(b => (
                   <option key={b.id} value={b.id}>{b.nameAr}</option>
@@ -611,7 +474,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
             <button
               type="button"
               onClick={handleCloneBankLevel}
-              className="px-5 py-2 bg-[#0057B8] text-white rounded-xl text-xs font-bold hover:bg-[#004bb0] shadow-xs cursor-pointer"
+              className="px-5 py-2 bg-[#0057B8] text-white rounded-xl text-xs font-bold hover:bg-[#004bb0] cursor-pointer"
             >
               تأكيد الاستنساخ والمزامنة
             </button>
@@ -619,455 +482,359 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
         </div>
       )}
 
-      {/* Banks Horizontal Scrollable Tabs */}
-      <div className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm overflow-x-auto whitespace-nowrap scrollbar-none flex gap-2.5">
-        {[
-          { id: 'all', nameAr: 'كل البنوك' },
-          ...banks.map(b => ({ id: b.id, nameAr: b.nameAr }))
-        ].map((b) => {
-          const isSelected = filterMarginBank === b.id;
-          const rowsForBank = b.id === 'all'
-            ? getFilteredMarginRows()
-            : getFilteredMarginRows().filter(r => r.bankId === b.id);
-          const count = rowsForBank.length;
-          return (
-            <button
-              key={b.id}
-              type="button"
-              onClick={() => setFilterMarginBank(b.id)}
-              className={`inline-flex items-center gap-2 px-4.5 py-2.5 rounded-xl text-xs font-bold transition-all border shrink-0 cursor-pointer ${
-                isSelected
-                  ? 'bg-[#0057B8] text-white border-[#0057B8] shadow-sm shadow-[#0057B8]/20 scale-[1.01]'
-                  : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-250/60'
-              }`}
-            >
-              <span>{b.nameAr}</span>
-              <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded-lg min-w-[20px] text-[10px] font-extrabold ${
-                isSelected
-                  ? 'bg-white/20 text-white'
-                  : 'bg-gray-200 text-gray-600'
-              }`}>
-                {count}
-              </span>
-            </button>
-          );
-        })}
+      {/* 2. Banks Horizontal Selection Row */}
+      <div className="space-y-2 text-right">
+        <span className="text-xs font-extrabold text-gray-500 block mb-1 font-sans">اختر البنك التمويلي:</span>
+        <div className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm overflow-x-auto whitespace-nowrap scrollbar-none flex gap-2.5 font-sans">
+          {banks.map((b) => {
+            const isSelected = selectedBank === b.id;
+            return (
+              <button
+                key={b.id}
+                type="button"
+                onClick={() => setSelectedBank(b.id)}
+                className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all border shrink-0 cursor-pointer ${
+                  isSelected
+                    ? 'bg-[#0057B8] text-white border-[#0057B8] shadow-sm shadow-[#0057B8]/20 scale-[1.01]'
+                    : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200'
+                }`}
+              >
+                <span>{b.nameAr}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Standalone Bank Sector Exceptions Card */}
-      {filterMarginBank !== 'all' && (
-        <div className="bg-white p-6 rounded-2xl border border-gray-150 shadow-sm space-y-4 animate-in fade-in duration-200 text-right font-sans">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-gray-100 pb-3 gap-2">
-            <h3 className="text-sm font-extrabold text-slate-850 flex items-center gap-2">
-              🛡️ استثناءات قطاعات القطاع المهني لجهة التمويل: <span className="text-[#0057B8]">{(banks.find(b => b.id === filterMarginBank)?.nameAr) || filterMarginBank}</span>
-            </h3>
-            <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-lg">
-              * الاستثناء يدخل كنقاط أساس Bps (مثال: -192 لرفع الهامش بنسبة 1.92٪، أو 100 لتخفيض الهامش بنسبة 1.00٪)
-            </span>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            {sectorsList.map((sec) => {
+      {/* 3. Selections and Controls Block */}
+      <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm space-y-6 text-right">
+        
+        {/* أولاً: نوع المنتج */}
+        <div className="space-y-2">
+          <span className="block text-xs font-extrabold text-[#0057B8] font-sans">أولاً: المنتج</span>
+          <div className="flex flex-wrap gap-2.5">
+            {productTypesList.map((p) => {
+              const isSelected = selectedProduct === p.id;
               return (
-                <div key={sec.id} className="bg-slate-50 border border-slate-150 p-4 rounded-xl space-y-2 flex flex-col justify-between">
-                  <label className="block text-xs font-bold text-slate-700 text-center">{sec.nameAr}</label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={localSectorExceptions[sec.id] ?? '0'}
-                      onChange={(e) => {
-                        let valStr = e.target.value;
-                        valStr = valStr.replace(/[^0-9-]/g, ''); // Keep numbers and minus sign only
-                        setLocalSectorExceptions(prev => ({ ...prev, [sec.id]: valStr }));
-                      }}
-                      className="bg-white border border-gray-300 rounded-xl px-2 py-2 w-full text-center text-xs font-bold font-mono focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-slate-800"
-                      placeholder="0"
-                    />
-                  </div>
-                </div>
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setSelectedProduct(p.id as ProductId)}
+                  className={`px-4 py-2.5 rounded-xl border text-xs font-bold font-sans transition-all cursor-pointer ${
+                    isSelected
+                      ? 'bg-[#0057B8] border-[#0057B8] text-white shadow-sm font-extrabold'
+                      : 'bg-white border-gray-200 text-gray-600 hover:bg-slate-50'
+                  }`}
+                >
+                  {p.nameAr}
+                </button>
               );
             })}
           </div>
+        </div>
 
-          <div className="flex justify-end pt-3 border-t border-gray-100">
-            <button
-              type="button"
-              onClick={handleSaveBankExceptions}
-              className="px-6 py-2.5 bg-[#0057B8] hover:bg-[#004bb0] text-white rounded-xl text-xs font-extrabold transition-all shadow-md shadow-[#0057B8]/20 cursor-pointer flex items-center gap-1.5"
-            >
-              💾 حفظ استثناءات القطاعات للبنك الحالي
-            </button>
+        {/* ثانياً: نوع الدعم */}
+        <div className="space-y-2">
+          <span className="block text-xs font-extrabold text-[#0057B8] font-sans">ثانياً: نوع الدعم</span>
+          <div className="flex flex-wrap gap-2.5">
+            {[
+              { id: 'none', nameAr: 'غير مدعوم' },
+              { id: 'monthly', nameAr: 'دعم شهري' },
+              { id: 'downpayment', nameAr: 'دعم دفعة' }
+            ].map((s) => {
+              const isSelected = selectedSupport === s.id;
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setSelectedSupport(s.id as SupportType)}
+                  className={`px-4 py-2.5 rounded-xl border text-xs font-bold font-sans transition-all cursor-pointer ${
+                    isSelected
+                      ? 'bg-[#0057B8] border-[#0057B8] text-white shadow-sm font-extrabold'
+                      : 'bg-white border-gray-200 text-gray-600 hover:bg-slate-50'
+                  }`}
+                >
+                  {s.nameAr}
+                </button>
+              );
+            })}
           </div>
         </div>
-      )}
 
-      {/* Filters Bar */}
-      <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm grid grid-cols-1 sm:grid-cols-3 gap-4 text-right">
-        {/* Product Type */}
-        <div className="space-y-1.5 font-sans">
-          <label className="block text-xs font-bold text-gray-600">نوع المنتج:</label>
-          <select
-            value={filterMarginProduct}
-            onChange={(e) => setFilterMarginProduct(e.target.value)}
-            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
-          >
-            <option value="all">كل المنتجات</option>
-            {productTypesList.map(type => (
-              <option key={type.id} value={type.id}>{type.nameAr}</option>
-            ))}
-          </select>
+        {/* ثالثاً: فئة الراتب */}
+        <div className="space-y-2">
+          <span className="block text-xs font-extrabold text-[#0057B8] font-sans">ثالثاً: فئة الراتب</span>
+          {selectedSupport === 'none' ? (
+            <div className="bg-slate-50 border border-slate-200 text-slate-500 rounded-xl px-4 py-3.5 text-xs font-semibold max-w-md font-sans">
+              🔒 فئة الراتب غير مطبقة لغير المدعوم ويتم تطبيق جدول عام لكافة الرواتب.
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-2.5">
+              {[
+                { id: 'below_25000', nameAr: '💵 أقل من 25,000' },
+                { id: 'above_or_equal_25000', nameAr: '💰 25,000 فأكثر' }
+              ].map((t) => {
+                const isSelected = selectedSalaryTier === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setSelectedSalaryTier(t.id as any)}
+                    className={`px-4 py-2.5 rounded-xl border text-xs font-bold font-sans transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-[#0057B8] border-[#0057B8] text-white shadow-sm font-extrabold'
+                        : 'bg-white border-gray-200 text-gray-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    {t.nameAr}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
-        {/* Support Type */}
-        <div className="space-y-1.5 font-sans">
-          <label className="block text-xs font-bold text-gray-600">نوع الدعم:</label>
-          <select
-            value={filterMarginSupport}
-            onChange={(e) => setFilterMarginSupport(e.target.value)}
-            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
-          >
-            <option value="all">كل أنواع الدعم</option>
-            <option value="none">غير مدعوم</option>
-            <option value="monthly">دعم شهري</option>
-            <option value="downpayment">دعم دفعة</option>
-          </select>
+        {/* طريقة إدارة السنوات وطريقة الحساب */}
+        <div className="bg-slate-50 border border-slate-150 rounded-2xl p-5 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-2">
+            <span className="text-xs font-extrabold text-gray-700 font-sans block">طريقة إدارة السنوات المعروضة:</span>
+            <div className="flex gap-1.5">
+              <button
+                type="button"
+                onClick={() => setSelectedYearsMode('key_points')}
+                className={`flex-1 px-3 py-2.5 rounded-xl text-xs font-bold font-sans transition-all cursor-pointer border text-center ${
+                  selectedYearsMode === 'key_points'
+                    ? 'bg-[#0057B8] text-white border-[#0057B8] font-extrabold shadow-xs'
+                    : 'bg-white text-gray-650 border-gray-250 hover:bg-slate-50'
+                }`}
+              >
+                نقاط رئيسية فقط (5/10/15/20/25/30)
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedYearsMode('yearly')}
+                className={`flex-1 px-3 py-2.5 rounded-xl text-xs font-bold font-sans transition-all cursor-pointer border text-center ${
+                  selectedYearsMode === 'yearly'
+                    ? 'bg-[#0057B8] text-white border-[#0057B8] font-extrabold shadow-xs'
+                    : 'bg-white text-gray-650 border-gray-250 hover:bg-slate-50'
+                }`}
+              >
+                كل سنة مستقلة (5 إلى 30 سنة كاملة)
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <span className="text-xs font-extrabold text-gray-700 font-sans block">طريقة الحساب (النسب البينية):</span>
+            <div className="flex gap-1.5">
+              <button
+                type="button"
+                onClick={() => setSelectedCalcMethod('fixed')}
+                className={`flex-1 px-3 py-2.5 rounded-xl text-xs font-bold font-sans transition-all cursor-pointer border text-center ${
+                  selectedCalcMethod === 'fixed'
+                    ? 'bg-[#0057B8] text-white border-[#0057B8] font-extrabold shadow-xs'
+                    : 'bg-white text-gray-655 border-gray-250 hover:bg-slate-50'
+                }`}
+              >
+                ثابتة Fixed (بدون تدرج)
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedCalcMethod('linear')}
+                className={`flex-1 px-3 py-2.5 rounded-xl text-xs font-bold font-sans transition-all cursor-pointer border text-center ${
+                  selectedCalcMethod === 'linear'
+                    ? 'bg-[#0057B8] text-white border-[#0057B8] font-extrabold shadow-xs'
+                    : 'bg-white text-gray-655 border-gray-250 hover:bg-slate-50'
+                }`}
+              >
+                تدرج خطي Linear (انسيابي)
+              </button>
+            </div>
+          </div>
         </div>
 
-        {/* Active Status */}
-        <div className="space-y-1.5 font-sans">
-          <label className="block text-xs font-bold text-gray-600">الحالة:</label>
-          <select
-            value={filterMarginActiveStatus}
-            onChange={(e) => setFilterMarginActiveStatus(e.target.value)}
-            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
-          >
-            <option value="all">كل الحالات</option>
-            <option value="active">مفعل فقط</option>
-            <option value="inactive">غير مفعل</option>
-          </select>
+      </div>
+
+      {/* 4. Standalone Bank Sector Exceptions Card */}
+      <div className="bg-white p-6 rounded-2xl border border-gray-150 shadow-sm space-y-4 text-right font-sans">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-gray-100 pb-3 gap-2">
+          <h3 className="text-sm font-extrabold text-[#111827] flex items-center gap-2">
+            🛡️ استثناءات القطاعات للبنك الحالي: <span className="text-[#0057B8]">{(banks.find(b => b.id === selectedBank)?.nameAr) || selectedBank}</span>
+          </h3>
+          <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-lg">
+            * دخل قيم نقاط الأساس Bps (مثال: -192 لرفع الهامش بنسبة 1.92٪، أو 100 لتخفيض الهامش بنسبة 1.00٪)
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          {sectorsList.map((sec) => {
+            return (
+              <div key={sec.id} className="bg-slate-50 border border-slate-150 p-4 rounded-xl space-y-2 flex flex-col justify-between">
+                <label className="block text-xs font-bold text-slate-705 text-center">{sec.nameAr}</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={localSectorExceptions[sec.id] ?? '0'}
+                    onChange={(e) => {
+                      let valStr = e.target.value;
+                      valStr = valStr.replace(/[^0-9-]/g, '');
+                      setLocalSectorExceptions(prev => ({ ...prev, [sec.id]: valStr }));
+                    }}
+                    className="bg-white border border-gray-350 rounded-xl px-2 py-2 w-full text-center text-xs font-bold font-mono focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-slate-800"
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      <div className="bg-amber-50 rounded-2xl p-4.5 border border-amber-150 text-right text-xs leading-relaxed text-amber-800 space-y-1 font-sans">
-        <span className="font-extrabold block mb-1">💡 طريقة آلية تطبيق المعادلة:</span>
-        <p>• <b>هامش الجدول Base Margin %</b> موحد للبنك والمدد المطلوبة بغض النظر عن القطاع. تعديله من أي قطاع يحدث القيمة لكافة القطاعات المماثلة.</p>
-        <p>• <b>نسبة الاستثناء Bps</b> تحدد القيمة التقاعدية أو العسكرية أو القطاعية المخصومة لجهة العمل بشكل كامل عبر جميع سنوات وعمر التمويل.</p>
-        <p>• <b>الهامش النهائي %</b> = هامش الجدول % مطروحاً منه استثناء القطاع (قسمة 100). هذه هي النسبة النهائية المعالجة والمطبقة في الحسبة آلياً.</p>
-      </div>
-
-      {/* Main Unified Table */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden text-right">
-        <div className="overflow-x-auto">
-          <table className="w-full text-right text-xs text-[#111827] min-w-[1000px] font-sans">
-            <thead className="bg-[#F8FAFC] text-gray-500 border-b border-gray-100 uppercase font-bold tracking-wider">
+      {/* 5. Base Margins Table Section */}
+      <div className="bg-white p-6 rounded-2xl border border-gray-150 shadow-sm space-y-4 text-right font-sans">
+        <h3 className="text-sm font-bold text-slate-850 flex items-center gap-2 border-b border-gray-100 pb-3">
+          📊 هوامش التمويل الأساسية
+        </h3>
+        
+        <div className="overflow-x-auto border border-gray-200 rounded-2xl max-h-[450px] overflow-y-auto">
+          <table className="min-w-full divide-y divide-gray-250 text-right text-xs">
+            <thead className="bg-slate-50 text-slate-650 font-bold sticky top-0">
               <tr>
-                <th className="p-4 font-bold text-right">البنك</th>
-                <th className="p-4 font-bold text-right">نوع المنتج</th>
-                <th className="p-4 font-bold text-right">نوع الدعم</th>
-                <th className="p-4 font-bold text-right">القطاع</th>
-                <th className="p-4 font-bold text-right">مدة التمويل</th>
-                <th className="p-4 font-bold text-center">هامش الجدول %</th>
-                <th className="p-4 font-bold text-center">نسبة الاستثناء Bps</th>
-                <th className="p-4 font-bold text-center">الهامش النهائي %</th>
-                <th className="p-4 font-bold text-center">الحالة</th>
-                <th className="p-4 font-bold text-center">الإجراءات</th>
+                <th scope="col" className="px-6 py-4 text-right font-bold">مدة التمويل بالسنوات</th>
+                <th scope="col" className="px-6 py-4 text-right font-bold text-[#0057B8]">هامش الجدول %</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50 font-semibold text-slate-700">
-              {(() => {
-                const list = getFilteredMarginRows();
-                if (list.length === 0) {
-                  return (
-                    <tr>
-                      <td colSpan={10} className="p-8 text-center text-gray-400 font-bold whitespace-nowrap">
-                        لا توجد هوامش أو استثناءات مسجلة تطابق التصفية الاختيارية الحالية.
-                      </td>
-                    </tr>
-                  );
-                }
-
-                return list.map((row) => {
-                  const bObj = banks.find(b => b.id === row.bankId);
-                  const bankName = bObj ? bObj.nameAr : row.bankId;
-                  const productName = productTypesList.find(p => p.id === row.productId)?.nameAr || row.productId;
-                  
-                  let supportName = row.supportType === 'none' ? 'غير مدعوم' : row.supportType === 'monthly' ? 'دعم شهري' : 'دعم دفعة';
-                  if (row.salaryTier === 'below_25000') {
-                    supportName += ' (< 25 ألف راتب)';
-                  } else if (row.salaryTier === 'above_or_equal_25000') {
-                    supportName += ' (>= 25 ألف راتب)';
-                  }
-
-                  const durationLabel = row.year === 5 || row.year === 10 ? `${row.year} سنوات` : `${row.year} سنة`;
-
-                  return (
-                    <tr key={row.id} className="hover:bg-slate-50/40 transition-colors">
-                      <td className="p-4 font-bold text-slate-800 whitespace-nowrap">{bankName}</td>
-                      <td className="p-4 text-slate-600 whitespace-nowrap">{productName}</td>
-                      <td className="p-4 text-slate-500 whitespace-nowrap">{supportName}</td>
-                      <td className="p-4 text-slate-900 font-bold whitespace-nowrap">{row.sectorNameAr}</td>
-                      <td className="p-4 text-slate-700 font-mono whitespace-nowrap">{durationLabel}</td>
-                      <td className="p-4 text-center text-slate-800 font-mono font-bold">{(row.baseMargin || 0).toFixed(2)}%</td>
-                      <td className={`p-4 text-center font-mono font-bold whitespace-nowrap ${
-                        row.exceptionBps > 0 
-                          ? 'text-rose-500' 
-                          : row.exceptionBps < 0 
-                            ? 'text-emerald-500' 
-                            : 'text-slate-400'
-                      }`}>
-                        {row.exceptionBps > 0 ? `+${row.exceptionBps}` : row.exceptionBps} Bps
-                      </td>
-                      <td className="p-4 text-center text-[#0057B8] font-mono font-extrabold text-sm">{(row.finalMarginSec || 0).toFixed(3)}%</td>
-                      <td className="p-4 text-center">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            // Find base margin rule for this combination and toggle
-                            const matchedBaseRule = marginRules.find(r => 
-                              r.bankId === row.bankId &&
-                              (r.productId === row.productId || r.productType === row.productId) &&
-                              (r.year === row.year || r.toTermMonths === row.year * 12) &&
-                              !r.isExceptionOnly
-                            );
-                            if (matchedBaseRule) {
-                              setMarginRules(prev => prev.map(m => m.id === matchedBaseRule.id ? { ...m, isActive: !m.isActive } : m));
-                              showToast('تم تغيير حالة تفعيل الهامش بنجاح', 'success');
-                            } else {
-                              showToast('الرجاء تهيئة قاعدة الهامش وتعديلها أولاً لتفعيل التبديل آلياً.', 'refuse');
+            <tbody className="divide-y divide-gray-200 bg-white text-slate-700 font-semibold">
+              {(selectedYearsMode === 'yearly'
+                ? Array.from({ length: 26 }, (_, i) => 5 + i)
+                : [5, 10, 15, 20, 25, 30]
+              ).map((year) => {
+                const label = year === 5 || year === 10 ? `${year} سنوات` : `${year} سنة`;
+                return (
+                  <tr key={year} className="hover:bg-slate-50/40 transition-colors">
+                    <td className="px-6 py-3.5 text-right font-bold text-slate-800">
+                      {label}
+                    </td>
+                    <td className="px-6 py-2">
+                      <div className="relative max-w-[180px] inline-block w-full">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={localMargins[year] ?? ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === '' || /^[0-9]*\.?[0-9]*$/.test(val)) {
+                              setLocalMargins(prev => ({ ...prev, [year]: val }));
                             }
                           }}
-                          className="inline-flex items-center justify-center p-1 cursor-pointer transition-colors"
-                        >
-                          {row.isActive ? (
-                            <ToggleRight className="w-6 h-6 text-emerald-500 animate-in fade-in duration-200" />
-                          ) : (
-                            <ToggleLeft className="w-6 h-6 text-gray-300 animate-in fade-in duration-200" />
-                          )}
-                        </button>
-                      </td>
-                      <td className="p-4 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => openEditMarginModal(row)}
-                            className="p-1.5 hover:bg-slate-100 rounded-lg text-[#0057B8] cursor-pointer transition-colors"
-                            title="تعديل هذا الصف"
-                          >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                            </svg>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => deleteMarginRow(row)}
-                            className="p-1.5 hover:bg-rose-50 rounded-lg text-rose-600 cursor-pointer transition-colors"
-                            title="حذف وتصفير"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                });
-              })()}
+                          className="bg-white border border-gray-300 rounded-xl pl-8 pr-4 py-2 w-full text-xs font-bold font-mono focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-left"
+                          placeholder="0.00"
+                        />
+                        <span className="absolute left-3 top-2.5 text-xs text-slate-400 font-bold">%</span>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* POPUP MODAL FOR ADD/EDIT */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs font-sans" dir="rtl">
-          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-slate-100 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
-            
-            {/* Header */}
-            <div className="bg-[#0057B8] text-white p-5 flex justify-between items-center">
-              <h3 className="text-sm font-bold">
-                {editingCombo ? 'تعديل الهامش وقاعدة الاستثناء' : 'إضافة قاعدة هامش جديدة'}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="text-white hover:text-slate-200 transition-colors text-lg font-bold outline-none cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
+      {/* 6. Unified Save Button */}
+      <div className="flex justify-end pt-2">
+        <button
+          type="button"
+          onClick={handleSaveConfig}
+          className="w-full sm:w-auto px-8 py-4 bg-[#0057B8] hover:bg-[#004bb0] text-white rounded-xl text-xs font-extrabold transition-all shadow-md shadow-[#0057B8]/20 cursor-pointer flex items-center justify-center gap-2 hover:scale-[1.01]"
+        >
+          <span>💾 حفظ وتطبيق الإعدادات</span>
+        </button>
+      </div>
 
-            {/* Body */}
-            <div className="p-6 space-y-4 overflow-y-auto max-h-[70vh] text-right">
-              {formError && (
-                <div className="bg-rose-50 border border-rose-150 text-rose-700 text-xs font-bold rounded-xl p-3.5">
-                  ⚠️ {formError}
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-4">
-                {/* Bank */}
-                <div className="col-span-2 space-y-1">
-                  <label className="block text-xs font-bold text-gray-600">البنك التمويلي:</label>
-                  <select
-                    value={formBankId}
-                    onChange={(e) => setFormBankId(e.target.value)}
-                    disabled={editingCombo !== null}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-[#0057B8] disabled:opacity-60"
-                  >
-                    {banks.map(b => (
-                      <option key={b.id} value={b.id}>{b.nameAr}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Product Type */}
-                <div className="col-span-2 space-y-1">
-                  <label className="block text-xs font-bold text-gray-600">نوع المنتج ككل:</label>
-                  <select
-                    value={formProductId}
-                    onChange={(e) => setFormProductId(e.target.value as ProductId)}
-                    disabled={editingCombo !== null}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-[#0057B8] disabled:opacity-60"
-                  >
-                    {productTypesList.map(p => (
-                      <option key={p.id} value={p.id}>{p.nameAr}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Support Type */}
-                <div className="space-y-1">
-                  <label className="block text-xs font-bold text-gray-600">نوع الدعم:</label>
-                  <select
-                    value={formSupportType}
-                    onChange={(e) => setFormSupportType(e.target.value as SupportType)}
-                    disabled={editingCombo !== null}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-[#0057B8] disabled:opacity-60"
-                  >
-                    <option value="none">غير مدعوم</option>
-                    <option value="monthly">دعم شهري</option>
-                    <option value="downpayment">دعم دفعة</option>
-                  </select>
-                </div>
-
-                {/* Salary Tier */}
-                <div className="space-y-1">
-                  <label className="block text-xs font-bold text-gray-600">فئة الراتب:</label>
-                  <select
-                    value={formSalaryTier}
-                    onChange={(e) => setFormSalaryTier(e.target.value as any)}
-                    disabled={editingCombo !== null || formSupportType === 'none'}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-[#0057B8] disabled:opacity-60"
-                  >
-                    {formSupportType === 'none' ? (
-                      <option value="not_applicable">غير مطبق</option>
-                    ) : (
-                      <>
-                        <option value="below_25000">أقل من 25 ألف ريال</option>
-                        <option value="above_or_equal_25000">25 ألف ريال فأكثر</option>
-                      </>
-                    )}
-                  </select>
-                </div>
-
-                {/* Sector */}
-                <div className="space-y-1">
-                  <label className="block text-xs font-bold text-gray-600">القطاع:</label>
-                  <select
-                    value={formSectorId}
-                    onChange={(e) => setFormSectorId(e.target.value)}
-                    disabled={editingCombo !== null}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-[#0057B8] disabled:opacity-60"
-                  >
-                    {sectorsList.map(s => (
-                      <option key={s.id} value={s.id}>{s.nameAr}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Duration */}
-                <div className="space-y-1">
-                  <label className="block text-xs font-bold text-gray-600">مدة التمويل (سنوات):</label>
-                  <select
-                    value={formYear}
-                    onChange={(e) => setFormYear(parseInt(e.target.value, 10))}
-                    disabled={editingCombo !== null}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-[#0057B8] disabled:opacity-60"
-                  >
-                    {yearsList.map(y => (
-                      <option key={y} value={y}>{y} سنة</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Base margin value */}
-                <div className="space-y-1">
-                  <label className="block text-xs font-bold text-gray-600">هامش الجدول Base %:</label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={formBaseMargin}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val === '' || /^[0-9]*\.?[0-9]*$/.test(val)) {
-                          setFormBaseMargin(val);
-                        }
-                      }}
-                      placeholder="4.35"
-                      className="w-full bg-white border border-gray-250 rounded-xl px-4 py-2.5 pl-8 text-xs font-bold font-mono text-left focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
-                    />
-                    <span className="absolute left-3 top-2.5 text-xs font-bold text-gray-400">%</span>
-                  </div>
-                </div>
-
-                {/* Exception Bps */}
-                <div className="space-y-1">
-                  <label className="block text-xs font-bold text-gray-600">نسبة الاستثناء Bps (نقاط):</label>
-                  <input
-                    type="text"
-                    inputMode="text"
-                    value={formExceptionBps}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      if (val === '' || val === '-' || /^-?[0-9]*$/.test(val)) {
-                        setFormExceptionBps(val);
-                      }
-                    }}
-                    placeholder="-192"
-                    className="w-full bg-white border border-gray-250 rounded-xl px-4 py-2.5 text-xs font-bold font-mono text-left focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
-                  />
-                </div>
-              </div>
-
-              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-150 text-[10px] text-gray-500 leading-normal space-y-1">
-                <p>💡 ملاحظة آلية التحديث:</p>
-                <p>• تحديث "هامش الجدول" ينعكس لجميع قطاعات هذه المدة والبنك بشكل جماعي لتوحيد القاعدة الأساسية.</p>
-                <p>• تحديث "نسبة الاستثناء" ينعكس لجميع مدد وسنوات هذا القطاع للبنك المحدد للحفاظ على النسبة المئوية المخصومة.</p>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="bg-slate-50 p-4 border-t border-slate-150 flex justify-end gap-3.5">
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="px-5 py-2.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-705 text-xs font-bold rounded-xl transition-all cursor-pointer"
-              >
-                إلغاء
-              </button>
-              <button
-                type="button"
-                onClick={saveMarginRule}
-                className="px-6 py-2.5 bg-[#0057B8] hover:bg-[#004bb0] text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer border border-[#0057B8]"
-              >
-                حفظ القاعدة
-              </button>
-            </div>
-
+      {/* 7. Collapsible General Review Log List */}
+      <div className="bg-white rounded-2xl border border-gray-150 shadow-sm overflow-hidden text-right font-sans">
+        <button
+          type="button"
+          onClick={() => setShowGeneralLogs(!showGeneralLogs)}
+          className="w-full flex items-center justify-between p-5 hover:bg-slate-50 transition-colors cursor-pointer text-right border-none outline-none leading-none"
+        >
+          <div className="flex items-center gap-2">
+            <span>📋</span>
+            <span className="text-sm font-bold text-slate-800 leading-none">سجل الهوامش</span>
           </div>
-        </div>
-      )}
+          <span className="text-xs font-bold text-[#0057B8] bg-blue-50 px-3 py-1.5 rounded-lg leading-none">
+            {showGeneralLogs ? 'إخفاء السجل 🔼' : 'عرض السجل الشامل 🔽'}
+          </span>
+        </button>
+
+        {showGeneralLogs && (
+          <div className="p-6 border-t border-gray-100 space-y-4 animate-in fade-in duration-200">
+            <p className="text-xs text-gray-500">
+              قائمة تفصيلية بكافة القواعد الفعالة في النظام حالياً لمراجعتها بشكل مجمع.
+            </p>
+            <div className="overflow-x-auto border border-gray-200 rounded-xl">
+              <table className="w-full text-right text-xs text-[#111827] min-w-[900px]">
+                <thead className="bg-slate-50 text-gray-500 border-b border-gray-100 uppercase font-bold sticky top-0">
+                  <tr>
+                    <th className="p-4 font-bold text-right col-span-1">البنك</th>
+                    <th className="p-4 font-bold text-right col-span-1">نوع المنتج</th>
+                    <th className="p-4 font-bold text-right col-span-1">نوع الدعم</th>
+                    <th className="p-4 font-bold text-right col-span-1">القطاع</th>
+                    <th className="p-4 font-bold text-right col-span-1">مدة التمويل</th>
+                    <th className="p-4 font-bold text-center col-span-1">هامش الجدول %</th>
+                    <th className="p-4 font-bold text-center col-span-1">نسبة الاستثناء Bps</th>
+                    <th className="p-4 font-bold text-center col-span-1">الهامش النهائي %</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50 text-slate-705 font-semibold">
+                  {(() => {
+                    const list = getFilteredMarginRows();
+                    if (list.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan={8} className="p-8 text-center text-gray-400 font-bold">
+                            لا توجد سجلات مطابقة للتصفية الحالية.
+                          </td>
+                        </tr>
+                      );
+                    }
+                    return list.map((row) => {
+                      const bObj = banks.find(b => b.id === row.bankId);
+                      const bankName = bObj ? bObj.nameAr : row.bankId;
+                      const productName = productTypesList.find(p => p.id === row.productId)?.nameAr || row.productId;
+                      const supportName = row.supportType === 'none' ? 'غير مدعوم' : row.supportType === 'monthly' ? 'دعم شهري' : 'دعم دفعة';
+                      const durationLabel = row.year === 5 || row.year === 10 ? `${row.year} سنوات` : `${row.year} سنة`;
+
+                      return (
+                        <tr key={row.id} className="hover:bg-slate-50/40">
+                          <td className="p-4 font-bold text-slate-800">{bankName}</td>
+                          <td className="p-4 text-slate-600">{productName}</td>
+                          <td className="p-4 text-slate-500">{supportName}</td>
+                          <td className="p-4 text-slate-900 font-bold">{row.sectorNameAr}</td>
+                          <td className="p-4 text-slate-700 font-mono">{durationLabel}</td>
+                          <td className="p-4 text-center text-slate-800 font-mono">{(row.baseMargin || 0).toFixed(2)}%</td>
+                          <td className={`p-4 text-center font-mono ${
+                            row.exceptionBps > 0 
+                              ? 'text-rose-500' 
+                              : row.exceptionBps < 0 
+                                ? 'text-emerald-500' 
+                                : 'text-slate-400'
+                          }`}>
+                            {row.exceptionBps > 0 ? `+${row.exceptionBps}` : row.exceptionBps} Bps
+                          </td>
+                          <td className="p-4 text-center text-[#0057B8] font-mono font-extrabold text-sm">{(row.finalMarginSec || 0).toFixed(3)}%</td>
+                        </tr>
+                      );
+                    });
+                  })()}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
 
     </div>
   );
