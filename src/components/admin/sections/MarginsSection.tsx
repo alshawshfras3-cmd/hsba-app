@@ -353,7 +353,11 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
         setFormError('يرجى إدخال نسبة مئوية صحيحة لهامش الجدول (مثال: 4.35).');
         return;
       }
-      const exBps = parseInt(formExceptionBps || '0', 10);
+      let cleanExBps = formExceptionBps;
+      if (cleanExBps === '-' || !cleanExBps) {
+        cleanExBps = '0';
+      }
+      const exBps = Number(cleanExBps);
       if (isNaN(exBps)) {
         setFormError('يرجى إدخال قيمة صحيحة للنسبة الاستثنائية Bps.');
         return;
@@ -945,12 +949,13 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                   <label className="block text-xs font-bold text-gray-600">نسبة الاستثناء Bps (نقاط):</label>
                   <input
                     type="text"
-                    inputMode="numeric"
+                    inputMode="text"
                     value={formExceptionBps}
                     onChange={(e) => {
-                      let valStr = e.target.value;
-                      valStr = valStr.replace(/[^0-9-]/g, '');
-                      setFormExceptionBps(valStr);
+                      const val = e.target.value;
+                      if (val === '' || val === '-' || /^-?[0-9]*$/.test(val)) {
+                        setFormExceptionBps(val);
+                      }
                     }}
                     placeholder="-192"
                     className="w-full bg-white border border-gray-250 rounded-xl px-4 py-2.5 text-xs font-bold font-mono text-left focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
