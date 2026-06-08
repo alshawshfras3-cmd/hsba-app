@@ -154,6 +154,39 @@ export function useSettings() {
             };
           });
         }
+
+        // Merge missing DSR Rules from defaults
+        const supabaseRules = (appSettingsObj.dsrRules ?? []) as any[];
+        const seedRules = DEFAULTS.dsr_rules as any[];
+
+        if (!Array.isArray(supabaseRules) || supabaseRules.length === 0) {
+          appSettingsObj.dsrRules = seedRules;
+          try {
+            await supabase.from('system_settings').upsert({
+              key: 'app_settings',
+              value: appSettingsObj,
+              source: data.source ?? 'seed_initial',
+              updated_at: new Date().toISOString()
+            });
+          } catch (_) {}
+        } else {
+          const existingIds = new Set(supabaseRules.map((r: any) => r.id));
+          const missing = seedRules.filter((r: any) => !existingIds.has(r.id));
+
+          if (missing.length > 0) {
+            const merged = [...supabaseRules, ...missing];
+            appSettingsObj.dsrRules = merged;
+            try {
+              await supabase.from('system_settings').upsert({
+                key: 'app_settings',
+                value: appSettingsObj,
+                source: data.source ?? 'seed_initial',
+                updated_at: new Date().toISOString()
+              });
+            } catch (_) {}
+          }
+        }
+
         console.log('[SETTINGS] Supabase value preserved, no overwrite');
       } else {
         console.log('[SETTINGS] key missing, inserting seed_initial: app_settings');
