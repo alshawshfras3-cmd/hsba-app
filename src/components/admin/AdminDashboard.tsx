@@ -12,7 +12,6 @@ import { ProductsSection } from './sections/ProductsSection';
 import { SectorsSection } from './sections/SectorsSection';
 import PensionSection from './sections/PensionSection';
 import TermsSection from './sections/TermsSection';
-import MarginsSection from './sections/MarginsSection';
 import DsrSection from './sections/DsrSection';
 import SupportSection from './sections/SupportSection';
 import { PersonalFinanceSection } from './sections/PersonalFinanceSection';
@@ -756,6 +755,7 @@ export default function AdminDashboard() {
   const [selectedMarginBank, setSelectedMarginBank] = useState<string>('alahli');
   const [selectedMarginProduct, setSelectedMarginProduct] = useState<ProductId>('real_estate_only');
   const [selectedMarginSupport, setSelectedMarginSupport] = useState<SupportType>('none');
+  const [selectedMarginSector, setSelectedMarginSector] = useState<'all' | SectorId>('all');
   const [selectedMarginSalaryTier, setSelectedMarginSalaryTier] = useState<'below_25000' | 'above_or_equal_25000' | 'not_applicable'>('not_applicable');
   const [selectedMarginInputMode, setSelectedMarginInputMode] = useState<'yearly' | 'key_points'>('key_points');
 
@@ -775,17 +775,20 @@ export default function AdminDashboard() {
     25: '4.95',
     30: '5.25'
   });
+  const [localExceptionBps, setLocalExceptionBps] = useState<Record<number, string>>({});
   const [localCalcMethod, setLocalCalcMethod] = useState<'linear' | 'fixed'>('fixed');
 
   // Copy-from states for Cloning inside the same bank & cross-bank
   const [cloningFromBank, setCloningFromBank] = useState<string>('alahli');
   const [cloningFromProduct, setCloningFromProduct] = useState<ProductId>('real_estate_only');
   const [cloningFromSupport, setCloningFromSupport] = useState<SupportType>('none');
+  const [cloningFromSector, setCloningFromSector] = useState<'all' | SectorId>('all');
   const [cloningFromSalaryTier, setCloningFromSalaryTier] = useState<'below_25000' | 'above_or_equal_25000' | 'not_applicable'>('not_applicable');
 
   useEffect(() => {
     setCloningFromBank(selectedMarginBank);
-  }, [selectedMarginBank]);
+    setCloningFromSector(selectedMarginSector);
+  }, [selectedMarginBank, selectedMarginSector]);
 
   // Synchronize local states when selection changes or marginRules are canceled/refreshed
   useEffect(() => {
@@ -793,19 +796,23 @@ export default function AdminDashboard() {
       r.bankId === selectedMarginBank && 
       (r.productType === selectedMarginProduct || r.productId === selectedMarginProduct || (selectedMarginProduct === 'real_estate_only' && r.productId === 'real_estate')) && 
       (r.supportType === selectedMarginSupport || r.supportType === 'all') &&
+      (r.sectorId || 'all') === selectedMarginSector &&
       (r.salaryTier === selectedMarginSalaryTier || (!r.salaryTier && selectedMarginSalaryTier === 'not_applicable'))
     );
 
     const yearsList = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30];
     const initialMargins: Record<number, string> = {};
+    const initialExceptionBps: Record<number, string> = {};
 
     const hasRules = relevantRules.length > 0;
 
     yearsList.forEach(year => {
       const rY = relevantRules.find(r => r.year === year || r.toTermMonths === year * 12);
       if (rY) {
-        initialMargins[year] = (rY.annualMargin !== undefined ? rY.annualMargin : rY.endMargin).toString();
+        initialMargins[year] = (rY.annualMargin !== undefined ? rY.annualMargin : (rY.baseMargin !== undefined ? Number((rY.baseMargin * 100).toFixed(3)) : rY.endMargin)).toString();
+        initialExceptionBps[year] = (rY.exceptionBps !== undefined ? rY.exceptionBps : 0).toString();
       } else {
+        initialExceptionBps[year] = '0';
         const isStandardYear = [5, 10, 15, 20, 25, 30].includes(year);
         if (!hasRules && isStandardYear) {
           if (year === 5) initialMargins[year] = '3.80';
@@ -841,11 +848,12 @@ export default function AdminDashboard() {
     }
 
     setLocalMargins(initialMargins);
+    setLocalExceptionBps(initialExceptionBps);
     setLocalCalcMethod(method);
     setSelectedMarginInputMode(inputMode);
-  }, [selectedMarginBank, selectedMarginProduct, selectedMarginSupport, selectedMarginSalaryTier, marginRules]);
+  }, [selectedMarginBank, selectedMarginProduct, selectedMarginSupport, selectedMarginSalaryTier, selectedMarginSector, marginRules]);
 
-  const updateGlobalRulesFromLocal = (marginsRecord: Record<number, string>, method: 'linear' | 'fixed', inputMode: 'yearly' | 'key_points') => {
+  const updateGlobalRulesFromLocal = (marginsRecord: Record<number, string>, exceptionsRecord: Record<number, string>, method: 'linear' | 'fixed', inputMode: 'yearly' | 'key_points') => {
     const productIdsToFilter = [selectedMarginProduct];
     if (selectedMarginProduct === 'real_estate_with_new_personal') {
       productIdsToFilter.push('real_estate');
@@ -862,6 +870,7 @@ export default function AdminDashboard() {
       const matchesTarget = r.bankId === selectedMarginBank &&
                             productIdsToFilter.includes(r.productId) &&
                             (r.supportType === normSupport || r.supportType === 'all') &&
+                            (r.sectorId || 'all') === selectedMarginSector &&
                             (r.salaryTier === selectedMarginSalaryTier || (!r.salaryTier && selectedMarginSalaryTier === 'not_applicable'));
       return !matchesTarget;
     });
@@ -885,12 +894,14 @@ export default function AdminDashboard() {
     }
 
     productIdsToFilter.forEach(pId => {
-      const definitions: Array<{ from: number, to: number, start: number, end: number, calcType: 'fixed' | 'linear', yearPoint: number }> = [];
+      const definitions: Array<{ from: number, to: number, start: number, end: number, calcType: 'fixed' | 'linear', yearPoint: number, exceptionBps: number }> = [];
 
       for (let i = 0; i < filledYears.length; i++) {
         const currentYear = filledYears[i];
         const currentMarginStr = marginsRecord[currentYear];
         const currentMarginVal = parseFloat(currentMarginStr) || 0;
+        const currentExceptionStr = exceptionsRecord[currentYear] || '0';
+        const currentExceptionVal = parseFloat(currentExceptionStr) || 0;
 
         if (i === 0) {
           definitions.push({
@@ -899,7 +910,8 @@ export default function AdminDashboard() {
             start: currentMarginVal,
             end: currentMarginVal,
             calcType: 'fixed' as const,
-            yearPoint: currentYear
+            yearPoint: currentYear,
+            exceptionBps: currentExceptionVal
           });
         } else {
           const prevYear = filledYears[i - 1];
@@ -915,7 +927,8 @@ export default function AdminDashboard() {
             start: method === 'fixed' ? currentMarginVal : prevMarginVal,
             end: currentMarginVal,
             calcType: method,
-            yearPoint: currentYear
+            yearPoint: currentYear,
+            exceptionBps: currentExceptionVal
           });
         }
       }
@@ -923,13 +936,16 @@ export default function AdminDashboard() {
       const lastYear = filledYears[filledYears.length - 1];
       const lastMarginStr = marginsRecord[lastYear];
       const lastMarginVal = parseFloat(lastMarginStr) || 0;
+      const lastExceptionStr = exceptionsRecord[lastYear] || '0';
+      const lastExceptionVal = parseFloat(lastExceptionStr) || 0;
       definitions.push({
         from: lastYear * 12 + 1,
         to: 9999,
         start: lastMarginVal,
         end: lastMarginVal,
         calcType: 'fixed' as const,
-        yearPoint: lastYear
+        yearPoint: lastYear,
+        exceptionBps: lastExceptionVal
       });
 
       definitions.forEach((def, index) => {
@@ -938,7 +954,7 @@ export default function AdminDashboard() {
           bankId: selectedMarginBank,
           productId: pId as ProductId,
           supportType: normSupport as any,
-          sectorId: 'all',
+          sectorId: selectedMarginSector,
           fromTermMonths: def.from,
           toTermMonths: def.to,
           startMargin: def.start,
@@ -952,7 +968,9 @@ export default function AdminDashboard() {
           calculationMethod: method,
           year: def.yearPoint,
           termMonths: def.to === 9999 ? (def.yearPoint * 12) : def.to,
-          annualMargin: def.end
+          annualMargin: def.end,
+          exceptionBps: def.exceptionBps,
+          baseMargin: Number((def.end / 100).toFixed(6))
         });
       });
     });
@@ -964,8 +982,12 @@ export default function AdminDashboard() {
     setLocalMargins(prev => ({ ...prev, [year]: value }));
   };
 
+  const handleExceptionLocalChange = (year: number, value: string) => {
+    setLocalExceptionBps(prev => ({ ...prev, [year]: value }));
+  };
+
   const handleSaveMargins = () => {
-    updateGlobalRulesFromLocal(localMargins, localCalcMethod, selectedMarginInputMode);
+    updateGlobalRulesFromLocal(localMargins, localExceptionBps, localCalcMethod, selectedMarginInputMode);
     showToast("تم حفظ وتطبيق إعدادات الهوامش على الحسبة", "success");
   };
 
@@ -973,6 +995,7 @@ export default function AdminDashboard() {
     if (cloningFromBank === selectedMarginBank &&
         cloningFromProduct === selectedMarginProduct &&
         cloningFromSupport === selectedMarginSupport &&
+        cloningFromSector === selectedMarginSector &&
         cloningFromSalaryTier === selectedMarginSalaryTier) {
       showToast("لا يمكن النسخ من وإلى نفس الحالة الحالية تماماً.", "refuse");
       return;
@@ -985,6 +1008,7 @@ export default function AdminDashboard() {
       r.bankId === cloningFromBank && 
       (r.productType === cloningFromProduct || r.productId === cloningFromProduct || (cloningFromProduct === 'real_estate_only' && r.productId === 'real_estate')) && 
       (r.supportType === cloningFromSupport || r.supportType === 'all') &&
+      (r.sectorId || 'all') === cloningFromSector &&
       (r.salaryTier === cloningFromSalaryTier || (!r.salaryTier && cloningFromSalaryTier === 'not_applicable'))
     );
 
@@ -1012,17 +1036,20 @@ export default function AdminDashboard() {
 
     const yearsList = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30];
     const newCopiedMargins: Record<number, string> = {};
+    const newCopiedExceptionBps: Record<number, string> = {};
 
     yearsList.forEach(year => {
       const rY = sourceRules.find(r => r.year === year || r.toTermMonths === year * 12);
       newCopiedMargins[year] = rY ? (rY.annualMargin !== undefined ? rY.annualMargin : rY.endMargin).toString() : '';
+      newCopiedExceptionBps[year] = rY ? (rY.exceptionBps !== undefined ? rY.exceptionBps : 0).toString() : '0';
     });
 
     setLocalMargins(newCopiedMargins);
+    setLocalExceptionBps(newCopiedExceptionBps);
     setLocalCalcMethod(method);
     setSelectedMarginInputMode(inputMode);
 
-    updateGlobalRulesFromLocal(newCopiedMargins, method, inputMode);
+    updateGlobalRulesFromLocal(newCopiedMargins, newCopiedExceptionBps, method, inputMode);
     showToast("تم استنساخ الجدول بنجاح وتحديث المسودة الحالية.", "success");
   };
 
@@ -4670,9 +4697,41 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* ثالثاً: فئة الراتب */}
+              {/* ثالثاً: القطاع المهني */}
               <div className="space-y-2">
-                <span className="block text-xs font-extrabold text-[#0057B8] font-sans">ثالثاً: فئة الراتب</span>
+                <span className="block text-xs font-extrabold text-[#0057B8] font-sans">ثالثاً: القطاع</span>
+                <div className="flex flex-wrap gap-2 font-sans">
+                  {[
+                    { id: 'all', nameAr: 'كل القطاعات' },
+                    { id: 'gov_civil', nameAr: 'حكومي مدني' },
+                    { id: 'military', nameAr: 'عسكري' },
+                    { id: 'semi_gov', nameAr: 'شبه حكومي' },
+                    { id: 'companies', nameAr: 'موظف شركات' },
+                    { id: 'private', nameAr: 'قطاع خاص' },
+                    { id: 'retired', nameAr: 'متقاعد' }
+                  ].map((s) => {
+                    const isSelected = selectedMarginSector === s.id;
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => setSelectedMarginSector(s.id as any)}
+                        className={`px-4 py-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                          isSelected
+                            ? 'bg-[#0057B8] border-[#0057B8] text-white shadow-xs font-extrabold'
+                            : 'bg-white border-gray-200 text-gray-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        {s.nameAr}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* رابعاً: فئة الراتب */}
+              <div className="space-y-2">
+                <span className="block text-xs font-extrabold text-[#0057B8] font-sans">رابعاً: فئة الراتب</span>
                 {selectedMarginSupport === 'none' ? (
                   <div className="bg-slate-50 border border-slate-250 text-slate-500 rounded-xl px-4 py-3 text-xs font-semibold max-w-md font-sans">
                     🔒 فئة الراتب غير مطبقة لغير المدعوم ويتم تطبيق جدول عام لكافة الرواتب.
@@ -4782,7 +4841,13 @@ export default function AdminDashboard() {
                   <h3 className="text-sm font-extrabold text-[#111827] font-sans">
                     {formBanksList.find(b => b.id === selectedMarginBank)?.nameAr || selectedMarginBank} — {' '}
                     {selectedMarginProduct === 'real_estate_only' ? 'عقاري فقط' : selectedMarginProduct === 'real_estate_with_new_personal' ? 'عقاري + شخصي جديد' : 'عقاري مع شخصي قائم'} — {' '}
-                    {selectedMarginSupport === 'none' ? 'غير مدعوم' : selectedMarginSupport === 'monthly' ? 'دعم شهري' : 'دعم دفعة'}
+                    {selectedMarginSupport === 'none' ? 'غير مدعوم' : selectedMarginSupport === 'monthly' ? 'دعم شهري' : 'دعم دفعة'} — {' '}
+                    {selectedMarginSector === 'all' ? 'كل القطاعات' :
+                     selectedMarginSector === 'gov_civil' ? 'حكومي مدني' :
+                     selectedMarginSector === 'military' ? 'عسكري' :
+                     selectedMarginSector === 'semi_gov' ? 'شبه حكومي' :
+                     selectedMarginSector === 'companies' ? 'موظف شركات' :
+                     selectedMarginSector === 'private' ? 'قطاع خاص' : 'متقاعد'}
                     {(selectedMarginSupport !== 'none') && ` (${selectedMarginSalaryTier === 'below_25000' ? 'فئة راتب أقل من 25 ألف' : 'فئة راتب 25 ألف فأكثر'})`}
                   </h3>
                   <p className="text-[11px] text-[#6B7280] mt-0.5">جدول هوامش الفوائد والنسب السنوية المعتمدة.</p>
@@ -4800,8 +4865,10 @@ export default function AdminDashboard() {
                 <table className="min-w-full divide-y divide-gray-200 text-right">
                   <thead className="bg-[#F8FAFC] text-slate-500 font-bold text-xs font-sans">
                     <tr>
-                      <th scope="col" className="px-6 py-3.5 text-right w-1/2">مدة التمويل بالسنوات</th>
-                      <th scope="col" className="px-6 py-3.5 text-right w-1/2 font-extrabold text-[#0057B8]">الهامش السنوي المدخل %</th>
+                      <th scope="col" className="px-6 py-3.5 text-right w-[20%]">مدة التمويل بالسنوات</th>
+                      <th scope="col" className="px-6 py-3.5 text-right w-[25%] font-extrabold text-[#0057B8]">هامش الجدول Base Margin %</th>
+                      <th scope="col" className="px-6 py-3.5 text-right w-[25%] text-amber-600 font-extrabold">نسبة الاستثناء Exception Bps</th>
+                      <th scope="col" className="px-6 py-3.5 text-right w-[30%] text-emerald-600 font-extrabold">الهامش النهائي Final Margin %</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 bg-white text-xs font-semibold text-gray-700">
@@ -4810,13 +4877,17 @@ export default function AdminDashboard() {
                       : [5, 10, 15, 20, 25, 30]
                     ).map((year) => {
                       const label = year <= 10 ? `${year} سنوات` : `${year} سنة`;
+                      const baseMarginVal = parseFloat(localMargins[year] || '');
+                      const exceptionBpsVal = parseFloat(localExceptionBps[year] || '0');
+                      const finalMarginVal = !isNaN(baseMarginVal) ? Number((baseMarginVal - (exceptionBpsVal / 100)).toFixed(3)) : null;
+
                       return (
                         <tr key={year} className="hover:bg-slate-50 transition-colors">
                           <td className="px-6 py-4 whitespace-nowrap text-right font-bold text-slate-800 font-sans">
                             {label}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right">
-                            <div className="relative max-w-[240px] inline-block w-full">
+                            <div className="relative max-w-[180px] inline-block w-full">
                               <input
                                 type="text"
                                 inputMode="decimal"
@@ -4832,6 +4903,25 @@ export default function AdminDashboard() {
                               />
                               <span className="absolute left-3 top-2 text-xs text-gray-400 font-bold font-sans">%</span>
                             </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right">
+                            <div className="relative max-w-[180px] inline-block w-full">
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                value={localExceptionBps[year] ?? ''}
+                                onChange={(e) => {
+                                  let valStr = e.target.value;
+                                  valStr = valStr.replace(/[^0-9-]/g, '');
+                                  handleExceptionLocalChange(year, valStr);
+                                }}
+                                className="bg-white border border-gray-300 rounded-xl px-4 py-2 w-full text-xs font-bold font-mono focus:outline-none focus:ring-2 focus:ring-amber-500 text-left"
+                                placeholder="0"
+                              />
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right font-mono font-bold text-xs text-emerald-600">
+                            {finalMarginVal !== null ? `${finalMarginVal.toFixed(3)}%` : '—'}
                           </td>
                         </tr>
                       );
@@ -4862,7 +4952,7 @@ export default function AdminDashboard() {
                 يتيح لك نسخ الهوامش وطرق الحساب والمدد المعتمدة من أي جدول أو بنك آخر وتطبيقها فورياً على المسودة الحالية.
               </p>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 items-end text-xs font-bold text-gray-700 font-sans">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 items-end text-xs font-bold text-gray-700 font-sans">
                 
                 {/* 1. Bank */}
                 <div>
@@ -4917,7 +5007,30 @@ export default function AdminDashboard() {
                   </select>
                 </div>
 
-                {/* 4. Salary Tier */}
+                {/* 4. Sector */}
+                <div>
+                  <label htmlFor="clone-from-sector" className="block text-slate-500 mb-1.5 font-sans">القطاع المصدر:</label>
+                  <select
+                    id="clone-from-sector"
+                    value={cloningFromSector}
+                    onChange={(e) => setCloningFromSector(e.target.value as any)}
+                    className="w-full bg-white border border-[#D1D5DB] rounded-xl px-3 py-2.5 text-xs font-bold text-gray-800 cursor-pointer text-right mb-1"
+                  >
+                    {[
+                      { id: 'all', nameAr: 'كل القطاعات' },
+                      { id: 'gov_civil', nameAr: 'حكومي مدني' },
+                      { id: 'military', nameAr: 'عسكري' },
+                      { id: 'semi_gov', nameAr: 'شبه حكومي' },
+                      { id: 'companies', nameAr: 'موظف شركات' },
+                      { id: 'private', nameAr: 'قطاع خاص' },
+                      { id: 'retired', nameAr: 'متقاعد' }
+                    ].map(sec => (
+                      <option key={sec.id} value={sec.id}>{sec.nameAr}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 5. Salary Tier */}
                 <div>
                   <label htmlFor="clone-from-salary" className="block text-slate-500 mb-1.5 font-sans">فئة الراتب المصدر:</label>
                   <select
