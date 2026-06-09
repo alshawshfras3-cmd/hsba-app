@@ -2340,6 +2340,12 @@ export default function AdminDashboard() {
     showToast(`تم نسخ جدول هوامش الفائدة من ${fromBank} إلى ${toBank} بنجاح!`, 'success');
   };
 
+  const parsedPfTerm = parseFloat(parseArabicAndEnglishNumber(formPfTerm)) || 0;
+  const parsedPfMargin = parseFloat(parseArabicAndEnglishNumber(formPfMargin)) || 0;
+  const calcPfTermYears = parsedPfTerm / 12;
+  const calcPfProfitFactor = 1 + ((parsedPfMargin / 100) * calcPfTermYears);
+  const calcPfEffectiveMultiplier = calcPfProfitFactor > 0 ? (parsedPfTerm / calcPfProfitFactor).toFixed(2) : '0';
+
   return (
     <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col lg:flex-row gap-8 ${hasUnsavedChanges ? 'pb-32' : ''}`}>
       
@@ -5008,19 +5014,18 @@ export default function AdminDashboard() {
                             <td className="p-4 text-center font-sans">{displayTerm} شهراً</td>
                             <td className="p-4 text-center font-sans">
                               {rule.calculationMethod === 'flat_rate' ? (
-                                <span className="text-[#0057B8] font-bold">هامش {displayMargin}%</span>
+                                <span className="text-[#0057B8] font-bold">
+                                  هامش {displayMargin}% | معامل فعلي { (1 + ((displayMargin / 100) * (displayTerm / 12))) > 0 ? (displayTerm / (1 + ((displayMargin / 100) * (displayTerm / 12)))).toFixed(2) : '0' }
+                                </span>
                               ) : rule.calculationMethod === 'pmt' ? (
-                                <span className="text-indigo-700 font-bold">APR {displayMargin}%</span>
+                                <span className="text-indigo-700 font-bold font-sans">APR {displayMargin}%</span>
                               ) : (
-                                <div className="flex flex-col items-center">
-                                  <span className="text-slate-800 font-sans font-bold">معامل {rule.financeCoefficient ?? 0}</span>
-                                  <span className="text-gray-400 text-[10px] font-normal font-sans">للعرض فقط ({displayMargin}%)</span>
-                                </div>
+                                <span className="text-slate-800 font-bold font-sans">معامل {rule.financeCoefficient ?? 0}</span>
                               )}
                             </td>
                             <td className="p-4 text-xs font-sans">
-                              <span className="text-gray-500 font-sans">
-                                {rule.calculationMethod === 'pmt' ? 'PMT' : rule.calculationMethod === 'multiplier' ? 'Multiplier' : 'Flat Rate'}
+                              <span className="text-gray-500 font-bold font-sans">
+                                {rule.calculationMethod === 'pmt' ? 'معادلة القسط PMT' : rule.calculationMethod === 'multiplier' ? 'معامل تمويل يدوي' : 'نسبة ربح مع معامل فعلي'}
                               </span>
                             </td>
                             <td className="p-4 text-center font-sans">{(rule.minSalary ?? 0).toLocaleString('ar-SA')} ريال</td>
@@ -5208,9 +5213,9 @@ export default function AdminDashboard() {
                             }}
                             className="w-full bg-blue-50 border border-blue-200 rounded-xl px-3 py-2 text-xs font-bold text-[#0057B8] focus:outline-none focus:ring-1 focus:ring-blue-500"
                           >
-                            <option value="flat_rate">نسبة الفائدة المسطحة (Flat Rate)</option>
-                            <option value="multiplier">معامل التمويل (Multiplier)</option>
-                            <option value="pmt">معادلة PMT</option>
+                            <option value="flat_rate">نسبة ربح مع معامل فعلي</option>
+                            <option value="multiplier">معامل تمويل يدوي</option>
+                            <option value="pmt">معادلة القسط PMT</option>
                           </select>
                         </div>
 
@@ -5218,8 +5223,7 @@ export default function AdminDashboard() {
                         {formPfCalcMethod === 'multiplier' && (
                           <div className="space-y-1.5 col-span-1 md:col-span-2">
                             <label className="block text-xs font-bold text-gray-600">
-                              معامل التمويل (Multiplier):{' '}
-                              <span className="text-red-500 text-[10px] font-bold">(أساسي للحساب)</span>
+                              معامل التمويل اليدوي:
                             </label>
                             <input
                               type="text"
@@ -5233,20 +5237,46 @@ export default function AdminDashboard() {
                           </div>
                         )}
 
-                        {/* 8. Margin percentage */}
-                        {(formPfCalcMethod === 'flat_rate' || formPfCalcMethod === 'pmt') && (
+                        {/* 8. Margin/APR/Profit Rate percentage and Calculated Effective Multiplier */}
+                        {formPfCalcMethod === 'flat_rate' && (
+                          <>
+                            <div className="space-y-1.5 col-span-1 md:col-span-2">
+                              <label className="block text-xs font-bold text-gray-600">
+                                نسبة الربح السنوية (%):
+                              </label>
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                id="pf-form-margin"
+                                value={formPfMargin}
+                                onChange={(e) => setFormPfMargin(e.target.value)}
+                                className="w-full border bg-amber-50 border-amber-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                placeholder="مثال: 4.59"
+                              />
+                            </div>
+                            <div className="space-y-1.5 col-span-1 md:col-span-2">
+                              <label className="block text-xs font-bold text-gray-500">
+                                المعامل الفعلي (للعرض فقط):
+                              </label>
+                              <input
+                                type="text"
+                                readOnly
+                                value={calcPfEffectiveMultiplier}
+                                className="w-full border bg-slate-100 border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-500 outline-none cursor-not-allowed"
+                              />
+                            </div>
+                          </>
+                        )}
+
+                        {formPfCalcMethod === 'pmt' && (
                           <div className="space-y-1.5 col-span-1 md:col-span-2">
                             <label className="block text-xs font-bold text-gray-600">
-                              {formPfCalcMethod === 'pmt' ? (
-                                <>نسبة الفائدة السنوية % (APR):</>
-                              ) : (
-                                <>نسبة الفائدة / الهامش % (Flat Rate):</>
-                              )}
+                              APR السنوي (%):
                             </label>
                             <input
                               type="text"
                               inputMode="decimal"
-                              id="pf-form-margin"
+                              id="pf-form-margin-pmt"
                               value={formPfMargin}
                               onChange={(e) => setFormPfMargin(e.target.value)}
                               className="w-full border bg-amber-50 border-amber-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500"

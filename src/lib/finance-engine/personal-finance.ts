@@ -80,8 +80,26 @@ export function calculatePersonalFinance(params: {
   if (rule) {
     source = rule.bankId === bankId ? 'bank_specific' : 'default_bank';
   } else {
-    // If the customer is retired and no rule is found, we should NOT fall back to active employee
-    if (customerStatus === 'retired') {
+    if (bankId === 'rajhi') {
+      source = 'fallback';
+      finalRule = {
+        bankId: 'rajhi',
+        sectorId: 'all',
+        dsrPercentage: customerStatus === 'retired' ? 25 : 33.33,
+        termMonths: 60,
+        financeCoefficient: 0,
+        annualMargin: 4.59,
+        minSalary: 2000,
+        minAge: 18,
+        maxAge: customerStatus === 'retired' ? 75 : 65,
+        retireeDsrPercentage: 25,
+        isActive: true,
+        calculationMethod: 'flat_rate',
+        pathType: pathType === 'real_estate_with_existing_personal' ? 'personal_only' : pathType,
+        customerStatus: targetStatus
+      };
+    } else if (customerStatus === 'retired') {
+      // If the customer is retired and no rule is found, we should NOT fall back to active employee
       matchError = "لا توجد قاعدة تمويل شخصي للمتقاعد لهذا البنك";
     } else {
       source = 'fallback';
@@ -155,6 +173,12 @@ export function calculatePersonalFinance(params: {
     ruleTermMonths = 60;
     dsrPercent = customerStatus === 'retired' ? 25 : 33.33;
     coeff = 0;
+  } else if (source === 'fallback' && finalRule.bankId === 'rajhi') {
+    annualMargin = 4.59;
+    ruleTermMonths = 60;
+    dsrPercent = customerStatus === 'retired' ? 25 : 33.33;
+    coeff = 0;
+    calculationMethod = 'flat_rate';
   }
 
   // تحديد مدة التمويل الشخصي الفعلية
@@ -226,7 +250,7 @@ export function calculatePersonalFinance(params: {
     totalProfitPercentage,
     termMonths,
     calculationMethod,
-    multiplier: coeff,
+    multiplier: calculationMethod === 'flat_rate' ? Number((termMonths / (1 + (annualMargin / 100) * (termMonths / 12))).toFixed(2)) : coeff,
     diagnostics: {
       ruleId: finalRule.id,
       bankId: finalRule.bankId,
@@ -235,8 +259,8 @@ export function calculatePersonalFinance(params: {
       dsr: dsrPercent,
       termMonths: termMonths,
       calculationMethod,
-      multiplier: coeff,
-      flatRate: annualMarginApprox !== undefined ? Number(annualMarginApprox.toFixed(2)) : finalRule.annualMargin,
+      multiplier: calculationMethod === 'flat_rate' ? Number((termMonths / (1 + (annualMargin / 100) * (termMonths / 12))).toFixed(2)) : coeff,
+      flatRate: calculationMethod === 'flat_rate' ? annualMargin : (annualMarginApprox !== undefined ? Number(annualMarginApprox.toFixed(2)) : finalRule.annualMargin),
       source
     }
   };

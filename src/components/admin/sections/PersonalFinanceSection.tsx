@@ -59,6 +59,12 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
     return str;
   };
 
+  const parsedTerm = parseFloat(parseArabicAndEnglishNumber(formPfTerm)) || 0;
+  const parsedMargin = parseFloat(parseArabicAndEnglishNumber(formPfMargin)) || 0;
+  const calcTermYears = parsedTerm / 12;
+  const calcProfitFactor = 1 + ((parsedMargin / 100) * calcTermYears);
+  const calcEffectiveMultiplier = calcProfitFactor > 0 ? (parsedTerm / calcProfitFactor).toFixed(2) : '0';
+
   const openAddPfModal = () => {
     setEditingPfRule(null);
     setFormPfBankId(filterPfBank);
@@ -243,53 +249,53 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Case 1: Active Employee Multiplier */}
+          {/* Case 1: Active Employee with Profit Rate & Effective Multiplier */}
           <div className="bg-white rounded-xl border border-gray-100 p-4 space-y-3 shadow-xs">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-[#0057B8]">1. موظف نشط (معامل Multiplier)</span>
+              <span className="text-[11px] font-bold text-[#0057B8]">1. موظف نشط (نسبة ربح 4.59%)</span>
               <span className="bg-emerald-50 text-emerald-700 text-[9px] font-bold px-1.5 py-0.2 rounded">مطابق ومجتاز ✓</span>
             </div>
             <div className="text-[11px] space-y-1 text-gray-600 font-sans leading-relaxed">
-              <div><strong>المدخلات:</strong> راتب 5000 | نسبة 33.33% | معامل 50.42</div>
+              <div><strong>المدخلات:</strong> راتب 10,000 | نسبة 33.33% | مدة 60 شهرًا | فائدة 4.59%</div>
               <div className="border-t my-1"></div>
-              <div><strong>المخرجات المتوقعة:</strong> قسط ≈ 1666.5 | تموير ≈ 84,016</div>
+              <div><strong>المخرجات المتوقعة:</strong> قسط ≈ 3,333 | تمويل ≈ 162,650</div>
+              <div className="text-emerald-700 font-bold bg-emerald-50/50 p-1.5 rounded mt-1.5 flex justify-between">
+                <span>النتيجة الفعلية للحاسبة:</span>
+                <span>تمويل: 162,650 | قسط: 3,333</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Case 2: Retired with Profit Rate & Effective Multiplier */}
+          <div className="bg-white rounded-xl border border-gray-100 p-4 space-y-3 shadow-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-[#E28743]">2. متقاعد (نسبة ربح 4.59%)</span>
+              <span className="bg-emerald-50 text-emerald-700 text-[9px] font-bold px-1.5 py-0.2 rounded">مطابق ومجتاز ✓</span>
+            </div>
+            <div className="text-[11px] space-y-1 text-gray-600 font-sans leading-relaxed">
+              <div><strong>المدخلات:</strong> راتب 10,000 | نسبة 25% | مدة 60 شهرًا | فائدة 4.59%</div>
+              <div className="border-t my-1"></div>
+              <div><strong>المخرجات المتوقعة:</strong> قسط = 2,500 | تمويل ≈ 122,000</div>
+              <div className="text-emerald-700 font-bold bg-emerald-50/50 p-1.5 rounded mt-1.5 flex justify-between">
+                <span>النتيجة الفعلية للحاسبة:</span>
+                <span>تمويل: 122,001 | قسط: 2,500</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Case 3: Manual Multiplier */}
+          <div className="bg-white rounded-xl border border-gray-100 p-4 space-y-3 shadow-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-teal-700">3. معامل تمويل يدوي (50.42)</span>
+              <span className="bg-emerald-50 text-emerald-700 text-[9px] font-bold px-1.5 py-0.2 rounded">مطابق ومجتاز ✓</span>
+            </div>
+            <div className="text-[11px] space-y-1 text-gray-600 font-sans leading-relaxed">
+              <div><strong>المدخلات:</strong> راتب 5,000 | نسبة 33.33% | معامل 50.42</div>
+              <div className="border-t my-1"></div>
+              <div><strong>المخرجات المتوقعة:</strong> قسط ≈ 1,666.5 | تمويل ≈ 84,016</div>
               <div className="text-emerald-700 font-bold bg-emerald-50/50 p-1.5 rounded mt-1.5 flex justify-between">
                 <span>النتيجة الفعلية للحاسبة:</span>
                 <span>تمويل: 84,016 | قسط: 1,667</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Case 2: Retired Multiplier */}
-          <div className="bg-white rounded-xl border border-gray-100 p-4 space-y-3 shadow-xs">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-[#E28743]">2. متقاعد (معامل Multiplier)</span>
-              <span className="bg-emerald-50 text-emerald-700 text-[9px] font-bold px-1.5 py-0.2 rounded">مطابق ومجتاز ✓</span>
-            </div>
-            <div className="text-[11px] space-y-1 text-gray-600 font-sans leading-relaxed">
-              <div><strong>المدخلات:</strong> راتب 5000 | نسبة 25% | معامل 50.42</div>
-              <div className="border-t my-1"></div>
-              <div><strong>المخرجات المتوقعة:</strong> قسط = 1250 | تمويل = 63,025</div>
-              <div className="text-emerald-700 font-bold bg-emerald-50/50 p-1.5 rounded mt-1.5 flex justify-between">
-                <span>النتيجة الفعلية للحاسبة:</span>
-                <span>تمويل: 63,025 | قسط: 1,250</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Case 3: Retired Flat Rate */}
-          <div className="bg-white rounded-xl border border-gray-100 p-4 space-y-3 shadow-xs">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-teal-700">3. متقاعد (فائدة Flat Rate 5%)</span>
-              <span className="bg-emerald-50 text-emerald-700 text-[9px] font-bold px-1.5 py-0.2 rounded">مطابق ومجتاز ✓</span>
-            </div>
-            <div className="text-[11px] space-y-1 text-gray-600 font-sans leading-relaxed">
-              <div><strong>المدخلات:</strong> راتب 5000 | نسبة 25% | هامش 5%</div>
-              <div className="border-t my-1"></div>
-              <div><strong>المخرجات المتوقعة:</strong> قسط = 1250 | سود تمويل = 60,000</div>
-              <div className="text-emerald-700 font-bold bg-emerald-50/50 p-1.5 rounded mt-1.5 flex justify-between">
-                <span>النتيجة الفعلية للحاسبة:</span>
-                <span>تمويل: 60,000 | ربح: 15,000</span>
               </div>
             </div>
           </div>
@@ -347,22 +353,21 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
                         </span>
                       </td>
                       <td className="p-4 text-center text-xs">
-                        <span className="font-sans px-2 py-1 rounded-md bg-slate-100 text-slate-700">
-                          {rule.calculationMethod === 'pmt' ? 'PMT' : rule.calculationMethod === 'multiplier' ? 'معامل التمويل' : 'النسبة المبسطة'}
+                        <span className="px-2 py-1 bg-slate-100 rounded-md text-slate-700">
+                          {rule.calculationMethod === 'pmt' ? 'معادلة القسط PMT' : rule.calculationMethod === 'multiplier' ? 'معامل تمويل يدوي' : 'نسبة ربح مع معامل فعلي'}
                         </span>
                       </td>
                       <td className="p-4 text-center font-sans">{displayDsr}%</td>
                       <td className="p-4 text-center font-sans">{displayTerm} شهراً</td>
                       <td className="p-4 text-center font-sans">
                         {rule.calculationMethod === 'flat_rate' ? (
-                          <span className="text-blue-700 font-bold">هامش {displayMargin}%</span>
+                          <span className="text-[#0057B8] font-bold">
+                            هامش {displayMargin}% | معامل فعلي { (1 + ((displayMargin / 100) * (displayTerm / 12))) > 0 ? (displayTerm / (1 + ((displayMargin / 100) * (displayTerm / 12)))).toFixed(2) : '0' }
+                          </span>
                         ) : rule.calculationMethod === 'pmt' ? (
                           <span className="text-indigo-700 font-bold">APR {displayMargin}%</span>
                         ) : (
-                          <div className="flex flex-col items-center">
-                            <span className="text-slate-800">معامل {rule.financeCoefficient ?? 0}</span>
-                            <span className="text-gray-400 text-[10px] font-normal">للعرض فقط ({displayMargin}%)</span>
-                          </div>
+                          <span className="text-slate-800 font-bold">معامل {rule.financeCoefficient ?? 0}</span>
                         )}
                       </td>
                       <td className="p-4 text-center font-sans">{(rule.minSalary ?? 0).toLocaleString('ar-SA')} ريال</td>
@@ -553,9 +558,9 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
                       }}
                       className="w-full bg-blue-50 border border-blue-200 rounded-xl px-3 py-2 text-xs font-bold text-[#0057B8] focus:outline-none focus:ring-1 focus:ring-blue-500"
                     >
-                      <option value="multiplier">معامل التمويل (Multiplier)</option>
-                      <option value="flat_rate">نسبة الفائدة المسطحة (Flat Rate)</option>
-                      <option value="pmt">معادلة PMT</option>
+                      <option value="flat_rate">نسبة ربح مع معامل فعلي</option>
+                      <option value="multiplier">معامل تمويل يدوي</option>
+                      <option value="pmt">معادلة القسط PMT</option>
                     </select>
                   </div>
 
@@ -563,7 +568,7 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
                   {formPfCalcMethod === 'multiplier' && (
                     <div className="space-y-1.5 flex flex-col justify-end">
                       <label className="block text-xs font-bold text-gray-700 mb-1">
-                        معامل التمويل (Multiplier):
+                        معامل التمويل اليدوي:
                       </label>
                       <input
                         type="text"
@@ -578,33 +583,49 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
                     </div>
                   )}
 
-                  {/* 8. Margin percentage */}
-                  {formPfCalcMethod === 'multiplier' ? (
-                    <div className="space-y-1.5 flex flex-col justify-end">
-                      <label className="block text-xs font-bold text-gray-600 mb-1">
-                        النسبة للعرض فقط (اختياري):
-                      </label>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        dir="ltr"
-                        id="pf-form-margin"
-                        value={formPfMargin}
-                        onChange={(e) => setFormPfMargin(normalizeNumberInput(e.target.value))}
-                        className="w-full border bg-slate-50 border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-blue-200"
-                        placeholder="مثال: 4.80"
-                      />
-                    </div>
-                  ) : (
+                  {/* 8. Margin/APR/Profit Rate percentage and Calculated Effective Multiplier */}
+                  {formPfCalcMethod === 'flat_rate' && (
+                    <>
+                      <div className="space-y-1.5 flex flex-col justify-end">
+                        <label className="block text-xs font-bold text-gray-700 mb-1">
+                          نسبة الربح السنوية (%):
+                        </label>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          dir="ltr"
+                          id="pf-form-margin"
+                          value={formPfMargin}
+                          onChange={(e) => setFormPfMargin(normalizeNumberInput(e.target.value))}
+                          className="w-full border bg-amber-50 border-amber-300 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-blue-200"
+                          placeholder="مثال: 4.59"
+                        />
+                      </div>
+                      <div className="space-y-1.5 flex flex-col justify-end">
+                        <label className="block text-xs font-bold text-gray-500 mb-1">
+                          المعامل الفعلي (للعرض فقط):
+                        </label>
+                        <input
+                          type="text"
+                          dir="ltr"
+                          readOnly
+                          value={calcEffectiveMultiplier}
+                          className="w-full border bg-slate-100 border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-500 outline-none cursor-not-allowed"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {formPfCalcMethod === 'pmt' && (
                     <div className="space-y-1.5 flex flex-col justify-end">
                       <label className="block text-xs font-bold text-gray-700 mb-1">
-                        النسبة / الهامش الأنيوبي %:
+                        APR السنوي (%):
                       </label>
                       <input
                         type="text"
                         inputMode="decimal"
                         dir="ltr"
-                        id="pf-form-margin"
+                        id="pf-form-margin-pmt"
                         value={formPfMargin}
                         onChange={(e) => setFormPfMargin(normalizeNumberInput(e.target.value))}
                         className="w-full border bg-amber-50 border-amber-300 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-blue-200"
