@@ -46,6 +46,54 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
   const [formPfSalaryBrackets, setFormPfSalaryBrackets] = useState<any[]>([]);
   const [pfError, setPfError] = useState('');
 
+  const [showCopySection, setShowCopySection] = useState(false);
+  const [selectedSourceRuleId, setSelectedSourceRuleId] = useState<string>('');
+  const [requireConfirm, setRequireConfirm] = useState(false);
+
+  const sourceRules = personalRules.filter(r => 
+    r.bankId === formPfBankId && 
+    r.id !== editingPfRule?.id && 
+    r.salaryBrackets && 
+    r.salaryBrackets.length > 0
+  );
+
+  const handleCopyClick = () => {
+    if (!selectedSourceRuleId) return;
+    if (formPfSalaryBrackets.length > 0) {
+      setRequireConfirm(true);
+    } else {
+      handleExecCopy();
+    }
+  };
+
+  const handleExecCopy = () => {
+    const srcRule = sourceRules.find(r => 
+      r.id === selectedSourceRuleId || 
+      `rule-${r.bankId}-${r.pathType}-${r.customerStatus}` === selectedSourceRuleId
+    );
+    if (!srcRule) return;
+
+    if (srcRule.rateApplicationType) {
+      setFormPfRateAppType(srcRule.rateApplicationType);
+    }
+    if (srcRule.calculationMethod) {
+      setFormPfCalcMethod(srcRule.calculationMethod);
+    }
+    
+    const bEdits = (srcRule.salaryBrackets || []).map(b => ({
+      fromSalary: String(b.fromSalary),
+      toSalary: b.toSalary !== null && b.toSalary !== undefined ? String(b.toSalary) : '',
+      annualMargin: String(b.annualMargin),
+      dsrPercentage: String(b.dsrPercentage),
+      termMonths: String(b.termMonths)
+    }));
+    
+    setFormPfSalaryBrackets(bEdits);
+    setShowCopySection(false);
+    setRequireConfirm(false);
+    showToast('تم نسخ جدول الشرائح بنجاح. يرجى الضغط على حفظ لتأكيد التغييرات.', 'success');
+  };
+
   const addBracket = () => {
     setFormPfSalaryBrackets(prev => [
       ...prev,
@@ -108,6 +156,9 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
     setFormPfRateAppType('fixed');
     setFormPfSalaryBrackets([]);
     setPfError('');
+    setShowCopySection(false);
+    setSelectedSourceRuleId('');
+    setRequireConfirm(false);
     setIsPfModalOpen(true);
   };
 
@@ -134,6 +185,9 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
     }));
     setFormPfSalaryBrackets(bEdits);
     setPfError('');
+    setShowCopySection(false);
+    setSelectedSourceRuleId('');
+    setRequireConfirm(false);
     setIsPfModalOpen(true);
   };
 
@@ -830,16 +884,112 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
 
                       {/* Brackets table section */}
                       <div className="col-span-1 md:col-span-2 border-t border-dashed pt-4 mt-2 space-y-3">
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                           <span className="text-xs font-extrabold text-blue-900">جدول شرائح الرواتب:</span>
-                          <button
-                            type="button"
-                            onClick={addBracket}
-                            className="bg-[#0057B8] hover:bg-blue-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1 cursor-pointer"
-                          >
-                            <span>+ إضافة شريحة</span>
-                          </button>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={addBracket}
+                              className="bg-[#0057B8] hover:bg-blue-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1 cursor-pointer"
+                            >
+                              <span>+ إضافة شريحة</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowCopySection(prev => !prev);
+                                setRequireConfirm(false);
+                              }}
+                              className="bg-amber-600 hover:bg-amber-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1 cursor-pointer"
+                            >
+                              <span>📋 نسخ من قاعدة أخرى</span>
+                            </button>
+                          </div>
                         </div>
+
+                        {showCopySection && (
+                          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-right space-y-3">
+                            <div className="text-xs font-extrabold text-slate-800 flex items-center gap-1.5">
+                              <span>📋 نسخ جدول الشرائح من قاعدة أخرى لنفس البنك:</span>
+                            </div>
+                            
+                            {sourceRules.length === 0 ? (
+                              <div className="text-xs text-amber-700 font-bold bg-amber-50 p-2.5 rounded-xl border border-amber-100">
+                                ⚠️ لا توجد قواعد أخرى لهذا البنك تحتوي على جدول شرائح قابل للنسخ.
+                              </div>
+                            ) : (
+                              <div className="space-y-3">
+                                <div className="space-y-1">
+                                  <label className="block text-[11px] font-bold text-gray-600 flex justify-between">
+                                    <span>اختر القاعدة المصدر:</span>
+                                    <span className="text-gray-400 font-normal">عرض قواعد نفس البنك فقط</span>
+                                  </label>
+                                  <select
+                                    value={selectedSourceRuleId}
+                                    onChange={(e) => {
+                                      setSelectedSourceRuleId(e.target.value);
+                                      setRequireConfirm(false);
+                                    }}
+                                    className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                  >
+                                    <option value="">-- اختر قاعدة --</option>
+                                    {sourceRules.map(sr => {
+                                      const bk = banks?.find(b => b.id === sr.bankId);
+                                      const nameOfBank = sr.bankId === 'all' ? '💼 الافتراضي العام (Default)' : bk?.nameAr || sr.bankId;
+                                      const pathLabel = sr.pathType === 'real_estate_with_new_personal' ? 'عقاري + شخصي جديد' : 'تمويل شخصي فقط';
+                                      const statusLabel = sr.customerStatus === 'retired' ? 'متقاعد' : 'موظف نشط';
+                                      const appTypeLabel = sr.rateApplicationType === 'bracket' ? 'شرائح حسب الراتب' : 'نسبة واحدة ثابتة';
+                                      
+                                      const label = `${nameOfBank} - ${pathLabel} - ${statusLabel} - ${appTypeLabel}`;
+                                      const ruleKey = sr.id || `rule-${sr.bankId}-${sr.pathType}-${sr.customerStatus}`;
+                                      return (
+                                        <option key={ruleKey} value={ruleKey}>
+                                          {label}
+                                        </option>
+                                      );
+                                    })}
+                                  </select>
+                                </div>
+
+                                {selectedSourceRuleId && (
+                                  <div className="flex flex-col gap-2 pt-1 border-t border-dashed border-gray-200">
+                                    {requireConfirm ? (
+                                      <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl space-y-2">
+                                        <p className="text-xs font-semibold text-amber-800">
+                                          ⚠️ سيتم استبدال جدول الشرائح الحالي بالجدول المنسوخ بالكامل. هل تريد المتابعة؟
+                                        </p>
+                                        <div className="flex gap-2">
+                                          <button
+                                            type="button"
+                                            onClick={handleExecCopy}
+                                            className="bg-amber-600 hover:bg-amber-700 text-white px-3 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
+                                          >
+                                            نعم، استبدل الشرائح
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => setRequireConfirm(false)}
+                                            className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
+                                          >
+                                            إلغاء
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={handleCopyClick}
+                                        className="w-fit bg-[#0057B8] hover:bg-blue-700 text-white px-4 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer self-start"
+                                      >
+                                        تحميل ونسخ الجدول
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
 
                         {formPfSalaryBrackets.length === 0 ? (
                           <div className="text-center py-8 border-2 border-dashed border-gray-200 bg-gray-50/50 rounded-2xl text-xs text-gray-400 font-semibold">
