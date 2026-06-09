@@ -46,6 +46,15 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
   const [cloneToBank, setCloneToBank] = useState('rajhi');
   const [showGeneralLogs, setShowGeneralLogs] = useState(false);
 
+  // Copy Margins Modal States
+  const [showCopyModal, setShowCopyModal] = useState(false);
+  const [copySrcBank, setCopySrcBank] = useState<string>(banks[0]?.id || 'alahli');
+  const [copySrcProduct, setCopySrcProduct] = useState<ProductId>('real_estate_only');
+  const [copySrcSupport, setCopySrcSupport] = useState<SupportType>('none');
+  const [copyDstBank, setCopyDstBank] = useState<string>(banks[1]?.id || 'rajhi');
+  const [copyDstProduct, setCopyDstProduct] = useState<ProductId>('real_estate_only');
+  const [copyDstSupport, setCopyDstSupport] = useState<SupportType>('none');
+
   // Auto handle support and salary tier dependencies
   useEffect(() => {
     if (selectedSupport === 'none') {
@@ -327,6 +336,100 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
         showToast('حدث خطأ أثناء عملية الاستنساخ.', 'refuse');
       }
     }
+  };
+
+  const handleCopyMargins = (
+    srcBank: string,
+    srcProduct: ProductId,
+    srcSupport: SupportType,
+    dstBank: string,
+    dstProduct: ProductId,
+    dstSupport: SupportType
+  ) => {
+    if (srcBank === dstBank && srcProduct === dstProduct && srcSupport === dstSupport) {
+      showToast('لا يمكن النسخ لقارنة مطابقة تماماً للمصدر.', 'refuse');
+      return;
+    }
+
+    // 1. Resolve source parameters
+    const normSrcSupport = (srcSupport as string) === 'down_payment' || srcSupport === 'downpayment' ? 'downpayment' : srcSupport;
+    const srcProductIds = [srcProduct];
+    if (srcProduct === 'real_estate_with_new_personal') {
+      srcProductIds.push('real_estate' as any, 'both' as any);
+    } else if (srcProduct === 'real_estate_with_existing_personal') {
+      srcProductIds.push('real_estate_with_personal_existing' as any);
+    } else if (srcProduct === 'real_estate_only') {
+      srcProductIds.push('real_estate' as any);
+    }
+
+    // Find all source margin rules for base margins
+    const sourceRules = marginRules.filter(r => 
+      r.bankId === srcBank &&
+      (r.productId === srcProduct || r.productType === srcProduct || srcProductIds.includes(r.productId)) &&
+      (r.supportType === normSrcSupport || r.supportType === 'all') &&
+      !r.isExceptionOnly
+    );
+
+    if (sourceRules.length === 0) {
+      showToast('لا توجد هوامش تمويل في البنك والمصدر المحددين لنسخها.', 'refuse');
+      return;
+    }
+
+    // 2. Resolve target parameters
+    const normDstSupport = (dstSupport as string) === 'down_payment' || dstSupport === 'downpayment' ? 'downpayment' : dstSupport;
+    const dstProductIds = [dstProduct];
+    if (dstProduct === 'real_estate_with_new_personal') {
+      dstProductIds.push('real_estate' as any, 'both' as any);
+    } else if (dstProduct === 'real_estate_with_existing_personal') {
+      dstProductIds.push('real_estate_with_personal_existing' as any);
+    } else if (dstProduct === 'real_estate_only') {
+      dstProductIds.push('real_estate' as any);
+    }
+
+    // Filter out any existing base rules on the target combination
+    const remainingRules = marginRules.filter(r => {
+      const isTargetBaseRule = 
+        r.bankId === dstBank &&
+        (r.productId === dstProduct || r.productType === dstProduct || dstProductIds.includes(r.productId)) &&
+        (r.supportType === normDstSupport || r.supportType === 'all') &&
+        !r.isExceptionOnly;
+      return !isTargetBaseRule;
+    });
+
+    // Construct copied rules
+    const copiedRulesAndNew: MarginRule[] = [];
+
+    sourceRules.forEach((rule, idx) => {
+      // Determine the target salary tiers
+      let targetTiers: Array<'not_applicable' | 'below_25000' | 'above_or_equal_25000'> = [];
+      if (normDstSupport === 'none') {
+        targetTiers = ['not_applicable'];
+      } else {
+        if (rule.salaryTier === 'not_applicable' || !rule.salaryTier) {
+          targetTiers = ['below_25000', 'above_or_equal_25000'];
+        } else {
+          targetTiers = [rule.salaryTier as any];
+        }
+      }
+
+      dstProductIds.forEach(pId => {
+        targetTiers.forEach(tier => {
+          copiedRulesAndNew.push({
+            ...rule,
+            id: `copied_margin_${dstBank}_${pId}_${normDstSupport}_${tier}_t${rule.fromTermMonths}_${rule.toTermMonths}_${idx}_${Date.now()}`,
+            bankId: dstBank,
+            productId: pId as ProductId,
+            productType: dstProduct as any,
+            supportType: normDstSupport as any,
+            salaryTier: tier,
+            exceptionBps: rule.exceptionBps ?? 0
+          });
+        });
+      });
+    });
+
+    setMarginRules([...remainingRules, ...copiedRulesAndNew]);
+    showToast('تم نسخ هوامش التمويل الأساسية وتطبيقها محلياً بنجاح! يرجى الضغط على حفظ وتطبيق الإعدادات بمجرد الانتهاء لتثبيتها.', 'success');
   };
 
   // Compile combined flat row configs for general log reviewing
@@ -731,7 +834,14 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       </div>
 
       {/* 6. Unified Save Button */}
-      <div className="flex justify-end pt-2">
+      <div className="flex flex-col sm:flex-row justify-end items-center gap-3 pt-2 font-sans">
+        <button
+          type="button"
+          onClick={() => setShowCopyModal(true)}
+          className="w-full sm:w-auto px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 hover:scale-[1.01] border border-slate-200"
+        >
+          <span>📋 نسخ الهوامش من بنك آخر</span>
+        </button>
         <button
           type="button"
           onClick={handleSaveConfig}
@@ -740,6 +850,140 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
           <span>💾 حفظ وتطبيق الإعدادات</span>
         </button>
       </div>
+
+      {/* Copy Margins Modal */}
+      {showCopyModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4 font-sans animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-gray-150 space-y-6 text-right relative">
+            <h3 className="text-sm font-extrabold text-gray-900 border-b border-gray-100 pb-3">
+              📋 نسخ وثائق هوامش أرباح التمويل الأساسية
+            </h3>
+            
+            <div className="space-y-4">
+              {/* المصدر */}
+              <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 space-y-3">
+                <span className="block text-xs font-extrabold text-[#0057B8]">👈 المصدر (الذي يُنسخ منه):</span>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-bold text-gray-650">البنك:</label>
+                    <select
+                      value={copySrcBank}
+                      onChange={(e) => setCopySrcBank(e.target.value)}
+                      className="w-full bg-white border border-gray-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-gray-800 outline-none focus:ring-1 focus:ring-[#0057B8]"
+                    >
+                      {banks.map(b => (
+                        <option key={b.id} value={b.id}>{b.nameAr}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-bold text-gray-650">المنتج:</label>
+                    <select
+                      value={copySrcProduct}
+                      onChange={(e) => setCopySrcProduct(e.target.value as ProductId)}
+                      className="w-full bg-white border border-gray-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-gray-800 outline-none focus:ring-1 focus:ring-[#0057B8]"
+                    >
+                      {productTypesList.map(p => (
+                        <option key={p.id} value={p.id}>{p.nameAr}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-bold text-gray-650">نوع الدعم:</label>
+                    <select
+                      value={copySrcSupport}
+                      onChange={(e) => setCopySrcSupport(e.target.value as SupportType)}
+                      className="w-full bg-white border border-gray-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-gray-800 outline-none focus:ring-1 focus:ring-[#0057B8]"
+                    >
+                      <option value="none">غير مدعوم</option>
+                      <option value="monthly">دعم شهري</option>
+                      <option value="downpayment">دعم دفعة</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* الهدف */}
+              <div className="bg-emerald-50/30 p-4 rounded-xl border border-emerald-100 space-y-3">
+                <span className="block text-xs font-extrabold text-emerald-700">👉 الهدف (الذي يتم النسخ والتبديل فيه):</span>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-bold text-gray-650">البنك:</label>
+                    <select
+                      value={copyDstBank}
+                      onChange={(e) => setCopyDstBank(e.target.value)}
+                      className="w-full bg-white border border-gray-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-gray-800 outline-none focus:ring-1 focus:ring-emerald-600"
+                    >
+                      {banks.map(b => (
+                        <option key={b.id} value={b.id}>{b.nameAr}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-bold text-gray-650">المنتج:</label>
+                    <select
+                      value={copyDstProduct}
+                      onChange={(e) => setCopyDstProduct(e.target.value as ProductId)}
+                      className="w-full bg-white border border-gray-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-gray-800 outline-none focus:ring-1 focus:ring-emerald-600"
+                    >
+                      {productTypesList.map(p => (
+                        <option key={p.id} value={p.id}>{p.nameAr}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-bold text-gray-650">نوع الدعم:</label>
+                    <select
+                      value={copyDstSupport}
+                      onChange={(e) => setCopyDstSupport(e.target.value as SupportType)}
+                      className="w-full bg-white border border-gray-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-gray-800 outline-none focus:ring-1 focus:ring-emerald-600"
+                    >
+                      <option value="none">غير مدعوم</option>
+                      <option value="monthly">دعم شهري</option>
+                      <option value="downpayment">دعم دفعة</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <p className="text-[10px] text-gray-500 leading-relaxed font-bold bg-amber-50 text-amber-700 p-3 rounded-xl border border-amber-100">
+              * تنبيه: عملية النسخ تطبق فقط على جدول هوامش التمويل الأساسية (سنوات التمويل والنسب %)، ولن تؤثر على استثناءات القطاعات، DSR، أو أي إعدادات أخرى. التعديلات تكون محلية مؤقتة ويتم تثبيتها فقط عند نقر "حفظ وتطبيق الإعدادات".
+            </p>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setShowCopyModal(false)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer"
+              >
+                إلغاء
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  handleCopyMargins(
+                    copySrcBank,
+                    copySrcProduct,
+                    copySrcSupport,
+                    copyDstBank,
+                    copyDstProduct,
+                    copyDstSupport
+                  );
+                  setShowCopyModal(false);
+                }}
+                className="px-5 py-2 bg-[#0057B8] hover:bg-[#004bb0] text-white rounded-xl text-xs font-extrabold cursor-pointer"
+              >
+                نسخ وتطبيق
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 7. Collapsible General Review Log List */}
       <div className="bg-white rounded-2xl border border-gray-150 shadow-sm overflow-hidden text-right font-sans">
