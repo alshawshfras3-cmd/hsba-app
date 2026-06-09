@@ -36,10 +36,39 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const getCachedProfile = (): UserProfile | null => {
+    try {
+      const cached = sessionStorage.getItem('hesba_cached_profile');
+      if (cached) return JSON.parse(cached);
+    } catch (e) {
+      console.error(e);
+    }
+    return null;
+  };
+
+  const getCachedUser = (): User | null => {
+    try {
+      const cached = sessionStorage.getItem('hesba_cached_user');
+      if (cached) return JSON.parse(cached);
+    } catch (e) {
+      console.error(e);
+    }
+    return null;
+  };
+
+  const isCheckedInSession = () => {
+    try {
+      return sessionStorage.getItem('hesba_permissions_checked') === 'true' ||
+             sessionStorage.getItem('hesba_calculator_permissions') === 'true';
+    } catch {
+      return false;
+    }
+  };
+
+  const [user, setUser] = useState<User | null>(() => getCachedUser());
   const [session, setSession] = useState<Session | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<UserProfile | null>(() => getCachedProfile());
+  const [loading, setLoading] = useState(() => !isCheckedInSession());
   const [isSuspendedUser, setIsSuspendedUser] = useState(false);
 
   async function fetchProfile(userId: string, email?: string, userMetadata?: any) {
@@ -125,14 +154,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Block suspended/blocked users (except the protected super admin)
         if (profileData.is_blocked === true && !isOwnerEmail) {
           setIsSuspendedUser(true);
-          setProfile({
+          const profObj: UserProfile = {
             id: profileData.id,
             email: lowercaseEmail,
             full_name: profileData.full_name || profileData.username || null,
             avatar_url: null,
             role: 'user',
             is_blocked: true
-          });
+          };
+          setProfile(profObj);
+          try {
+            sessionStorage.setItem('hesba_cached_profile', JSON.stringify(profObj));
+            sessionStorage.setItem('hesba_permissions_checked', 'true');
+            sessionStorage.setItem('hesba_calculator_permissions', 'true');
+          } catch (e) {
+            console.error(e);
+          }
           setLoading(false);
           return;
         } else {
@@ -141,14 +178,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         const targetRole = isOwnerEmail ? 'admin' : 'user';
         
-        setProfile({
+        const profObj: UserProfile = {
           id: profileData.id,
           email: lowercaseEmail,
           full_name: profileData.full_name || profileData.username || null,
           avatar_url: null,
           role: targetRole as UserRole,
           is_blocked: profileData.is_blocked === true
-        });
+        };
+        setProfile(profObj);
+        try {
+          sessionStorage.setItem('hesba_cached_profile', JSON.stringify(profObj));
+          sessionStorage.setItem('hesba_permissions_checked', 'true');
+          sessionStorage.setItem('hesba_calculator_permissions', 'true');
+        } catch (e) {
+          console.error(e);
+        }
       } else {
         throw new Error("Profile not found in either app_users or user_profiles");
       }
@@ -159,27 +204,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       setIsSuspendedUser(false);
 
-      setProfile({
+      const profObj: UserProfile = {
         id: userId,
         email: email || '',
         full_name: userMetadata?.full_name || userMetadata?.username || null,
         avatar_url: userMetadata?.avatar_url || null,
         role: isOwnerEmail ? 'admin' : 'user',
         is_blocked: false
-      });
+      };
+      setProfile(profObj);
+      try {
+        sessionStorage.setItem('hesba_cached_profile', JSON.stringify(profObj));
+        sessionStorage.setItem('hesba_permissions_checked', 'true');
+        sessionStorage.setItem('hesba_calculator_permissions', 'true');
+      } catch (e) {
+        console.error(e);
+      }
     }
   }
 
   useEffect(() => {
     let active = true;
 
-    // Safety timeout: If loading takes more than 1 second due to any network issues, force-disable it (render with defaults)
+    // Safety timeout: If loading takes more than 2 seconds due to network, force-disable it to show UI with defaults immediately
     const safetyTimer = setTimeout(() => {
       if (active) {
-        console.warn("Auth initialization safety timer triggered (1 second). Forcing loading=false to display UI immediately");
+        console.warn("Auth initialization safety timer triggered (2 seconds). Forcing loading=false to display UI immediately with default permissions");
         setLoading(false);
       }
-    }, 1000);
+    }, 2000);
 
     if (!hasSupabaseKeys) {
       setLoading(false);
@@ -207,7 +260,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(session ?? null);
         setUser(session?.user ?? null);
         if (session?.user) {
+          try {
+            sessionStorage.setItem('hesba_cached_user', JSON.stringify(session.user));
+          } catch (e) {
+            console.error(e);
+          }
           await fetchProfile(session.user.id, session.user.email, session.user.user_metadata);
+        }
+        try {
+          sessionStorage.setItem('hesba_permissions_checked', 'true');
+          sessionStorage.setItem('hesba_calculator_permissions', 'true');
+        } catch (e) {
+          console.error(e);
         }
         if (active) setLoading(false);
       })
@@ -221,6 +285,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setUser(null);
             setProfile(null);
           }
+          try {
+            sessionStorage.removeItem('hesba_cached_user');
+            sessionStorage.removeItem('hesba_cached_profile');
+            sessionStorage.removeItem('hesba_permissions_checked');
+            sessionStorage.removeItem('hesba_calculator_permissions');
+          } catch (e) {
+            console.error(e);
+          }
         }
         if (active) setLoading(false);
       });
@@ -230,11 +302,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!active) return;
         setSession(session);
         setUser(session?.user ?? null);
-        setLoading(true); // Loading starts when auth states change
+
+        const hasChecked = sessionStorage.getItem('hesba_permissions_checked') === 'true' ||
+                           sessionStorage.getItem('hesba_calculator_permissions') === 'true';
+
+        // Only show full loading if we haven't checked once in this session
+        if (!hasChecked) {
+          setLoading(true);
+        }
+
         if (session?.user) {
+          try {
+            sessionStorage.setItem('hesba_cached_user', JSON.stringify(session.user));
+          } catch (e) {
+            console.error(e);
+          }
           await fetchProfile(session.user.id, session.user.email, session.user.user_metadata);
         } else {
           setProfile(null);
+          try {
+            sessionStorage.removeItem('hesba_cached_user');
+            sessionStorage.removeItem('hesba_cached_profile');
+            sessionStorage.removeItem('hesba_permissions_checked');
+            sessionStorage.removeItem('hesba_calculator_permissions');
+          } catch (e) {
+            console.error(e);
+          }
         }
         if (active) setLoading(false);
       }
@@ -437,6 +530,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setProfile(null);
     setSession(null);
     setIsSuspendedUser(false);
+    try {
+      sessionStorage.removeItem('hesba_cached_user');
+      sessionStorage.removeItem('hesba_cached_profile');
+      sessionStorage.removeItem('hesba_permissions_checked');
+      sessionStorage.removeItem('hesba_calculator_permissions');
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   return (

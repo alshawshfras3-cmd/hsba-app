@@ -117,7 +117,25 @@ function AppContent() {
   const { user, loading } = useAuth();
   const location = useLocation();
 
-  if (loading) {
+  const hasDraft = React.useMemo(() => {
+    try {
+      const draft = localStorage.getItem('hesba_calculator_draft');
+      return !!draft;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const hasChecked = React.useMemo(() => {
+    try {
+      return sessionStorage.getItem('hesba_permissions_checked') === 'true' ||
+             sessionStorage.getItem('hesba_calculator_permissions') === 'true';
+    } catch {
+      return false;
+    }
+  }, []);
+
+  if (loading && !hasDraft && !hasChecked) {
     return (
       <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] flex flex-col items-center justify-center space-y-4 transition-colors duration-200" dir="rtl">
         <Loader2 className="w-10 h-10 animate-spin text-[#0057B8] dark:text-[#0EA5A4]" />

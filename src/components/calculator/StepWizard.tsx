@@ -229,6 +229,9 @@ export default function StepWizard() {
           if (parsed.currentStep !== undefined) {
             setCurrentStep(parsed.currentStep);
           }
+          if (parsed.results !== undefined && parsed.results !== null) {
+            setResults(parsed.results);
+          }
         }
       }
     } catch (e) {
@@ -272,7 +275,8 @@ export default function StepWizard() {
       isEtizazEligible,
       existingMonthlyObligations,
       obligationRemainingMonths,
-      currentStep
+      currentStep,
+      results
     };
     try {
       localStorage.setItem('hesba_calculator_draft', JSON.stringify(draft));
@@ -313,7 +317,8 @@ export default function StepWizard() {
     isEtizazEligible,
     existingMonthlyObligations,
     obligationRemainingMonths,
-    currentStep
+    currentStep,
+    results
   ]);
 
   const clearAndResetCalculator = () => {

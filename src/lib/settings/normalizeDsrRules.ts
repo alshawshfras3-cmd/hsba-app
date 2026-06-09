@@ -9,10 +9,14 @@ export function normalizeDsrRules(rules: DsrRule[]): DsrRule[] {
         ? 'personal_only'
         : 'real_estate_only';
 
-    const normalizedSupportType =
+    let normalizedSupportType =
       (rule.supportType as string) === 'downpayment'
         ? 'down_payment'
         : rule.supportType;
+
+    if (normalizedProductType === 'personal_only' && (normalizedSupportType === 'none' || !normalizedSupportType)) {
+      normalizedSupportType = 'not_applicable';
+    }
 
     const key = [
       rule.bankId,

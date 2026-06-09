@@ -156,11 +156,20 @@ interface AdminSettings {
 
 function upgradeMarginRules(rules: MarginRule[]): MarginRule[] {
   return (rules || []).map(rule => {
-    const annual = rule.annualMargin ?? 0;
+    const sourceMargin =
+      rule.annualMargin ??
+      rule.endMargin ??
+      rule.baseMargin;
 
     const normalizedBaseMargin =
       rule.baseMargin ??
-      (annual > 1 ? annual / 100 : annual);
+      (
+        sourceMargin === undefined
+          ? undefined
+          : sourceMargin > 1
+            ? sourceMargin / 100
+            : sourceMargin
+      );
 
     return {
       ...rule,
