@@ -167,6 +167,26 @@ export function calculatePersonalFinance(params: {
   let calculationMethod = finalRule.calculationMethod || 'flat_rate';
   let annualMargin = Number(finalRule.annualMargin) || 0;
 
+  const rateAppType = finalRule.rateApplicationType || 'fixed';
+  const brackets = finalRule.salaryBrackets || [];
+
+  if (rateAppType === 'bracket' && brackets.length > 0) {
+    const matchingBracket = brackets.find(b => {
+      const fromSal = Number(b.fromSalary) || 0;
+      const toSal = b.toSalary !== null && b.toSalary !== undefined ? Number(b.toSalary) : null;
+      if (toSal !== null) {
+        return safeSalary >= fromSal && safeSalary <= toSal;
+      }
+      return safeSalary >= fromSal;
+    });
+
+    if (matchingBracket) {
+      dsrPercent = Number(matchingBracket.dsrPercentage) || 0;
+      ruleTermMonths = Number(matchingBracket.termMonths) || 0;
+      annualMargin = Number(matchingBracket.annualMargin) || 0;
+    }
+  }
+
   // Only apply strict hardcoded defaults if it is a fallback rule from the calculator
   if (source === 'fallback' && finalRule.bankId === 'alahli') {
     annualMargin = 5.00;

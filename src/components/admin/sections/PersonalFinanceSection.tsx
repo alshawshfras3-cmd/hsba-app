@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Trash2, Coins } from 'lucide-react';
-import { Bank, PersonalFinanceRules } from '../../../types';
+import { Bank, PersonalFinanceRules, SalaryBracket } from '../../../types';
 import { normalizeNumberInput, parseNumberInput } from '../../../lib/number-input';
 
 interface PersonalFinanceSectionProps {
@@ -29,6 +29,7 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
   const [filterPfBank, setFilterPfBank] = useState<string>('rajhi');
   const [isPfModalOpen, setIsPfModalOpen] = useState(false);
   const [editingPfRule, setEditingPfRule] = useState<PersonalFinanceRules | null>(null);
+  const [expandedBrackets, setExpandedBrackets] = useState<Record<string, boolean>>({});
 
   const [formPfBankId, setFormPfBankId] = useState('all');
   const [formPfPathType, setFormPfPathType] = useState<'personal_only' | 'real_estate_with_new_personal'>('personal_only');
@@ -41,7 +42,33 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
   const [formPfMaxSalary, setFormPfMaxSalary] = useState('');
   const [formPfCalcMethod, setFormPfCalcMethod] = useState<'multiplier' | 'pmt' | 'flat_rate'>('flat_rate');
   const [formPfActive, setFormPfActive] = useState(true);
+  const [formPfRateAppType, setFormPfRateAppType] = useState<'fixed' | 'bracket'>('fixed');
+  const [formPfSalaryBrackets, setFormPfSalaryBrackets] = useState<any[]>([]);
   const [pfError, setPfError] = useState('');
+
+  const addBracket = () => {
+    setFormPfSalaryBrackets(prev => [
+      ...prev,
+      {
+        fromSalary: prev.length > 0 ? String(parseFloat(parseArabicAndEnglishNumber(prev[prev.length - 1].toSalary)) || 0) : '0',
+        toSalary: '',
+        annualMargin: '4.59',
+        dsrPercentage: '33.33',
+        termMonths: '60'
+      }
+    ]);
+  };
+
+  const removeBracket = (index: number) => {
+    setFormPfSalaryBrackets(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updateBracketField = (index: number, key: string, value: string) => {
+    setFormPfSalaryBrackets(prev => prev.map((b, i) => {
+      if (i !== index) return b;
+      return { ...b, [key]: value };
+    }));
+  };
 
   const formBanksList = banks.map(b => ({ id: b.id, nameAr: b.nameAr }));
 
@@ -78,6 +105,8 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
     setFormPfMaxSalary('');
     setFormPfCalcMethod('flat_rate');
     setFormPfActive(true);
+    setFormPfRateAppType('fixed');
+    setFormPfSalaryBrackets([]);
     setPfError('');
     setIsPfModalOpen(true);
   };
@@ -95,11 +124,22 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
     setFormPfMaxSalary(rule.maxSalary !== undefined ? String(rule.maxSalary) : '');
     setFormPfCalcMethod(rule.calculationMethod || 'multiplier');
     setFormPfActive(rule.isActive !== false);
+    setFormPfRateAppType(rule.rateApplicationType || 'fixed');
+    const bEdits = (rule.salaryBrackets || []).map(b => ({
+      fromSalary: String(b.fromSalary),
+      toSalary: b.toSalary !== null && b.toSalary !== undefined ? String(b.toSalary) : '',
+      annualMargin: String(b.annualMargin),
+      dsrPercentage: String(b.dsrPercentage),
+      termMonths: String(b.termMonths)
+    }));
+    setFormPfSalaryBrackets(bEdits);
     setPfError('');
     setIsPfModalOpen(true);
   };
 
   const savePfRule = () => {
+    const isBracket = formPfRateAppType === 'bracket';
+
     const cleanDsrStr = normalizeNumberInput(parseArabicAndEnglishNumber(formPfDsr));
     const cleanTermStr = normalizeNumberInput(parseArabicAndEnglishNumber(formPfTerm));
     const cleanSalaryStr = normalizeNumberInput(parseArabicAndEnglishNumber(formPfMinSalary));
@@ -108,19 +148,48 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
     const cleanCoeffStr = normalizeNumberInput(parseArabicAndEnglishNumber(formPfCoeff)) || '0';
     const cleanMarginStr = normalizeNumberInput(parseArabicAndEnglishNumber(formPfMargin)) || '4.80';
 
-    if (!cleanDsrStr || !cleanTermStr || !cleanSalaryStr || (formPfCalcMethod === 'multiplier' && !cleanCoeffStr) || ((formPfCalcMethod === 'flat_rate' || formPfCalcMethod === 'pmt') && !cleanMarginStr)) {
+    if (!isBracket && (!cleanDsrStr || !cleanTermStr || !cleanSalaryStr || (formPfCalcMethod === 'multiplier' && !cleanCoeffStr) || ((formPfCalcMethod === 'flat_rate' || formPfCalcMethod === 'pmt') && !cleanMarginStr))) {
       setPfError('جميع الحقول المطلوبة لطريقة الحساب المحددة يجب ملؤها.');
       return;
     }
 
-    const dsrNum = Number(cleanDsrStr);
-    const termNum = Number(cleanTermStr);
+    if (isBracket && formPfSalaryBrackets.length === 0) {
+      setPfError('يجب إضافة شريحة واحدة على الأقل عند اختيار نظام شرائح الرواتب.');
+      return;
+    }
+
+    let finalBrackets: SalaryBracket[] = [];
+    if (isBracket) {
+      for (const b of formPfSalaryBrackets) {
+        const parsedFrom = parseFloat(parseArabicAndEnglishNumber(b.fromSalary));
+        const parsedTo = b.toSalary !== null && String(b.toSalary).trim() !== '' ? parseFloat(parseArabicAndEnglishNumber(b.toSalary)) : null;
+        const parsedMargin = parseFloat(parseArabicAndEnglishNumber(b.annualMargin));
+        const parsedDsr = parseFloat(parseArabicAndEnglishNumber(b.dsrPercentage));
+        const parsedTerm = parseFloat(parseArabicAndEnglishNumber(b.termMonths));
+
+        if (isNaN(parsedFrom) || (parsedTo !== null && isNaN(parsedTo)) || isNaN(parsedMargin) || isNaN(parsedDsr) || isNaN(parsedTerm)) {
+          setPfError('الرجاء التأكد من صحة الحقول الرقمية في جميع الشرائح.');
+          return;
+        }
+
+        finalBrackets.push({
+          fromSalary: parsedFrom,
+          toSalary: parsedTo,
+          annualMargin: parsedMargin,
+          dsrPercentage: parsedDsr,
+          termMonths: parsedTerm
+        });
+      }
+    }
+
+    const dsrNum = isBracket ? (finalBrackets[0]?.dsrPercentage ?? 33.33) : Number(cleanDsrStr);
+    const termNum = isBracket ? (finalBrackets[0]?.termMonths ?? 60) : Number(cleanTermStr);
     const coeffNum = Number(cleanCoeffStr);
-    const marginNum = Number(cleanMarginStr);
+    const marginNum = isBracket ? (finalBrackets[0]?.annualMargin ?? 4.59) : Number(cleanMarginStr);
     const salaryNum = Number(cleanSalaryStr);
     const maxSalaryNum = cleanMaxSalaryStr ? Number(cleanMaxSalaryStr) : undefined;
 
-    if (isNaN(dsrNum) || isNaN(termNum) || isNaN(coeffNum) || isNaN(marginNum) || isNaN(salaryNum) || (maxSalaryNum !== undefined && isNaN(maxSalaryNum))) {
+    if ((!isBracket && (isNaN(dsrNum) || isNaN(termNum) || isNaN(marginNum))) || isNaN(coeffNum) || isNaN(salaryNum) || (maxSalaryNum !== undefined && isNaN(maxSalaryNum))) {
       setPfError('الرجاء التأكد من إدخال قيم رقمية صحيحة.');
       return;
     }
@@ -141,7 +210,9 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
       isActive: formPfActive,
       calculationMethod: formPfCalcMethod,
       pathType: formPfPathType,
-      customerStatus: formPfCustomerStatus
+      customerStatus: formPfCustomerStatus,
+      rateApplicationType: formPfRateAppType,
+      salaryBrackets: finalBrackets
     };
 
     if (editingPfRule) {
@@ -339,75 +410,132 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
                     displayMargin = 5;
                   }
 
+                  const isBracketRule = rule.rateApplicationType === 'bracket';
+                  const bracketCount = rule.salaryBrackets?.length || 0;
+
                   return (
-                    <tr key={ruleId} className="hover:bg-slate-50 transition-colors">
-                      <td className="p-4 text-xs font-bold text-slate-800">{bankName}</td>
-                      <td className="p-4">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${rule.pathType === 'real_estate_with_new_personal' ? 'bg-[#0E9A9B]/10 text-[#0EA5A4]' : 'bg-blue-50 text-blue-700'}`}>
-                          {pathLabel}
-                        </span>
-                      </td>
-                      <td className="p-4 text-xs">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] ${rule.customerStatus === 'retired' ? 'bg-amber-50 text-amber-700 font-bold' : 'bg-gray-100 text-gray-700'}`}>
-                          {statusLabel}
-                        </span>
-                      </td>
-                      <td className="p-4 text-center text-xs">
-                        <span className="px-2 py-1 bg-slate-100 rounded-md text-slate-700">
-                          {rule.calculationMethod === 'pmt' ? 'معادلة القسط PMT' : rule.calculationMethod === 'multiplier' ? 'معامل تمويل يدوي' : 'نسبة ربح مع معامل فعلي'}
-                        </span>
-                      </td>
-                      <td className="p-4 text-center font-sans">{displayDsr}%</td>
-                      <td className="p-4 text-center font-sans">{displayTerm} شهراً</td>
-                      <td className="p-4 text-center font-sans">
-                        {rule.calculationMethod === 'flat_rate' ? (
-                          <span className="text-[#0057B8] font-bold">
-                            هامش {displayMargin}% | معامل فعلي { (1 + ((displayMargin / 100) * (displayTerm / 12))) > 0 ? (displayTerm / (1 + ((displayMargin / 100) * (displayTerm / 12)))).toFixed(2) : '0' }
+                    <React.Fragment key={ruleId}>
+                      <tr className="hover:bg-slate-50 transition-colors">
+                        <td className="p-4 text-xs font-bold text-slate-800">{bankName}</td>
+                        <td className="p-4">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${rule.pathType === 'real_estate_with_new_personal' ? 'bg-[#0E9A9B]/10 text-[#0EA5A4]' : 'bg-blue-50 text-blue-700'}`}>
+                            {pathLabel}
                           </span>
-                        ) : rule.calculationMethod === 'pmt' ? (
-                          <span className="text-indigo-700 font-bold">APR {displayMargin}%</span>
-                        ) : (
-                          <span className="text-slate-800 font-bold">معامل {rule.financeCoefficient ?? 0}</span>
-                        )}
-                      </td>
-                      <td className="p-4 text-center font-sans">{(rule.minSalary ?? 0).toLocaleString('ar-SA')} ريال</td>
-                      <td className="p-4 text-center font-sans">{rule.maxSalary ? `${rule.maxSalary.toLocaleString('ar-SA')} ريال` : 'غير محدد'}</td>
-                      <td className="p-4 text-center">
-                        <button
-                          onClick={() => setPersonalRules(prev => prev.map(r => r.id === rule.id ? { ...r, isActive: !r.isActive } : r))}
-                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                            rule.isActive ? 'bg-[#0057B8]' : 'bg-slate-200'
-                          }`}
-                        >
-                          <span
-                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
-                              rule.isActive ? '-translate-x-4' : 'translate-x-0'
-                            }`}
-                          />
-                        </button>
-                      </td>
-                      <td className="p-4 text-center font-sans">
-                        <div className="flex items-center justify-center gap-2">
+                        </td>
+                        <td className="p-4 text-xs">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] ${rule.customerStatus === 'retired' ? 'bg-amber-50 text-amber-700 font-bold' : 'bg-gray-100 text-gray-700'}`}>
+                            {statusLabel}
+                          </span>
+                        </td>
+                        <td className="p-4 text-center text-xs">
+                          <span className="px-2 py-1 bg-slate-100 rounded-md text-slate-700">
+                            {rule.calculationMethod === 'pmt' ? 'معادلة القسط PMT' : rule.calculationMethod === 'multiplier' ? 'معامل تمويل يدوي' : 'نسبة ربح مع معامل فعلي'}
+                          </span>
+                        </td>
+                        <td className="p-4 text-center font-sans">
+                          {isBracketRule ? <span className="text-gray-400 text-[11px] font-sans">متغير</span> : `${displayDsr}%`}
+                        </td>
+                        <td className="p-4 text-center font-sans">
+                          {isBracketRule ? <span className="text-gray-400 text-[11px] font-sans">متغير</span> : `${displayTerm} شهراً`}
+                        </td>
+                        <td className="p-4 text-center font-sans">
+                          {isBracketRule ? (
+                            <div className="flex flex-col items-center gap-1">
+                              <span className="text-slate-800 font-bold font-sans">
+                                شرائح رواتب: {bracketCount} شرائح
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setExpandedBrackets(prev => ({ ...prev, [ruleId]: !prev[ruleId] }))}
+                                className="text-[#0057B8] bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer transition-all"
+                              >
+                                {expandedBrackets[ruleId] ? 'إخفاء الشرائح' : 'عرض الشرائح'}
+                              </button>
+                            </div>
+                          ) : rule.calculationMethod === 'flat_rate' ? (
+                            <span className="text-[#0057B8] font-bold">
+                              هامش {displayMargin}% | معامل فعلي { (1 + ((displayMargin / 100) * (displayTerm / 12))) > 0 ? (displayTerm / (1 + ((displayMargin / 100) * (displayTerm / 12)))).toFixed(2) : '0' }
+                            </span>
+                          ) : rule.calculationMethod === 'pmt' ? (
+                            <span className="text-indigo-700 font-bold">APR {displayMargin}%</span>
+                          ) : (
+                            <span className="text-slate-800 font-bold">معامل {rule.financeCoefficient ?? 0}</span>
+                          )}
+                        </td>
+                        <td className="p-4 text-center font-sans">{(rule.minSalary ?? 0).toLocaleString('ar-SA')} ريال</td>
+                        <td className="p-4 text-center font-sans">{rule.maxSalary ? `${rule.maxSalary.toLocaleString('ar-SA')} ريال` : 'غير محدد'}</td>
+                        <td className="p-4 text-center">
                           <button
-                            type="button"
-                            onClick={() => openEditPfModal(rule)}
-                            className="text-[#0057B8] hover:bg-blue-50 px-2 py-1 rounded transition-colors text-xs font-bold cursor-pointer"
+                            onClick={() => setPersonalRules(prev => prev.map(r => r.id === rule.id ? { ...r, isActive: !r.isActive } : r))}
+                            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                              rule.isActive ? 'bg-[#0057B8]' : 'bg-slate-200'
+                            }`}
                           >
-                            تعديل
+                            <span
+                              className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                                rule.isActive ? '-translate-x-4' : 'translate-x-0'
+                              }`}
+                            />
                           </button>
-                          {rule.bankId !== 'all' && (
+                        </td>
+                        <td className="p-4 text-center font-sans">
+                          <div className="flex items-center justify-center gap-2">
                             <button
                               type="button"
-                              onClick={() => rule.id && deletePfRule(rule.id)}
-                              className="text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
-                              title="حذف القاعدة"
+                              onClick={() => openEditPfModal(rule)}
+                              className="text-[#0057B8] hover:bg-blue-50 px-2 py-1 rounded transition-colors text-xs font-bold cursor-pointer"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              تعديل
                             </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
+                            {rule.bankId !== 'all' && (
+                              <button
+                                type="button"
+                                onClick={() => rule.id && deletePfRule(rule.id)}
+                                className="text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                                title="حذف القاعدة"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                      {isBracketRule && expandedBrackets[ruleId] && (
+                        <tr className="bg-blue-50/10">
+                          <td colSpan={11} className="p-4 border-b border-gray-100">
+                            <div className="bg-white rounded-xl border border-blue-100/60 p-4 space-y-2 shadow-xs text-right">
+                              <div className="text-xs font-extrabold text-[#0057B8] flex items-center gap-1.5 mb-2">
+                                <span>📊 تفاصيل شرائح الرواتب لتطبيق النسب لتلك القاعدة:</span>
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                                {(rule.salaryBrackets || []).map((br, bIdx) => {
+                                  const bTerm = parseFloat(parseArabicAndEnglishNumber(br.termMonths)) || 0;
+                                  const bMargin = parseFloat(parseArabicAndEnglishNumber(br.annualMargin)) || 0;
+                                  const bTermYears = bTerm / 12;
+                                  const bProfitFactor = 1 + ((bMargin / 100) * bTermYears);
+                                  const bEffectiveMultiplier = bProfitFactor > 0 ? (bTerm / bProfitFactor).toFixed(2) : '0';
+
+                                  const toSalaryText = br.toSalary !== null && br.toSalary !== undefined && br.toSalary !== '' ? `${Number(parseArabicAndEnglishNumber(br.toSalary)).toLocaleString('ar-SA')} ريال` : 'مفتوح للأعلى';
+
+                                  return (
+                                    <div key={bIdx} className="border border-gray-100 bg-gray-50/50 p-3 rounded-xl space-y-1 text-right text-[11px] leading-relaxed">
+                                      <div className="flex justify-between border-b pb-1 mb-1 font-bold">
+                                        <span className="text-slate-500">الشريحة #{bIdx + 1}</span>
+                                        <span className="text-[#0057B8]">هامش {bMargin}%</span>
+                                      </div>
+                                      <div><strong>الراتب:</strong> من {Number(parseArabicAndEnglishNumber(br.fromSalary) || 0).toLocaleString('ar-SA')} إلى {toSalaryText}</div>
+                                      <div><strong>الـ DSR:</strong> {br.dsrPercentage}%</div>
+                                      <div><strong>مدة التمويل:</strong> {br.termMonths} شهراً</div>
+                                      <div><strong>المعامل الفعلي:</strong> <span className="font-mono text-slate-800 font-bold">{bEffectiveMultiplier}</span></div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   );
                 })
               ) : (
@@ -428,7 +556,7 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
 
             <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
 
-            <div className="relative z-55 inline-block align-bottom bg-white rounded-3xl text-right overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-xl sm:w-full border border-gray-100">
+            <div className={`relative z-55 inline-block align-bottom bg-white rounded-3xl text-right overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle ${formPfRateAppType === 'bracket' ? 'sm:max-w-4xl' : 'sm:max-w-xl'} sm:w-full border border-gray-100`}>
               <div className="bg-gray-50 px-6 py-5 border-b border-gray-100 flex items-center justify-between">
                 <h3 className="text-sm font-extrabold text-gray-900" id="pf-modal-title">
                   {editingPfRule ? 'تعديل قاعدة معالجة التمويل الشخصي' : 'إضافة قاعدة تمويل شخصي جديدة'}
@@ -511,127 +639,299 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
                     </select>
                   </div>
 
-                  {/* 4. Dsr percentage */}
-                  <div className="space-y-1.5 flex flex-col justify-end">
-                    <label className="block text-xs font-bold text-gray-700 mb-1">DSR التمويل الشخصي (%):</label>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      dir="ltr"
-                      id="pf-form-dsr"
-                      value={formPfDsr}
-                      onChange={(e) => setFormPfDsr(normalizeNumberInput(e.target.value))}
-                      className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-blue-200"
-                      placeholder="مثال: 33"
-                    />
-                  </div>
-
-                  {/* 5. Term Months */}
-                  <div className="space-y-1.5 flex flex-col justify-end">
-                    <label className="block text-xs font-bold text-gray-700 mb-1">مدة التمويل (بالشهور):</label>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      dir="ltr"
-                      id="pf-form-term"
-                      value={formPfTerm}
-                      onChange={(e) => setFormPfTerm(normalizeNumberInput(e.target.value))}
-                      className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-blue-200"
-                      placeholder="مثال: 60"
-                    />
-                  </div>
-
-                  {/* 7. Profit method choice */}
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-gray-600">طريقة الحساب:</label>
+                   {/* Rate Application Type Choice */}
+                  <div className="space-y-1.5 col-span-1 md:col-span-2 border-t pt-3 mt-1">
+                    <label className="block text-xs font-bold text-gray-600">نوع تطبيق النسبة:</label>
                     <select
-                      id="pf-form-calcmethod"
-                      value={formPfCalcMethod}
-                      onChange={(e) => {
-                        const val = e.target.value as any;
-                        setFormPfCalcMethod(val);
-                        if (formPfBankId === 'alahli' && val === 'flat_rate') {
-                          setFormPfMargin('5');
-                          setFormPfTerm('60');
-                          setFormPfDsr(formPfCustomerStatus === 'retired' ? '25' : '33.33');
-                        }
-                      }}
+                      id="pf-form-rateapptype"
+                      value={formPfRateAppType}
+                      onChange={(e) => setFormPfRateAppType(e.target.value as any)}
                       className="w-full bg-blue-50 border border-blue-200 rounded-xl px-3 py-2 text-xs font-bold text-[#0057B8] focus:outline-none focus:ring-1 focus:ring-blue-500"
                     >
-                      <option value="flat_rate">نسبة ربح مع معامل فعلي</option>
-                      <option value="multiplier">معامل تمويل يدوي</option>
-                      <option value="pmt">معادلة القسط PMT</option>
+                      <option value="fixed">نسبة واحدة ثابتة</option>
+                      <option value="bracket">شرائح حسب الراتب</option>
                     </select>
                   </div>
 
-                  {/* 6. Multiplier coeff */}
-                  {formPfCalcMethod === 'multiplier' && (
-                    <div className="space-y-1.5 flex flex-col justify-end">
-                      <label className="block text-xs font-bold text-gray-700 mb-1">
-                        معامل التمويل اليدوي:
-                      </label>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        dir="ltr"
-                        id="pf-form-coeff"
-                        value={formPfCoeff}
-                        onChange={(e) => setFormPfCoeff(normalizeNumberInput(e.target.value))}
-                        className="w-full border bg-amber-50 border-amber-300 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-blue-200"
-                        placeholder="مثال: 50.42"
-                      />
-                    </div>
-                  )}
-
-                  {/* 8. Margin/APR/Profit Rate percentage and Calculated Effective Multiplier */}
-                  {formPfCalcMethod === 'flat_rate' && (
+                  {formPfRateAppType === 'fixed' ? (
                     <>
+                      {/* 4. Dsr percentage */}
                       <div className="space-y-1.5 flex flex-col justify-end">
-                        <label className="block text-xs font-bold text-gray-700 mb-1">
-                          نسبة الربح السنوية (%):
-                        </label>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">DSR التمويل الشخصي (%):</label>
                         <input
                           type="text"
                           inputMode="decimal"
                           dir="ltr"
-                          id="pf-form-margin"
-                          value={formPfMargin}
-                          onChange={(e) => setFormPfMargin(normalizeNumberInput(e.target.value))}
-                          className="w-full border bg-amber-50 border-amber-300 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-blue-200"
-                          placeholder="مثال: 4.59"
+                          id="pf-form-dsr"
+                          value={formPfDsr}
+                          onChange={(e) => setFormPfDsr(normalizeNumberInput(e.target.value))}
+                          className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-blue-200"
+                          placeholder="مثال: 33"
                         />
                       </div>
+
+                      {/* 5. Term Months */}
                       <div className="space-y-1.5 flex flex-col justify-end">
-                        <label className="block text-xs font-bold text-gray-500 mb-1">
-                          المعامل الفعلي (للعرض فقط):
-                        </label>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">مدة التمويل (بالشهور):</label>
                         <input
                           type="text"
+                          inputMode="decimal"
                           dir="ltr"
-                          readOnly
-                          value={calcEffectiveMultiplier}
-                          className="w-full border bg-slate-100 border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-500 outline-none cursor-not-allowed"
+                          id="pf-form-term"
+                          value={formPfTerm}
+                          onChange={(e) => setFormPfTerm(normalizeNumberInput(e.target.value))}
+                          className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-blue-200"
+                          placeholder="مثال: 60"
                         />
                       </div>
-                    </>
-                  )}
 
-                  {formPfCalcMethod === 'pmt' && (
-                    <div className="space-y-1.5 flex flex-col justify-end">
-                      <label className="block text-xs font-bold text-gray-700 mb-1">
-                        APR السنوي (%):
-                      </label>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        dir="ltr"
-                        id="pf-form-margin-pmt"
-                        value={formPfMargin}
-                        onChange={(e) => setFormPfMargin(normalizeNumberInput(e.target.value))}
-                        className="w-full border bg-amber-50 border-amber-300 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-blue-200"
-                        placeholder="مثال: 4.80"
-                      />
-                    </div>
+                      {/* 7. Profit method choice */}
+                      <div className="space-y-1.5 col-span-1 md:col-span-2">
+                        <label className="block text-xs font-bold text-gray-600">طريقة الحساب:</label>
+                        <select
+                          id="pf-form-calcmethod"
+                          value={formPfCalcMethod}
+                          onChange={(e) => {
+                            const val = e.target.value as any;
+                            setFormPfCalcMethod(val);
+                            if (formPfBankId === 'alahli' && val === 'flat_rate') {
+                              setFormPfMargin('5');
+                              setFormPfTerm('60');
+                              setFormPfDsr(formPfCustomerStatus === 'retired' ? '25' : '33.33');
+                            }
+                          }}
+                          className="w-full bg-blue-50 border border-blue-200 rounded-xl px-3 py-2 text-xs font-bold text-[#0057B8] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        >
+                          <option value="flat_rate">نسبة ربح مع معامل فعلي</option>
+                          <option value="multiplier">معامل تمويل يدوي</option>
+                          <option value="pmt">معادلة القسط PMT</option>
+                        </select>
+                      </div>
+
+                      {/* 6. Multiplier coeff */}
+                      {formPfCalcMethod === 'multiplier' && (
+                        <div className="space-y-1.5 flex flex-col justify-end col-span-1 md:col-span-2">
+                          <label className="block text-xs font-bold text-gray-700 mb-1">
+                            معامل التمويل اليدوي:
+                          </label>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            dir="ltr"
+                            id="pf-form-coeff"
+                            value={formPfCoeff}
+                            onChange={(e) => setFormPfCoeff(normalizeNumberInput(e.target.value))}
+                            className="w-full border bg-amber-50 border-amber-300 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-blue-200"
+                            placeholder="مثال: 50.42"
+                          />
+                        </div>
+                      )}
+
+                      {/* 8. Margin/APR/Profit Rate percentage and Calculated Effective Multiplier */}
+                      {formPfCalcMethod === 'flat_rate' && (
+                        <>
+                          <div className="space-y-1.5 flex flex-col justify-end">
+                            <label className="block text-xs font-bold text-gray-700 mb-1">
+                              نسبة الربح السنوية (%):
+                            </label>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              dir="ltr"
+                              id="pf-form-margin"
+                              value={formPfMargin}
+                              onChange={(e) => setFormPfMargin(normalizeNumberInput(e.target.value))}
+                              className="w-full border bg-amber-50 border-amber-300 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-blue-200"
+                              placeholder="مثال: 4.59"
+                            />
+                          </div>
+                          <div className="space-y-1.5 flex flex-col justify-end">
+                            <label className="block text-xs font-bold text-gray-500 mb-1">
+                              المعامل الفعلي (للعرض فقط):
+                            </label>
+                            <input
+                              type="text"
+                              dir="ltr"
+                              readOnly
+                              value={calcEffectiveMultiplier}
+                              className="w-full border bg-slate-100 border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-500 outline-none cursor-not-allowed"
+                            />
+                          </div>
+                        </>
+                      )}
+
+                      {formPfCalcMethod === 'pmt' && (
+                        <div className="space-y-1.5 flex flex-col justify-end col-span-1 md:col-span-2">
+                          <label className="block text-xs font-bold text-gray-700 mb-1">
+                            APR السنوي (%):
+                          </label>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            dir="ltr"
+                            id="pf-form-margin-pmt"
+                            value={formPfMargin}
+                            onChange={(e) => setFormPfMargin(normalizeNumberInput(e.target.value))}
+                            className="w-full border bg-amber-50 border-amber-300 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-blue-200"
+                            placeholder="مثال: 4.80"
+                          />
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {/* 7. Profit method choice for brackets */}
+                      <div className="space-y-1.5 col-span-1 md:col-span-2">
+                        <label className="block text-xs font-bold text-gray-600">طريقة الحساب للشرائح:</label>
+                        <select
+                          id="pf-form-calcmethod"
+                          value={formPfCalcMethod}
+                          onChange={(e) => setFormPfCalcMethod(e.target.value as any)}
+                          className="w-full bg-blue-50 border border-blue-200 rounded-xl px-3 py-2 text-xs font-bold text-[#0057B8] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        >
+                          <option value="flat_rate">نسبة ربح مع معامل فعلي</option>
+                          <option value="multiplier">معامل تمويل يدوي</option>
+                          <option value="pmt">معادلة القسط PMT</option>
+                        </select>
+                      </div>
+
+                      {/* 6. Multiplier coeff if multiplier for bracket */}
+                      {formPfCalcMethod === 'multiplier' && (
+                        <div className="space-y-1.5 flex flex-col justify-end col-span-1 md:col-span-2">
+                          <label className="block text-xs font-bold text-gray-700 mb-1">
+                            معامل التمويل اليدوي:
+                          </label>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            dir="ltr"
+                            id="pf-form-coeff"
+                            value={formPfCoeff}
+                            onChange={(e) => setFormPfCoeff(normalizeNumberInput(e.target.value))}
+                            className="w-full border bg-amber-50 border-amber-300 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-blue-200"
+                            placeholder="مثال: 50.42"
+                          />
+                        </div>
+                      )}
+
+                      {/* Brackets table section */}
+                      <div className="col-span-1 md:col-span-2 border-t border-dashed pt-4 mt-2 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-extrabold text-blue-900">جدول شرائح الرواتب:</span>
+                          <button
+                            type="button"
+                            onClick={addBracket}
+                            className="bg-[#0057B8] hover:bg-blue-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1 cursor-pointer"
+                          >
+                            <span>+ إضافة شريحة</span>
+                          </button>
+                        </div>
+
+                        {formPfSalaryBrackets.length === 0 ? (
+                          <div className="text-center py-8 border-2 border-dashed border-gray-200 bg-gray-50/50 rounded-2xl text-xs text-gray-400 font-semibold">
+                            ⚠️ لا توجد أي شرائح مضافة حالياً. اضغط "إضافة شريحة" للبدء.
+                          </div>
+                        ) : (
+                          <div className="overflow-x-auto border border-gray-100 rounded-2xl">
+                            <table className="w-full text-right text-xs">
+                              <thead>
+                                <tr className="bg-gray-100 text-gray-600 font-extrabold border-b border-gray-200">
+                                  <th className="p-3 text-center">من راتب</th>
+                                  <th className="p-3 text-center">إلى راتب</th>
+                                  <th className="p-3 text-center">نسبة الربح %</th>
+                                  <th className="p-3 text-center">DSR الشخصي %</th>
+                                  <th className="p-3 text-center">المدة (بالأشهر)</th>
+                                  <th className="p-3 text-center">المعامل الفعلي</th>
+                                  <th className="p-3 text-center w-14">إجراءات</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100 bg-white">
+                                {formPfSalaryBrackets.map((bracket, index) => {
+                                  const bTerm = parseFloat(parseArabicAndEnglishNumber(bracket.termMonths)) || 0;
+                                  const bMargin = parseFloat(parseArabicAndEnglishNumber(bracket.annualMargin)) || 0;
+                                  const bTermYears = bTerm / 12;
+                                  const bProfitFactor = 1 + ((bMargin / 100) * bTermYears);
+                                  const bEffectiveMultiplier = bProfitFactor > 0 ? (bTerm / bProfitFactor).toFixed(2) : '0';
+
+                                  return (
+                                    <tr key={index} className="hover:bg-gray-50/50">
+                                      <td className="p-2">
+                                        <input
+                                          type="text"
+                                          inputMode="decimal"
+                                          dir="ltr"
+                                          value={bracket.fromSalary}
+                                          onChange={(e) => updateBracketField(index, 'fromSalary', normalizeNumberInput(e.target.value))}
+                                          className="w-full text-center border border-gray-200 rounded-lg px-2 py-1 text-xs font-bold text-gray-800 outline-none focus:ring-1 focus:ring-blue-500"
+                                          placeholder="0"
+                                        />
+                                      </td>
+                                      <td className="p-2">
+                                        <input
+                                          type="text"
+                                          inputMode="decimal"
+                                          dir="ltr"
+                                          value={bracket.toSalary}
+                                          onChange={(e) => updateBracketField(index, 'toSalary', normalizeNumberInput(e.target.value))}
+                                          className="w-full text-center border border-gray-200 rounded-lg px-2 py-1 text-xs font-bold text-gray-800 outline-none focus:ring-1 focus:ring-blue-500"
+                                          placeholder="فارغ لمفتوح"
+                                        />
+                                      </td>
+                                      <td className="p-2">
+                                        <input
+                                          type="text"
+                                          inputMode="decimal"
+                                          dir="ltr"
+                                          value={bracket.annualMargin}
+                                          onChange={(e) => updateBracketField(index, 'annualMargin', normalizeNumberInput(e.target.value))}
+                                          className="w-full text-center border border-gray-200 rounded-lg px-2 py-1 text-xs font-bold text-gray-800 outline-none focus:ring-1 focus:ring-blue-500"
+                                          placeholder="3.69"
+                                        />
+                                      </td>
+                                      <td className="p-2">
+                                        <input
+                                          type="text"
+                                          inputMode="decimal"
+                                          dir="ltr"
+                                          value={bracket.dsrPercentage}
+                                          onChange={(e) => updateBracketField(index, 'dsrPercentage', normalizeNumberInput(e.target.value))}
+                                          className="w-full text-center border border-gray-200 rounded-lg px-2 py-1 text-xs font-bold text-gray-800 outline-none focus:ring-1 focus:ring-blue-500"
+                                          placeholder="33.33"
+                                        />
+                                      </td>
+                                      <td className="p-2">
+                                        <input
+                                          type="text"
+                                          inputMode="decimal"
+                                          dir="ltr"
+                                          value={bracket.termMonths}
+                                          onChange={(e) => updateBracketField(index, 'termMonths', normalizeNumberInput(e.target.value))}
+                                          className="w-full text-center border border-gray-200 rounded-lg px-2 py-1 text-xs font-bold text-gray-800 outline-none focus:ring-1 focus:ring-blue-500"
+                                          placeholder="60"
+                                        />
+                                      </td>
+                                      <td className="p-2 text-center font-bold text-gray-500 font-sans">
+                                        {bEffectiveMultiplier}
+                                      </td>
+                                      <td className="p-2 text-center">
+                                        <button
+                                          type="button"
+                                          onClick={() => removeBracket(index)}
+                                          className="text-red-500 hover:text-red-700 p-1.5 cursor-pointer transition-colors"
+                                          title="حذف الشريحة"
+                                        >
+                                          <Trash2 className="w-4 h-4 mx-auto" />
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    </>
                   )}
 
                   {/* 9. Minimum Salary */}

@@ -171,6 +171,14 @@ export interface SupportSettings {
   downpaymentBrackets: SupportDownpaymentBracket[];
 }
 
+export interface SalaryBracket {
+  fromSalary: number;
+  toSalary: number | null;
+  annualMargin: number;
+  dsrPercentage: number;
+  termMonths: number;
+}
+
 export interface PersonalFinanceRules {
   id?: string;
   bankId: string;
@@ -188,6 +196,8 @@ export interface PersonalFinanceRules {
   calculationMethod?: 'multiplier' | 'pmt' | 'flat_rate';
   pathType?: 'personal_only' | 'real_estate_with_new_personal';
   customerStatus?: 'active_employee' | 'retired';
+  rateApplicationType?: 'fixed' | 'bracket';
+  salaryBrackets?: SalaryBracket[];
 }
 
 export interface AdvancedRule {
