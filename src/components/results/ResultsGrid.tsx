@@ -391,10 +391,10 @@ export default function ResultsGrid({
                               <span className="text-xs text-[#6B7280] block mb-0.5">طريقة الحساب</span>
                               <span className="font-bold text-indigo-700">
                                 {offer.personalCalculationMethod === 'pmt' 
-                                  ? 'PMT' 
+                                  ? 'معادلة القسط PMT' 
                                   : offer.personalCalculationMethod === 'flat_rate' 
-                                  ? 'نسبة الفائدة المبسطة (Flat Rate)' 
-                                  : 'معامل التمويل (Multiplier)'}
+                                  ? 'نسبة ربح مع معامل فعلي' 
+                                  : 'معامل تمويل يدوي'}
                               </span>
                             </div>
                             <div className="border border-[#E5E7EB] rounded-xl p-3">
@@ -403,12 +403,23 @@ export default function ResultsGrid({
                             </div>
                             {offer.personalCalculationMethod === 'multiplier' ? (
                               <div className="border border-[#E5E7EB] rounded-xl p-3">
-                                <span className="text-xs text-[#6B7280] block mb-0.5">معامل التمويل المستخدم</span>
-                                <span className="font-bold text-[#111827]">{offer.personalCoefficient || 50.42}</span>
+                                <span className="text-xs text-[#6B7280] block mb-0.5">معامل التمويل اليدوي</span>
+                                <span className="font-bold text-[#111827]">{offer.personalCoefficient || '-'}</span>
                               </div>
+                            ) : offer.personalCalculationMethod === 'flat_rate' ? (
+                              <>
+                                <div className="border border-[#E5E7EB] rounded-xl p-3">
+                                  <span className="text-xs text-[#6B7280] block mb-0.5">نسبة الربح السنوية</span>
+                                  <span className="font-bold text-[#0057B8]">{offer.annualMargin}%</span>
+                                </div>
+                                <div className="border border-[#E5E7EB] rounded-xl p-3">
+                                  <span className="text-xs text-[#6B7280] block mb-0.5">المعامل الفعلي</span>
+                                  <span className="font-bold text-[#0057B8]">{offer.personalCoefficient || '-'}</span>
+                                </div>
+                              </>
                             ) : (
                               <div className="border border-[#E5E7EB] rounded-xl p-3">
-                                <span className="text-xs text-[#6B7280] block mb-0.5">الهامش/النسبة المستخدمة</span>
+                                <span className="text-xs text-[#6B7280] block mb-0.5">APR السنوي</span>
                                 <span className="font-bold text-[#0057B8]">{offer.annualMargin}%</span>
                               </div>
                             )}
@@ -428,6 +439,15 @@ export default function ResultsGrid({
                                 {Math.round(offer.personalProfitAmount !== undefined ? offer.personalProfitAmount : (offer.personalAmount * (offer.annualMargin / 100) * (offer.termMonths / 12))).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال
                               </span>
                             </div>
+                            {offer.personalDiagnostics?.source === 'fallback' && (
+                              <div className="col-span-2 bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2 text-xs text-amber-800">
+                                <span className="font-bold text-sm leading-none mt-0.5">⚠️</span>
+                                <div>
+                                  <span className="font-bold block mb-0.5">تنبيه النظام:</span>
+                                  <span>تم استخدام قاعدة افتراضية لعدم وجود قاعدة مفعلة لهذا البنك.</span>
+                                </div>
+                              </div>
+                            )}
                           </>
                         ) : (
                           <>
@@ -737,10 +757,10 @@ export default function ResultsGrid({
                         <span className="text-xs text-[#6B7280] block mb-1">طريقة الحساب</span>
                         <span className="font-bold text-indigo-700">
                           {selectedOffer.personalCalculationMethod === 'pmt' 
-                            ? 'PMT' 
+                            ? 'معادلة القسط PMT' 
                             : selectedOffer.personalCalculationMethod === 'flat_rate' 
-                            ? 'نسبة الفائدة المبسطة (Flat Rate)' 
-                            : 'معامل التمويل (Multiplier)'}
+                            ? 'نسبة ربح مع معامل فعلي' 
+                            : 'معامل تمويل يدوي'}
                         </span>
                       </div>
                       <div>
@@ -749,14 +769,22 @@ export default function ResultsGrid({
                       </div>
                       {selectedOffer.personalCalculationMethod === 'multiplier' ? (
                         <div>
-                          <span className="text-xs text-[#6B7280] block mb-1">معامل التمويل المستخدم</span>
-                          <span className="font-bold text-[#111827]">{selectedOffer.personalCoefficient || 50.42}</span>
+                          <span className="text-xs text-[#6B7280] block mb-1">معامل التمويل اليدوي</span>
+                          <span className="font-bold text-[#111827]">{selectedOffer.personalCoefficient || '-'}</span>
                         </div>
                       ) : (
-                        <div>
-                          <span className="text-xs text-[#6B7280] block mb-1">الهامش/النسبة المستخدمة</span>
-                          <span className="font-bold text-[#0057B8]">{selectedOffer.annualMargin}%</span>
-                        </div>
+                        <>
+                          <div>
+                            <span className="text-xs text-[#6B7280] block mb-1">{selectedOffer.personalCalculationMethod === 'flat_rate' ? 'نسبة الربح السنوية' : 'APR السنوي'}</span>
+                            <span className="font-bold text-[#0057B8]">{selectedOffer.annualMargin}%</span>
+                          </div>
+                          {selectedOffer.personalCalculationMethod === 'flat_rate' && (
+                            <div>
+                              <span className="text-xs text-[#6B7280] block mb-1">المعامل الفعلي</span>
+                              <span className="font-bold text-[#0057B8]">{selectedOffer.personalCoefficient || '-'}</span>
+                            </div>
+                          )}
+                        </>
                       )}
                       <div>
                         <span className="text-xs text-[#6B7280] block mb-1">مدة التمويل بالشهور</span>
@@ -774,6 +802,15 @@ export default function ResultsGrid({
                           {Math.round(selectedOffer.personalProfitAmount !== undefined ? selectedOffer.personalProfitAmount : (selectedOffer.personalAmount * (selectedOffer.annualMargin / 100) * (selectedOffer.termMonths / 12))).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال
                         </span>
                       </div>
+                      {selectedOffer.personalDiagnostics?.source === 'fallback' && (
+                        <div className="col-span-2 md:col-span-3 bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2 text-xs text-amber-800">
+                          <span className="font-bold text-sm leading-none mt-0.5">⚠️</span>
+                          <div>
+                            <span className="font-bold block mb-0.5">تنبيه النظام:</span>
+                            <span>تم استخدام قاعدة افتراضية لعدم وجود قاعدة مفعلة لهذا البنك.</span>
+                          </div>
+                        </div>
+                      )}
                     </>
                   ) : (
                     <>

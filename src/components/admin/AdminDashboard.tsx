@@ -1424,6 +1424,7 @@ export default function AdminDashboard() {
   const [formError, setFormError] = useState('');
 
   // --- Personal Finance Rules States & Management ---
+  /*
   const [filterPfBank, setFilterPfBank] = useState<string>('rajhi');
   const [isPfModalOpen, setIsPfModalOpen] = useState(false);
   const [editingPfRule, setEditingPfRule] = useState<PersonalFinanceRules | null>(null);
@@ -1439,7 +1440,9 @@ export default function AdminDashboard() {
   const [formPfCalcMethod, setFormPfCalcMethod] = useState<'multiplier' | 'pmt' | 'flat_rate'>('flat_rate');
   const [formPfActive, setFormPfActive] = useState(true);
   const [pfError, setPfError] = useState('');
+  */
 
+  /*
   const openAddPfModal = () => {
     setEditingPfRule(null);
     setFormPfBankId(filterPfBank);
@@ -1541,6 +1544,7 @@ export default function AdminDashboard() {
       showToast('تم حذف القاعدة بنجاح!', 'success');
     }
   };
+  */
 
   // --- Sectors States & Management ---
   const [isSectorModalOpen, setIsSectorModalOpen] = useState(false);
@@ -2340,11 +2344,13 @@ export default function AdminDashboard() {
     showToast(`تم نسخ جدول هوامش الفائدة من ${fromBank} إلى ${toBank} بنجاح!`, 'success');
   };
 
+  /*
   const parsedPfTerm = parseFloat(parseArabicAndEnglishNumber(formPfTerm)) || 0;
   const parsedPfMargin = parseFloat(parseArabicAndEnglishNumber(formPfMargin)) || 0;
   const calcPfTermYears = parsedPfTerm / 12;
   const calcPfProfitFactor = 1 + ((parsedPfMargin / 100) * calcPfTermYears);
   const calcPfEffectiveMultiplier = calcPfProfitFactor > 0 ? (parsedPfTerm / calcPfProfitFactor).toFixed(2) : '0';
+  */
 
   return (
     <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col lg:flex-row gap-8 ${hasUnsavedChanges ? 'pb-32' : ''}`}>
