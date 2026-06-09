@@ -40,6 +40,8 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
   const [localMargins, setLocalMargins] = useState<Record<number, string>>({});
   const [localSectorExceptions, setLocalSectorExceptions] = useState<Record<string, string>>({});
 
+  const [isLoaded, setIsLoaded] = useState(false);
+
   // Auxiliary UI States
   const [showCloneCard, setShowCloneCard] = useState(false);
   const [cloneFromBank, setCloneFromBank] = useState('alahli');
@@ -70,18 +72,24 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
 
     const normSupport = (selectedSupport as string) === 'down_payment' || selectedSupport === 'downpayment' ? 'downpayment' : selectedSupport;
 
-    const productIdsToFilter = [selectedProduct];
-    if (selectedProduct === 'real_estate_with_new_personal') {
-      productIdsToFilter.push('real_estate' as any, 'both' as any);
-    } else if (selectedProduct === 'real_estate_with_existing_personal') {
-      productIdsToFilter.push('real_estate_with_personal_existing' as any);
-    } else if (selectedProduct === 'real_estate_only') {
-      productIdsToFilter.push('real_estate' as any);
-    }
+    // Normalize all rules to clean official product IDs and support types upon reading
+    const relevantRules = marginRules.map(r => {
+      let pId = r.productId as string;
+      if (pId === 'real_estate') pId = 'real_estate_only';
+      else if (pId === 'both') pId = 'real_estate_with_new_personal';
+      else if (pId === 'real_estate_with_personal_existing') pId = 'real_estate_with_existing_personal';
 
-    const relevantRules = marginRules.filter(r => 
+      let sType = r.supportType as string;
+      if (sType === 'down_payment') sType = 'downpayment';
+
+      return {
+        ...r,
+        productId: pId as ProductId,
+        supportType: sType as SupportType
+      };
+    }).filter(r => 
       r.bankId === selectedBank && 
-      (r.productId === selectedProduct || r.productType === selectedProduct || productIdsToFilter.includes(r.productId)) && 
+      r.productId === selectedProduct && 
       (r.supportType === normSupport || r.supportType === 'all') &&
       (!r.isExceptionOnly) &&
       (r.salaryTier === selectedSalaryTier || (!r.salaryTier && selectedSalaryTier === 'not_applicable'))
@@ -89,24 +97,13 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
 
     const yearsListFull = Array.from({ length: 26 }, (_, i) => 5 + i);
     const initialMargins: Record<number, string> = {};
-    const hasRules = relevantRules.length > 0;
 
     yearsListFull.forEach(year => {
       const rY = relevantRules.find(r => r.year === year || r.toTermMonths === year * 12);
       if (rY) {
         initialMargins[year] = (rY.annualMargin !== undefined ? rY.annualMargin : (rY.baseMargin !== undefined ? Number((rY.baseMargin * 100).toFixed(3)) : rY.endMargin)).toString();
       } else {
-        const isStandardYear = [5, 10, 15, 20, 25, 30].includes(year);
-        if (!hasRules && isStandardYear) {
-          if (year === 5) initialMargins[year] = '3.80';
-          else if (year === 10) initialMargins[year] = '3.98';
-          else if (year === 15) initialMargins[year] = '4.25';
-          else if (year === 20) initialMargins[year] = '4.60';
-          else if (year === 25) initialMargins[year] = '4.95';
-          else if (year === 30) initialMargins[year] = '5.25';
-        } else {
-          initialMargins[year] = '';
-        }
+        initialMargins[year] = '';
       }
     });
 
@@ -145,6 +142,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       initialExceptions[sec.id] = exRule && exRule.exceptionBps !== undefined ? exRule.exceptionBps.toString() : '0';
     });
     setLocalSectorExceptions(initialExceptions);
+    setIsLoaded(true);
 
   }, [selectedBank, selectedProduct, selectedSupport, selectedSalaryTier, marginRules]);
 
@@ -197,78 +195,76 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     filledYears.sort((a, b) => a - b);
 
     if (filledYears.length > 0) {
-      productIdsToFilter.forEach(pId => {
-        const definitions: Array<{ from: number, to: number, start: number, end: number, calcType: 'fixed' | 'linear', yearPoint: number }> = [];
+      const definitions: Array<{ from: number, to: number, start: number, end: number, calcType: 'fixed' | 'linear', yearPoint: number }> = [];
 
-        for (let i = 0; i < filledYears.length; i++) {
-          const currentYear = filledYears[i];
-          const currentMarginStr = marginsRecord[currentYear];
-          const currentMarginVal = parseFloat(currentMarginStr) || 0;
+      for (let i = 0; i < filledYears.length; i++) {
+        const currentYear = filledYears[i];
+        const currentMarginStr = marginsRecord[currentYear];
+        const currentMarginVal = parseFloat(currentMarginStr) || 0;
 
-          if (i === 0) {
-            definitions.push({
-              from: 0,
-              to: currentYear * 12,
-              start: currentMarginVal,
-              end: currentMarginVal,
-              calcType: 'fixed' as const,
-              yearPoint: currentYear
-            });
-          } else {
-            const prevYear = filledYears[i - 1];
-            const prevMarginStr = marginsRecord[prevYear];
-            const prevMarginVal = parseFloat(prevMarginStr) || 0;
-
-            const fromMonths = prevYear * 12 + 1;
-            const toMonths = currentYear * 12;
-
-            definitions.push({
-              from: fromMonths,
-              to: toMonths,
-              start: method === 'fixed' ? currentMarginVal : prevMarginVal,
-              end: currentMarginVal,
-              calcType: method,
-              yearPoint: currentYear
-            });
-          }
-        }
-
-        const lastYear = filledYears[filledYears.length - 1];
-        const lastMarginStr = marginsRecord[lastYear];
-        const lastMarginVal = parseFloat(lastMarginStr) || 0;
-
-        definitions.push({
-          from: lastYear * 12 + 1,
-          to: 9999,
-          start: lastMarginVal,
-          end: lastMarginVal,
-          calcType: 'fixed' as const,
-          yearPoint: lastYear
-        });
-
-        definitions.forEach((def, index) => {
-          newRulesForThisCombo.push({
-            id: `gen_margin_${targetBank}_${pId}_${normSupport}_${targetSalaryTier}_t${def.from}_${def.to}_${index}`,
-            bankId: targetBank,
-            productId: pId as ProductId,
-            supportType: normSupport as any,
-            sectorId: 'all',
-            fromTermMonths: def.from,
-            toTermMonths: def.to,
-            startMargin: def.start,
-            endMargin: def.end,
-            calcType: def.calcType,
-            isActive: true,
-            salaryTier: targetSalaryTier,
-            productType: targetProduct as any,
-            marginInputMode: inputMode,
-            calculationMethod: method,
-            year: def.yearPoint,
-            termMonths: def.to === 9999 ? (def.yearPoint * 12) : def.to,
-            annualMargin: def.end,
-            exceptionBps: 0,
-            baseMargin: Number((def.end / 100).toFixed(6))
+        if (i === 0) {
+          definitions.push({
+            from: 0,
+            to: currentYear * 12,
+            start: currentMarginVal,
+            end: currentMarginVal,
+            calcType: 'fixed' as const,
+            yearPoint: currentYear
           });
+        } else {
+          const prevYear = filledYears[i - 1];
+          const prevMarginStr = marginsRecord[prevYear];
+          const prevMarginVal = parseFloat(prevMarginStr) || 0;
+
+          const fromMonths = prevYear * 12 + 1;
+          const toMonths = currentYear * 12;
+
+          definitions.push({
+            from: fromMonths,
+            to: toMonths,
+            start: method === 'fixed' ? currentMarginVal : prevMarginVal,
+            end: currentMarginVal,
+            calcType: method,
+            yearPoint: currentYear
+          });
+        }
+      }
+
+      const lastYear = filledYears[filledYears.length - 1];
+      const lastMarginStr = marginsRecord[lastYear];
+      const lastMarginVal = parseFloat(lastMarginStr) || 0;
+
+      definitions.push({
+        from: lastYear * 12 + 1,
+        to: 9999,
+        start: lastMarginVal,
+        end: lastMarginVal,
+        calcType: 'fixed' as const,
+        yearPoint: lastYear
+      });
+
+      definitions.forEach((def, index) => {
+        newRulesForThisCombo.push({
+          id: `gen_margin_${targetBank}_${targetProduct}_${normSupport}_${targetSalaryTier}_t${def.from}_${def.to}_${index}`,
+          bankId: targetBank,
+          productId: targetProduct,
+          supportType: normSupport as any,
+          sectorId: 'all',
+          fromTermMonths: def.from,
+          toTermMonths: def.to,
+          startMargin: def.start,
+          endMargin: def.end,
+          calcType: def.calcType,
+          isActive: true,
+          salaryTier: targetSalaryTier,
+          productType: targetProduct as any,
+          marginInputMode: inputMode,
+          calculationMethod: method,
+          year: def.yearPoint,
+          termMonths: def.to === 9999 ? (def.yearPoint * 12) : def.to,
+          annualMargin: def.end,
+          exceptionBps: 0,
+          baseMargin: Number((def.end / 100).toFixed(6))
         });
       });
     }
@@ -356,20 +352,27 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
 
     // Build the mapped product IDs for raw DB matches from source
     const srcProductIds = [srcProduct];
-    if (srcProduct === 'real_estate_with_new_personal') {
-      srcProductIds.push('real_estate' as any, 'both' as any);
-    } else if (srcProduct === 'real_estate_with_existing_personal') {
-      srcProductIds.push('real_estate_with_personal_existing' as any);
-    } else if (srcProduct === 'real_estate_only') {
-      srcProductIds.push('real_estate' as any);
-    }
 
     // Try both with/without salary tier to get the rules of the source
     const srcSalaryTier = normSrcSupport === 'none' ? 'not_applicable' : 'below_25000';
 
-    const relevantSrcRules = marginRules.filter(r => 
+    const relevantSrcRules = marginRules.map(r => {
+      let pId = r.productId as string;
+      if (pId === 'real_estate') pId = 'real_estate_only';
+      else if (pId === 'both') pId = 'real_estate_with_new_personal';
+      else if (pId === 'real_estate_with_personal_existing') pId = 'real_estate_with_existing_personal';
+
+      let sType = r.supportType as string;
+      if (sType === 'down_payment') sType = 'downpayment';
+
+      return {
+        ...r,
+        productId: pId as ProductId,
+        supportType: sType as SupportType
+      };
+    }).filter(r => 
       r.bankId === srcBank && 
-      (r.productId === srcProduct || r.productType === srcProduct || srcProductIds.includes(r.productId)) && 
+      r.productId === srcProduct && 
       (r.supportType === normSrcSupport || r.supportType === 'all') &&
       (!r.isExceptionOnly) &&
       (r.salaryTier === srcSalaryTier || (!r.salaryTier && srcSalaryTier === 'not_applicable') || r.salaryTier === 'not_applicable' || !r.salaryTier)
@@ -377,24 +380,13 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
 
     const yearsListFull = Array.from({ length: 26 }, (_, i) => 5 + i);
     const srcMargins: Record<number, string> = {};
-    const hasRules = relevantSrcRules.length > 0;
 
     yearsListFull.forEach(year => {
       const rY = relevantSrcRules.find(r => r.year === year || r.toTermMonths === year * 12);
       if (rY) {
         srcMargins[year] = (rY.annualMargin !== undefined ? rY.annualMargin : (rY.baseMargin !== undefined ? Number((rY.baseMargin * 100).toFixed(3)) : rY.endMargin)).toLocaleString('en-US', {useGrouping: false});
       } else {
-        const isStandardYear = [5, 10, 15, 20, 25, 30].includes(year);
-        if (!hasRules && isStandardYear) {
-          if (year === 5) srcMargins[year] = '3.80';
-          else if (year === 10) srcMargins[year] = '3.98';
-          else if (year === 15) srcMargins[year] = '4.25';
-          else if (year === 20) srcMargins[year] = '4.60';
-          else if (year === 25) srcMargins[year] = '4.95';
-          else if (year === 30) srcMargins[year] = '5.25';
-        } else {
-          srcMargins[year] = '';
-        }
+        srcMargins[year] = '';
       }
     });
 
@@ -455,79 +447,77 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     filledYears.sort((a, b) => a - b);
 
     if (filledYears.length > 0) {
-      dstProductIds.forEach(pId => {
-        targetSalaryTiers.forEach(targetSalaryTier => {
-          const definitions: Array<{ from: number, to: number, start: number, end: number, calcType: 'fixed' | 'linear', yearPoint: number }> = [];
+      targetSalaryTiers.forEach(targetSalaryTier => {
+        const definitions: Array<{ from: number, to: number, start: number, end: number, calcType: 'fixed' | 'linear', yearPoint: number }> = [];
 
-          for (let i = 0; i < filledYears.length; i++) {
-            const currentYear = filledYears[i];
-            const currentMarginStr = srcMargins[currentYear];
-            const currentMarginVal = parseFloat(currentMarginStr) || 0;
+        for (let i = 0; i < filledYears.length; i++) {
+          const currentYear = filledYears[i];
+          const currentMarginStr = srcMargins[currentYear];
+          const currentMarginVal = parseFloat(currentMarginStr) || 0;
 
-            if (i === 0) {
-              definitions.push({
-                from: 0,
-                to: currentYear * 12,
-                start: currentMarginVal,
-                end: currentMarginVal,
-                calcType: 'fixed' as const,
-                yearPoint: currentYear
-              });
-            } else {
-              const prevYear = filledYears[i - 1];
-              const prevMarginStr = srcMargins[prevYear];
-              const prevMarginVal = parseFloat(prevMarginStr) || 0;
-
-              const fromMonths = prevYear * 12 + 1;
-              const toMonths = currentYear * 12;
-
-              definitions.push({
-                from: fromMonths,
-                to: toMonths,
-                start: method === 'fixed' ? currentMarginVal : prevMarginVal,
-                end: currentMarginVal,
-                calcType: method,
-                yearPoint: currentYear
-              });
-            }
-          }
-
-          const lastYear = filledYears[filledYears.length - 1];
-          const lastMarginStr = srcMargins[lastYear];
-          const lastMarginVal = parseFloat(lastMarginStr) || 0;
-
-          definitions.push({
-            from: lastYear * 12 + 1,
-            to: 9999,
-            start: lastMarginVal,
-            end: lastMarginVal,
-            calcType: 'fixed' as const,
-            yearPoint: lastYear
-          });
-
-          definitions.forEach((def, index) => {
-            newRulesForDst.push({
-              id: `copied_margin_${dstBank}_${pId}_${normDstSupport}_${targetSalaryTier}_t${def.from}_${def.to}_${index}_${Date.now()}`,
-              bankId: dstBank,
-              productId: pId as ProductId,
-              supportType: normDstSupport as any,
-              sectorId: 'all',
-              fromTermMonths: def.from,
-              toTermMonths: def.to,
-              startMargin: def.start,
-              endMargin: def.end,
-              calcType: def.calcType,
-              isActive: true,
-              salaryTier: targetSalaryTier,
-              productType: dstProduct as any,
-              marginInputMode: inputMode,
-              calculationMethod: method,
-              year: def.yearPoint,
-              termMonths: def.to === 9999 ? (def.yearPoint * 12) : def.to,
-              annualMargin: def.end,
-              exceptionBps: 0,
-              baseMargin: Number((def.end / 100).toFixed(6))
+          if (i === 0) {
+            definitions.push({
+              from: 0,
+              to: currentYear * 12,
+              start: currentMarginVal,
+              end: currentMarginVal,
+              calcType: 'fixed' as const,
+              yearPoint: currentYear
             });
+          } else {
+            const prevYear = filledYears[i - 1];
+            const prevMarginStr = srcMargins[prevYear];
+            const prevMarginVal = parseFloat(prevMarginStr) || 0;
+
+            const fromMonths = prevYear * 12 + 1;
+            const toMonths = currentYear * 12;
+
+            definitions.push({
+              from: fromMonths,
+              to: toMonths,
+              start: method === 'fixed' ? currentMarginVal : prevMarginVal,
+              end: currentMarginVal,
+              calcType: method,
+              yearPoint: currentYear
+            });
+          }
+        }
+
+        const lastYear = filledYears[filledYears.length - 1];
+        const lastMarginStr = srcMargins[lastYear];
+        const lastMarginVal = parseFloat(lastMarginStr) || 0;
+
+        definitions.push({
+          from: lastYear * 12 + 1,
+          to: 9999,
+          start: lastMarginVal,
+          end: lastMarginVal,
+          calcType: 'fixed' as const,
+          yearPoint: lastYear
+        });
+
+        definitions.forEach((def, index) => {
+          newRulesForDst.push({
+            id: `copied_margin_${dstBank}_${dstProduct}_${normDstSupport}_${targetSalaryTier}_t${def.from}_${def.to}_${index}_${Date.now()}`,
+            bankId: dstBank,
+            productId: dstProduct,
+            supportType: normDstSupport as any,
+            sectorId: 'all',
+            fromTermMonths: def.from,
+            toTermMonths: def.to,
+            startMargin: def.start,
+            endMargin: def.end,
+            calcType: def.calcType,
+            isActive: true,
+            salaryTier: targetSalaryTier,
+            productType: dstProduct as any,
+            marginInputMode: inputMode,
+            calculationMethod: method,
+            year: def.yearPoint,
+            termMonths: def.to === 9999 ? (def.yearPoint * 12) : def.to,
+            annualMargin: def.end,
+            exceptionBps: 0,
+            baseMargin: Number((def.end / 100).toFixed(6))
           });
         });
       });
@@ -572,9 +562,23 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
           tiers.forEach(tier => {
             if (sId !== 'none' && selectedSalaryTier !== tier) return;
 
-            const relevantRules = marginRules.filter(r => 
+            const relevantRules = marginRules.map(r => {
+              let prodInput = r.productId as string;
+              if (prodInput === 'real_estate') prodInput = 'real_estate_only';
+              else if (prodInput === 'both') prodInput = 'real_estate_with_new_personal';
+              else if (prodInput === 'real_estate_with_personal_existing') prodInput = 'real_estate_with_existing_personal';
+
+              let sType = r.supportType as string;
+              if (sType === 'down_payment') sType = 'downpayment';
+
+              return {
+                ...r,
+                productId: prodInput as ProductId,
+                supportType: sType as SupportType
+              };
+            }).filter(r => 
               r.bankId === bId &&
-              (r.productId === pId || r.productType === pId || (pId === 'real_estate_only' && r.productId === 'real_estate')) &&
+              r.productId === pId &&
               (r.supportType === sId || r.supportType === 'all') &&
               (r.salaryTier === tier || (!r.salaryTier && tier === 'not_applicable'))
             );
@@ -904,6 +908,13 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
         <h3 className="text-sm font-bold text-slate-850 flex items-center gap-2 border-b border-gray-100 pb-3">
           📊 هوامش التمويل الأساسية
         </h3>
+        
+        {isLoaded && Object.values(localMargins).every(v => !v || v === '') && (
+          <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl p-4 text-xs font-bold font-sans text-center my-2 leading-6 flex items-center justify-center gap-2">
+            <span>⚠️</span>
+            <span>لا توجد هوامش محفوظة لهذه التركيبة، أدخل القيم ثم اضغط حفظ.</span>
+          </div>
+        )}
         
         <div className="overflow-x-auto border border-gray-200 rounded-2xl max-h-[450px] overflow-y-auto">
           <table className="min-w-full divide-y divide-gray-250 text-right text-xs">
