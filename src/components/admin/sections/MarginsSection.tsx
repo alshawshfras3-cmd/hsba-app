@@ -833,133 +833,123 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
         </div>
       </div>
 
-      {/* 6. Unified Save Button */}
-      <div className="flex flex-col sm:flex-row justify-end items-center gap-3 pt-2 font-sans">
-        <button
-          type="button"
-          onClick={() => setShowCopyModal(true)}
-          className="w-full sm:w-auto px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 hover:scale-[1.01] border border-slate-200"
-        >
-          <span>📋 نسخ الهوامش من بنك آخر</span>
-        </button>
-        <button
-          type="button"
-          onClick={handleSaveConfig}
-          className="w-full sm:w-auto px-8 py-4 bg-[#0057B8] hover:bg-[#004bb0] text-white rounded-xl text-xs font-extrabold transition-all shadow-md shadow-[#0057B8]/20 cursor-pointer flex items-center justify-center gap-2 hover:scale-[1.01]"
-        >
-          <span>💾 حفظ وتطبيق الإعدادات</span>
-        </button>
-      </div>
-
-      {/* Copy Margins Modal */}
+      {/* 5. Inline Copy Margins Section */}
       {showCopyModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4 font-sans animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-gray-150 space-y-6 text-right relative">
-            <h3 className="text-sm font-extrabold text-gray-900 border-b border-gray-100 pb-3">
-              📋 نسخ وثائق هوامش أرباح التمويل الأساسية
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 text-right space-y-5 my-5 font-sans animate-in fade-in duration-200">
+          <div className="flex items-center justify-between border-b border-gray-150 pb-3">
+            <h3 className="text-xs sm:text-sm font-extrabold text-gray-900 flex items-center gap-2">
+              📋 نسخ هوامش الأرباح الأساسية
             </h3>
-            
-            <div className="space-y-4">
-              {/* المصدر */}
-              <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 space-y-3">
-                <span className="block text-xs font-extrabold text-[#0057B8]">👈 المصدر (الذي يُنسخ منه):</span>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="space-y-1">
-                    <label className="block text-[10px] font-bold text-gray-650">البنك:</label>
-                    <select
-                      value={copySrcBank}
-                      onChange={(e) => setCopySrcBank(e.target.value)}
-                      className="w-full bg-white border border-gray-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-gray-800 outline-none focus:ring-1 focus:ring-[#0057B8]"
-                    >
-                      {banks.map(b => (
-                        <option key={b.id} value={b.id}>{b.nameAr}</option>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  <div className="space-y-1">
-                    <label className="block text-[10px] font-bold text-gray-650">المنتج:</label>
-                    <select
-                      value={copySrcProduct}
-                      onChange={(e) => setCopySrcProduct(e.target.value as ProductId)}
-                      className="w-full bg-white border border-gray-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-gray-800 outline-none focus:ring-1 focus:ring-[#0057B8]"
-                    >
-                      {productTypesList.map(p => (
-                        <option key={p.id} value={p.id}>{p.nameAr}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="block text-[10px] font-bold text-gray-650">نوع الدعم:</label>
-                    <select
-                      value={copySrcSupport}
-                      onChange={(e) => setCopySrcSupport(e.target.value as SupportType)}
-                      className="w-full bg-white border border-gray-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-gray-800 outline-none focus:ring-1 focus:ring-[#0057B8]"
-                    >
-                      <option value="none">غير مدعوم</option>
-                      <option value="monthly">دعم شهري</option>
-                      <option value="downpayment">دعم دفعة</option>
-                    </select>
-                  </div>
+            <button
+              type="button"
+              onClick={() => setShowCopyModal(false)}
+              className="text-[10px] sm:text-xs bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-1.5 rounded-xl font-bold cursor-pointer transition-colors"
+            >
+              إخفاء
+            </button>
+          </div>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* المصدر */}
+            <div className="bg-blue-50/40 p-4 sm:p-5 rounded-2xl border border-blue-100 space-y-3">
+              <span className="block text-xs font-extrabold text-[#0057B8]">👈 المصدر (الذي يُنسخ منه):</span>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-gray-500">البنك:</label>
+                  <select
+                    value={copySrcBank}
+                    onChange={(e) => setCopySrcBank(e.target.value)}
+                    className="w-full bg-white border border-gray-200 rounded-xl px-2.5 py-2 text-xs font-bold text-gray-800 outline-none focus:ring-1 focus:ring-[#0057B8]"
+                  >
+                    {banks.map(b => (
+                      <option key={b.id} value={b.id}>{b.nameAr}</option>
+                    ))}
+                  </select>
                 </div>
-              </div>
+                
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-gray-500">المنتج:</label>
+                  <select
+                    value={copySrcProduct}
+                    onChange={(e) => setCopySrcProduct(e.target.value as ProductId)}
+                    className="w-full bg-white border border-gray-200 rounded-xl px-2.5 py-2 text-xs font-bold text-gray-800 outline-none focus:ring-1 focus:ring-[#0057B8]"
+                  >
+                    {productTypesList.map(p => (
+                      <option key={p.id} value={p.id}>{p.nameAr}</option>
+                    ))}
+                  </select>
+                </div>
 
-              {/* الهدف */}
-              <div className="bg-emerald-50/30 p-4 rounded-xl border border-emerald-100 space-y-3">
-                <span className="block text-xs font-extrabold text-emerald-700">👉 الهدف (الذي يتم النسخ والتبديل فيه):</span>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="space-y-1">
-                    <label className="block text-[10px] font-bold text-gray-650">البنك:</label>
-                    <select
-                      value={copyDstBank}
-                      onChange={(e) => setCopyDstBank(e.target.value)}
-                      className="w-full bg-white border border-gray-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-gray-800 outline-none focus:ring-1 focus:ring-emerald-600"
-                    >
-                      {banks.map(b => (
-                        <option key={b.id} value={b.id}>{b.nameAr}</option>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  <div className="space-y-1">
-                    <label className="block text-[10px] font-bold text-gray-650">المنتج:</label>
-                    <select
-                      value={copyDstProduct}
-                      onChange={(e) => setCopyDstProduct(e.target.value as ProductId)}
-                      className="w-full bg-white border border-gray-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-gray-800 outline-none focus:ring-1 focus:ring-emerald-600"
-                    >
-                      {productTypesList.map(p => (
-                        <option key={p.id} value={p.id}>{p.nameAr}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="block text-[10px] font-bold text-gray-650">نوع الدعم:</label>
-                    <select
-                      value={copyDstSupport}
-                      onChange={(e) => setCopyDstSupport(e.target.value as SupportType)}
-                      className="w-full bg-white border border-gray-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-gray-800 outline-none focus:ring-1 focus:ring-emerald-600"
-                    >
-                      <option value="none">غير مدعوم</option>
-                      <option value="monthly">دعم شهري</option>
-                      <option value="downpayment">دعم دفعة</option>
-                    </select>
-                  </div>
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-gray-500">نوع الدعم:</label>
+                  <select
+                    value={copySrcSupport}
+                    onChange={(e) => setCopySrcSupport(e.target.value as SupportType)}
+                    className="w-full bg-white border border-gray-200 rounded-xl px-2.5 py-2 text-xs font-bold text-gray-800 outline-none focus:ring-1 focus:ring-[#0057B8]"
+                  >
+                    <option value="none">غير مدعوم</option>
+                    <option value="monthly">دعم شهري</option>
+                    <option value="downpayment">دعم دفعة</option>
+                  </select>
                 </div>
               </div>
             </div>
 
-            <p className="text-[10px] text-gray-500 leading-relaxed font-bold bg-amber-50 text-amber-700 p-3 rounded-xl border border-amber-100">
+            {/* الهدف */}
+            <div className="bg-emerald-50/20 p-4 sm:p-5 rounded-2xl border border-emerald-100 space-y-3">
+              <span className="block text-xs font-extrabold text-emerald-700">👉 الهدف (الذي يتم النسخ والتبديل فيه):</span>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-gray-500">البنك:</label>
+                  <select
+                    value={copyDstBank}
+                    onChange={(e) => setCopyDstBank(e.target.value)}
+                    className="w-full bg-white border border-gray-200 rounded-xl px-2.5 py-2 text-xs font-bold text-gray-800 outline-none focus:ring-1 focus:ring-emerald-600"
+                  >
+                    {banks.map(b => (
+                      <option key={b.id} value={b.id}>{b.nameAr}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-gray-500">المنتج:</label>
+                  <select
+                    value={copyDstProduct}
+                    onChange={(e) => setCopyDstProduct(e.target.value as ProductId)}
+                    className="w-full bg-white border border-gray-200 rounded-xl px-2.5 py-2 text-xs font-bold text-gray-800 outline-none focus:ring-1 focus:ring-emerald-600"
+                  >
+                    {productTypesList.map(p => (
+                      <option key={p.id} value={p.id}>{p.nameAr}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-gray-500">نوع الدعم:</label>
+                  <select
+                    value={copyDstSupport}
+                    onChange={(e) => setCopyDstSupport(e.target.value as SupportType)}
+                    className="w-full bg-white border border-gray-200 rounded-xl px-2.5 py-2 text-xs font-bold text-gray-800 outline-none focus:ring-1 focus:ring-emerald-600"
+                  >
+                    <option value="none">غير مدعوم</option>
+                    <option value="monthly">دعم شهري</option>
+                    <option value="downpayment">دعم دفعة</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-3 bg-amber-50 rounded-2xl p-4 border border-amber-100">
+            <p className="text-[10px] text-gray-500 leading-relaxed font-bold text-right">
               * تنبيه: عملية النسخ تطبق فقط على جدول هوامش التمويل الأساسية (سنوات التمويل والنسب %)، ولن تؤثر على استثناءات القطاعات، DSR، أو أي إعدادات أخرى. التعديلات تكون محلية مؤقتة ويتم تثبيتها فقط عند نقر "حفظ وتطبيق الإعدادات".
             </p>
-
-            <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
               <button
                 type="button"
                 onClick={() => setShowCopyModal(false)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer"
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl text-xs font-bold cursor-pointer transition-colors"
               >
                 إلغاء
               </button>
@@ -974,9 +964,8 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                     copyDstProduct,
                     copyDstSupport
                   );
-                  setShowCopyModal(false);
                 }}
-                className="px-5 py-2 bg-[#0057B8] hover:bg-[#004bb0] text-white rounded-xl text-xs font-extrabold cursor-pointer"
+                className="px-5 py-2 bg-[#0057B8] hover:bg-[#004bb0] text-white rounded-xl text-xs font-extrabold cursor-pointer transition-colors shadow-xs"
               >
                 نسخ وتطبيق
               </button>
@@ -984,6 +973,24 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
           </div>
         </div>
       )}
+
+      {/* 6. Unified Save Button */}
+      <div className="flex flex-col sm:flex-row justify-end items-center gap-3 pt-2 font-sans">
+        <button
+          type="button"
+          onClick={() => setShowCopyModal(!showCopyModal)}
+          className="w-full sm:w-auto px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 hover:scale-[1.01] border border-slate-200"
+        >
+          <span>📋 نسخ الهوامش من بنك آخر</span>
+        </button>
+        <button
+          type="button"
+          onClick={handleSaveConfig}
+          className="w-full sm:w-auto px-8 py-4 bg-[#0057B8] hover:bg-[#004bb0] text-white rounded-xl text-xs font-extrabold transition-all shadow-md shadow-[#0057B8]/20 cursor-pointer flex items-center justify-center gap-2 hover:scale-[1.01]"
+        >
+          <span>💾 حفظ وتطبيق الإعدادات</span>
+        </button>
+      </div>
 
       {/* 7. Collapsible General Review Log List */}
       <div className="bg-white rounded-2xl border border-gray-150 shadow-sm overflow-hidden text-right font-sans">
