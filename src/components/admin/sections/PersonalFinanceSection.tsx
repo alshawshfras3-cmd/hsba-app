@@ -154,29 +154,43 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
     }
 
     if (isBracket && formPfSalaryBrackets.length === 0) {
-      setPfError('يجب إضافة شريحة واحدة على الأقل عند اختيار نظام شرائح الرواتب.');
+      setPfError('أضف شريحة راتب واحدة على الأقل قبل الحفظ');
       return;
     }
 
     let finalBrackets: SalaryBracket[] = [];
     if (isBracket) {
       for (const b of formPfSalaryBrackets) {
-        const parsedFrom = parseFloat(parseArabicAndEnglishNumber(b.fromSalary));
+        const rawFrom = String(b.fromSalary).trim();
+        const rawMargin = String(b.annualMargin).trim();
+        const rawDsr = String(b.dsrPercentage).trim();
+        const rawTerm = String(b.termMonths).trim();
+
+        if (rawFrom === "" || rawMargin === "" || rawDsr === "" || rawTerm === "") {
+          setPfError('الرجاء تعبئة جميع حقول الشرائح (من راتب، نسبة الربح، DSR، مدة التمويل).');
+          return;
+        }
+
+        const parsedFrom = parseFloat(parseArabicAndEnglishNumber(rawFrom));
         const parsedTo = b.toSalary !== null && String(b.toSalary).trim() !== '' ? parseFloat(parseArabicAndEnglishNumber(b.toSalary)) : null;
-        const parsedMargin = parseFloat(parseArabicAndEnglishNumber(b.annualMargin));
-        const parsedDsr = parseFloat(parseArabicAndEnglishNumber(b.dsrPercentage));
-        const parsedTerm = parseFloat(parseArabicAndEnglishNumber(b.termMonths));
+        const parsedMargin = parseFloat(parseArabicAndEnglishNumber(rawMargin));
+        const parsedDsr = parseFloat(parseArabicAndEnglishNumber(rawDsr));
+        const parsedTerm = parseFloat(parseArabicAndEnglishNumber(rawTerm));
 
         if (isNaN(parsedFrom) || (parsedTo !== null && isNaN(parsedTo)) || isNaN(parsedMargin) || isNaN(parsedDsr) || isNaN(parsedTerm)) {
-          setPfError('الرجاء التأكد من صحة الحقول الرقمية في جميع الشرائح.');
+          setPfError('الرجاء التأكد من صحة القيم الرقمية في جميع الشرائح للرواتب.');
           return;
         }
 
         finalBrackets.push({
           fromSalary: parsedFrom,
+          salaryFrom: parsedFrom,
           toSalary: parsedTo,
+          salaryTo: parsedTo,
           annualMargin: parsedMargin,
+          annualFlatRate: parsedMargin,
           dsrPercentage: parsedDsr,
+          personalDsr: parsedDsr,
           termMonths: parsedTerm
         });
       }
@@ -217,7 +231,7 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
 
     if (editingPfRule) {
       setPersonalRules(prev => prev.map(r => (r.id === editingPfRule.id || (!r.id && r.bankId === editingPfRule.bankId && r.pathType === editingPfRule.pathType && r.customerStatus === editingPfRule.customerStatus)) ? ruleData : r));
-      showToast('تم تحديث قاعدة التمويل الشخصي بنجاح!', 'success');
+      showToast('تم حفظ قاعدة التمويل الشخصي بنجاح', 'success');
     } else {
       const exists = personalRules.some(r => r.bankId === formPfBankId && r.pathType === formPfPathType && r.customerStatus === formPfCustomerStatus);
       if (exists) {
@@ -225,7 +239,7 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
         return;
       }
       setPersonalRules(prev => [...prev, ruleData]);
-      showToast('تم إضافة قاعدة التمويل الشخصي بنجاح!', 'success');
+      showToast('تم حفظ قاعدة التمويل الشخصي بنجاح', 'success');
     }
 
     setIsPfModalOpen(false);
@@ -983,23 +997,23 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
                   </div>
                 </div>
               </div>
-            </div>
 
-            <div className="bg-gray-50 px-6 py-4 flex flex-row-reverse gap-3 border-t border-gray-100 font-bold text-xs">
-              <button
-                type="button"
-                onClick={savePfRule}
-                className="bg-[#0057B8] hover:bg-blue-700 text-white px-5 py-2 rounded-xl text-xs font-bold transition-all shadow-sm hover:shadow cursor-pointer"
-              >
-                {editingPfRule ? 'تحديث القاعدة' : 'حفظ وإضافة'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsPfModalOpen(false)}
-                className="bg-white hover:bg-gray-100 border border-gray-200 text-gray-700 px-5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer"
-              >
-                إلغاء
-              </button>
+              <div className="bg-gray-50 px-6 py-4 flex flex-row-reverse gap-3 border-t border-gray-100 font-bold text-xs sticky bottom-0 z-10">
+                <button
+                  type="button"
+                  onClick={savePfRule}
+                  className="bg-[#0057B8] hover:bg-blue-700 text-white px-5 py-2 rounded-xl text-xs font-bold transition-all shadow-sm hover:shadow cursor-pointer"
+                >
+                  {editingPfRule ? 'تحديث القاعدة' : 'إضافة القاعدة'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsPfModalOpen(false)}
+                  className="bg-white hover:bg-gray-100 border border-gray-200 text-gray-700 px-5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  إلغاء
+                </button>
+              </div>
             </div>
           </div>
         </div>

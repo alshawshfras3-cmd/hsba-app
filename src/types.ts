@@ -177,6 +177,10 @@ export interface SalaryBracket {
   annualMargin: number;
   dsrPercentage: number;
   termMonths: number;
+  salaryFrom?: number;
+  salaryTo?: number | null;
+  annualFlatRate?: number;
+  personalDsr?: number;
 }
 
 export interface PersonalFinanceRules {
