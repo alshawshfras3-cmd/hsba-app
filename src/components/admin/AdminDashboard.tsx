@@ -4966,9 +4966,8 @@ export default function AdminDashboard() {
                       <th className="p-4 font-bold">حالة العميل</th>
                       <th className="p-4 font-bold text-center">DSR الشخصي</th>
                       <th className="p-4 font-bold text-center">مدة التمويل (بالشهور)</th>
-                      <th className="p-4 font-bold text-center">معامل التمويل</th>
+                      <th className="p-4 font-bold text-center">النسبة / المعامل</th>
                       <th className="p-4 font-bold">طريقة الحساب</th>
-                      <th className="p-4 font-bold text-center">الهامش للعرض</th>
                       <th className="p-4 font-bold text-center">أقل راتب</th>
                       <th className="p-4 font-bold text-center">مفعل</th>
                       <th className="p-4 font-bold text-center">الإجراءات</th>
@@ -5008,21 +5007,21 @@ export default function AdminDashboard() {
                             <td className="p-4 text-center font-sans">{displayDsr}%</td>
                             <td className="p-4 text-center font-sans">{displayTerm} شهراً</td>
                             <td className="p-4 text-center font-sans">
-                              {rule.calculationMethod === 'multiplier' ? (rule.financeCoefficient ?? 0) : '-'}
+                              {rule.calculationMethod === 'flat_rate' ? (
+                                <span className="text-[#0057B8] font-bold">هامش {displayMargin}%</span>
+                              ) : rule.calculationMethod === 'pmt' ? (
+                                <span className="text-indigo-700 font-bold">APR {displayMargin}%</span>
+                              ) : (
+                                <div className="flex flex-col items-center">
+                                  <span className="text-slate-800 font-sans font-bold">معامل {rule.financeCoefficient ?? 0}</span>
+                                  <span className="text-gray-400 text-[10px] font-normal font-sans">للعرض فقط ({displayMargin}%)</span>
+                                </div>
+                              )}
                             </td>
-                            <td className="p-4 text-xs">
+                            <td className="p-4 text-xs font-sans">
                               <span className="text-gray-500 font-sans">
                                 {rule.calculationMethod === 'pmt' ? 'PMT' : rule.calculationMethod === 'multiplier' ? 'Multiplier' : 'Flat Rate'}
                               </span>
-                            </td>
-                            <td className="p-4 text-center font-sans">
-                              {rule.calculationMethod === 'multiplier' ? (
-                                <span className="text-gray-400 text-[10px] font-normal">للعرض فقط</span>
-                              ) : rule.calculationMethod === 'pmt' ? (
-                                <span className="text-blue-700">{displayMargin}% (الفائدة)</span>
-                              ) : (
-                                <span>{displayMargin}%</span>
-                              )}
                             </td>
                             <td className="p-4 text-center font-sans">{(rule.minSalary ?? 0).toLocaleString('ar-SA')} ريال</td>
                             <td className="p-4 text-center">
@@ -5065,7 +5064,7 @@ export default function AdminDashboard() {
                       })
                     ) : (
                       <tr>
-                        <td colSpan={11} className="p-8 text-center text-gray-400">لا توجد قواعد سارية حالياً.</td>
+                        <td colSpan={10} className="p-8 text-center text-gray-400">لا توجد قواعد سارية حالياً.</td>
                       </tr>
                     )}
                   </tbody>
