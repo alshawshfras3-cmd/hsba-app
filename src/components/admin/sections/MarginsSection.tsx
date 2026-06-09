@@ -347,12 +347,14 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     dstSupport: SupportType
   ) => {
     if (srcBank === dstBank && srcProduct === dstProduct && srcSupport === dstSupport) {
-      showToast('لا يمكن النسخ لقارنة مطابقة تماماً للمصدر.', 'refuse');
+      showToast('لا يمكن النسخ لقرينة مطابِقة تماماً للمصدر.', 'refuse');
       return;
     }
 
-    // 1. Resolve source parameters
     const normSrcSupport = (srcSupport as string) === 'down_payment' || srcSupport === 'downpayment' ? 'downpayment' : srcSupport;
+    const normDstSupport = (dstSupport as string) === 'down_payment' || dstSupport === 'downpayment' ? 'downpayment' : dstSupport;
+
+    // Build the mapped product IDs for raw DB matches from source
     const srcProductIds = [srcProduct];
     if (srcProduct === 'real_estate_with_new_personal') {
       srcProductIds.push('real_estate' as any, 'both' as any);
@@ -362,21 +364,61 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       srcProductIds.push('real_estate' as any);
     }
 
-    // Find all source margin rules for base margins
-    const sourceRules = marginRules.filter(r => 
-      r.bankId === srcBank &&
-      (r.productId === srcProduct || r.productType === srcProduct || srcProductIds.includes(r.productId)) &&
+    // Try both with/without salary tier to get the rules of the source
+    const srcSalaryTier = normSrcSupport === 'none' ? 'not_applicable' : 'below_25000';
+
+    const relevantSrcRules = marginRules.filter(r => 
+      r.bankId === srcBank && 
+      (r.productId === srcProduct || r.productType === srcProduct || srcProductIds.includes(r.productId)) && 
       (r.supportType === normSrcSupport || r.supportType === 'all') &&
-      !r.isExceptionOnly
+      (!r.isExceptionOnly) &&
+      (r.salaryTier === srcSalaryTier || (!r.salaryTier && srcSalaryTier === 'not_applicable') || r.salaryTier === 'not_applicable' || !r.salaryTier)
     );
 
-    if (sourceRules.length === 0) {
-      showToast('لا توجد هوامش تمويل في البنك والمصدر المحددين لنسخها.', 'refuse');
-      return;
+    const yearsListFull = Array.from({ length: 26 }, (_, i) => 5 + i);
+    const srcMargins: Record<number, string> = {};
+    const hasRules = relevantSrcRules.length > 0;
+
+    yearsListFull.forEach(year => {
+      const rY = relevantSrcRules.find(r => r.year === year || r.toTermMonths === year * 12);
+      if (rY) {
+        srcMargins[year] = (rY.annualMargin !== undefined ? rY.annualMargin : (rY.baseMargin !== undefined ? Number((rY.baseMargin * 100).toFixed(3)) : rY.endMargin)).toLocaleString('en-US', {useGrouping: false});
+      } else {
+        const isStandardYear = [5, 10, 15, 20, 25, 30].includes(year);
+        if (!hasRules && isStandardYear) {
+          if (year === 5) srcMargins[year] = '3.80';
+          else if (year === 10) srcMargins[year] = '3.98';
+          else if (year === 15) srcMargins[year] = '4.25';
+          else if (year === 20) srcMargins[year] = '4.60';
+          else if (year === 25) srcMargins[year] = '4.95';
+          else if (year === 30) srcMargins[year] = '5.25';
+        } else {
+          srcMargins[year] = '';
+        }
+      }
+    });
+
+    let method: 'linear' | 'fixed' = 'fixed';
+    const foundMethodRule = relevantSrcRules.find(r => r.calculationMethod || r.calcType);
+    if (foundMethodRule) {
+      method = (foundMethodRule.calculationMethod || foundMethodRule.calcType) as any;
+    }
+
+    let inputMode: 'yearly' | 'key_points' = 'key_points';
+    const foundInputModeRule = relevantSrcRules.find(r => r.marginInputMode);
+    if (foundInputModeRule) {
+      inputMode = foundInputModeRule.marginInputMode;
+    } else {
+      const hasIntermediate = relevantSrcRules.some(r => {
+        const y = r.year || (r.toTermMonths / 12);
+        return y !== undefined && ![5, 10, 15, 20, 25, 30].includes(y);
+      });
+      if (hasIntermediate) {
+        inputMode = 'yearly';
+      }
     }
 
     // 2. Resolve target parameters
-    const normDstSupport = (dstSupport as string) === 'down_payment' || dstSupport === 'downpayment' ? 'downpayment' : dstSupport;
     const dstProductIds = [dstProduct];
     if (dstProduct === 'real_estate_with_new_personal') {
       dstProductIds.push('real_estate' as any, 'both' as any);
@@ -385,6 +427,9 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     } else if (dstProduct === 'real_estate_only') {
       dstProductIds.push('real_estate' as any);
     }
+
+    const targetSalaryTiers: Array<'below_25000' | 'above_or_equal_25000' | 'not_applicable'> = 
+      normDstSupport === 'none' ? ['not_applicable'] : ['below_25000', 'above_or_equal_25000'];
 
     // Filter out any existing base rules on the target combination
     const remainingRules = marginRules.filter(r => {
@@ -396,40 +441,112 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       return !isTargetBaseRule;
     });
 
-    // Construct copied rules
-    const copiedRulesAndNew: MarginRule[] = [];
+    // Generate new rules for the target combo
+    const newRulesForDst: MarginRule[] = [];
+    const yearsToExtract = inputMode === 'yearly'
+      ? Array.from({ length: 26 }, (_, i) => 5 + i)
+      : [5, 10, 15, 20, 25, 30];
 
-    sourceRules.forEach((rule, idx) => {
-      // Determine the target salary tiers
-      let targetTiers: Array<'not_applicable' | 'below_25000' | 'above_or_equal_25000'> = [];
-      if (normDstSupport === 'none') {
-        targetTiers = ['not_applicable'];
-      } else {
-        if (rule.salaryTier === 'not_applicable' || !rule.salaryTier) {
-          targetTiers = ['below_25000', 'above_or_equal_25000'];
-        } else {
-          targetTiers = [rule.salaryTier as any];
-        }
-      }
+    const filledYears = yearsToExtract.filter(year => {
+      const val = srcMargins[year];
+      return val !== undefined && val !== '' && !isNaN(parseFloat(val)) && parseFloat(val) > 0;
+    });
 
+    filledYears.sort((a, b) => a - b);
+
+    if (filledYears.length > 0) {
       dstProductIds.forEach(pId => {
-        targetTiers.forEach(tier => {
-          copiedRulesAndNew.push({
-            ...rule,
-            id: `copied_margin_${dstBank}_${pId}_${normDstSupport}_${tier}_t${rule.fromTermMonths}_${rule.toTermMonths}_${idx}_${Date.now()}`,
-            bankId: dstBank,
-            productId: pId as ProductId,
-            productType: dstProduct as any,
-            supportType: normDstSupport as any,
-            salaryTier: tier,
-            exceptionBps: rule.exceptionBps ?? 0
+        targetSalaryTiers.forEach(targetSalaryTier => {
+          const definitions: Array<{ from: number, to: number, start: number, end: number, calcType: 'fixed' | 'linear', yearPoint: number }> = [];
+
+          for (let i = 0; i < filledYears.length; i++) {
+            const currentYear = filledYears[i];
+            const currentMarginStr = srcMargins[currentYear];
+            const currentMarginVal = parseFloat(currentMarginStr) || 0;
+
+            if (i === 0) {
+              definitions.push({
+                from: 0,
+                to: currentYear * 12,
+                start: currentMarginVal,
+                end: currentMarginVal,
+                calcType: 'fixed' as const,
+                yearPoint: currentYear
+              });
+            } else {
+              const prevYear = filledYears[i - 1];
+              const prevMarginStr = srcMargins[prevYear];
+              const prevMarginVal = parseFloat(prevMarginStr) || 0;
+
+              const fromMonths = prevYear * 12 + 1;
+              const toMonths = currentYear * 12;
+
+              definitions.push({
+                from: fromMonths,
+                to: toMonths,
+                start: method === 'fixed' ? currentMarginVal : prevMarginVal,
+                end: currentMarginVal,
+                calcType: method,
+                yearPoint: currentYear
+              });
+            }
+          }
+
+          const lastYear = filledYears[filledYears.length - 1];
+          const lastMarginStr = srcMargins[lastYear];
+          const lastMarginVal = parseFloat(lastMarginStr) || 0;
+
+          definitions.push({
+            from: lastYear * 12 + 1,
+            to: 9999,
+            start: lastMarginVal,
+            end: lastMarginVal,
+            calcType: 'fixed' as const,
+            yearPoint: lastYear
+          });
+
+          definitions.forEach((def, index) => {
+            newRulesForDst.push({
+              id: `copied_margin_${dstBank}_${pId}_${normDstSupport}_${targetSalaryTier}_t${def.from}_${def.to}_${index}_${Date.now()}`,
+              bankId: dstBank,
+              productId: pId as ProductId,
+              supportType: normDstSupport as any,
+              sectorId: 'all',
+              fromTermMonths: def.from,
+              toTermMonths: def.to,
+              startMargin: def.start,
+              endMargin: def.end,
+              calcType: def.calcType,
+              isActive: true,
+              salaryTier: targetSalaryTier,
+              productType: dstProduct as any,
+              marginInputMode: inputMode,
+              calculationMethod: method,
+              year: def.yearPoint,
+              termMonths: def.to === 9999 ? (def.yearPoint * 12) : def.to,
+              annualMargin: def.end,
+              exceptionBps: 0,
+              baseMargin: Number((def.end / 100).toFixed(6))
+            });
           });
         });
       });
-    });
+    }
 
-    setMarginRules([...remainingRules, ...copiedRulesAndNew]);
-    showToast('تم نسخ هوامش التمويل الأساسية وتطبيقها محلياً بنجاح! يرجى الضغط على حفظ وتطبيق الإعدادات بمجرد الانتهاء لتثبيتها.', 'success');
+    setMarginRules([...remainingRules, ...newRulesForDst]);
+
+    // Force context selections to change to the target combo automatically
+    // so the state-update event is triggered, and the user directly sees the copied values in the grid!
+    setSelectedBank(dstBank);
+    setSelectedProduct(dstProduct);
+    setSelectedSupport(dstSupport);
+    if (normDstSupport === 'none') {
+      setSelectedSalaryTier('not_applicable');
+    } else {
+      setSelectedSalaryTier('below_25000');
+    }
+
+    showToast('تم نسخ هوامش التمويل الأساسية وتطبيقها بنجاح! تم تحويل شاشة العرض تلقائياً للبنك الهدف لمراجعة وتثبيت التعديلات.', 'success');
   };
 
   // Compile combined flat row configs for general log reviewing
