@@ -235,7 +235,8 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
         isActive: formIsActive,
         allowAfterRetirement: safeAllowedSectors.includes('retired'),
         supportsRealEstate: (formProductId === 'real_estate_only' || formProductId === 'real_estate_with_new_personal' || formProductId === 'real_estate_with_existing_personal') ? true : undefined,
-        supportsPersonal: (formProductId === 'personal_only') ? true : undefined
+        supportsPersonal: formProductId === 'real_estate_with_new_personal' ? true : (formProductId === 'real_estate_with_existing_personal' ? false : (formProductId === 'personal_only' ? true : undefined)),
+        existingPersonal: formProductId === 'real_estate_with_existing_personal' ? true : undefined,
       };
 
       if (editingProduct) {

@@ -1,8 +1,18 @@
 import { DsrOutput, DsrRule } from '../../types';
 
 export function mapProductIdToType(productId: string): 'real_estate_only' | 'real_estate_with_new_personal' | 'real_estate_with_existing_personal' | 'personal_only' {
-  if (productId === 'personal' || productId === 'personal_only') {
+  const p = productId ? productId.trim().toLowerCase() : '';
+  if (p === 'personal' || p === 'personal_only') {
     return 'personal_only';
+  }
+  if (p === 'real_estate' || p === 'real_estate_only') {
+    return 'real_estate_only';
+  }
+  if (p === 'both' || p === 'real_estate_with_new_personal') {
+    return 'real_estate_with_new_personal';
+  }
+  if (p === 'real_estate_with_personal_existing' || p === 'real_estate_with_existing_personal') {
+    return 'real_estate_with_existing_personal';
   }
   return 'real_estate_only';
 }

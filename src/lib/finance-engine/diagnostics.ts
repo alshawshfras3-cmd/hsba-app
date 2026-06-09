@@ -78,7 +78,8 @@ export function runDiagnostics(params: {
   }
 
   // Step 5.5: Check support type eligibility
-  if (productId !== 'personal_only' && productId !== 'personal') {
+  const normProductId = (productId === 'personal' || productId === 'personal_only') ? 'personal_only' : productId;
+  if (normProductId !== 'personal_only') {
     if (supportType === 'none' && !acceptance.allowUnsupported) {
       status = 'rejected';
       messages.push(`تم رفض الطلب: هذا المنتج لا يقبل العملاء بدون دعم سكني لدى ${bankName}.`);

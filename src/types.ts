@@ -52,6 +52,7 @@ export interface ProductAcceptance {
   defaultRejectionMessage: string;
   supportsRealEstate?: boolean;
   supportsPersonal?: boolean;
+  existingPersonal?: boolean;
 }
 
 export interface Sector {

@@ -73,6 +73,16 @@ const DB_TO_CACHE_KEY: Record<string, string> = {
   pension_rules_library: 'pensionRulesLibrary',
 };
 
+export function normalizeMemoryProductId(id: string): string {
+  if (!id) return id;
+  const p = id.trim().toLowerCase();
+  if (p === 'real_estate' || p === 'real_estate_only') return 'real_estate_only';
+  if (p === 'personal' || p === 'personal_only') return 'personal_only';
+  if (p === 'both' || p === 'real_estate_with_new_personal') return 'real_estate_with_new_personal';
+  if (p === 'real_estate_with_personal_existing' || p === 'real_estate_with_existing_personal') return 'real_estate_with_existing_personal';
+  return id;
+}
+
 function getDsrRuleKey(rule: DsrRule): string {
   return [
     rule.bankId,
@@ -368,15 +378,15 @@ export function useSettings() {
     fetchSettings,
     saveSetting,
     banks: settings.banks ?? DEFAULTS.banks,
-    marginRules: settings.margin_rules ?? DEFAULTS.margin_rules,
-    dsrRules: normalizeDsrRules(settings.dsr_rules ?? DEFAULTS.dsr_rules),
-    personalRules: settings.personal_finance_rules ?? DEFAULTS.personal_finance_rules,
-    products: settings.product_acceptance ?? DEFAULTS.product_acceptance,
+    marginRules: (settings.margin_rules ?? DEFAULTS.margin_rules).map((r: any) => ({ ...r, productId: normalizeMemoryProductId(r.productId) })),
+    dsrRules: normalizeDsrRules(settings.dsr_rules ?? DEFAULTS.dsr_rules).map((r: any) => ({ ...r, productType: normalizeMemoryProductId(r.productType || r.productId) })),
+    personalRules: (settings.personal_finance_rules ?? DEFAULTS.personal_finance_rules).map((r: any) => ({ ...r, productId: normalizeMemoryProductId(r.productId) })),
+    products: (settings.product_acceptance ?? DEFAULTS.product_acceptance).map((r: any) => ({ ...r, productId: normalizeMemoryProductId(r.productId) })),
     militaryRanks: (settings.military_ranks && Array.isArray(settings.military_ranks) && settings.military_ranks.length > 0 && settings.military_ranks.every((r: any) => r.hasOwnProperty('sectorScope') && r.sectorScope)) ? settings.military_ranks : DEFAULTS.military_ranks,
     pensionRules: settings.pension_rules ?? DEFAULTS.pension_rules,
     supportSettings: settings.support_settings ?? DEFAULTS.support_settings,
     salaryRules: settings.salary_rules ?? DEFAULTS.salary_rules,
-    termRules: settings.term_rules ?? DEFAULTS.term_rules,
+    termRules: (settings.term_rules ?? DEFAULTS.term_rules).map((r: any) => ({ ...r, productId: normalizeMemoryProductId(r.productId) })),
     advancedRules: settings.advanced_rules ?? DEFAULTS.advanced_rules,
     userSubscriptions: settings.user_subscriptions ?? DEFAULTS.user_subscriptions,
     customSectors: settings.hasba_custom_sectors ?? DEFAULTS.hasba_custom_sectors,
