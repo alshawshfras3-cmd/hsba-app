@@ -157,21 +157,14 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     method: 'linear' | 'fixed' = 'fixed',
     inputMode: 'yearly' | 'key_points' = 'key_points'
   ) => {
-    const productIdsToFilter = [targetProduct];
-    if (targetProduct === 'real_estate_with_new_personal') {
-      productIdsToFilter.push('real_estate' as any, 'both' as any);
-    } else if (targetProduct === 'real_estate_with_existing_personal') {
-      productIdsToFilter.push('real_estate_with_personal_existing' as any);
-    } else if (targetProduct === 'real_estate_only') {
-      productIdsToFilter.push('real_estate' as any);
-    }
-
     const normSupport = (targetSupport as string) === 'down_payment' || targetSupport === 'downpayment' ? 'downpayment' : targetSupport;
 
     const remainingRules = marginRules.filter(r => {
+      const normalizedSupportType = (r.supportType === 'down_payment' || r.supportType === 'downpayment') ? 'downpayment' : r.supportType;
+      
       const isBaseForCombo = r.bankId === targetBank &&
-                             productIdsToFilter.includes(r.productId) &&
-                             (r.supportType === normSupport || r.supportType === 'all') &&
+                             r.productId === targetProduct &&
+                             normalizedSupportType === normSupport &&
                              (r.sectorId || 'all') === 'all' &&
                              (r.salaryTier === targetSalaryTier || (!r.salaryTier && targetSalaryTier === 'not_applicable')) &&
                              !r.isExceptionOnly;
@@ -411,24 +404,17 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     }
 
     // 2. Resolve target parameters
-    const dstProductIds = [dstProduct];
-    if (dstProduct === 'real_estate_with_new_personal') {
-      dstProductIds.push('real_estate' as any, 'both' as any);
-    } else if (dstProduct === 'real_estate_with_existing_personal') {
-      dstProductIds.push('real_estate_with_personal_existing' as any);
-    } else if (dstProduct === 'real_estate_only') {
-      dstProductIds.push('real_estate' as any);
-    }
-
     const targetSalaryTiers: Array<'below_25000' | 'above_or_equal_25000' | 'not_applicable'> = 
       normDstSupport === 'none' ? ['not_applicable'] : ['below_25000', 'above_or_equal_25000'];
 
     // Filter out any existing base rules on the target combination
     const remainingRules = marginRules.filter(r => {
+      const normalizedSupportType = (r.supportType === 'down_payment' || r.supportType === 'downpayment') ? 'downpayment' : r.supportType;
       const isTargetBaseRule = 
         r.bankId === dstBank &&
-        (r.productId === dstProduct || r.productType === dstProduct || dstProductIds.includes(r.productId)) &&
-        (r.supportType === normDstSupport || r.supportType === 'all') &&
+        r.productId === dstProduct &&
+        normalizedSupportType === normDstSupport &&
+        targetSalaryTiers.includes(r.salaryTier || 'not_applicable' as any) &&
         !r.isExceptionOnly;
       return !isTargetBaseRule;
     });

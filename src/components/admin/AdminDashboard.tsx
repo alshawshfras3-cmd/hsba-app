@@ -752,33 +752,6 @@ export default function AdminDashboard() {
   const [newUserRoleStr, setNewUserRoleStr] = useState<'owner' | 'manager' | 'employee' | 'user'>('user');
   const [newUserPlanStr, setNewUserPlanStr] = useState<'free' | 'premium' | 'enterprise'>('free');
 
-  // States to facilitate adding new entries easily in margins
-  const [newMarginBank, setNewMarginBank] = useState('alahli');
-  const [newMarginStart, setNewMarginStart] = useState(2.5);
-  const [newMarginEnd, setNewMarginEnd] = useState(3.5);
-  const [newMarginFrom, setNewMarginFrom] = useState(1);
-  const [newMarginTo, setNewMarginTo] = useState(300);
-
-  // Filter margins
-  const [filterMarginBank, setFilterMarginBank] = useState('all');
-  const [filterMarginProduct, setFilterMarginProduct] = useState('all');
-  const [filterMarginSupport, setFilterMarginSupport] = useState('all');
-  const [filterMarginActiveStatus, setFilterMarginActiveStatus] = useState('all');
-
-  // Modal / Form state for Add/Edit margin
-  const [isMarginModalOpen, setIsMarginModalOpen] = useState(false);
-  const [editingMarginCombo, setEditingMarginCombo] = useState<any>(null);
-  const [formMarginBankId, setFormMarginBankId] = useState('alahli');
-  const [formMarginProductId, setFormMarginProductId] = useState<ProductId>('real_estate_only');
-  const [formMarginSupportType, setFormMarginSupportType] = useState<SupportType>('none');
-  const [formMarginSalaryTier, setFormMarginSalaryTier] = useState<'below_25000' | 'above_or_equal_25000' | 'not_applicable'>('not_applicable');
-  const [formMarginSectorId, setFormMarginSectorId] = useState('gov_civil');
-  const [formMarginYear, setFormMarginYear] = useState<number>(25);
-  const [formMarginBase, setFormMarginBase] = useState('');
-  const [formMarginException, setFormMarginException] = useState('');
-  const [formMarginIsActive, setFormMarginIsActive] = useState(true);
-  const [formMarginError, setFormMarginError] = useState('');
-
   // --- DSR Rules States & Management ---
   const [filterDsrBank, setFilterDsrBank] = useState<string>('rajhi');
   const [filterDsrSupport, setFilterDsrSupport] = useState<string>('all');
@@ -1817,43 +1790,6 @@ export default function AdminDashboard() {
 
   const toggleProductActive = (id: string) => {
     setProducts(prev => prev.map(p => p.id === id ? { ...p, isActive: !p.isActive } : p));
-  };
-
-  const toggleMarginActive = (id: string) => {
-    setMarginRules(prev => prev.map(m => m.id === id ? { ...m, isActive: !m.isActive } : m));
-  };
-
-  const deleteMargin = (id: string) => {
-    setMarginRules(prev => prev.filter(m => m.id !== id));
-  };
-
-  const addMarginRule = () => {
-    const newRule: MarginRule = {
-      id: `m_rule_${Date.now()}`,
-      bankId: newMarginBank,
-      productId: 'real_estate',
-      supportType: 'all',
-      sectorId: 'all',
-      fromTermMonths: newMarginFrom,
-      toTermMonths: newMarginTo,
-      startMargin: newMarginStart,
-      endMargin: newMarginEnd,
-      calcType: 'linear',
-      isActive: true
-    };
-    setMarginRules(prev => [newRule, ...prev]);
-    showToast('تم إضافة نطاق الفائدة ومعدل الهامش بنجاح!', 'success');
-  };
-
-  const cloneMargins = (fromBank: string, toBank: string) => {
-    const parentRules = marginRules.filter(m => m.bankId === fromBank);
-    const clonedRules = parentRules.map((r, i) => ({
-      ...r,
-      id: `cloned_${r.id}_${Date.now()}_${i}`,
-      bankId: toBank
-    }));
-    setMarginRules(prev => [...clonedRules, ...prev]);
-    showToast(`تم نسخ جدول هوامش الفائدة من ${fromBank} إلى ${toBank} بنجاح!`, 'success');
   };
 
   /*
