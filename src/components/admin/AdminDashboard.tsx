@@ -89,6 +89,7 @@ const sectorsList = [
 
 export default function AdminDashboard() {
   const {
+    isSettingsLoading,
     banks, setBanks,
     products, setProducts,
     militaryRanks, setMilitaryRanks,
@@ -110,6 +111,15 @@ export default function AdminDashboard() {
     bankSectorRules, setBankSectorRules,
     pensionRulesLibrary: libraryRules, setPensionRulesLibrary: setLibraryRules
   } = useAppState();
+
+  if (isSettingsLoading) {
+    return (
+      <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center space-y-4" dir="rtl">
+        <Loader2 className="w-10 h-10 animate-spin text-[#0057B8]" />
+        <span className="text-xs text-slate-500 font-bold font-sans">جاري تحميل إعدادات لوحة التحكم...</span>
+      </div>
+    );
+  }
 
   const formBanksList = banks.map(b => ({ id: b.id, nameAr: b.nameAr }));
 
