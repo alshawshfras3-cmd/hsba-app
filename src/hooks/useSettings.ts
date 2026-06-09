@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase, hasSupabaseKeys } from '../lib/supabase';
 import { DsrRule, HousingSupportTier, AdvancePaymentTier } from '../types';
+import { normalizeDsrRules } from '../lib/settings/normalizeDsrRules';
 import { defaultLibraryRules } from '../lib/finance-engine/pension';
 import {
   fallbackApprovedSalaryRules,
@@ -79,39 +80,6 @@ function getDsrRuleKey(rule: DsrRule): string {
     rule.supportType,
     rule.customerStage
   ].join('|');
-}
-
-export function normalizeDsrRules(rules: DsrRule[]): DsrRule[] {
-  const map = new Map<string, DsrRule>();
-
-  for (const rule of rules || []) {
-    const normalizedProductType =
-      rule.productType === 'personal_only'
-        ? 'personal_only'
-        : 'real_estate_only';
-
-    const normalizedSupportType =
-      (rule.supportType as string) === 'downpayment'
-        ? 'down_payment'
-        : rule.supportType;
-
-    const key = [
-      rule.bankId,
-      normalizedProductType,
-      normalizedSupportType,
-      rule.customerStage
-    ].join('|');
-
-    if (!map.has(key)) {
-      map.set(key, {
-        ...rule,
-        productType: normalizedProductType as any,
-        supportType: normalizedSupportType as any
-      });
-    }
-  }
-
-  return Array.from(map.values());
 }
 
 function mergeDsrRulesWithSeeds(existingRules: DsrRule[], seedRules: DsrRule[]) {

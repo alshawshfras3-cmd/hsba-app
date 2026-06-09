@@ -1,6 +1,7 @@
 import { supabase, hasSupabaseKeys } from './supabase';
 import { MarginRule, DsrRule, PersonalFinanceRules } from '../types';
 import { ApprovedSalarySourceRule, PensionCalculationRule, SectorClassificationMapping } from '../types/pension-rules';
+import { normalizeDsrRules } from './settings/normalizeDsrRules';
 
 // Helper to convert any string to a unique deterministic RFC4122-compliant UUID
 export function toUUID(str: string): string {
@@ -192,8 +193,9 @@ export async function copyBankSettings(
         id: `dsr_${toBankId}_${Math.random().toString(36).substr(2, 9)}`,
         bankId: toBankId
       }));
-      nextDsrRules = [...dsrRules.filter(r => r.bankId !== toBankId), ...remapped];
-      await logVersion('dsr_rules', toBankId, null, oldRules, remapped, `نسخ من ${fromBankId}`, changedBy);
+      const normalizedRemap = normalizeDsrRules(remapped);
+      nextDsrRules = [...dsrRules.filter(r => r.bankId !== toBankId), ...normalizedRemap];
+      await logVersion('dsr_rules', toBankId, null, oldRules, normalizedRemap, `نسخ من ${fromBankId}`, changedBy);
     }
 
     if (section === 'personal') {
@@ -390,8 +392,9 @@ export async function importBankSettings(
 
   if (remapped.dsrRules && remapped.dsrRules.length > 0) {
     const oldRules = dsrRules.filter(r => r.bankId === targetBankId);
-    nextDsrRules = [...dsrRules.filter(r => r.bankId !== targetBankId), ...remapped.dsrRules];
-    await logVersion('dsr_rules', targetBankId, null, oldRules, remapped.dsrRules, `استيراد من ${sourceBankId}`, changedBy);
+    const normalizedDsr = normalizeDsrRules(remapped.dsrRules);
+    nextDsrRules = [...dsrRules.filter(r => r.bankId !== targetBankId), ...normalizedDsr];
+    await logVersion('dsr_rules', targetBankId, null, oldRules, normalizedDsr, `استيراد من ${sourceBankId}`, changedBy);
   }
 
   if (remapped.personalFinanceRules && remapped.personalFinanceRules.length > 0) {
@@ -515,8 +518,9 @@ export async function restoreVersion(
 
   else if (tableName === 'dsr_rules') {
     const currentRules = dsrRules.filter(r => r.bankId === targetBankId);
-    nextDsrRules = [...dsrRules.filter(r => r.bankId !== targetBankId), ...restoredData];
-    await logVersion('dsr_rules', targetBankId, version.record_id, currentRules, restoredData, 'استعادة إصدار سابق', changedBy);
+    const normalizedRestored = normalizeDsrRules(restoredData);
+    nextDsrRules = [...dsrRules.filter(r => r.bankId !== targetBankId), ...normalizedRestored];
+    await logVersion('dsr_rules', targetBankId, version.record_id, currentRules, normalizedRestored, 'استعادة إصدار سابق', changedBy);
   }
 
   else if (tableName === 'personal_finance_rules') {

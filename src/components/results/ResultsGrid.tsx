@@ -26,7 +26,7 @@ export default function ResultsGrid({
   mainFinanceType = 'real_estate',
   sectorId = 'gov_civil'
 }: ResultsGridProps) {
-  const { user, userSubscriptions, setUserSubscriptions } = useAppState();
+  const { user, userRole, userSubscriptions, setUserSubscriptions } = useAppState();
   const [activeSort, setActiveSort] = useState<'power' | 'installment' | 'margin' | 'term'>('power');
   const [selectedOffer, setSelectedOffer] = useState<BankCalculationResult | null>(null);
   const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
@@ -988,14 +988,44 @@ export default function ResultsGrid({
 
                 {/* Steps workflow visual */}
                 <div className="space-y-3.5 pr-2 border-r-2 border-slate-100">
-                  {selectedOffer.diagnosticSteps.map((step, i) => (
-                    <div key={i} className="relative flex gap-3 items-start mr-3">
-                      <div className="w-5 h-5 rounded-full bg-slate-100 border border-slate-200 text-[#6B7280] font-bold text-[10px] flex items-center justify-center shrink-0">
-                        {i + 1}
+                  {(() => {
+                    const isUserAdmin = userRole === 'admin';
+                    const filteredSteps = selectedOffer.diagnosticSteps.filter((step: string) => {
+                      if (isUserAdmin) return true;
+                      
+                      const forbiddenKeywords = [
+                        'Exception Bps',
+                        'exceptionBps',
+                        'Base Margin',
+                        'Final Margin',
+                        'baseMargin',
+                        'نسبة الاستثناء',
+                        'استثناء',
+                        'الهامش النهائي',
+                        'هامش الجدول',
+                        'معادلة الاستثناء',
+                        'معادلة الهامش',
+                        'تفاصيل استثناء الهامش',
+                        'طريقة حساب التمويل العقاري',
+                        'نقاط أساس'
+                      ];
+                      
+                      return !forbiddenKeywords.some(keyword => step.includes(keyword));
+                    }).map((step: string) => {
+                      if (isUserAdmin) return step;
+                      // Clean any trailing exception text in any other matched log items
+                      return step.replace(/\s*\(تم تطبيق استثناء بمقدار.*\)\s*$/, '');
+                    });
+
+                    return filteredSteps.map((step, i) => (
+                      <div key={i} className="relative flex gap-3 items-start mr-3">
+                        <div className="w-5 h-5 rounded-full bg-slate-100 border border-slate-200 text-[#6B7280] font-bold text-[10px] flex items-center justify-center shrink-0">
+                          {i + 1}
+                        </div>
+                        <p className="text-xs text-[#4B5563] leading-relaxed font-sans">{step}</p>
                       </div>
-                      <p className="text-xs text-[#4B5563] leading-relaxed font-sans">{step}</p>
-                    </div>
-                  ))}
+                    ));
+                  })()}
                 </div>
 
                 {/* Status messages notifications */}
