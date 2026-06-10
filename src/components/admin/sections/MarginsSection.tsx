@@ -1305,7 +1305,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                 </div>
               )}
               
-              <div className="overflow-x-auto border border-gray-200 rounded-xl max-h-[360px] overflow-y-auto scrollbar-thin">
+              <div className="overflow-x-auto border border-gray-200 rounded-xl">
                 <table className="min-w-full divide-y divide-gray-200 text-right text-xs">
                   <thead className="bg-slate-50 text-slate-600 font-bold sticky top-0 z-10">
                     <tr>
@@ -1595,7 +1595,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
           </div>
 
           <div className="p-4 space-y-3">
-            <div className="overflow-x-auto border border-gray-200 rounded-lg max-h-[350px] overflow-y-auto">
+            <div className="overflow-x-auto border border-gray-200 rounded-lg">
               <table className="w-full text-right text-xs text-[#111827] min-w-[750px]">
                 <thead className="bg-slate-50 text-gray-500 border-b border-gray-150 sticky top-0 z-10 font-bold">
                   <tr>
