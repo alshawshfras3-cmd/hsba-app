@@ -64,6 +64,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
 
   // Copy Margins Modal States
   const [showCopyModal, setShowCopyModal] = useState(false);
+  const [copyTableType, setCopyTableType] = useState<'key_points' | 'yearly' | 'duration_tiers' | 'all'>('all');
   const [copySrcBank, setCopySrcBank] = useState<string>(banks[0]?.id || 'alahli');
   const [copySrcProduct, setCopySrcProduct] = useState<ProductId>('real_estate_only');
   const [copySrcSupport, setCopySrcSupport] = useState<SupportType>('none');
@@ -406,9 +407,6 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     const normSrcSupport = (srcSupport as string) === 'down_payment' || srcSupport === 'downpayment' ? 'downpayment' : srcSupport;
     const normDstSupport = (dstSupport as string) === 'down_payment' || dstSupport === 'downpayment' ? 'downpayment' : dstSupport;
 
-    // Build the mapped product IDs for raw DB matches from source
-    const srcProductIds = [srcProduct];
-
     // Try both with/without salary tier to get the rules of the source
     const srcSalaryTier = normSrcSupport === 'none' ? 'not_applicable' : 'below_25000';
 
@@ -434,99 +432,77 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       (r.salaryTier === srcSalaryTier || (!r.salaryTier && srcSalaryTier === 'not_applicable') || r.salaryTier === 'not_applicable' || !r.salaryTier)
     );
 
-    const yearsListFull = Array.from({ length: 26 }, (_, i) => 5 + i);
-    const srcMargins: Record<number, string> = {};
-
-    yearsListFull.forEach(year => {
-      const rY = relevantSrcRules.find(r => r.year === year || r.toTermMonths === year * 12);
-      if (rY) {
-        srcMargins[year] = (rY.annualMargin !== undefined ? rY.annualMargin : (rY.baseMargin !== undefined ? Number((rY.baseMargin * 100).toFixed(3)) : rY.endMargin)).toLocaleString('en-US', {useGrouping: false});
-      } else {
-        srcMargins[year] = '';
-      }
-    });
-
-    let method: 'linear' | 'fixed' = 'fixed';
-    const foundMethodRule = relevantSrcRules.find(r => r.calculationMethod || r.calcType);
-    if (foundMethodRule) {
-      method = (foundMethodRule.calculationMethod || foundMethodRule.calcType) as any;
-    }
-
-    let inputMode: 'yearly' | 'key_points' | 'duration_tiers' = 'key_points';
-    const foundInputModeRule = relevantSrcRules.find(r => r.marginInputMode);
-    if (foundInputModeRule) {
-      inputMode = foundInputModeRule.marginInputMode as any;
-    } else {
-      const hasIntermediate = relevantSrcRules.some(r => {
-        const y = r.year || (r.toTermMonths / 12);
-        return y !== undefined && ![5, 10, 15, 20, 25, 30].includes(y);
-      });
-      if (hasIntermediate) {
-        inputMode = 'yearly';
-      }
-    }
-
-    // 2. Resolve target parameters
+    // Resolve target parameters
     const targetSalaryTiers: Array<'below_25000' | 'above_or_equal_25000' | 'not_applicable'> = 
       normDstSupport === 'none' ? ['not_applicable'] : ['below_25000', 'above_or_equal_25000'];
 
-    // Filter out any existing base rules on the target combination
-    const remainingRules = marginRules.filter(r => {
-      const normalizedSupportType = (r.supportType === 'down_payment' || r.supportType === 'downpayment') ? 'downpayment' : r.supportType;
-      const isTargetBaseRule = 
-         r.bankId === dstBank &&
-         r.productId === dstProduct &&
-         normalizedSupportType === normDstSupport &&
-         targetSalaryTiers.includes(r.salaryTier || 'not_applicable' as any) &&
-         !r.isExceptionOnly;
-      return !isTargetBaseRule;
-    });
-
-    // Generate new rules for the target combo
     const newRulesForDst: MarginRule[] = [];
 
-    if (inputMode === 'duration_tiers') {
+    const shouldCopyTiers = copyTableType === 'duration_tiers' || copyTableType === 'all';
+    const shouldCopyKeyPoints = copyTableType === 'key_points' || copyTableType === 'all';
+    const shouldCopyYearly = copyTableType === 'yearly' || copyTableType === 'all';
+
+    // 1. Process Duration Tiers
+    if (shouldCopyTiers) {
       const tierRules = relevantSrcRules.filter(r => r.marginInputMode === 'duration_tiers');
-      targetSalaryTiers.forEach(targetSalaryTier => {
-        tierRules.forEach((srcRule, idx) => {
-          newRulesForDst.push({
-            id: `copied_tier_${dstBank}_${dstProduct}_${normDstSupport}_${targetSalaryTier}_t${srcRule.fromMonth}_${srcRule.toMonth}_${idx}_${Date.now()}`,
-            bankId: dstBank,
-            productId: dstProduct,
-            supportType: normDstSupport as any,
-            sectorId: 'all',
-            fromTermMonths: srcRule.fromMonth!,
-            toTermMonths: srcRule.toMonth!,
-            startMargin: srcRule.marginRate!,
-            endMargin: srcRule.marginRate!,
-            calcType: 'fixed',
-            isActive: srcRule.active !== false && srcRule.isActive !== false,
-            salaryTier: targetSalaryTier,
-            productType: dstProduct as any,
-            marginInputMode: 'duration_tiers',
-            calculationMethod: 'fixed',
-            termMonths: srcRule.toMonth!,
-            annualMargin: srcRule.marginRate!,
-            exceptionBps: 0,
-            baseMargin: Number((srcRule.marginRate! / 100).toFixed(6)),
-            fromMonth: srcRule.fromMonth!,
-            toMonth: srcRule.toMonth!,
-            marginRate: srcRule.marginRate!,
-            active: srcRule.active !== false && srcRule.isActive !== false,
-            notes: srcRule.notes || ''
+      if (tierRules.length > 0) {
+        targetSalaryTiers.forEach(targetSalaryTier => {
+          tierRules.forEach((srcRule, idx) => {
+            newRulesForDst.push({
+              id: `copied_tier_${dstBank}_${dstProduct}_${normDstSupport}_${targetSalaryTier}_t${srcRule.fromMonth}_${srcRule.toMonth}_${idx}_${Date.now()}`,
+              bankId: dstBank,
+              productId: dstProduct,
+              supportType: normDstSupport as any,
+              sectorId: 'all',
+              fromTermMonths: srcRule.fromMonth!,
+              toTermMonths: srcRule.toMonth!,
+              startMargin: srcRule.marginRate!,
+              endMargin: srcRule.marginRate!,
+              calcType: 'fixed',
+              isActive: srcRule.active !== false && srcRule.isActive !== false,
+              salaryTier: targetSalaryTier,
+              productType: dstProduct as any,
+              marginInputMode: 'duration_tiers',
+              calculationMethod: 'fixed',
+              termMonths: srcRule.toMonth!,
+              annualMargin: srcRule.marginRate!,
+              exceptionBps: 0,
+              baseMargin: Number((srcRule.marginRate! / 100).toFixed(6)),
+              fromMonth: srcRule.fromMonth!,
+              toMonth: srcRule.toMonth!,
+              marginRate: srcRule.marginRate!,
+              active: srcRule.active !== false && srcRule.isActive !== false,
+              notes: srcRule.notes || ''
+            });
           });
         });
-      });
-    } else {
-      const yearsToExtract = inputMode === 'yearly'
-        ? Array.from({ length: 26 }, (_, i) => 5 + i)
-        : [5, 10, 15, 20, 25, 30];
+      }
+    }
 
-      const filledYears = yearsToExtract.filter(year => {
-        const val = srcMargins[year];
+    // 2. Process Key Points
+    if (shouldCopyKeyPoints) {
+      const srcKeyPointRules = relevantSrcRules.filter(r => r.marginInputMode === 'key_points' || (!r.marginInputMode && [5, 10, 15, 20, 25, 30].includes(r.year || r.toTermMonths/12)));
+      
+      const srcMarginsKeyPoints: Record<number, string> = {};
+      [5, 10, 15, 20, 25, 30].forEach(year => {
+        const rY = srcKeyPointRules.find(r => r.year === year || r.toTermMonths === year * 12);
+        if (rY) {
+          srcMarginsKeyPoints[year] = (rY.annualMargin !== undefined ? rY.annualMargin : (rY.baseMargin !== undefined ? Number((rY.baseMargin * 100).toFixed(3)) : rY.endMargin)).toLocaleString('en-US', {useGrouping: false});
+        } else {
+          srcMarginsKeyPoints[year] = '';
+        }
+      });
+
+      let methodKey: 'linear' | 'fixed' = 'fixed';
+      const foundMethodRule = srcKeyPointRules.find(r => r.calculationMethod || r.calcType);
+      if (foundMethodRule) {
+        methodKey = (foundMethodRule.calculationMethod || foundMethodRule.calcType) as any;
+      }
+
+      const filledYears = [5, 10, 15, 20, 25, 30].filter(year => {
+        const val = srcMarginsKeyPoints[year];
         return val !== undefined && val !== '' && !isNaN(parseFloat(val)) && parseFloat(val) > 0;
       });
-
       filledYears.sort((a, b) => a - b);
 
       if (filledYears.length > 0) {
@@ -535,7 +511,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
 
           for (let i = 0; i < filledYears.length; i++) {
             const currentYear = filledYears[i];
-            const currentMarginStr = srcMargins[currentYear];
+            const currentMarginStr = srcMarginsKeyPoints[currentYear];
             const currentMarginVal = parseFloat(currentMarginStr) || 0;
 
             if (i === 0) {
@@ -549,7 +525,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
               });
             } else {
               const prevYear = filledYears[i - 1];
-              const prevMarginStr = srcMargins[prevYear];
+              const prevMarginStr = srcMarginsKeyPoints[prevYear];
               const prevMarginVal = parseFloat(prevMarginStr) || 0;
 
               const fromMonths = prevYear * 12 + 1;
@@ -558,16 +534,16 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
               definitions.push({
                 from: fromMonths,
                 to: toMonths,
-                start: method === 'fixed' ? currentMarginVal : prevMarginVal,
+                start: methodKey === 'fixed' ? currentMarginVal : prevMarginVal,
                 end: currentMarginVal,
-                calcType: method,
+                calcType: methodKey,
                 yearPoint: currentYear
               });
             }
           }
 
           const lastYear = filledYears[filledYears.length - 1];
-          const lastMarginStr = srcMargins[lastYear];
+          const lastMarginStr = srcMarginsKeyPoints[lastYear];
           const lastMarginVal = parseFloat(lastMarginStr) || 0;
 
           definitions.push({
@@ -594,8 +570,8 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
               isActive: true,
               salaryTier: targetSalaryTier,
               productType: dstProduct as any,
-              marginInputMode: inputMode as any,
-              calculationMethod: method,
+              marginInputMode: 'key_points',
+              calculationMethod: methodKey,
               year: def.yearPoint,
               termMonths: def.to === 9999 ? (def.yearPoint * 12) : def.to,
               annualMargin: def.end,
@@ -607,10 +583,136 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       }
     }
 
+    // 3. Process Yearly Independent
+    if (shouldCopyYearly) {
+      const srcYearlyRules = relevantSrcRules.filter(r => r.marginInputMode === 'yearly' || (!r.marginInputMode && r.year && r.year >= 5 && r.year <= 30 && ![5, 10, 15, 20, 25, 30].includes(r.year)));
+      
+      const srcMarginsYearly: Record<number, string> = {};
+      const yearsListFullForYearly = Array.from({ length: 26 }, (_, i) => 5 + i);
+      yearsListFullForYearly.forEach(year => {
+        const rY = srcYearlyRules.find(r => r.year === year || r.toTermMonths === year * 12);
+        if (rY) {
+          srcMarginsYearly[year] = (rY.annualMargin !== undefined ? rY.annualMargin : (rY.baseMargin !== undefined ? Number((rY.baseMargin * 100).toFixed(3)) : rY.endMargin)).toLocaleString('en-US', {useGrouping: false});
+        } else {
+          srcMarginsYearly[year] = '';
+        }
+      });
+
+      let methodYearly: 'linear' | 'fixed' = 'fixed';
+      const foundMethodRule = srcYearlyRules.find(r => r.calculationMethod || r.calcType);
+      if (foundMethodRule) {
+        methodYearly = (foundMethodRule.calculationMethod || foundMethodRule.calcType) as any;
+      }
+
+      const filledYears = yearsListFullForYearly.filter(year => {
+        const val = srcMarginsYearly[year];
+        return val !== undefined && val !== '' && !isNaN(parseFloat(val)) && parseFloat(val) > 0;
+      });
+      filledYears.sort((a, b) => a - b);
+
+      if (filledYears.length > 0) {
+        targetSalaryTiers.forEach(targetSalaryTier => {
+          const definitions: Array<{ from: number, to: number, start: number, end: number, calcType: 'fixed' | 'linear', yearPoint: number }> = [];
+
+          for (let i = 0; i < filledYears.length; i++) {
+            const currentYear = filledYears[i];
+            const currentMarginStr = srcMarginsYearly[currentYear];
+            const currentMarginVal = parseFloat(currentMarginStr) || 0;
+
+            if (i === 0) {
+              definitions.push({
+                from: 0,
+                to: currentYear * 12,
+                start: currentMarginVal,
+                end: currentMarginVal,
+                calcType: 'fixed' as const,
+                yearPoint: currentYear
+              });
+            } else {
+              const prevYear = filledYears[i - 1];
+              const prevMarginStr = srcMarginsYearly[prevYear];
+              const prevMarginVal = parseFloat(prevMarginStr) || 0;
+
+              const fromMonths = prevYear * 12 + 1;
+              const toMonths = currentYear * 12;
+
+              definitions.push({
+                from: fromMonths,
+                to: toMonths,
+                start: methodYearly === 'fixed' ? currentMarginVal : prevMarginVal,
+                end: currentMarginVal,
+                calcType: methodYearly,
+                yearPoint: currentYear
+              });
+            }
+          }
+
+          const lastYear = filledYears[filledYears.length - 1];
+          const lastMarginStr = srcMarginsYearly[lastYear];
+          const lastMarginVal = parseFloat(lastMarginStr) || 0;
+
+          definitions.push({
+            from: lastYear * 12 + 1,
+            to: 9999,
+            start: lastMarginVal,
+            end: lastMarginVal,
+            calcType: 'fixed' as const,
+            yearPoint: lastYear
+          });
+
+          definitions.forEach((def, index) => {
+            newRulesForDst.push({
+              id: `copied_margin_${dstBank}_${dstProduct}_${normDstSupport}_${targetSalaryTier}_t${def.from}_${def.to}_${index}_${Date.now()}`,
+              bankId: dstBank,
+              productId: dstProduct,
+              supportType: normDstSupport as any,
+              sectorId: 'all',
+              fromTermMonths: def.from,
+              toTermMonths: def.to,
+              startMargin: def.start,
+              endMargin: def.end,
+              calcType: def.calcType,
+              isActive: true,
+              salaryTier: targetSalaryTier,
+              productType: dstProduct as any,
+              marginInputMode: 'yearly',
+              calculationMethod: methodYearly,
+              year: def.yearPoint,
+              termMonths: def.to === 9999 ? (def.yearPoint * 12) : def.to,
+              annualMargin: def.end,
+              exceptionBps: 0,
+              baseMargin: Number((def.end / 100).toFixed(6))
+            });
+          });
+        });
+      }
+    }
+
+    const remainingRules = marginRules.filter(r => {
+      const normalizedSupportType = (r.supportType === 'down_payment' || r.supportType === 'downpayment') ? 'downpayment' : r.supportType;
+      const isTargetBaseRule = 
+         r.bankId === dstBank &&
+         r.productId === dstProduct &&
+         normalizedSupportType === normDstSupport &&
+         targetSalaryTiers.includes(r.salaryTier || 'not_applicable' as any) &&
+         !r.isExceptionOnly;
+
+      if (!isTargetBaseRule) return true;
+
+      const rMode = r.marginInputMode;
+      const isKeyPointsRule = rMode === 'key_points' || (!rMode && [5, 10, 15, 20, 25, 30].includes(r.year || r.toTermMonths/12));
+      const rIsTiers = rMode === 'duration_tiers';
+      const rIsYearly = rMode === 'yearly';
+
+      if (copyTableType === 'duration_tiers') return !rIsTiers;
+      if (copyTableType === 'key_points') return !isKeyPointsRule;
+      if (copyTableType === 'yearly') return !rIsYearly;
+      return false; // delete all of them for 'all'
+    });
+
     setMarginRules([...remainingRules, ...newRulesForDst]);
 
     // Force context selections to change to the target combo automatically
-    // so the state-update event is triggered, and the user directly sees the copied values in the grid!
     setSelectedBank(dstBank);
     setSelectedProduct(dstProduct);
     setSelectedSupport(dstSupport);
@@ -620,7 +722,30 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       setSelectedSalaryTier('below_25000');
     }
 
-    showToast('تم نسخ هوامش التمويل الأساسية وتطبيقها بنجاح! تم تحويل شاشة العرض تلقائياً للبنك الهدف لمراجعة وتثبيت التعديلات.', 'success');
+    // Beautifully construct localized strings for copy toaster
+    const getSupportName = (s: SupportType) => {
+      if (s === 'monthly') return 'دعم شهري';
+      if (s === 'downpayment') return 'دعم دفعة';
+      return 'غير مدعوم';
+    };
+    const getTypeName = (t: typeof copyTableType) => {
+      if (t === 'key_points') return 'الهوامش الأساسية';
+      if (t === 'yearly') return 'الهوامش السنوية';
+      if (t === 'duration_tiers') return 'هوامش الشرائح';
+      return 'جميع الهوامش';
+    };
+
+    const srcBankName = banks.find(b => b.id === srcBank)?.nameAr || srcBank;
+    const dstBankName = banks.find(b => b.id === dstBank)?.nameAr || dstBank;
+    const srcProductName = productTypesList.find(p => p.id === srcProduct)?.nameAr || srcProduct;
+    const dstProductName = productTypesList.find(p => p.id === dstProduct)?.nameAr || dstProduct;
+    const srcSupportName = getSupportName(srcSupport);
+    const dstSupportName = getSupportName(dstSupport);
+
+    showToast(
+      `تم نسخ: (${getTypeName(copyTableType)}) من: [${srcBankName} - ${srcProductName} - ${srcSupportName}] إلى: [${dstBankName} - ${dstProductName} - ${dstSupportName}] وتطبيقها بنجاح! تم تحويل شاشة العرض تلقائياً للبنك الهدف لمراجعة وتثبيت التعديلات.`,
+      'success'
+    );
   };
 
   // Compile combined flat row configs for general log reviewing
@@ -1192,8 +1317,8 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       {showCopyModal && (
         <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 text-right space-y-5 my-5 font-sans animate-in fade-in duration-200">
           <div className="flex items-center justify-between border-b border-gray-150 pb-3">
-            <h3 className="text-xs sm:text-sm font-extrabold text-gray-900 flex items-center gap-2">
-              📋 نسخ هوامش الأرباح الأساسية
+            <h3 className="text-xs sm:text-sm font-extrabold text-gray-900 flex items-center gap-2 font-sans">
+              📋 نسخ هوامش الأرباح
             </h3>
             <button
               type="button"
@@ -1202,6 +1327,21 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
             >
               إخفاء
             </button>
+          </div>
+
+          {/* نوع الجدول المراد نسخه */}
+          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-gray-150 space-y-2">
+            <label className="block text-xs font-extrabold text-gray-700 font-sans">نوع الجدول المراد نسخه:</label>
+            <select
+              value={copyTableType}
+              onChange={(e) => setCopyTableType(e.target.value as any)}
+              className="w-full sm:max-w-xs bg-slate-50 border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 outline-none focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+            >
+              <option value="key_points">الهوامش الأساسية (نقاط رئيسية)</option>
+              <option value="yearly">الهوامش السنوية (كل سنة مستقلة)</option>
+              <option value="duration_tiers">هوامش الشرائح (من شهر إلى شهر)</option>
+              <option value="all">جميع الهوامش</option>
+            </select>
           </div>
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -1298,7 +1438,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
 
           <div className="flex flex-col sm:flex-row justify-between items-center gap-3 bg-amber-50 rounded-2xl p-4 border border-amber-100">
             <p className="text-[10px] text-gray-500 leading-relaxed font-bold text-right">
-              * تنبيه: عملية النسخ تطبق فقط على جدول هوامش التمويل الأساسية (سنوات التمويل والنسب %)، ولن تؤثر على استثناءات القطاعات، DSR، أو أي إعدادات أخرى. التعديلات تكون محلية مؤقتة ويتم تثبيتها فقط عند نقر "حفظ وتطبيق الإعدادات".
+              * تنبيه: عملية النسخ تطبق فقط على هوامش الأرباح المحددة، ولن تؤثر على استثناءات القطاعات، DSR، أو أي إعدادات أخرى. التعديلات تكون محلية مؤقتة ويتم تثبيتها فقط عند نقر "حفظ وتطبيق الإعدادات".
             </p>
             <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
               <button
