@@ -79,7 +79,7 @@ export function DiagnosticsPage() {
   const [appointmentMonth, setAppointmentMonth] = useState(1);
   const [appointmentCalendar, setAppointmentCalendar] = useState<'gregorian' | 'hijri'>('gregorian');
 
-  const [selectedProductId, setSelectedProductId] = useState<ProductId>('personal');
+  const [selectedProductId, setSelectedProductId] = useState<ProductId>('personal_only');
   const [termYears, setTermYears] = useState(5);
   const [obligations, setObligations] = useState(0);
   const [monthlySupport, setMonthlySupport] = useState(0);
@@ -193,7 +193,7 @@ export function DiagnosticsPage() {
           appointmentCalendar: 'gregorian',
           obligations: 0,
           monthlySupport: 0,
-          productId: 'personal',
+          productId: 'personal_only',
           termYears: 5,
           banks, products, militaryRanks, salaryRules, pensionRules, marginRules, dsrRules, supportSettings, personalRules, termRules,
           approvedSalaryDbRules: dbApprovedSalaryRules, pensionDbRules: dbPensionRules, sectorMappings: dbSectorMappings,
@@ -225,7 +225,7 @@ export function DiagnosticsPage() {
           appointmentCalendar: 'gregorian',
           obligations: 0,
           monthlySupport: 0,
-          productId: 'personal',
+          productId: 'personal_only',
           termYears: 5,
           banks, products, militaryRanks, salaryRules, pensionRules, marginRules, dsrRules, supportSettings, personalRules, termRules,
           approvedSalaryDbRules: dbApprovedSalaryRules, pensionDbRules: dbPensionRules, sectorMappings: dbSectorMappings,
@@ -257,7 +257,7 @@ export function DiagnosticsPage() {
           appointmentCalendar: 'gregorian',
           obligations: 3004,
           monthlySupport: 665,
-          productId: 'both',
+          productId: 'real_estate_with_new_personal',
           termYears: 20,
           banks, products, militaryRanks, salaryRules, pensionRules, marginRules, dsrRules, supportSettings, personalRules, termRules,
           approvedSalaryDbRules: dbApprovedSalaryRules, pensionDbRules: dbPensionRules, sectorMappings: dbSectorMappings,
@@ -283,7 +283,7 @@ export function DiagnosticsPage() {
           birthCalendar: 'gregorian',
           obligations: 0,
           monthlySupport: 0,
-          productId: 'personal',
+          productId: 'personal_only',
           termYears: 5,
           banks, products, militaryRanks, salaryRules, pensionRules, marginRules, dsrRules, supportSettings, personalRules, termRules,
           approvedSalaryDbRules: dbApprovedSalaryRules, pensionDbRules: dbPensionRules, sectorMappings: dbSectorMappings,
@@ -392,7 +392,7 @@ export function DiagnosticsPage() {
       setAppointmentCalendar('gregorian');
       setObligations(0);
       setMonthlySupport(0);
-      setSelectedProductId('personal');
+      setSelectedProductId('personal_only');
       setTermYears(5);
     } else if (testId === 'ahli-strong-close') {
       setSelectedBankId('ahli');
@@ -410,7 +410,7 @@ export function DiagnosticsPage() {
       setAppointmentCalendar('gregorian');
       setObligations(0);
       setMonthlySupport(0);
-      setSelectedProductId('personal');
+      setSelectedProductId('personal_only');
       setTermYears(5);
     } else if (testId === 'rajhi-real-estate') {
       setSelectedBankId('rajhi');
@@ -428,7 +428,7 @@ export function DiagnosticsPage() {
       setAppointmentCalendar('gregorian');
       setObligations(3004);
       setMonthlySupport(665);
-      setSelectedProductId('both');
+      setSelectedProductId('real_estate_with_new_personal');
       setTermYears(20);
     } else if (testId === 'ahli-retired') {
       setSelectedBankId('ahli');
@@ -441,7 +441,7 @@ export function DiagnosticsPage() {
       setBirthCalendar('gregorian');
       setObligations(0);
       setMonthlySupport(0);
-      setSelectedProductId('personal');
+      setSelectedProductId('personal_only');
       setTermYears(5);
     }
   };
@@ -712,9 +712,9 @@ export function DiagnosticsPage() {
                 onChange={(e) => setSelectedProductId(e.target.value as ProductId)}
                 className="w-full px-3 py-2 text-xs font-bold bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg focus:ring-1 focus:ring-[#0057B8]"
               >
-                <option value="personal">تمويل شخصي فقط</option>
-                <option value="real_estate">تمويل عقاري فقط</option>
-                <option value="both">تمويل مدعوم مدمج (عقاري + شخصي)</option>
+                <option value="personal_only">تمويل شخصي فقط</option>
+                <option value="real_estate_only">تمويل عقاري فقط</option>
+                <option value="real_estate_with_new_personal">تمويل مدعوم مدمج (عقاري + شخصي جديد)</option>
               </select>
             </div>
 

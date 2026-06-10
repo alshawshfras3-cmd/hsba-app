@@ -19,13 +19,24 @@ interface ResultsGridProps {
 
 export default function ResultsGrid({ 
   results, 
-  productId, 
+  productId: rawProductId, 
   onRestart,
   existingMonthlyObligations = 0,
   obligationRemainingMonths = 0,
   mainFinanceType = 'real_estate',
   sectorId = 'gov_civil'
 }: ResultsGridProps) {
+  // Normalize legacy aliases for display-only compatibility
+  const productId = (rawProductId === 'both' as any)
+    ? 'real_estate_with_new_personal'
+    : (rawProductId === 'real_estate' as any)
+    ? 'real_estate_only'
+    : (rawProductId === 'real_estate_with_personal_existing' as any)
+    ? 'real_estate_with_existing_personal'
+    : (rawProductId === 'personal' as any)
+    ? 'personal_only'
+    : rawProductId;
+
   const { user, userRole, userSubscriptions, setUserSubscriptions } = useAppState();
   const [activeSort, setActiveSort] = useState<'power' | 'installment' | 'margin' | 'term'>('power');
   const [selectedOffer, setSelectedOffer] = useState<BankCalculationResult | null>(null);
@@ -75,10 +86,10 @@ export default function ResultsGrid({
 
     lines.push(`إجمالي التمويل المتاح: ${formatNum(totalAmount)} ريال`);
 
-    if (productId !== 'personal') {
+    if (productId !== 'personal_only') {
       lines.push(`القرض العقاري: ${formatNum(offer.realEstateAmount)} ريال`);
     }
-    if (productId !== 'real_estate' && mainFinanceType !== 'real_estate_with_existing_personal' && offer.supportsPersonal !== false) {
+    if (productId !== 'real_estate_only' && mainFinanceType !== 'real_estate_with_existing_personal' && offer.supportsPersonal !== false) {
       lines.push(`القرض الشخصي: ${formatNum(offer.personalAmount)} ريال`);
     }
 
@@ -86,7 +97,7 @@ export default function ResultsGrid({
 
     if (mainFinanceType === 'personal_only') {
       lines.push(`قسط التمويل الشخصي: ${formatNum(offer.monthlyInstallmentBeforeRetirement)} ريال`);
-    } else if (productId === 'both') {
+    } else if (productId === 'real_estate_with_new_personal') {
       lines.push(`القسط الشهري الإجمالي: ${formatNum(offer.monthlyInstallmentBeforeRetirement)} ريال`);
       lines.push(`├─ قسط العقاري: ${formatNum(offer.realEstateInstallmentOnly || 0)} ريال`);
       lines.push(`└─ قسط الشخصي: ${offer.supportsPersonal === false ? "غير متوفر" : `${formatNum(offer.personalInstallmentAmount || 0)} ريال`}`);
@@ -133,10 +144,10 @@ export default function ResultsGrid({
   };
 
   const getFinanceTypeArabicName = (type?: string, prodId?: string) => {
-    if (prodId === 'personal') return 'تمويل شخصي فقط';
-    if (prodId === 'real_estate') return 'تمويل عقاري فقط';
-    if (prodId === 'both') return 'تمويل عقاري وشخصي متكامل';
-    if (prodId === 'real_estate_with_existing_personal') return 'تمويل عقاري مع التزام قائم';
+    if (prodId === 'personal' || prodId === 'personal_only') return 'تمويل شخصي فقط';
+    if (prodId === 'real_estate' || prodId === 'real_estate_only') return 'تمويل عقاري فقط';
+    if (prodId === 'both' || prodId === 'real_estate_with_new_personal') return 'تمويل عقاري وشخصي متكامل';
+    if (prodId === 'real_estate_with_existing_personal' || prodId === 'real_estate_with_personal_existing') return 'تمويل عقاري مع التزام قائم';
     
     switch (type) {
       case 'personal_only': return 'تمويل شخصي فقط';
@@ -451,13 +462,13 @@ export default function ResultsGrid({
                           </>
                         ) : (
                           <>
-                            {productId !== 'personal' && (
+                            {productId !== 'personal_only' && (
                               <div className="border border-[#E5E7EB] rounded-xl p-3">
                                 <span className="text-xs text-[#6B7280] block mb-0.5">القرض العقاري</span>
                                 <span className="font-bold text-[#111827]">{Math.round(offer.realEstateAmount).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال</span>
                               </div>
                             )}
-                            {productId !== 'real_estate' && mainFinanceType !== 'real_estate_with_existing_personal' && (
+                            {productId !== 'real_estate_only' && mainFinanceType !== 'real_estate_with_existing_personal' && (
                               <div className="border border-[#E5E7EB] rounded-xl p-3">
                                 <span className="text-xs text-[#6B7280] block mb-0.5">القرض الشخصي</span>
                                 <span className={offer.supportsPersonal === false ? "font-bold text-rose-600 text-xs" : "font-bold text-[#111827]"}>
@@ -526,7 +537,7 @@ export default function ResultsGrid({
                               </div>
                             )}
                           </div>
-                        ) : productId === 'both' ? (
+                        ) : productId === 'real_estate_with_new_personal' ? (
                           <div className="space-y-1.5 bg-[#F9FAFB] border border-[#F3F4F6] rounded-xl p-3">
                             <div className="flex justify-between items-center">
                               <span className="font-bold text-[#374151]">القسط الشهري الإجمالي:</span>
@@ -882,7 +893,7 @@ export default function ResultsGrid({
                             </div>
                           )}
                         </>
-                      ) : productId === 'both' ? (
+                      ) : productId === 'real_estate_with_new_personal' ? (
                         <>
                           <div className="flex justify-between">
                             <span className="text-[#6B7280] font-bold">القسط الشهري الإجمالي:</span>

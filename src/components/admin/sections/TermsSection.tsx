@@ -553,7 +553,7 @@ export default function TermsSection({
                       sectorId: termRuleFormSectorId as SectorId,
                       militarySubType: termRuleFormSectorId === 'military' ? termRuleFormMilitarySubType : undefined,
                       rankId: termRuleFormSectorId === 'military' && termRuleFormMilitarySubType !== 'all' ? termRuleFormMilitarySubType : 'all',
-                      productId: 'real_estate',
+                      productId: 'all',
                       supportType: 'all',
                       maxTermMonths: maxTermVal,
                       maxAgeAtEnd: maxAgeVal,

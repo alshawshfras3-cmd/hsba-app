@@ -32,13 +32,15 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
   showToast,
   sectors
 }) => {
-  const sectorsList = (sectors || []).map(sec => ({ id: sec.id, nameAr: sec.nameAr }));
+  const activeSectors = (sectors || []).filter(sec => sec.isActive !== false);
+  const sectorsList = activeSectors.map(sec => ({ id: sec.id, nameAr: sec.nameAr }));
 
   // 1. Selector States (Active single configuration)
   const [selectedBank, setSelectedBank] = useState<string>(banks[0]?.id || 'alahli');
   const [selectedProduct, setSelectedProduct] = useState<ProductId>('real_estate_only');
   const [selectedSupport, setSelectedSupport] = useState<SupportType>('none');
   const [selectedSalaryTier, setSelectedSalaryTier] = useState<'below_25000' | 'above_or_equal_25000' | 'not_applicable'>('not_applicable');
+  const [selectedSector, setSelectedSector] = useState<string>('');
   const [selectedYearsMode, setSelectedYearsMode] = useState<'yearly' | 'key_points' | 'duration_tiers'>('key_points');
   const [selectedCalcMethod, setSelectedCalcMethod] = useState<'linear' | 'fixed'>('fixed');
 
@@ -81,6 +83,13 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     }
   }, [selectedSupport]);
 
+  // Handle default selected sector initialization
+  useEffect(() => {
+    if (sectorsList.length > 0 && !selectedSector) {
+      setSelectedSector(sectorsList[0].id);
+    }
+  }, [sectorsList, selectedSector]);
+
   // Synchronize local states when selection changes or marginRules are updated
   useEffect(() => {
     if (!selectedBank) return;
@@ -88,7 +97,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     const normSupport = (selectedSupport as string) === 'down_payment' || selectedSupport === 'downpayment' ? 'downpayment' : selectedSupport;
 
     // Normalize all rules to clean official product IDs and support types upon reading
-    const relevantRules = marginRules.map(r => {
+    const allNormalized = marginRules.map(r => {
       let pId = r.productId as string;
       if (pId === 'real_estate') pId = 'real_estate_only';
       else if (pId === 'both') pId = 'real_estate_with_new_personal';
@@ -102,13 +111,29 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
         productId: pId as ProductId,
         supportType: sType as SupportType
       };
-    }).filter(r => 
+    });
+
+    // Try finding rules specific to the selectedSector
+    let relevantRules = allNormalized.filter(r => 
       r.bankId === selectedBank && 
       r.productId === selectedProduct && 
       (r.supportType === normSupport || r.supportType === 'all') &&
       (!r.isExceptionOnly) &&
+      (r.sectorId === selectedSector) &&
       (r.salaryTier === selectedSalaryTier || (!r.salaryTier && selectedSalaryTier === 'not_applicable'))
     );
+
+    // If no sector-specific rules exist, fallback to general/all sector
+    if (relevantRules.length === 0) {
+      relevantRules = allNormalized.filter(r => 
+        r.bankId === selectedBank && 
+        r.productId === selectedProduct && 
+        (r.supportType === normSupport || r.supportType === 'all') &&
+        (!r.isExceptionOnly) &&
+        (!r.sectorId || r.sectorId === 'all') &&
+        (r.salaryTier === selectedSalaryTier || (!r.salaryTier && selectedSalaryTier === 'not_applicable'))
+      );
+    }
 
     const yearsListFull = Array.from({ length: 26 }, (_, i) => 5 + i);
     const initialMargins: Record<number, string> = {};
@@ -172,13 +197,14 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     setLocalSectorExceptions(initialExceptions);
     setIsLoaded(true);
 
-  }, [selectedBank, selectedProduct, selectedSupport, selectedSalaryTier, marginRules]);
+  }, [selectedBank, selectedProduct, selectedSupport, selectedSalaryTier, selectedSector, marginRules]);
 
   // Database updater to match exact core rules compatibility
   const updateGlobalRulesForCombo = (
     targetBank: string,
     targetProduct: ProductId,
     targetSupport: SupportType,
+    targetSector: string,
     targetSalaryTier: 'below_25000' | 'above_or_equal_25000' | 'not_applicable',
     marginsRecord: Record<number, string>,
     sectorExceptionsRecord: Record<string, string>,
@@ -193,7 +219,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       const isBaseForCombo = r.bankId === targetBank &&
                              r.productId === targetProduct &&
                              normalizedSupportType === normSupport &&
-                             (r.sectorId || 'all') === 'all' &&
+                             (r.sectorId === targetSector) &&
                              (r.salaryTier === targetSalaryTier || (!r.salaryTier && targetSalaryTier === 'not_applicable')) &&
                              !r.isExceptionOnly;
 
@@ -212,11 +238,11 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
         const numRate = Number(tier.marginRate) || 0;
         
         newRulesForThisCombo.push({
-          id: tier.id || `tier_margin_${targetBank}_${targetProduct}_${normSupport}_${targetSalaryTier}_t${numFrom}_${numTo}_${index}`,
+          id: tier.id || `tier_margin_${targetBank}_${targetProduct}_${normSupport}_${targetSector}_${targetSalaryTier}_t${numFrom}_${numTo}_${index}`,
           bankId: targetBank,
           productId: targetProduct,
           supportType: normSupport as any,
-          sectorId: 'all',
+          sectorId: targetSector as any,
           fromTermMonths: numFrom,
           toTermMonths: numTo,
           startMargin: numRate,
@@ -301,11 +327,11 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
 
         definitions.forEach((def, index) => {
           newRulesForThisCombo.push({
-            id: `gen_margin_${targetBank}_${targetProduct}_${normSupport}_${targetSalaryTier}_t${def.from}_${def.to}_${index}`,
+            id: `gen_margin_${targetBank}_${targetProduct}_${normSupport}_${targetSector}_${targetSalaryTier}_t${def.from}_${def.to}_${index}`,
             bankId: targetBank,
             productId: targetProduct,
             supportType: normSupport as any,
-            sectorId: 'all',
+            sectorId: targetSector as any,
             fromTermMonths: def.from,
             toTermMonths: def.to,
             startMargin: def.start,
@@ -350,6 +376,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
         selectedBank,
         selectedProduct,
         selectedSupport,
+        selectedSector,
         selectedSalaryTier,
         localMargins,
         localSectorExceptions,
@@ -807,11 +834,18 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                   netSalary: tier === 'below_25000' ? 20000 : tier === 'above_or_equal_25000' ? 30000 : undefined
                 });
 
-                const matchedBaseRule = relevantRules.find(r => 
-                  (r.sectorId === 'all' || !r.sectorId) &&
+                let matchedBaseRule = relevantRules.find(r => 
+                  r.sectorId === sec.id &&
                   !r.isExceptionOnly &&
                   (r.year === year || r.toTermMonths === year * 12)
                 );
+                if (!matchedBaseRule) {
+                  matchedBaseRule = relevantRules.find(r => 
+                    (r.sectorId === 'all' || !r.sectorId) &&
+                    !r.isExceptionOnly &&
+                    (r.year === year || r.toTermMonths === year * 12)
+                  );
+                }
                 const isActive = matchedBaseRule ? matchedBaseRule.isActive !== false : true;
 
                 list.push({
@@ -1013,6 +1047,30 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
               })}
             </div>
           )}
+        </div>
+
+        {/* رابعاً: القطاع */}
+        <div className="space-y-2">
+          <span className="block text-[#0057B8] text-xs font-extrabold font-sans">رابعاً: القطاع</span>
+          <div className="flex flex-wrap gap-2.5">
+            {sectorsList.map((sec) => {
+              const isSelected = selectedSector === sec.id;
+              return (
+                <button
+                  key={sec.id}
+                  type="button"
+                  onClick={() => setSelectedSector(sec.id)}
+                  className={`px-4 py-2.5 rounded-xl border text-xs font-bold font-sans transition-all cursor-pointer ${
+                    isSelected
+                      ? 'bg-[#0057B8] border-[#0057B8] text-white shadow-sm font-extrabold'
+                      : 'bg-white border-gray-200 text-gray-600 hover:bg-slate-50'
+                  }`}
+                >
+                  {sec.nameAr}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* طريقة إدارة السنوات وطريقة الحساب */}

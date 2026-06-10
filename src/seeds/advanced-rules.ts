@@ -29,7 +29,7 @@ export const initialAdvancedRules: AdvancedRule[] = [
     id: 'rule_snb_downpayment_bonus',
     name: 'الأهلي: حافز دعم الدفعة لتقليص الهامش',
     bankId: 'alahli',
-    productId: 'real_estate',
+    productId: 'all',
     sectorId: 'all',
     conditionFormula: 'supportType === "downpayment"',
     actionType: 'apply_modifier',

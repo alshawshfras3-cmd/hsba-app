@@ -132,7 +132,7 @@ export const initialMarginRules: MarginRule[] = [
   {
     id: 'snb_re_m1',
     bankId: 'alahli',
-    productId: 'real_estate',
+    productId: 'all',
     supportType: 'all',
     sectorId: 'all',
     fromTermMonths: 0,
@@ -145,7 +145,7 @@ export const initialMarginRules: MarginRule[] = [
   {
     id: 'snb_re_m2',
     bankId: 'alahli',
-    productId: 'real_estate',
+    productId: 'all',
     supportType: 'all',
     sectorId: 'all',
     fromTermMonths: 61,
@@ -158,7 +158,7 @@ export const initialMarginRules: MarginRule[] = [
   {
     id: 'snb_re_m3',
     bankId: 'alahli',
-    productId: 'real_estate',
+    productId: 'all',
     supportType: 'all',
     sectorId: 'all',
     fromTermMonths: 121,
@@ -171,7 +171,7 @@ export const initialMarginRules: MarginRule[] = [
   {
     id: 'snb_re_m4',
     bankId: 'alahli',
-    productId: 'real_estate',
+    productId: 'all',
     supportType: 'all',
     sectorId: 'all',
     fromTermMonths: 181,
@@ -184,7 +184,7 @@ export const initialMarginRules: MarginRule[] = [
   {
     id: 'snb_re_m5',
     bankId: 'alahli',
-    productId: 'real_estate',
+    productId: 'all',
     supportType: 'all',
     sectorId: 'all',
     fromTermMonths: 241,
@@ -202,7 +202,7 @@ export const initialMarginRules: MarginRule[] = [
   {
     id: 'alinma_re_m1',
     bankId: 'alinma',
-    productId: 'real_estate',
+    productId: 'all',
     supportType: 'all',
     sectorId: 'all',
     fromTermMonths: 0,
@@ -215,7 +215,7 @@ export const initialMarginRules: MarginRule[] = [
   {
     id: 'alinma_re_m2',
     bankId: 'alinma',
-    productId: 'real_estate',
+    productId: 'all',
     supportType: 'all',
     sectorId: 'all',
     fromTermMonths: 181,
@@ -230,7 +230,7 @@ export const initialMarginRules: MarginRule[] = [
   {
     id: 'default_re_m1',
     bankId: 'all',
-    productId: 'real_estate',
+    productId: 'all',
     supportType: 'all',
     sectorId: 'all',
     fromTermMonths: 0,

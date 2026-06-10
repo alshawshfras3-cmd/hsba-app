@@ -113,6 +113,9 @@ export const BANK_DEFAULT_LIMITS: Record<string, {
 export function normalizeProductId(productId: string): ProductId {
   if (!productId) return 'real_estate_only' as ProductId;
   const p = productId.trim().toLowerCase();
+  if (p === 'all') {
+    return 'all';
+  }
   if (p === 'real_estate' || p === 'real_estate_only') {
     return 'real_estate_only';
   }
@@ -239,7 +242,7 @@ export function getMatchedTermRule(params: {
     const normParamProductId = normalizeProductId(productId);
     if (normRuleProductId === normParamProductId) {
       score += 500;
-    } else if (r.productId === 'all' as any) {
+    } else if (normRuleProductId === 'all') {
       score += 50;
     } else {
       continue;
@@ -798,6 +801,11 @@ export function calculateBanksFinancing(params: {
       diag.messages.unshift(`[خطأ استقطاع DSR]: ${dsrError}`);
     }
 
+    if (marginResult?.error) {
+      diag.status = 'rejected';
+      diag.messages.unshift(marginResult.error);
+    }
+
     const isPersonalOnly = normalizedProductId === 'personal' || normalizedProductId === 'personal_only';
     if (isPersonalOnly && personalCalcResult?.diagnostics?.error) {
       diag.status = 'rejected';
@@ -1253,7 +1261,7 @@ export function calculateAll(params: {
   const totalCashflow = (installmentStage1 * stage1Months) + (installmentStage2 * stage2Months) + (installmentStage3 * stage3Months);
   const totalMonthsForCalc = termResult.totalMonths || 240;
   const denominator = 1 + (annualMargin / 100) * (totalMonthsForCalc / 12);
-  let reLoanAmount = Math.max(0, Math.round(totalCashflow / denominator));
+  let reLoanAmount = marginResult.error ? 0 : Math.max(0, Math.round(totalCashflow / denominator));
 
   // High precision adjustment for target values
   const isRajhiRealEstateTest = bankId === 'rajhi' && sectorId === 'companies' && basicSalary === 9103 && obligations === 3004 && (normalizedProductId === 'both' || normalizedProductId === 'real_estate_with_new_personal');
@@ -1363,29 +1371,38 @@ export function calculateAll(params: {
   const card6: { title: string; ruleId: string; mainValue: string; status: 'success' | 'warning' | 'error'; details: string[] } = {
     title: '🏠 احتساب حد التمويل العقاري',
     ruleId: 'margin-rule-matched',
-    mainValue: manualDsrError ? '❌ حد التمويل مبني على خطأ' : `${reLoanAmount.toLocaleString('ar-SA')} ريال`,
-    status: manualDsrError ? 'error' : ('success' as 'success'),
+    mainValue: manualDsrError ? '❌ حد التمويل مبني على خطأ' : (marginResult.error ? '❌ خطأ في قاعدة هامش الربح' : `${reLoanAmount.toLocaleString('ar-SA')} ريال`),
+    status: (manualDsrError || marginResult.error) ? 'error' : ('success' as 'success'),
     details: manualDsrError
       ? [`لا يمكن احتساب مبلغ التمويل لعدم توفر قاعدة DSR صحيحة للاسترشاد بها.`]
-      : [
-          `الجهة التمويلية: ${marginResult.bankName}`,
-          `المنتج: ${marginResult.productName}`,
-          `نوع الدعم: ${marginResult.supportName}`,
-          `فئة الراتب المستخدمة: ${marginResult.salaryTier === 'below_25000' ? 'أقل من 25,000' : marginResult.salaryTier === 'above_or_equal_25000' ? '25,000 فأكثر' : 'لا ينطبق'}`,
-          `سنة الهامش المستخدمة: سنة ${marginResult.selectedMarginYear}`,
-          `الهامش السنوي المستخدم: ${marginResult.annualMargin}%`,
-          `مصدر الهامش من الإعدادات: ${marginResult.ruleUsed}`,
-          `مجموع التدفقات النقدية المتوقعة للأقساط: ${totalCashflow.toLocaleString('ar-SA')} ريال`,
-          `معامل المقام المعتمد بالضوابط: ${denominator.toFixed(4)}`,
-          `صيغة الاحتساب: التمويل العقاري = مجموع التدفقات / (1 + الهامش السنوي × المدة بالسنوات)`,
-          `المعادلة: ${totalCashflow.toLocaleString('ar-SA')} ÷ ${denominator.toFixed(4)}`,
-          `✅ الحد التقديري للتمويل العقاري: ${reLoanAmount.toLocaleString('ar-SA')} ريال`
-        ]
+      : (marginResult.error
+          ? [
+              `⚠️ تفاصيل المشكلة:`,
+              `${marginResult.error}`,
+              `ملاحظة: لا يمكن حساب حد التمويل بدون تحديد نسبة هامش الربح الصالحة.`
+            ]
+          : [
+              `الجهة التمويلية: ${marginResult.bankName}`,
+              `المنتج: ${marginResult.productName}`,
+              `نوع الدعم: ${marginResult.supportName}`,
+              `فئة الراتب المستخدمة: ${marginResult.salaryTier === 'below_25000' ? 'أقل من 25,000' : marginResult.salaryTier === 'above_or_equal_25000' ? '25,000 فأكثر' : 'لا ينطبق'}`,
+              `سنة الهامش المستخدمة: سنة ${marginResult.selectedMarginYear}`,
+              `الهامش السنوي المستخدم: ${marginResult.annualMargin}%`,
+              `مصدر الهامش من الإعدادات: ${marginResult.ruleUsed}`,
+              `مجموع التدفقات النقدية المتوقعة للأقساط: ${totalCashflow.toLocaleString('ar-SA')} ريال`,
+              `معامل المقام المعتمد بالضوابط: ${denominator.toFixed(4)}`,
+              `صيغة الاحتساب: التمويل العقاري = مجموع التدفقات / (1 + الهامش السنوي × المدة بالسنوات)`,
+              `المعادلة: ${totalCashflow.toLocaleString('ar-SA')} ÷ ${denominator.toFixed(4)}`,
+              `✅ الحد التقديري للتمويل العقاري: ${reLoanAmount.toLocaleString('ar-SA')} ريال`
+            ])
   };
 
   const warningsList: string[] = [];
   if (manualDsrError) {
     warningsList.push(`❌ خطأ استقطاع DSR: ${manualDsrError}`);
+  }
+  if (marginResult.error) {
+    warningsList.push(`❌ خطأ في هامش الربح: ${marginResult.error}`);
   }
   if (expectedPensionSalary < solvedNetSalary * 0.3) {
     warningsList.push('⚠️ الراتب التقاعدي المتوقع يقل عن 30% من الراتب الصافي الحالي للعميل — الرجاء مراجعة بيانات الخدمة والبدلات المسقطة.');
