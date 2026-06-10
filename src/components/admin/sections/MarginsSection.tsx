@@ -33,10 +33,18 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
   const [selectedProduct, setSelectedProduct] = useState<ProductId>('real_estate_only');
   const [selectedSupport, setSelectedSupport] = useState<SupportType>('none');
   const [selectedSalaryTier, setSelectedSalaryTier] = useState<'below_25000' | 'above_or_equal_25000' | 'not_applicable'>('not_applicable');
-  const [selectedYearsMode, setSelectedYearsMode] = useState<'yearly' | 'key_points'>('key_points');
+  const [selectedYearsMode, setSelectedYearsMode] = useState<'yearly' | 'key_points' | 'duration_tiers'>('key_points');
   const [selectedCalcMethod, setSelectedCalcMethod] = useState<'linear' | 'fixed'>('fixed');
 
   // 2. Local inputs for Edit Grid
+  const [localTiers, setLocalTiers] = useState<Array<{
+    id: string;
+    fromMonth: number;
+    toMonth: number;
+    marginRate: number;
+    notes?: string;
+    active: boolean;
+  }>>([]);
   const [localMargins, setLocalMargins] = useState<Record<number, string>>({});
   const [localSectorExceptions, setLocalSectorExceptions] = useState<Record<string, string>>({});
 
@@ -113,10 +121,10 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       method = (foundMethodRule.calculationMethod || foundMethodRule.calcType) as any;
     }
 
-    let inputMode: 'yearly' | 'key_points' = 'key_points';
+    let inputMode: 'yearly' | 'key_points' | 'duration_tiers' = 'key_points';
     const foundInputModeRule = relevantRules.find(r => r.marginInputMode);
     if (foundInputModeRule) {
-      inputMode = foundInputModeRule.marginInputMode;
+      inputMode = foundInputModeRule.marginInputMode as any;
     } else {
       const hasIntermediate = relevantRules.some(r => {
         const y = r.year || (r.toTermMonths / 12);
@@ -126,6 +134,19 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
         inputMode = 'yearly';
       }
     }
+
+    // Synchronize duration tiers
+    const tierRules = relevantRules.filter(r => r.marginInputMode === 'duration_tiers');
+    const initialTiers = tierRules.map((r, idx) => ({
+      id: r.id || `tier_${idx}_${Date.now()}`,
+      fromMonth: r.fromMonth ?? r.fromTermMonths ?? 0,
+      toMonth: r.toMonth ?? r.toTermMonths ?? 0,
+      marginRate: r.marginRate ?? r.endMargin ?? 3.50,
+      notes: r.notes || '',
+      active: r.active !== false && r.isActive !== false
+    }));
+    initialTiers.sort((a, b) => a.fromMonth - b.fromMonth);
+    setLocalTiers(initialTiers);
 
     setLocalMargins(initialMargins);
     setSelectedCalcMethod(method);
@@ -155,7 +176,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     marginsRecord: Record<number, string>,
     sectorExceptionsRecord: Record<string, string>,
     method: 'linear' | 'fixed' = 'fixed',
-    inputMode: 'yearly' | 'key_points' = 'key_points'
+    inputMode: 'yearly' | 'key_points' | 'duration_tiers' = 'key_points'
   ) => {
     const normSupport = (targetSupport as string) === 'down_payment' || targetSupport === 'downpayment' ? 'downpayment' : targetSupport;
 
@@ -176,90 +197,122 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     });
 
     const newRulesForThisCombo: MarginRule[] = [];
-    const yearsToExtract = inputMode === 'yearly'
-      ? Array.from({ length: 26 }, (_, i) => 5 + i)
-      : [5, 10, 15, 20, 25, 30];
 
-    const filledYears = yearsToExtract.filter(year => {
-      const val = marginsRecord[year];
-      return val !== undefined && val !== '' && !isNaN(parseFloat(val)) && parseFloat(val) > 0;
-    });
-
-    filledYears.sort((a, b) => a - b);
-
-    if (filledYears.length > 0) {
-      const definitions: Array<{ from: number, to: number, start: number, end: number, calcType: 'fixed' | 'linear', yearPoint: number }> = [];
-
-      for (let i = 0; i < filledYears.length; i++) {
-        const currentYear = filledYears[i];
-        const currentMarginStr = marginsRecord[currentYear];
-        const currentMarginVal = parseFloat(currentMarginStr) || 0;
-
-        if (i === 0) {
-          definitions.push({
-            from: 0,
-            to: currentYear * 12,
-            start: currentMarginVal,
-            end: currentMarginVal,
-            calcType: 'fixed' as const,
-            yearPoint: currentYear
-          });
-        } else {
-          const prevYear = filledYears[i - 1];
-          const prevMarginStr = marginsRecord[prevYear];
-          const prevMarginVal = parseFloat(prevMarginStr) || 0;
-
-          const fromMonths = prevYear * 12 + 1;
-          const toMonths = currentYear * 12;
-
-          definitions.push({
-            from: fromMonths,
-            to: toMonths,
-            start: method === 'fixed' ? currentMarginVal : prevMarginVal,
-            end: currentMarginVal,
-            calcType: method,
-            yearPoint: currentYear
-          });
-        }
-      }
-
-      const lastYear = filledYears[filledYears.length - 1];
-      const lastMarginStr = marginsRecord[lastYear];
-      const lastMarginVal = parseFloat(lastMarginStr) || 0;
-
-      definitions.push({
-        from: lastYear * 12 + 1,
-        to: 9999,
-        start: lastMarginVal,
-        end: lastMarginVal,
-        calcType: 'fixed' as const,
-        yearPoint: lastYear
-      });
-
-      definitions.forEach((def, index) => {
+    if (inputMode === 'duration_tiers') {
+      localTiers.forEach((tier, index) => {
         newRulesForThisCombo.push({
-          id: `gen_margin_${targetBank}_${targetProduct}_${normSupport}_${targetSalaryTier}_t${def.from}_${def.to}_${index}`,
+          id: tier.id || `tier_margin_${targetBank}_${targetProduct}_${normSupport}_${targetSalaryTier}_t${tier.fromMonth}_${tier.toMonth}_${index}`,
           bankId: targetBank,
           productId: targetProduct,
           supportType: normSupport as any,
           sectorId: 'all',
-          fromTermMonths: def.from,
-          toTermMonths: def.to,
-          startMargin: def.start,
-          endMargin: def.end,
-          calcType: def.calcType,
-          isActive: true,
+          fromTermMonths: tier.fromMonth,
+          toTermMonths: tier.toMonth,
+          startMargin: tier.marginRate,
+          endMargin: tier.marginRate,
+          calcType: 'fixed',
+          isActive: tier.active !== false,
           salaryTier: targetSalaryTier,
           productType: targetProduct as any,
-          marginInputMode: inputMode,
-          calculationMethod: method,
-          year: def.yearPoint,
-          termMonths: def.to === 9999 ? (def.yearPoint * 12) : def.to,
-          annualMargin: def.end,
+          marginInputMode: 'duration_tiers',
+          calculationMethod: 'fixed',
+          termMonths: tier.toMonth,
+          annualMargin: tier.marginRate,
           exceptionBps: 0,
-          baseMargin: Number((def.end / 100).toFixed(6))
+          baseMargin: Number((tier.marginRate / 100).toFixed(6)),
+          fromMonth: tier.fromMonth,
+          toMonth: tier.toMonth,
+          marginRate: tier.marginRate,
+          active: tier.active !== false,
+          notes: tier.notes || ''
         });
       });
+    } else {
+      const yearsToExtract = inputMode === 'yearly'
+        ? Array.from({ length: 26 }, (_, i) => 5 + i)
+        : [5, 10, 15, 20, 25, 30];
+
+      const filledYears = yearsToExtract.filter(year => {
+        const val = marginsRecord[year];
+        return val !== undefined && val !== '' && !isNaN(parseFloat(val)) && parseFloat(val) > 0;
+      });
+
+      filledYears.sort((a, b) => a - b);
+
+      if (filledYears.length > 0) {
+        const definitions: Array<{ from: number, to: number, start: number, end: number, calcType: 'fixed' | 'linear', yearPoint: number }> = [];
+
+        for (let i = 0; i < filledYears.length; i++) {
+          const currentYear = filledYears[i];
+          const currentMarginStr = marginsRecord[currentYear];
+          const currentMarginVal = parseFloat(currentMarginStr) || 0;
+
+          if (i === 0) {
+            definitions.push({
+              from: 0,
+              to: currentYear * 12,
+              start: currentMarginVal,
+              end: currentMarginVal,
+              calcType: 'fixed' as const,
+              yearPoint: currentYear
+            });
+          } else {
+            const prevYear = filledYears[i - 1];
+            const prevMarginStr = marginsRecord[prevYear];
+            const prevMarginVal = parseFloat(prevMarginStr) || 0;
+
+            const fromMonths = prevYear * 12 + 1;
+            const toMonths = currentYear * 12;
+
+            definitions.push({
+              from: fromMonths,
+              to: toMonths,
+              start: method === 'fixed' ? currentMarginVal : prevMarginVal,
+              end: currentMarginVal,
+              calcType: method,
+              yearPoint: currentYear
+            });
+          }
+        }
+
+        const lastYear = filledYears[filledYears.length - 1];
+        const lastMarginStr = marginsRecord[lastYear];
+        const lastMarginVal = parseFloat(lastMarginStr) || 0;
+
+        definitions.push({
+          from: lastYear * 12 + 1,
+          to: 9999,
+          start: lastMarginVal,
+          end: lastMarginVal,
+          calcType: 'fixed' as const,
+          yearPoint: lastYear
+        });
+
+        definitions.forEach((def, index) => {
+          newRulesForThisCombo.push({
+            id: `gen_margin_${targetBank}_${targetProduct}_${normSupport}_${targetSalaryTier}_t${def.from}_${def.to}_${index}`,
+            bankId: targetBank,
+            productId: targetProduct,
+            supportType: normSupport as any,
+            sectorId: 'all',
+            fromTermMonths: def.from,
+            toTermMonths: def.to,
+            startMargin: def.start,
+            endMargin: def.end,
+            calcType: def.calcType,
+            isActive: true,
+            salaryTier: targetSalaryTier,
+            productType: targetProduct as any,
+            marginInputMode: inputMode as any,
+            calculationMethod: method,
+            year: def.yearPoint,
+            termMonths: def.to === 9999 ? (def.yearPoint * 12) : def.to,
+            annualMargin: def.end,
+            exceptionBps: 0,
+            baseMargin: Number((def.end / 100).toFixed(6))
+          });
+        });
+      }
     }
 
     const newExceptionRules: MarginRule[] = [];
@@ -389,10 +442,10 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       method = (foundMethodRule.calculationMethod || foundMethodRule.calcType) as any;
     }
 
-    let inputMode: 'yearly' | 'key_points' = 'key_points';
+    let inputMode: 'yearly' | 'key_points' | 'duration_tiers' = 'key_points';
     const foundInputModeRule = relevantSrcRules.find(r => r.marginInputMode);
     if (foundInputModeRule) {
-      inputMode = foundInputModeRule.marginInputMode;
+      inputMode = foundInputModeRule.marginInputMode as any;
     } else {
       const hasIntermediate = relevantSrcRules.some(r => {
         const y = r.year || (r.toTermMonths / 12);
@@ -411,102 +464,137 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     const remainingRules = marginRules.filter(r => {
       const normalizedSupportType = (r.supportType === 'down_payment' || r.supportType === 'downpayment') ? 'downpayment' : r.supportType;
       const isTargetBaseRule = 
-        r.bankId === dstBank &&
-        r.productId === dstProduct &&
-        normalizedSupportType === normDstSupport &&
-        targetSalaryTiers.includes(r.salaryTier || 'not_applicable' as any) &&
-        !r.isExceptionOnly;
+         r.bankId === dstBank &&
+         r.productId === dstProduct &&
+         normalizedSupportType === normDstSupport &&
+         targetSalaryTiers.includes(r.salaryTier || 'not_applicable' as any) &&
+         !r.isExceptionOnly;
       return !isTargetBaseRule;
     });
 
     // Generate new rules for the target combo
     const newRulesForDst: MarginRule[] = [];
-    const yearsToExtract = inputMode === 'yearly'
-      ? Array.from({ length: 26 }, (_, i) => 5 + i)
-      : [5, 10, 15, 20, 25, 30];
 
-    const filledYears = yearsToExtract.filter(year => {
-      const val = srcMargins[year];
-      return val !== undefined && val !== '' && !isNaN(parseFloat(val)) && parseFloat(val) > 0;
-    });
-
-    filledYears.sort((a, b) => a - b);
-
-    if (filledYears.length > 0) {
+    if (inputMode === 'duration_tiers') {
+      const tierRules = relevantSrcRules.filter(r => r.marginInputMode === 'duration_tiers');
       targetSalaryTiers.forEach(targetSalaryTier => {
-        const definitions: Array<{ from: number, to: number, start: number, end: number, calcType: 'fixed' | 'linear', yearPoint: number }> = [];
-
-        for (let i = 0; i < filledYears.length; i++) {
-          const currentYear = filledYears[i];
-          const currentMarginStr = srcMargins[currentYear];
-          const currentMarginVal = parseFloat(currentMarginStr) || 0;
-
-          if (i === 0) {
-            definitions.push({
-              from: 0,
-              to: currentYear * 12,
-              start: currentMarginVal,
-              end: currentMarginVal,
-              calcType: 'fixed' as const,
-              yearPoint: currentYear
-            });
-          } else {
-            const prevYear = filledYears[i - 1];
-            const prevMarginStr = srcMargins[prevYear];
-            const prevMarginVal = parseFloat(prevMarginStr) || 0;
-
-            const fromMonths = prevYear * 12 + 1;
-            const toMonths = currentYear * 12;
-
-            definitions.push({
-              from: fromMonths,
-              to: toMonths,
-              start: method === 'fixed' ? currentMarginVal : prevMarginVal,
-              end: currentMarginVal,
-              calcType: method,
-              yearPoint: currentYear
-            });
-          }
-        }
-
-        const lastYear = filledYears[filledYears.length - 1];
-        const lastMarginStr = srcMargins[lastYear];
-        const lastMarginVal = parseFloat(lastMarginStr) || 0;
-
-        definitions.push({
-          from: lastYear * 12 + 1,
-          to: 9999,
-          start: lastMarginVal,
-          end: lastMarginVal,
-          calcType: 'fixed' as const,
-          yearPoint: lastYear
-        });
-
-        definitions.forEach((def, index) => {
+        tierRules.forEach((srcRule, idx) => {
           newRulesForDst.push({
-            id: `copied_margin_${dstBank}_${dstProduct}_${normDstSupport}_${targetSalaryTier}_t${def.from}_${def.to}_${index}_${Date.now()}`,
+            id: `copied_tier_${dstBank}_${dstProduct}_${normDstSupport}_${targetSalaryTier}_t${srcRule.fromMonth}_${srcRule.toMonth}_${idx}_${Date.now()}`,
             bankId: dstBank,
             productId: dstProduct,
             supportType: normDstSupport as any,
             sectorId: 'all',
-            fromTermMonths: def.from,
-            toTermMonths: def.to,
-            startMargin: def.start,
-            endMargin: def.end,
-            calcType: def.calcType,
-            isActive: true,
+            fromTermMonths: srcRule.fromMonth!,
+            toTermMonths: srcRule.toMonth!,
+            startMargin: srcRule.marginRate!,
+            endMargin: srcRule.marginRate!,
+            calcType: 'fixed',
+            isActive: srcRule.active !== false && srcRule.isActive !== false,
             salaryTier: targetSalaryTier,
             productType: dstProduct as any,
-            marginInputMode: inputMode,
-            calculationMethod: method,
-            year: def.yearPoint,
-            termMonths: def.to === 9999 ? (def.yearPoint * 12) : def.to,
-            annualMargin: def.end,
+            marginInputMode: 'duration_tiers',
+            calculationMethod: 'fixed',
+            termMonths: srcRule.toMonth!,
+            annualMargin: srcRule.marginRate!,
             exceptionBps: 0,
-            baseMargin: Number((def.end / 100).toFixed(6))
+            baseMargin: Number((srcRule.marginRate! / 100).toFixed(6)),
+            fromMonth: srcRule.fromMonth!,
+            toMonth: srcRule.toMonth!,
+            marginRate: srcRule.marginRate!,
+            active: srcRule.active !== false && srcRule.isActive !== false,
+            notes: srcRule.notes || ''
           });
         });
       });
+    } else {
+      const yearsToExtract = inputMode === 'yearly'
+        ? Array.from({ length: 26 }, (_, i) => 5 + i)
+        : [5, 10, 15, 20, 25, 30];
+
+      const filledYears = yearsToExtract.filter(year => {
+        const val = srcMargins[year];
+        return val !== undefined && val !== '' && !isNaN(parseFloat(val)) && parseFloat(val) > 0;
+      });
+
+      filledYears.sort((a, b) => a - b);
+
+      if (filledYears.length > 0) {
+        targetSalaryTiers.forEach(targetSalaryTier => {
+          const definitions: Array<{ from: number, to: number, start: number, end: number, calcType: 'fixed' | 'linear', yearPoint: number }> = [];
+
+          for (let i = 0; i < filledYears.length; i++) {
+            const currentYear = filledYears[i];
+            const currentMarginStr = srcMargins[currentYear];
+            const currentMarginVal = parseFloat(currentMarginStr) || 0;
+
+            if (i === 0) {
+              definitions.push({
+                from: 0,
+                to: currentYear * 12,
+                start: currentMarginVal,
+                end: currentMarginVal,
+                calcType: 'fixed' as const,
+                yearPoint: currentYear
+              });
+            } else {
+              const prevYear = filledYears[i - 1];
+              const prevMarginStr = srcMargins[prevYear];
+              const prevMarginVal = parseFloat(prevMarginStr) || 0;
+
+              const fromMonths = prevYear * 12 + 1;
+              const toMonths = currentYear * 12;
+
+              definitions.push({
+                from: fromMonths,
+                to: toMonths,
+                start: method === 'fixed' ? currentMarginVal : prevMarginVal,
+                end: currentMarginVal,
+                calcType: method,
+                yearPoint: currentYear
+              });
+            }
+          }
+
+          const lastYear = filledYears[filledYears.length - 1];
+          const lastMarginStr = srcMargins[lastYear];
+          const lastMarginVal = parseFloat(lastMarginStr) || 0;
+
+          definitions.push({
+            from: lastYear * 12 + 1,
+            to: 9999,
+            start: lastMarginVal,
+            end: lastMarginVal,
+            calcType: 'fixed' as const,
+            yearPoint: lastYear
+          });
+
+          definitions.forEach((def, index) => {
+            newRulesForDst.push({
+              id: `copied_margin_${dstBank}_${dstProduct}_${normDstSupport}_${targetSalaryTier}_t${def.from}_${def.to}_${index}_${Date.now()}`,
+              bankId: dstBank,
+              productId: dstProduct,
+              supportType: normDstSupport as any,
+              sectorId: 'all',
+              fromTermMonths: def.from,
+              toTermMonths: def.to,
+              startMargin: def.start,
+              endMargin: def.end,
+              calcType: def.calcType,
+              isActive: true,
+              salaryTier: targetSalaryTier,
+              productType: dstProduct as any,
+              marginInputMode: inputMode as any,
+              calculationMethod: method,
+              year: def.yearPoint,
+              termMonths: def.to === 9999 ? (def.yearPoint * 12) : def.to,
+              annualMargin: def.end,
+              exceptionBps: 0,
+              baseMargin: Number((def.end / 100).toFixed(6))
+            });
+          });
+        });
+      }
     }
 
     setMarginRules([...remainingRules, ...newRulesForDst]);
@@ -796,7 +884,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
         <div className="bg-slate-50 border border-slate-150 rounded-2xl p-5 grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
             <span className="text-xs font-extrabold text-gray-700 font-sans block">طريقة إدارة السنوات المعروضة:</span>
-            <div className="flex gap-1.5">
+            <div className="flex flex-col sm:flex-row gap-1.5">
               <button
                 type="button"
                 onClick={() => setSelectedYearsMode('key_points')}
@@ -818,6 +906,17 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                 }`}
               >
                 كل سنة مستقلة (5 إلى 30 سنة كاملة)
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedYearsMode('duration_tiers')}
+                className={`flex-1 px-3 py-2.5 rounded-xl text-xs font-bold font-sans transition-all cursor-pointer border text-center ${
+                  selectedYearsMode === 'duration_tiers'
+                    ? 'bg-[#0057B8] text-white border-[#0057B8] font-extrabold shadow-xs'
+                    : 'bg-white text-gray-650 border-gray-250 hover:bg-slate-50'
+                }`}
+              >
+                شرائح مدة التمويل
               </button>
             </div>
           </div>
@@ -890,62 +989,184 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       </div>
 
       {/* 5. Base Margins Table Section */}
-      <div className="bg-white p-6 rounded-2xl border border-gray-150 shadow-sm space-y-4 text-right font-sans">
-        <h3 className="text-sm font-bold text-slate-850 flex items-center gap-2 border-b border-gray-100 pb-3">
-          📊 هوامش التمويل الأساسية
-        </h3>
-        
-        {isLoaded && Object.values(localMargins).every(v => !v || v === '') && (
-          <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl p-4 text-xs font-bold font-sans text-center my-2 leading-6 flex items-center justify-center gap-2">
-            <span>⚠️</span>
-            <span>لا توجد هوامش محفوظة لهذه التركيبة، أدخل القيم ثم اضغط حفظ.</span>
+      {selectedYearsMode === 'duration_tiers' ? (
+        <div className="bg-white p-6 rounded-2xl border border-gray-150 shadow-sm space-y-4 text-right font-sans">
+          <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+            <h3 className="text-sm font-bold text-slate-850 flex items-center gap-2">
+              📊 شرائح مدة التمويل (بالأشهر)
+            </h3>
+            <button
+              type="button"
+              onClick={() => {
+                setLocalTiers(prev => [
+                  ...prev,
+                  {
+                    id: `new_tier_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+                    fromMonth: 36,
+                    toMonth: 60,
+                    marginRate: 3.50,
+                    notes: '',
+                    active: true
+                  }
+                ]);
+              }}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
+            >
+              <span>+ إضافة شريحة</span>
+            </button>
           </div>
-        )}
-        
-        <div className="overflow-x-auto border border-gray-200 rounded-2xl max-h-[450px] overflow-y-auto">
-          <table className="min-w-full divide-y divide-gray-250 text-right text-xs">
-            <thead className="bg-slate-50 text-slate-650 font-bold sticky top-0">
-              <tr>
-                <th scope="col" className="px-6 py-4 text-right font-bold">مدة التمويل بالسنوات</th>
-                <th scope="col" className="px-6 py-4 text-right font-bold text-[#0057B8]">هامش الجدول %</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 bg-white text-slate-700 font-semibold">
-              {(selectedYearsMode === 'yearly'
-                ? Array.from({ length: 26 }, (_, i) => 5 + i)
-                : [5, 10, 15, 20, 25, 30]
-              ).map((year) => {
-                const label = year === 5 || year === 10 ? `${year} سنوات` : `${year} سنة`;
-                return (
-                  <tr key={year} className="hover:bg-slate-50/40 transition-colors">
-                    <td className="px-6 py-3.5 text-right font-bold text-slate-800">
-                      {label}
-                    </td>
-                    <td className="px-6 py-2">
-                      <div className="relative max-w-[180px] inline-block w-full">
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          value={localMargins[year] ?? ''}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            if (val === '' || /^[0-9]*\.?[0-9]*$/.test(val)) {
-                              setLocalMargins(prev => ({ ...prev, [year]: val }));
-                            }
-                          }}
-                          className="bg-white border border-gray-300 rounded-xl pl-8 pr-4 py-2 w-full text-xs font-bold font-mono focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-left"
-                          placeholder="0.00"
-                        />
-                        <span className="absolute left-3 top-2.5 text-xs text-slate-400 font-bold">%</span>
-                      </div>
+
+          <div className="overflow-x-auto border border-gray-200 rounded-2xl">
+            <table className="min-w-full divide-y divide-gray-200 text-right text-xs">
+              <thead className="bg-slate-50 text-slate-650 font-bold">
+                <tr>
+                  <th scope="col" className="px-4 py-3 text-right">من شهر</th>
+                  <th scope="col" className="px-4 py-3 text-right">إلى شهر</th>
+                  <th scope="col" className="px-4 py-3 text-right">هامش الربح %</th>
+                  <th scope="col" className="px-4 py-3 text-right">ملاحظات اختيارية</th>
+                  <th scope="col" className="px-4 py-3 text-center">حذف</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 bg-white">
+                {localTiers.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="p-8 text-center text-gray-400 font-bold">
+                      لا توجد شرائح حالياً لهذه التركيبة. اضغط على زر "إضافة شريحة" للبدء.
                     </td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                ) : (
+                  localTiers.map((tier, index) => (
+                    <tr key={tier.id} className="hover:bg-slate-50/40 transition-colors">
+                      <td className="px-4 py-2.5">
+                        <input
+                          type="number"
+                          value={tier.fromMonth}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value) || 0;
+                            setLocalTiers(prev => prev.map(t => t.id === tier.id ? { ...t, fromMonth: val } : t));
+                          }}
+                          className="bg-white border border-gray-300 rounded-xl px-3 py-1.5 w-full text-xs font-bold text-center focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                          placeholder="مثال: 36"
+                        />
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <input
+                          type="number"
+                          value={tier.toMonth}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value) || 0;
+                            setLocalTiers(prev => prev.map(t => t.id === tier.id ? { ...t, toMonth: val } : t));
+                          }}
+                          className="bg-white border border-gray-300 rounded-xl px-3 py-1.5 w-full text-xs font-bold text-center focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                          placeholder="مثال: 60"
+                        />
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <div className="relative">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={tier.marginRate}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val === '' || /^[0-9]*\.?[0-9]*$/.test(val)) {
+                                setLocalTiers(prev => prev.map(t => t.id === tier.id ? { ...t, marginRate: parseFloat(val) || 0 } : t));
+                              }
+                            }}
+                            className="bg-white border border-gray-300 rounded-xl pl-8 pr-3 py-1.5 w-full text-xs font-bold text-left focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                            placeholder="3.50"
+                          />
+                          <span className="absolute left-3 top-2 text-xs text-slate-400 font-bold">%</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <input
+                          type="text"
+                          value={tier.notes || ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setLocalTiers(prev => prev.map(t => t.id === tier.id ? { ...t, notes: val } : t));
+                          }}
+                          className="bg-white border border-gray-300 rounded-xl px-3 py-1.5 w-full text-xs font-bold text-right focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                          placeholder="مثال: شريحة تمويل متوسط الأجل"
+                        />
+                      </td>
+                      <td className="px-4 py-2.5 text-center">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setLocalTiers(prev => prev.filter(t => t.id !== tier.id));
+                          }}
+                          className="p-1 px-3 bg-rose-550 hover:bg-rose-650 text-white rounded-lg text-[10px] font-bold transition-colors cursor-pointer"
+                        >
+                          حذف
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="bg-white p-6 rounded-2xl border border-gray-150 shadow-sm space-y-4 text-right font-sans">
+          <h3 className="text-sm font-bold text-slate-850 flex items-center gap-2 border-b border-gray-100 pb-3">
+            📊 هوامش التمويل الأساسية
+          </h3>
+          
+          {isLoaded && Object.values(localMargins).every(v => !v || v === '') && (
+            <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl p-4 text-xs font-bold font-sans text-center my-2 leading-6 flex items-center justify-center gap-2">
+              <span>⚠️</span>
+              <span>لا توجد هوامش محفوظة لهذه التركيبة، أدخل القيم ثم اضغط حفظ.</span>
+            </div>
+          )}
+          
+          <div className="overflow-x-auto border border-gray-200 rounded-2xl max-h-[450px] overflow-y-auto">
+            <table className="min-w-full divide-y divide-gray-250 text-right text-xs">
+              <thead className="bg-slate-50 text-slate-650 font-bold sticky top-0">
+                <tr>
+                  <th scope="col" className="px-6 py-4 text-right font-bold">مدة التمويل بالسنوات</th>
+                  <th scope="col" className="px-6 py-4 text-right font-bold text-[#0057B8]">هامش الجدول %</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 bg-white text-slate-700 font-semibold">
+                {(selectedYearsMode === 'yearly'
+                  ? Array.from({ length: 26 }, (_, i) => 5 + i)
+                  : [5, 10, 15, 20, 25, 30]
+                ).map((year) => {
+                  const label = year === 5 || year === 10 ? `${year} سنوات` : `${year} سنة`;
+                  return (
+                    <tr key={year} className="hover:bg-slate-50/40 transition-colors">
+                      <td className="px-6 py-3.5 text-right font-bold text-slate-800">
+                        {label}
+                      </td>
+                      <td className="px-6 py-2">
+                        <div className="relative max-w-[180px] inline-block w-full">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={localMargins[year] ?? ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val === '' || /^[0-9]*\.?[0-9]*$/.test(val)) {
+                                setLocalMargins(prev => ({ ...prev, [year]: val }));
+                              }
+                            }}
+                            className="bg-white border border-gray-300 rounded-xl pl-8 pr-4 py-2 w-full text-xs font-bold font-mono focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-left"
+                            placeholder="0.00"
+                          />
+                          <span className="absolute left-3 top-2.5 text-xs text-slate-400 font-bold">%</span>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* 5. Inline Copy Margins Section */}
       {showCopyModal && (

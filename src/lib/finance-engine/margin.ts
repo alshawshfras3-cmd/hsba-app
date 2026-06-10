@@ -96,9 +96,19 @@ export function calculateMargin(params: {
 
   // Find if there is a specified marginInputMode in the matched rules
   const activeInputModeRule = rules.find(r => r.marginInputMode);
-  const activeInputMode: 'yearly' | 'key_points' = activeInputModeRule ? activeInputModeRule.marginInputMode : 'key_points';
+  const activeInputMode: 'yearly' | 'key_points' | 'duration_tiers' = activeInputModeRule ? activeInputModeRule.marginInputMode as any : 'key_points';
 
-  if (activeInputMode === 'key_points') {
+  if (activeInputMode === 'duration_tiers') {
+    const tierRules = rules.filter(r => r.marginInputMode === 'duration_tiers' && r.fromMonth !== undefined && r.toMonth !== undefined);
+    const matchedTier = tierRules.find(r => termMonths >= r.fromMonth! && termMonths <= r.toMonth!);
+    if (matchedTier) {
+      annualMargin = matchedTier.marginRate ?? 3.50;
+      ruleUsed = `هامش شريحة مدة التمويل (${matchedTier.fromMonth} إلى ${matchedTier.toMonth} شهر) بمعدل ${annualMargin}%.`;
+    } else {
+      annualMargin = 3.50;
+      ruleUsed = `لم يتم العثور على شريحة مدة تمويل مطابقة لـ ${termMonths} شهر (تم استخدام افتراضي 3.50%).`;
+    }
+  } else if (activeInputMode === 'key_points') {
     const termYearsFloat = termMonths / 12;
     if (termYearsFloat <= 5) {
       annualMargin = getMarginForExactMonths(60);

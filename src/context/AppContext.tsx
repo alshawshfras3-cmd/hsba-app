@@ -501,26 +501,26 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     if (clonedData.sectorMappings) setSectorMappings(clonedData.sectorMappings);
  
     const merged: AdminSettings = {
-      banks: clonedData.banks || deepClone(initialData.banks),
-      products: clonedData.products || deepClone(initialData.products),
-      militaryRanks: clonedData.militaryRanks || deepClone(initialData.militaryRanks),
-      salaryRules: clonedData.salaryRules || deepClone(initialData.salaryRules),
-      pensionRules: clonedData.pensionRules || deepClone(initialData.pensionRules),
-      termRules: clonedData.termRules || deepClone(initialData.termRules),
+      banks: clonedData.banks ?? deepClone(initialData.banks),
+      products: clonedData.products ?? deepClone(initialData.products),
+      militaryRanks: clonedData.militaryRanks ?? deepClone(initialData.militaryRanks),
+      salaryRules: clonedData.salaryRules ?? deepClone(initialData.salaryRules),
+      pensionRules: clonedData.pensionRules ?? deepClone(initialData.pensionRules),
+      termRules: clonedData.termRules ?? deepClone(initialData.termRules),
       marginRules: clonedData.marginRules ? upgradeMarginRules(clonedData.marginRules) : deepClone(initialData.marginRules),
-      dsrRules: clonedData.dsrRules || deepClone(initialData.dsrRules),
-      supportSettings: clonedData.supportSettings || deepClone(initialData.supportSettings),
-      housingSupportTiers: clonedData.housingSupportTiers || deepClone(initialData.housingSupportTiers),
-      advancePaymentTiers: clonedData.advancePaymentTiers || deepClone(initialData.advancePaymentTiers),
-      personalRules: clonedData.personalRules || deepClone(initialData.personalRules),
-      advancedRules: clonedData.advancedRules || deepClone(initialData.advancedRules),
-      userSubscriptions: clonedData.userSubscriptions || deepClone(initialData.userSubscriptions),
-      customSectors: clonedData.customSectors || deepClone(initialData.customSectors),
-      bankSectorRules: clonedData.bankSectorRules || deepClone(initialData.bankSectorRules),
-      pensionRulesLibrary: clonedData.pensionRulesLibrary || deepClone(initialData.pensionRulesLibrary),
-      approvedSalaryRules: clonedData.approvedSalaryRules || clonedData.approvedSalaryDbRules || deepClone(fallbackApprovedSalaryRules),
-      pensionDbRules: clonedData.pensionDbRules || deepClone(fallbackPensionRules),
-      sectorMappings: clonedData.sectorMappings || deepClone(fallbackSectorMappings),
+      dsrRules: clonedData.dsrRules ?? deepClone(initialData.dsrRules),
+      supportSettings: clonedData.supportSettings ?? deepClone(initialData.supportSettings),
+      housingSupportTiers: clonedData.housingSupportTiers ?? deepClone(initialData.housingSupportTiers),
+      advancePaymentTiers: clonedData.advancePaymentTiers ?? deepClone(initialData.advancePaymentTiers),
+      personalRules: clonedData.personalRules ?? deepClone(initialData.personalRules),
+      advancedRules: clonedData.advancedRules ?? deepClone(initialData.advancedRules),
+      userSubscriptions: clonedData.userSubscriptions ?? deepClone(initialData.userSubscriptions),
+      customSectors: clonedData.customSectors ?? deepClone(initialData.customSectors),
+      bankSectorRules: clonedData.bankSectorRules ?? deepClone(initialData.bankSectorRules),
+      pensionRulesLibrary: clonedData.pensionRulesLibrary ?? deepClone(initialData.pensionRulesLibrary),
+      approvedSalaryRules: clonedData.approvedSalaryRules ?? clonedData.approvedSalaryDbRules ?? deepClone(fallbackApprovedSalaryRules),
+      pensionDbRules: clonedData.pensionDbRules ?? deepClone(fallbackPensionRules),
+      sectorMappings: clonedData.sectorMappings ?? deepClone(fallbackSectorMappings),
     };
     setSavedSettings(merged);
   };
@@ -582,13 +582,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (settingsInitialized && supabaseFetched && tiersLoaded && !hasSynced) {
       const merged: AdminSettings = {
-        banks: settings.banks || initialData.banks,
-        products: settings.product_acceptance || initialData.products,
-        militaryRanks: (settings.military_ranks && Array.isArray(settings.military_ranks) && settings.military_ranks.length > 0) ? settings.military_ranks : initialData.militaryRanks,
-        salaryRules: settings.salary_rules || initialData.salaryRules,
-        pensionRules: settings.pension_rules || initialData.pensionRules,
-        termRules: settings.term_rules || initialData.termRules,
-        marginRules: upgradeMarginRules(settings.margin_rules || []),
+        banks: (settings.banks !== undefined && settings.banks !== null) ? settings.banks : initialData.banks,
+        products: (settings.product_acceptance !== undefined && settings.product_acceptance !== null) ? settings.product_acceptance : initialData.products,
+        militaryRanks: (settings.military_ranks !== undefined && settings.military_ranks !== null) ? settings.military_ranks : initialData.militaryRanks,
+        salaryRules: (settings.salary_rules !== undefined && settings.salary_rules !== null) ? settings.salary_rules : initialData.salaryRules,
+        pensionRules: (settings.pension_rules !== undefined && settings.pension_rules !== null) ? settings.pension_rules : initialData.pensionRules,
+        termRules: (settings.term_rules !== undefined && settings.term_rules !== null) ? settings.term_rules : initialData.termRules,
+        marginRules: upgradeMarginRules((settings.margin_rules !== undefined && settings.margin_rules !== null) ? settings.margin_rules : []),
         dsrRules: normalizeDsrRules(
           (settings.dsrRules !== undefined && settings.dsrRules !== null)
             ? settings.dsrRules
@@ -596,18 +596,21 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
               ? settings.dsr_rules
               : initialData.dsrRules)
         ),
-        supportSettings: settings.support_settings || initialData.supportSettings,
-        housingSupportTiers: housingSupportTiers.length > 0 ? housingSupportTiers : initialData.housingSupportTiers,
-        advancePaymentTiers: advancePaymentTiers.length > 0 ? advancePaymentTiers : initialData.advancePaymentTiers,
-        personalRules: settings.personal_finance_rules || initialData.personalRules,
-        advancedRules: settings.advanced_rules || initialData.advancedRules,
-        userSubscriptions: settings.user_subscriptions || initialData.userSubscriptions,
-        customSectors: settings.hasba_custom_sectors || defaultSectorsList,
-        bankSectorRules: ensureBankSectorPensionRules(settings.banks || initialData.banks, settings.bank_sector_pension_rules || []),
-        pensionRulesLibrary: settings.pension_rules_library || defaultLibraryRules,
-        approvedSalaryRules: settings.approvedSalaryRules || fallbackApprovedSalaryRules,
-        pensionDbRules: settings.pensionDbRules || fallbackPensionRules,
-        sectorMappings: settings.sectorMappings || fallbackSectorMappings,
+        supportSettings: (settings.support_settings !== undefined && settings.support_settings !== null) ? settings.support_settings : initialData.supportSettings,
+        housingSupportTiers: (housingSupportTiers !== undefined && housingSupportTiers !== null && housingSupportTiers.length > 0) ? housingSupportTiers : initialData.housingSupportTiers,
+        advancePaymentTiers: (advancePaymentTiers !== undefined && advancePaymentTiers !== null && advancePaymentTiers.length > 0) ? advancePaymentTiers : initialData.advancePaymentTiers,
+        personalRules: (settings.personal_finance_rules !== undefined && settings.personal_finance_rules !== null) ? settings.personal_finance_rules : initialData.personalRules,
+        advancedRules: (settings.advanced_rules !== undefined && settings.advanced_rules !== null) ? settings.advanced_rules : initialData.advancedRules,
+        userSubscriptions: (settings.user_subscriptions !== undefined && settings.user_subscriptions !== null) ? settings.user_subscriptions : initialData.userSubscriptions,
+        customSectors: (settings.hasba_custom_sectors !== undefined && settings.hasba_custom_sectors !== null) ? settings.hasba_custom_sectors : defaultSectorsList,
+        bankSectorRules: ensureBankSectorPensionRules(
+          (settings.banks !== undefined && settings.banks !== null) ? settings.banks : initialData.banks,
+          (settings.bank_sector_pension_rules !== undefined && settings.bank_sector_pension_rules !== null) ? settings.bank_sector_pension_rules : []
+        ),
+        pensionRulesLibrary: (settings.pension_rules_library !== undefined && settings.pension_rules_library !== null) ? settings.pension_rules_library : defaultLibraryRules,
+        approvedSalaryRules: (settings.approvedSalaryRules !== undefined && settings.approvedSalaryRules !== null) ? settings.approvedSalaryRules : fallbackApprovedSalaryRules,
+        pensionDbRules: (settings.pensionDbRules !== undefined && settings.pensionDbRules !== null) ? settings.pensionDbRules : fallbackPensionRules,
+        sectorMappings: (settings.sectorMappings !== undefined && settings.sectorMappings !== null) ? settings.sectorMappings : fallbackSectorMappings,
       };
 
       applySettingsState(merged);

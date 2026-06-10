@@ -132,7 +132,7 @@ export interface MarginRule {
 
   // NEW internal keys/metadata fields
   productType?: 'real_estate_only' | 'real_estate_with_new_personal' | 'real_estate_with_existing_personal';
-  marginInputMode?: 'yearly' | 'key_points';
+  marginInputMode?: 'yearly' | 'key_points' | 'duration_tiers';
   calculationMethod?: 'fixed' | 'linear';
   year?: number;
   termMonths?: number;
@@ -140,6 +140,11 @@ export interface MarginRule {
   exceptionBps?: number;
   baseMargin?: number;
   isExceptionOnly?: boolean;
+  fromMonth?: number;
+  toMonth?: number;
+  marginRate?: number;
+  active?: boolean;
+  notes?: string;
 }
 
 export interface DsrRule {
