@@ -854,7 +854,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                   productId: pId,
                   supportType: sId,
                   salaryTier: tier,
-                  sectorId: sec.id,
+                  sectorId: sec.id as SectorId,
                   sectorNameAr: sec.nameAr,
                   year: year,
                   baseMargin: result.baseMargin !== undefined ? (result.baseMargin * 100) : result.annualMargin,
@@ -873,720 +873,680 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
   };
 
   return (
-    <div className="space-y-6" dir="rtl">
+    <div className="space-y-4 text-right" dir="rtl">
       
-      {/* 1. Header Section */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm text-right">
-        <div className="space-y-1 text-right">
-          <h2 className="text-xl font-bold text-gray-900 font-sans">هوامش الأرباح البنكية</h2>
+      {/* 1. Header Section - Compact */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white p-4 rounded-xl border border-gray-100 shadow-xs">
+        <div className="space-y-0.5 text-right">
+          <h2 className="text-lg font-bold text-gray-900 font-sans">هوامش الأرباح البنكية</h2>
           <p className="text-xs text-gray-500 font-sans">
-            جهة سهلة ومباشرة لإعداد هوامش التمويل الأساسية ومزامنة كافة استثناءات القطاعات.
+            إدارة هوامش التمويل الأساسية ومزامنة كافة استثناءات القطاعات في واجهة واحدة متكاملة.
           </p>
         </div>
-        <div className="flex gap-2 font-sans">
+        <div className="flex items-center gap-2">
+          {/* Main Actions Sticky Header */}
           <button
             type="button"
-            onClick={() => setShowCloneCard(!showCloneCard)}
-            className="inline-flex items-center gap-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-gray-700 px-4 py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer"
+            onClick={handleSaveConfig}
+            className="px-5 py-2.5 bg-[#0057B8] hover:bg-[#004bb0] text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-[#0057B8]/10 cursor-pointer flex items-center justify-center gap-1.5"
           >
-            <Copy className="w-4 h-4" />
-            <span>نسخ إعدادات بنك</span>
+            <span>💾 حفظ وتطبيق الإعدادات</span>
           </button>
         </div>
       </div>
 
-      {/* Clone Quick Actions Block */}
-      {showCloneCard && (
-        <div className="bg-slate-50 border border-slate-150 rounded-2xl p-5 space-y-4 animate-in fade-in duration-200 text-right font-sans">
-          <h4 className="font-bold text-slate-800 text-xs">📋 استنساخ ومزامنة هوامش جهة تمويلية كاملة</h4>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-600">البنك المصدر (الذي ستنسخ منه):</label>
-              <select
-                value={cloneFromBank}
-                onChange={(e) => setCloneFromBank(e.target.value)}
-                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-705 outline-none focus:ring-1 focus:ring-[#0057B8]"
-              >
-                {banks.map(b => (
-                  <option key={b.id} value={b.id}>{b.nameAr}</option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-600">البنك المستهدف (الذي سيمسح ويستبدل):</label>
-              <select
-                value={cloneToBank}
-                onChange={(e) => setCloneToBank(e.target.value)}
-                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-705 outline-none focus:ring-1 focus:ring-[#0057B8]"
-              >
-                {banks.map(b => (
-                  <option key={b.id} value={b.id}>{b.nameAr}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div className="flex justify-end pt-1">
-            <button
-              type="button"
-              onClick={handleCloneBankLevel}
-              className="px-5 py-2 bg-[#0057B8] text-white rounded-xl text-xs font-bold hover:bg-[#004bb0] cursor-pointer"
-            >
-              تأكيد الاستنساخ والمزامنة
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* 2. Banks Horizontal Selection Row */}
-      <div className="space-y-2 text-right">
-        <span className="text-xs font-extrabold text-gray-500 block mb-1 font-sans">اختر البنك التمويلي:</span>
-        <div className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm overflow-x-auto whitespace-nowrap scrollbar-none flex gap-2.5 font-sans">
-          {banks.map((b) => {
-            const isSelected = selectedBank === b.id;
-            return (
-              <button
-                key={b.id}
-                type="button"
-                onClick={() => setSelectedBank(b.id)}
-                className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all border shrink-0 cursor-pointer ${
-                  isSelected
-                    ? 'bg-[#0057B8] text-white border-[#0057B8] shadow-sm shadow-[#0057B8]/20 scale-[1.01]'
-                    : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200'
-                }`}
-              >
-                <span>{b.nameAr}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* 3. Selections and Controls Block */}
-      <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm space-y-6 text-right">
+      {/* 2. Main Horizontal Dashboard Grid (Settings Right, Table Left) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
         
-        {/* أولاً: نوع المنتج */}
-        <div className="space-y-2">
-          <span className="block text-xs font-extrabold text-[#0057B8] font-sans">أولاً: المنتج</span>
-          <div className="flex flex-wrap gap-2.5">
-            {productTypesList.map((p) => {
-              const isSelected = selectedProduct === p.id;
-              return (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => setSelectedProduct(p.id as ProductId)}
-                  className={`px-4 py-2.5 rounded-xl border text-xs font-bold font-sans transition-all cursor-pointer ${
-                    isSelected
-                      ? 'bg-[#0057B8] border-[#0057B8] text-white shadow-sm font-extrabold'
-                      : 'bg-white border-gray-200 text-gray-600 hover:bg-slate-50'
-                  }`}
+        {/* Right Column: Settings Panel + Sector Exceptions (320px wide approximately on large screens) */}
+        <div className="lg:col-span-4 xl:col-span-3 space-y-4">
+          
+          {/* Settings Section Card */}
+          <div className="bg-white border border-gray-150 rounded-xl p-4 shadow-xs space-y-3">
+            <h3 className="text-xs font-black text-slate-800 border-b border-gray-100 pb-2 flex items-center gap-1.5">
+              <span>⚙️</span>
+              <span>لوحة التحكم والتصفية</span>
+            </h3>
+
+            {/* Bank Select */}
+            <div className="space-y-1">
+              <label className="block text-[10px] font-bold text-gray-500">البنك التمويلي:</label>
+              <select
+                value={selectedBank}
+                onChange={(e) => setSelectedBank(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 text-xs font-bold text-slate-800 outline-none focus:ring-1 focus:ring-[#0057B8] cursor-pointer"
+              >
+                {banks.map(b => (
+                  <option key={b.id} value={b.id}>{b.nameAr}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Product Select */}
+            <div className="space-y-1">
+              <label className="block text-[10px] font-bold text-gray-500">المنتج:</label>
+              <select
+                value={selectedProduct}
+                onChange={(e) => setSelectedProduct(e.target.value as ProductId)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 text-xs font-bold text-slate-800 outline-none focus:ring-1 focus:ring-[#0057B8] cursor-pointer"
+              >
+                {productTypesList.map(p => (
+                  <option key={p.id} value={p.id}>{p.nameAr}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Support Select */}
+            <div className="space-y-1">
+              <label className="block text-[10px] font-bold text-gray-500">نوع الدعم:</label>
+              <select
+                value={selectedSupport}
+                onChange={(e) => setSelectedSupport(e.target.value as SupportType)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 text-xs font-bold text-slate-800 outline-none focus:ring-1 focus:ring-[#0057B8] cursor-pointer"
+              >
+                <option value="none">غير مدعوم</option>
+                <option value="monthly">دعم شهري</option>
+                <option value="downpayment">دعم دفعة</option>
+              </select>
+            </div>
+
+            {/* Sector Select */}
+            <div className="space-y-1">
+              <label className="block text-[10px] font-bold text-gray-500">القطاع الفعال:</label>
+              <select
+                value={selectedSector}
+                onChange={(e) => setSelectedSector(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 text-xs font-bold text-slate-800 outline-none focus:ring-1 focus:ring-[#0057B8] cursor-pointer"
+              >
+                {sectorsList.map(sec => (
+                  <option key={sec.id} value={sec.id}>{sec.nameAr}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Salary Tier Select */}
+            <div className="space-y-1">
+              <label className="block text-[10px] font-bold text-gray-500">فئة الراتب:</label>
+              {selectedSupport === 'none' ? (
+                <div className="bg-slate-50 border border-slate-100 text-slate-400 rounded-lg px-2.5 py-2.5 text-[10px] font-bold leading-normal">
+                  🔒 فئة الراتب غير قابلة للتعيين لغير المدعوم (جدول عام)
+                </div>
+              ) : (
+                <select
+                  value={selectedSalaryTier}
+                  onChange={(e) => setSelectedSalaryTier(e.target.value as any)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 text-xs font-bold text-slate-800 outline-none focus:ring-1 focus:ring-[#0057B8] cursor-pointer"
                 >
-                  {p.nameAr}
-                </button>
-              );
-            })}
+                  <option value="below_25000">💵 أقل من 25,000</option>
+                  <option value="above_or_equal_25000">💰 25,000 فأكثر</option>
+                </select>
+              )}
+            </div>
+
+            {/* Show Mode Selector */}
+            <div className="space-y-1">
+              <label className="block text-[10px] font-bold text-gray-500">طريقة إدارة السنوات:</label>
+              <select
+                value={selectedYearsMode}
+                onChange={(e) => setSelectedYearsMode(e.target.value as any)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 text-xs font-bold text-slate-800 outline-none focus:ring-1 focus:ring-[#0057B8] cursor-pointer"
+              >
+                <option value="key_points">نقاط رئيسية (5/10/15/20/25/30 سنة)</option>
+                <option value="yearly">كل سنة مستقلة (5 إلى 30 سنة كاملة)</option>
+                <option value="duration_tiers">شرائح مدة التمويل (من شهر إلى شهر)</option>
+              </select>
+            </div>
+
+            {/* Calc Method Selector */}
+            <div className="space-y-1">
+              <label className="block text-[10px] font-bold text-gray-500">طريقة الحساب (النسب البينية):</label>
+              <select
+                value={selectedCalcMethod}
+                onChange={(e) => setSelectedCalcMethod(e.target.value as any)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 text-xs font-bold text-slate-800 outline-none focus:ring-1 focus:ring-[#0057B8] cursor-pointer"
+              >
+                <option value="fixed">ثابتة Fixed (بدون تدرج)</option>
+                <option value="linear">تدرج خطي Linear (انسيابي)</option>
+              </select>
+            </div>
           </div>
+
+          {/* Sector Exceptions Section Card */}
+          <div className="bg-white border border-gray-150 rounded-xl p-4 shadow-xs space-y-2.5 text-right font-sans">
+            <div className="border-b border-gray-100 pb-2">
+              <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                <span>🛡️</span>
+                <span>استثناءات القطاعات الحالي</span>
+              </h4>
+              <p className="text-[9px] text-gray-400 leading-normal mt-0.5">
+                تُدخل كقيم نقاط أساس Bps (مؤثرة على كافة جداول البنك المحدّد).
+              </p>
+            </div>
+
+            <div className="space-y-2 max-h-[190px] overflow-y-auto pr-0.5 scrollbar-thin">
+              {sectorsList.map((sec) => (
+                <div key={sec.id} className="flex items-center justify-between gap-2.5 bg-slate-50 border border-slate-150 p-2 rounded-lg">
+                  <span className="block text-xs font-bold text-slate-700 truncate">{sec.nameAr}</span>
+                  <div className="relative w-24 shrink-0">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={localSectorExceptions[sec.id] ?? '0'}
+                      onChange={(e) => {
+                        let valStr = e.target.value;
+                        valStr = valStr.replace(/[^0-9-]/g, '');
+                        setLocalSectorExceptions(prev => ({ ...prev, [sec.id]: valStr }));
+                      }}
+                      className="bg-white border border-gray-300 rounded-lg py-1 px-2 text-center text-xs font-bold font-mono focus:outline-none focus:ring-1 focus:ring-[#0057B8] text-slate-800"
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
         </div>
 
-        {/* ثانياً: نوع الدعم */}
-        <div className="space-y-2">
-          <span className="block text-xs font-extrabold text-[#0057B8] font-sans">ثانياً: نوع الدعم</span>
-          <div className="flex flex-wrap gap-2.5">
-            {[
-              { id: 'none', nameAr: 'غير مدعوم' },
-              { id: 'monthly', nameAr: 'دعم شهري' },
-              { id: 'downpayment', nameAr: 'دعم دفعة' }
-            ].map((s) => {
-              const isSelected = selectedSupport === s.id;
-              return (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => setSelectedSupport(s.id as SupportType)}
-                  className={`px-4 py-2.5 rounded-xl border text-xs font-bold font-sans transition-all cursor-pointer ${
-                    isSelected
-                      ? 'bg-[#0057B8] border-[#0057B8] text-white shadow-sm font-extrabold'
-                      : 'bg-white border-gray-200 text-gray-600 hover:bg-slate-50'
-                  }`}
-                >
-                  {s.nameAr}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        {/* Left Column: Information Bar + Table Content (main workspace) */}
+        <div className="lg:col-span-8 xl:col-span-9 space-y-4">
+          
+          {/* Live Selector Information Tags Bar */}
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 shadow-xs flex flex-wrap gap-2 items-center justify-between text-right font-sans">
+            <div className="flex flex-wrap gap-1.5 items-center">
+              <span className="text-[10px] font-black text-slate-400 ml-1 shrink-0">التصفية النشطة:</span>
+              
+              <span className="bg-blue-50 border border-blue-100 text-[#0057B8] text-[11px] px-2.5 py-1 rounded-lg font-bold">
+                🏦 {(banks.find(b => b.id === selectedBank)?.nameAr) || selectedBank}
+              </span>
 
-        {/* ثالثاً: فئة الراتب */}
-        <div className="space-y-2">
-          <span className="block text-xs font-extrabold text-[#0057B8] font-sans">ثالثاً: فئة الراتب</span>
-          {selectedSupport === 'none' ? (
-            <div className="bg-slate-50 border border-slate-200 text-slate-500 rounded-xl px-4 py-3.5 text-xs font-semibold max-w-md font-sans">
-              🔒 فئة الراتب غير مطبقة لغير المدعوم ويتم تطبيق جدول عام لكافة الرواتب.
+              <span className="bg-emerald-50 border border-emerald-100 text-emerald-700 text-[11px] px-2.5 py-1 rounded-lg font-bold">
+                📦 {productTypesList.find(p => p.id === selectedProduct)?.nameAr || selectedProduct}
+              </span>
+
+              <span className="bg-purple-50 border border-purple-100 text-purple-700 text-[11px] px-2.5 py-1 rounded-lg font-bold">
+                🎁 {selectedSupport === 'none' ? 'غير مدعوم' : selectedSupport === 'monthly' ? 'دعم شهري' : 'دعم دفعة'}
+              </span>
+
+              <span className="bg-amber-50 border border-amber-100 text-amber-700 text-[11px] px-2.5 py-1 rounded-lg font-bold">
+                💼 {sectorsList.find(s => s.id === selectedSector)?.nameAr || 'عام'}
+              </span>
+
+              <span className="col-span-1 bg-indigo-50 border border-indigo-100 text-indigo-700 text-[11px] px-2.5 py-1 rounded-lg font-bold">
+                💵 {selectedSupport === 'none' ? 'الجدول العام لغير المدعوم' : selectedSalaryTier === 'below_25000' ? 'راتب أقل من 25,000' : 'راتب 25,000 فأكثر'}
+              </span>
+
+              <span className="bg-slate-100 border border-slate-200 text-slate-700 text-[11px] px-2.5 py-1 rounded-lg font-bold">
+                ⏱️ {selectedYearsMode === 'key_points' ? 'نقاط رئيسية' : selectedYearsMode === 'yearly' ? 'كل سنة مستقلة' : 'شرائح مدة'}
+              </span>
+            </div>
+
+            <div className="shrink-0 flex gap-2">
+              <button
+                type="button"
+                onClick={handleSaveConfig}
+                className="px-4 py-1.5 bg-[#0057B8] hover:bg-[#004bb0] text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
+              >
+                حفظ الجدول
+              </button>
+            </div>
+          </div>
+
+          {/* Margins Inputs Table/Grid */}
+          {selectedYearsMode === 'duration_tiers' ? (
+            <div className="bg-white p-4 rounded-xl border border-gray-150 shadow-xs space-y-3 text-right font-sans">
+              <div className="flex justify-between items-center border-b border-gray-100 pb-2">
+                <h3 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <span>📊</span>
+                  <span>شرائح مدة التمويل المحدّدة لهذه التصفية والقطاع (مدة بالأشهر)</span>
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLocalTiers(prev => [
+                      ...prev,
+                      {
+                        id: `new_tier_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+                        fromMonth: 36,
+                        toMonth: 60,
+                        marginRate: 3.50,
+                        notes: '',
+                        active: true
+                      }
+                    ]);
+                  }}
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
+                >
+                  <span>+ إضافة شريحة</span>
+                </button>
+              </div>
+
+              <div className="overflow-x-auto border border-gray-200 rounded-xl max-h-[360px] overflow-y-auto scrollbar-thin">
+                <table className="min-w-full divide-y divide-gray-200 text-right text-xs">
+                  <thead className="bg-slate-50 text-slate-600 font-bold sticky top-0 z-10">
+                    <tr>
+                      <th scope="col" className="px-3 py-2.5 text-center font-bold">من شهر</th>
+                      <th scope="col" className="px-3 py-2.5 text-center font-bold">إلى شهر</th>
+                      <th scope="col" className="px-3 py-2.5 text-center font-bold text-[#0057B8]">هامش الربح %</th>
+                      <th scope="col" className="px-3 py-2.5 text-right font-bold">ملاحظات اختيارية</th>
+                      <th scope="col" className="px-3 py-2.5 text-center font-bold">خيارات</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 bg-white">
+                    {localTiers.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="p-8 text-center text-gray-400 font-bold">
+                          لا توجد شرائح حالياً لهذه التركيبة. اضغط على زر "إضافة شريحة" للبدء.
+                        </td>
+                      </tr>
+                    ) : (
+                      localTiers.map((tier, index) => (
+                        <tr key={tier.id} className="hover:bg-slate-50/40 transition-colors">
+                          <td className="px-3 py-2">
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              value={tier.fromMonth}
+                              onChange={(e) => {
+                                const raw = toEnglishDigits(e.target.value);
+                                const clean = raw.replace(/[^0-9]/g, '');
+                                setLocalTiers(prev => prev.map(t => t.id === tier.id ? { ...t, fromMonth: clean } : t));
+                              }}
+                              className="bg-white border border-gray-300 rounded-lg px-2 py-1 w-full text-xs font-bold font-mono text-center focus:outline-none focus:ring-1 focus:ring-[#0057B8] text-slate-800"
+                              placeholder="36"
+                              dir="ltr"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              value={tier.toMonth}
+                              onChange={(e) => {
+                                const raw = toEnglishDigits(e.target.value);
+                                const clean = raw.replace(/[^0-9]/g, '');
+                                setLocalTiers(prev => prev.map(t => t.id === tier.id ? { ...t, toMonth: clean } : t));
+                              }}
+                              className="bg-white border border-gray-300 rounded-lg px-2 py-1 w-full text-xs font-bold font-mono text-center focus:outline-none focus:ring-1 focus:ring-[#0057B8] text-slate-800"
+                              placeholder="60"
+                              dir="ltr"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <div className="relative">
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                value={tier.marginRate}
+                                onChange={(e) => {
+                                  const raw = toEnglishDigits(e.target.value);
+                                  let clean = raw.replace(/[^0-9.]/g, '');
+                                  const firstDotIdx = clean.indexOf('.');
+                                  if (firstDotIdx !== -1) {
+                                    clean = clean.substring(0, firstDotIdx + 1) + clean.substring(firstDotIdx + 1).replace(/\./g, '');
+                                  }
+                                  setLocalTiers(prev => prev.map(t => t.id === tier.id ? { ...t, marginRate: clean } : t));
+                                }}
+                                className="bg-white border border-gray-300 rounded-lg pl-7 pr-2 py-1 w-full text-xs font-bold font-mono text-center focus:outline-none focus:ring-1 focus:ring-[#0057B8] text-slate-800"
+                                placeholder="3.50"
+                                dir="ltr"
+                              />
+                              <span className="absolute left-2.5 top-1.5 text-xs text-slate-400 font-bold font-mono">%</span>
+                            </div>
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="text"
+                              value={tier.notes || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setLocalTiers(prev => prev.map(t => t.id === tier.id ? { ...t, notes: val } : t));
+                              }}
+                              className="bg-white border border-gray-300 rounded-lg px-2.5 py-1 w-full text-xs font-bold text-right focus:outline-none focus:ring-1 focus:ring-[#0057B8] text-slate-800"
+                              placeholder="ملاحظات توضيحية..."
+                            />
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setLocalTiers(prev => prev.filter(t => t.id !== tier.id));
+                              }}
+                              className="px-2.5 py-1 bg-rose-500 hover:bg-rose-600 text-white rounded-lg text-[10px] font-bold transition-colors cursor-pointer"
+                            >
+                              حذف
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           ) : (
-            <div className="flex flex-wrap gap-2.5">
-              {[
-                { id: 'below_25000', nameAr: '💵 أقل من 25,000' },
-                { id: 'above_or_equal_25000', nameAr: '💰 25,000 فأكثر' }
-              ].map((t) => {
-                const isSelected = selectedSalaryTier === t.id;
-                return (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => setSelectedSalaryTier(t.id as any)}
-                    className={`px-4 py-2.5 rounded-xl border text-xs font-bold font-sans transition-all cursor-pointer ${
-                      isSelected
-                        ? 'bg-[#0057B8] border-[#0057B8] text-white shadow-sm font-extrabold'
-                        : 'bg-white border-gray-200 text-gray-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    {t.nameAr}
-                  </button>
-                );
-              })}
+            <div className="bg-white p-4 rounded-xl border border-gray-150 shadow-xs space-y-3 text-right font-sans">
+              <h3 className="text-xs font-bold text-slate-800 flex items-center gap-1.5 border-b border-gray-100 pb-2">
+                <span>📊</span>
+                <span>جدول هوامش الأرباح السنوية المحددة للقطاع والتصفية الحالية</span>
+              </h3>
+              
+              {isLoaded && Object.values(localMargins).every(v => !v || v === '') && (
+                <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-xl p-3 text-xs font-semibold font-sans text-center my-1 leading-normal flex items-center justify-center gap-2">
+                  <span>⚠️</span>
+                  <span>لا توجد هوامش محفوظة لهذه التصفية بعد. أدخل القيم المناسبة بالأسفل ثم احفظ الإعدادات لتطبيقها.</span>
+                </div>
+              )}
+              
+              <div className="overflow-x-auto border border-gray-200 rounded-xl max-h-[360px] overflow-y-auto scrollbar-thin">
+                <table className="min-w-full divide-y divide-gray-200 text-right text-xs">
+                  <thead className="bg-slate-50 text-slate-600 font-bold sticky top-0 z-10">
+                    <tr>
+                      <th scope="col" className="px-5 py-2.5 text-right font-bold">مدة التمويل بالسنوات</th>
+                      <th scope="col" className="px-5 py-2.5 text-right font-bold text-[#0057B8]">هامش الجدول %</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 bg-white text-slate-705 font-medium">
+                    {(selectedYearsMode === 'yearly'
+                      ? Array.from({ length: 26 }, (_, i) => 5 + i)
+                      : [5, 10, 15, 20, 25, 30]
+                    ).map((year) => {
+                      const label = year === 5 || year === 10 ? `${year} سنوات` : `${year} سنة`;
+                      return (
+                        <tr key={year} className="hover:bg-slate-50/40 transition-colors">
+                          <td className="px-5 py-2 font-bold text-slate-800">
+                            {label}
+                          </td>
+                          <td className="px-5 py-1">
+                            <div className="relative max-w-[140px] inline-block w-full">
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                value={localMargins[year] ?? ''}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  if (val === '' || /^[0-9]*\.?[0-9]*$/.test(val)) {
+                                    setLocalMargins(prev => ({ ...prev, [year]: val }));
+                                  }
+                                }}
+                                className="bg-white border border-gray-300 rounded-lg pl-7 pr-3 py-1.5 w-full text-xs font-bold font-mono focus:outline-none focus:ring-1 focus:ring-[#0057B8] text-left text-slate-800"
+                                placeholder="0.00"
+                              />
+                              <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">%</span>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
-        </div>
 
-        {/* رابعاً: القطاع */}
-        <div className="space-y-2">
-          <span className="block text-[#0057B8] text-xs font-extrabold font-sans">رابعاً: القطاع</span>
-          <div className="flex flex-wrap gap-2.5">
-            {sectorsList.map((sec) => {
-              const isSelected = selectedSector === sec.id;
-              return (
-                <button
-                  key={sec.id}
-                  type="button"
-                  onClick={() => setSelectedSector(sec.id)}
-                  className={`px-4 py-2.5 rounded-xl border text-xs font-bold font-sans transition-all cursor-pointer ${
-                    isSelected
-                      ? 'bg-[#0057B8] border-[#0057B8] text-white shadow-sm font-extrabold'
-                      : 'bg-white border-gray-200 text-gray-600 hover:bg-slate-50'
-                  }`}
-                >
-                  {sec.nameAr}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* طريقة إدارة السنوات وطريقة الحساب */}
-        <div className="bg-slate-50 border border-slate-150 rounded-2xl p-5 grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-2">
-            <span className="text-xs font-extrabold text-gray-700 font-sans block">طريقة إدارة السنوات المعروضة:</span>
-            <div className="flex flex-col sm:flex-row gap-1.5">
-              <button
-                type="button"
-                onClick={() => setSelectedYearsMode('key_points')}
-                className={`flex-1 px-3 py-2.5 rounded-xl text-xs font-bold font-sans transition-all cursor-pointer border text-center ${
-                  selectedYearsMode === 'key_points'
-                    ? 'bg-[#0057B8] text-white border-[#0057B8] font-extrabold shadow-xs'
-                    : 'bg-white text-gray-650 border-gray-250 hover:bg-slate-50'
-                }`}
-              >
-                نقاط رئيسية فقط (5/10/15/20/25/30)
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedYearsMode('yearly')}
-                className={`flex-1 px-3 py-2.5 rounded-xl text-xs font-bold font-sans transition-all cursor-pointer border text-center ${
-                  selectedYearsMode === 'yearly'
-                    ? 'bg-[#0057B8] text-white border-[#0057B8] font-extrabold shadow-xs'
-                    : 'bg-white text-gray-650 border-gray-250 hover:bg-slate-50'
-                }`}
-              >
-                كل سنة مستقلة (5 إلى 30 سنة كاملة)
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedYearsMode('duration_tiers')}
-                className={`flex-1 px-3 py-2.5 rounded-xl text-xs font-bold font-sans transition-all cursor-pointer border text-center ${
-                  selectedYearsMode === 'duration_tiers'
-                    ? 'bg-[#0057B8] text-white border-[#0057B8] font-extrabold shadow-xs'
-                    : 'bg-white text-gray-650 border-gray-250 hover:bg-slate-50'
-                }`}
-              >
-                شرائح مدة التمويل
-              </button>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <span className="text-xs font-extrabold text-gray-700 font-sans block">طريقة الحساب (النسب البينية):</span>
-            <div className="flex gap-1.5">
-              <button
-                type="button"
-                onClick={() => setSelectedCalcMethod('fixed')}
-                className={`flex-1 px-3 py-2.5 rounded-xl text-xs font-bold font-sans transition-all cursor-pointer border text-center ${
-                  selectedCalcMethod === 'fixed'
-                    ? 'bg-[#0057B8] text-white border-[#0057B8] font-extrabold shadow-xs'
-                    : 'bg-white text-gray-655 border-gray-250 hover:bg-slate-50'
-                }`}
-              >
-                ثابتة Fixed (بدون تدرج)
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedCalcMethod('linear')}
-                className={`flex-1 px-3 py-2.5 rounded-xl text-xs font-bold font-sans transition-all cursor-pointer border text-center ${
-                  selectedCalcMethod === 'linear'
-                    ? 'bg-[#0057B8] text-white border-[#0057B8] font-extrabold shadow-xs'
-                    : 'bg-white text-gray-655 border-gray-250 hover:bg-slate-50'
-                }`}
-              >
-                تدرج خطي Linear (انسيابي)
-              </button>
-            </div>
-          </div>
         </div>
 
       </div>
 
-      {/* 4. Standalone Bank Sector Exceptions Card */}
-      <div className="bg-white p-6 rounded-2xl border border-gray-150 shadow-sm space-y-4 text-right font-sans">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-gray-100 pb-3 gap-2">
-          <h3 className="text-sm font-extrabold text-[#111827] flex items-center gap-2">
-            🛡️ استثناءات القطاعات للبنك الحالي: <span className="text-[#0057B8]">{(banks.find(b => b.id === selectedBank)?.nameAr) || selectedBank}</span>
-          </h3>
-          <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-lg">
-            * دخل قيم نقاط الأساس Bps (مثال: -192 لرفع الهامش بنسبة 1.92٪، أو 100 لتخفيض الهامش بنسبة 1.00٪)
-          </span>
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          {sectorsList.map((sec) => {
-            return (
-              <div key={sec.id} className="bg-slate-50 border border-slate-150 p-4 rounded-xl space-y-2 flex flex-col justify-between">
-                <label className="block text-xs font-bold text-slate-705 text-center">{sec.nameAr}</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={localSectorExceptions[sec.id] ?? '0'}
-                    onChange={(e) => {
-                      let valStr = e.target.value;
-                      valStr = valStr.replace(/[^0-9-]/g, '');
-                      setLocalSectorExceptions(prev => ({ ...prev, [sec.id]: valStr }));
-                    }}
-                    className="bg-white border border-gray-350 rounded-xl px-2 py-2 w-full text-center text-xs font-bold font-mono focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-slate-800"
-                    placeholder="0"
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* 5. Base Margins Table Section */}
-      {selectedYearsMode === 'duration_tiers' ? (
-        <div className="bg-white p-6 rounded-2xl border border-gray-150 shadow-sm space-y-4 text-right font-sans">
-          <div className="flex justify-between items-center border-b border-gray-100 pb-3">
-            <h3 className="text-sm font-bold text-slate-850 flex items-center gap-2">
-              📊 شرائح مدة التمويل (بالأشهر)
-            </h3>
-            <button
-              type="button"
-              onClick={() => {
-                setLocalTiers(prev => [
-                  ...prev,
-                  {
-                    id: `new_tier_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-                    fromMonth: 36,
-                    toMonth: 60,
-                    marginRate: 3.50,
-                    notes: '',
-                    active: true
-                  }
-                ]);
-              }}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
-            >
-              <span>+ إضافة شريحة</span>
-            </button>
-          </div>
-
-          <div className="overflow-x-auto border border-gray-200 rounded-2xl">
-            <table className="min-w-full divide-y divide-gray-200 text-right text-xs">
-              <thead className="bg-slate-50 text-slate-650 font-bold">
-                <tr>
-                  <th scope="col" className="px-4 py-3 text-center">من شهر</th>
-                  <th scope="col" className="px-4 py-3 text-center">إلى شهر</th>
-                  <th scope="col" className="px-4 py-3 text-center">هامش الربح %</th>
-                  <th scope="col" className="px-4 py-3 text-right">ملاحظات اختيارية</th>
-                  <th scope="col" className="px-4 py-3 text-center">حذف</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 bg-white">
-                {localTiers.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="p-8 text-center text-gray-400 font-bold">
-                      لا توجد شرائح حالياً لهذه التركيبة. اضغط على زر "إضافة شريحة" للبدء.
-                    </td>
-                  </tr>
-                ) : (
-                  localTiers.map((tier, index) => (
-                    <tr key={tier.id} className="hover:bg-slate-50/40 transition-colors">
-                      <td className="px-4 py-2.5">
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          value={tier.fromMonth}
-                          onChange={(e) => {
-                            const raw = toEnglishDigits(e.target.value);
-                            const clean = raw.replace(/[^0-9]/g, '');
-                            setLocalTiers(prev => prev.map(t => t.id === tier.id ? { ...t, fromMonth: clean } : t));
-                          }}
-                          className="bg-white border border-gray-300 rounded-xl px-3 py-1.5 w-full text-xs font-bold font-mono text-center focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-slate-800"
-                          placeholder="36"
-                          dir="ltr"
-                        />
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          value={tier.toMonth}
-                          onChange={(e) => {
-                            const raw = toEnglishDigits(e.target.value);
-                            const clean = raw.replace(/[^0-9]/g, '');
-                            setLocalTiers(prev => prev.map(t => t.id === tier.id ? { ...t, toMonth: clean } : t));
-                          }}
-                          className="bg-white border border-gray-300 rounded-xl px-3 py-1.5 w-full text-xs font-bold font-mono text-center focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-slate-800"
-                          placeholder="60"
-                          dir="ltr"
-                        />
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <div className="relative">
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            value={tier.marginRate}
-                            onChange={(e) => {
-                              const raw = toEnglishDigits(e.target.value);
-                              let clean = raw.replace(/[^0-9.]/g, '');
-                              const firstDotIdx = clean.indexOf('.');
-                              if (firstDotIdx !== -1) {
-                                clean = clean.substring(0, firstDotIdx + 1) + clean.substring(firstDotIdx + 1).replace(/\./g, '');
-                              }
-                              setLocalTiers(prev => prev.map(t => t.id === tier.id ? { ...t, marginRate: clean } : t));
-                            }}
-                            className="bg-white border border-gray-300 rounded-xl pl-8 pr-3 py-1.5 w-full text-xs font-bold font-mono text-center focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-slate-800"
-                            placeholder="3.50"
-                            dir="ltr"
-                          />
-                          <span className="absolute left-3 top-2 text-xs text-slate-400 font-bold font-mono">%</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <input
-                          type="text"
-                          value={tier.notes || ''}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setLocalTiers(prev => prev.map(t => t.id === tier.id ? { ...t, notes: val } : t));
-                          }}
-                          className="bg-white border border-gray-300 rounded-xl px-3 py-1.5 w-full text-xs font-bold text-right focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-slate-800"
-                          placeholder="مثال: شريحة تمويل متوسط الأجل"
-                        />
-                      </td>
-                      <td className="px-4 py-2.5 text-center">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setLocalTiers(prev => prev.filter(t => t.id !== tier.id));
-                          }}
-                          className="p-1 px-3 bg-rose-550 hover:bg-rose-650 text-white rounded-lg text-[10px] font-bold transition-colors cursor-pointer"
-                        >
-                          حذف
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ) : (
-        <div className="bg-white p-6 rounded-2xl border border-gray-150 shadow-sm space-y-4 text-right font-sans">
-          <h3 className="text-sm font-bold text-slate-850 flex items-center gap-2 border-b border-gray-100 pb-3">
-            📊 هوامش التمويل الأساسية
-          </h3>
-          
-          {isLoaded && Object.values(localMargins).every(v => !v || v === '') && (
-            <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl p-4 text-xs font-bold font-sans text-center my-2 leading-6 flex items-center justify-center gap-2">
-              <span>⚠️</span>
-              <span>لا توجد هوامش محفوظة لهذه التركيبة، أدخل القيم ثم اضغط حفظ.</span>
-            </div>
-          )}
-          
-          <div className="overflow-x-auto border border-gray-200 rounded-2xl max-h-[450px] overflow-y-auto">
-            <table className="min-w-full divide-y divide-gray-250 text-right text-xs">
-              <thead className="bg-slate-50 text-slate-650 font-bold sticky top-0">
-                <tr>
-                  <th scope="col" className="px-6 py-4 text-right font-bold">مدة التمويل بالسنوات</th>
-                  <th scope="col" className="px-6 py-4 text-right font-bold text-[#0057B8]">هامش الجدول %</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 bg-white text-slate-700 font-semibold">
-                {(selectedYearsMode === 'yearly'
-                  ? Array.from({ length: 26 }, (_, i) => 5 + i)
-                  : [5, 10, 15, 20, 25, 30]
-                ).map((year) => {
-                  const label = year === 5 || year === 10 ? `${year} سنوات` : `${year} سنة`;
-                  return (
-                    <tr key={year} className="hover:bg-slate-50/40 transition-colors">
-                      <td className="px-6 py-3.5 text-right font-bold text-slate-800">
-                        {label}
-                      </td>
-                      <td className="px-6 py-2">
-                        <div className="relative max-w-[180px] inline-block w-full">
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            value={localMargins[year] ?? ''}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              if (val === '' || /^[0-9]*\.?[0-9]*$/.test(val)) {
-                                setLocalMargins(prev => ({ ...prev, [year]: val }));
-                              }
-                            }}
-                            className="bg-white border border-gray-300 rounded-xl pl-8 pr-4 py-2 w-full text-xs font-bold font-mono focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-left"
-                            placeholder="0.00"
-                          />
-                          <span className="absolute left-3 top-2.5 text-xs text-slate-400 font-bold">%</span>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* 5. Inline Copy Margins Section */}
-      {showCopyModal && (
-        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 text-right space-y-5 my-5 font-sans animate-in fade-in duration-200">
-          <div className="flex items-center justify-between border-b border-gray-150 pb-3">
-            <h3 className="text-xs sm:text-sm font-extrabold text-gray-900 flex items-center gap-2 font-sans">
-              📋 نسخ هوامش الأرباح
-            </h3>
-            <button
-              type="button"
-              onClick={() => setShowCopyModal(false)}
-              className="text-[10px] sm:text-xs bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-1.5 rounded-xl font-bold cursor-pointer transition-colors"
-            >
-              إخفاء
-            </button>
-          </div>
-
-          {/* نوع الجدول المراد نسخه */}
-          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-gray-150 space-y-2">
-            <label className="block text-xs font-extrabold text-gray-700 font-sans">نوع الجدول المراد نسخه:</label>
-            <select
-              value={copyTableType}
-              onChange={(e) => setCopyTableType(e.target.value as any)}
-              className="w-full sm:max-w-xs bg-slate-50 border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 outline-none focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
-            >
-              <option value="key_points">الهوامش الأساسية (نقاط رئيسية)</option>
-              <option value="yearly">الهوامش السنوية (كل سنة مستقلة)</option>
-              <option value="duration_tiers">هوامش الشرائح (من شهر إلى شهر)</option>
-              <option value="all">جميع الهوامش</option>
-            </select>
-          </div>
-          
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* المصدر */}
-            <div className="bg-blue-50/40 p-4 sm:p-5 rounded-2xl border border-blue-100 space-y-3">
-              <span className="block text-xs font-extrabold text-[#0057B8]">👈 المصدر (الذي يُنسخ منه):</span>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="space-y-1">
-                  <label className="block text-[10px] font-bold text-gray-500">البنك:</label>
-                  <select
-                    value={copySrcBank}
-                    onChange={(e) => setCopySrcBank(e.target.value)}
-                    className="w-full bg-white border border-gray-200 rounded-xl px-2.5 py-2 text-xs font-bold text-gray-800 outline-none focus:ring-1 focus:ring-[#0057B8]"
-                  >
-                    {banks.map(b => (
-                      <option key={b.id} value={b.id}>{b.nameAr}</option>
-                    ))}
-                  </select>
-                </div>
-                
-                <div className="space-y-1">
-                  <label className="block text-[10px] font-bold text-gray-500">المنتج:</label>
-                  <select
-                    value={copySrcProduct}
-                    onChange={(e) => setCopySrcProduct(e.target.value as ProductId)}
-                    className="w-full bg-white border border-gray-200 rounded-xl px-2.5 py-2 text-xs font-bold text-gray-800 outline-none focus:ring-1 focus:ring-[#0057B8]"
-                  >
-                    {productTypesList.map(p => (
-                      <option key={p.id} value={p.id}>{p.nameAr}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block text-[10px] font-bold text-gray-500">نوع الدعم:</label>
-                  <select
-                    value={copySrcSupport}
-                    onChange={(e) => setCopySrcSupport(e.target.value as SupportType)}
-                    className="w-full bg-white border border-gray-200 rounded-xl px-2.5 py-2 text-xs font-bold text-gray-800 outline-none focus:ring-1 focus:ring-[#0057B8]"
-                  >
-                    <option value="none">غير مدعوم</option>
-                    <option value="monthly">دعم شهري</option>
-                    <option value="downpayment">دعم دفعة</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* الهدف */}
-            <div className="bg-emerald-50/20 p-4 sm:p-5 rounded-2xl border border-emerald-100 space-y-3">
-              <span className="block text-xs font-extrabold text-emerald-700">👉 الهدف (الذي يتم النسخ والتبديل فيه):</span>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="space-y-1">
-                  <label className="block text-[10px] font-bold text-gray-500">البنك:</label>
-                  <select
-                    value={copyDstBank}
-                    onChange={(e) => setCopyDstBank(e.target.value)}
-                    className="w-full bg-white border border-gray-200 rounded-xl px-2.5 py-2 text-xs font-bold text-gray-800 outline-none focus:ring-1 focus:ring-emerald-600"
-                  >
-                    {banks.map(b => (
-                      <option key={b.id} value={b.id}>{b.nameAr}</option>
-                    ))}
-                  </select>
-                </div>
-                
-                <div className="space-y-1">
-                  <label className="block text-[10px] font-bold text-gray-500">المنتج:</label>
-                  <select
-                    value={copyDstProduct}
-                    onChange={(e) => setCopyDstProduct(e.target.value as ProductId)}
-                    className="w-full bg-white border border-gray-200 rounded-xl px-2.5 py-2 text-xs font-bold text-gray-800 outline-none focus:ring-1 focus:ring-emerald-600"
-                  >
-                    {productTypesList.map(p => (
-                      <option key={p.id} value={p.id}>{p.nameAr}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block text-[10px] font-bold text-gray-500">نوع الدعم:</label>
-                  <select
-                    value={copyDstSupport}
-                    onChange={(e) => setCopyDstSupport(e.target.value as SupportType)}
-                    className="w-full bg-white border border-gray-200 rounded-xl px-2.5 py-2 text-xs font-bold text-gray-800 outline-none focus:ring-1 focus:ring-emerald-600"
-                  >
-                    <option value="none">غير مدعوم</option>
-                    <option value="monthly">دعم شهري</option>
-                    <option value="downpayment">دعم دفعة</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-3 bg-amber-50 rounded-2xl p-4 border border-amber-100">
-            <p className="text-[10px] text-gray-500 leading-relaxed font-bold text-right">
-              * تنبيه: عملية النسخ تطبق فقط على هوامش الأرباح المحددة، ولن تؤثر على استثناءات القطاعات، DSR، أو أي إعدادات أخرى. التعديلات تكون محلية مؤقتة ويتم تثبيتها فقط عند نقر "حفظ وتطبيق الإعدادات".
-            </p>
-            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-              <button
-                type="button"
-                onClick={() => setShowCopyModal(false)}
-                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl text-xs font-bold cursor-pointer transition-colors"
-              >
-                إلغاء
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  handleCopyMargins(
-                    copySrcBank,
-                    copySrcProduct,
-                    copySrcSupport,
-                    copyDstBank,
-                    copyDstProduct,
-                    copyDstSupport
-                  );
-                }}
-                className="px-5 py-2 bg-[#0057B8] hover:bg-[#004bb0] text-white rounded-xl text-xs font-extrabold cursor-pointer transition-colors shadow-xs"
-              >
-                نسخ وتطبيق
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 6. Unified Save Button */}
-      <div className="flex flex-col sm:flex-row justify-end items-center gap-3 pt-2 font-sans">
+      {/* 3. Collapsible Cloning and Copying Section (Closed by default) */}
+      <div className="bg-white border border-gray-200 rounded-xl shadow-xs overflow-hidden text-right font-sans">
         <button
           type="button"
           onClick={() => setShowCopyModal(!showCopyModal)}
-          className="w-full sm:w-auto px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 hover:scale-[1.01] border border-slate-200"
-        >
-          <span>📋 نسخ الهوامش من بنك آخر</span>
-        </button>
-        <button
-          type="button"
-          onClick={handleSaveConfig}
-          className="w-full sm:w-auto px-8 py-4 bg-[#0057B8] hover:bg-[#004bb0] text-white rounded-xl text-xs font-extrabold transition-all shadow-md shadow-[#0057B8]/20 cursor-pointer flex items-center justify-center gap-2 hover:scale-[1.01]"
-        >
-          <span>💾 حفظ وتطبيق الإعدادات</span>
-        </button>
-      </div>
-
-      {/* 7. Collapsible General Review Log List */}
-      <div className="bg-white rounded-2xl border border-gray-150 shadow-sm overflow-hidden text-right font-sans">
-        <button
-          type="button"
-          onClick={() => setShowGeneralLogs(!showGeneralLogs)}
-          className="w-full flex items-center justify-between p-5 hover:bg-slate-50 transition-colors cursor-pointer text-right border-none outline-none leading-none"
+          className="w-full flex items-center justify-between p-4 hover:bg-slate-50 transition-colors cursor-pointer text-right border-none outline-none leading-none"
         >
           <div className="flex items-center gap-2">
-            <span>📋</span>
-            <span className="text-sm font-bold text-slate-800 leading-none">سجل الهوامش</span>
+            <span className="text-base">📋</span>
+            <span className="text-xs font-bold text-gray-800">نسخ الهوامش من بنك آخر (مدير تكرار ومزامنة الهوامش والشرائح)</span>
           </div>
-          <span className="text-xs font-bold text-[#0057B8] bg-blue-50 px-3 py-1.5 rounded-lg leading-none">
-            {showGeneralLogs ? 'إخفاء السجل 🔼' : 'عرض السجل الشامل 🔽'}
+          <span className="text-xs font-bold text-[#0057B8] bg-blue-50 px-2.5 py-1 rounded-lg leading-none">
+            {showCopyModal ? 'إغلاق القسم 🔼' : 'فتح خيارات النسخ والاستنساخ 🔽'}
           </span>
         </button>
 
-        {showGeneralLogs && (
-          <div className="p-6 border-t border-gray-100 space-y-4 animate-in fade-in duration-200">
-            <p className="text-xs text-gray-500">
-              قائمة تفصيلية بكافة القواعد الفعالة في النظام حالياً لمراجعتها بشكل مجمع.
-            </p>
-            <div className="overflow-x-auto border border-gray-200 rounded-xl">
-              <table className="w-full text-right text-xs text-[#111827] min-w-[900px]">
-                <thead className="bg-slate-50 text-gray-500 border-b border-gray-100 uppercase font-bold sticky top-0">
+        {showCopyModal && (
+          <div className="p-4 border-t border-gray-150 bg-slate-50/50 space-y-4 animate-in fade-in duration-205">
+            
+            <div className="bg-white p-4 rounded-xl border border-gray-200 space-y-3">
+              <label className="block text-xs font-bold text-gray-700">نوع الجدول المراد نسخه من المصدر للهدف:</label>
+              <select
+                value={copyTableType}
+                onChange={(e) => setCopyTableType(e.target.value as any)}
+                className="bg-slate-50 border border-gray-300 rounded-lg px-2.5 py-1.5 text-xs font-bold text-gray-805 outline-none focus:ring-1 focus:ring-[#0057B8] cursor-pointer"
+              >
+                <option value="key_points">الهوامش الأساسية (نقاط رئيسية)</option>
+                <option value="yearly">الهوامش السنوية (كل سنة مستقلة)</option>
+                <option value="duration_tiers">هوامش الشرائح (من شهر إلى شهر)</option>
+                <option value="all">جميع الهوامش مجتمعة</option>
+              </select>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              
+              {/* Source (المنسوخ منه) */}
+              <div className="bg-blue-50/20 p-4 rounded-xl border border-blue-105 space-y-3">
+                <span className="block text-xs font-bold text-[#0057B8]">👈 المصدر التمويلي (المنسخ منه):</span>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-bold text-gray-400">البنك:</label>
+                    <select
+                      value={copySrcBank}
+                      onChange={(e) => setCopySrcBank(e.target.value)}
+                      className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold text-gray-800 outline-none focus:ring-1 focus:ring-[#0057B8]"
+                    >
+                      {banks.map(b => (
+                        <option key={b.id} value={b.id}>{b.nameAr}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-bold text-gray-400">المنتج:</label>
+                    <select
+                      value={copySrcProduct}
+                      onChange={(e) => setCopySrcProduct(e.target.value as ProductId)}
+                      className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold text-gray-800 outline-none focus:ring-1 focus:ring-[#0057B8]"
+                    >
+                      {productTypesList.map(p => (
+                        <option key={p.id} value={p.id}>{p.nameAr}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-bold text-gray-400">نوع الدعم:</label>
+                    <select
+                      value={copySrcSupport}
+                      onChange={(e) => setCopySrcSupport(e.target.value as SupportType)}
+                      className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold text-gray-800 outline-none focus:ring-1 focus:ring-[#0057B8]"
+                    >
+                      <option value="none">غير مدعوم</option>
+                      <option value="monthly">دعم شهري</option>
+                      <option value="downpayment">دعم دفعة</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Destination (الهدف) */}
+              <div className="bg-emerald-50/10 p-4 rounded-xl border border-emerald-110 space-y-3">
+                <span className="block text-xs font-bold text-emerald-700">👉 الهدف التمويلي (الذي سيتم استبدال قيمه):</span>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-bold text-gray-400">البنك:</label>
+                    <select
+                      value={copyDstBank}
+                      onChange={(e) => setCopyDstBank(e.target.value)}
+                      className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold text-gray-800 outline-none focus:ring-1 focus:ring-[#0057B8]"
+                    >
+                      {banks.map(b => (
+                        <option key={b.id} value={b.id}>{b.nameAr}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-bold text-gray-400">المنتج البديل:</label>
+                    <select
+                      value={copyDstProduct}
+                      onChange={(e) => setCopyDstProduct(e.target.value as ProductId)}
+                      className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold text-gray-800 outline-none focus:ring-1 focus:ring-[#0057B8]"
+                    >
+                      {productTypesList.map(p => (
+                        <option key={p.id} value={p.id}>{p.nameAr}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-bold text-gray-400">دعم المستهدف:</label>
+                    <select
+                      value={copyDstSupport}
+                      onChange={(e) => setCopyDstSupport(e.target.value as SupportType)}
+                      className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold text-gray-800 outline-none focus:ring-1 focus:ring-[#0057B8]"
+                    >
+                      <option value="none">غير مدعوم</option>
+                      <option value="monthly">دعم شهري</option>
+                      <option value="downpayment">دعم دفعة</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-3 bg-amber-50 rounded-xl p-3.5 border border-amber-100">
+              <p className="text-[10px] text-amber-800 font-bold leading-normal text-right max-w-2xl">
+                ⚠️ تنبيه: نسخ الهوامش يؤثر فقط على هوامش الأرباح للتركيبة المختارة، ولن يؤثر على استثناءات القطاعات أو DSR. لن تُحفَظ التعديلات نهائياً حتى يتم نقر زر الحفظ بالصفحة.
+              </p>
+              <div className="flex gap-2 self-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleCopyMargins(
+                      copySrcBank,
+                      copySrcProduct,
+                      copySrcSupport,
+                      copyDstBank,
+                      copyDstProduct,
+                      copyDstSupport
+                    );
+                  }}
+                  className="px-5 py-2 bg-[#0057B8] hover:bg-[#004bb0] text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
+                >
+                  نسخ وتطبيق الجدول
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Bank to Bank Clone */}
+            <div className="bg-slate-100/60 p-4 rounded-xl border border-gray-200 space-y-2 text-right">
+              <span className="block text-xs font-extrabold text-slate-800">📋 أو استنساخ البنك بالكامل (استبدال كافة قواعد وإعدادات بنك من بنك آخر)</span>
+              <p className="text-[10px] text-slate-500 mb-2">ينسخ ويستبدل جميع هوامش الأرباح واستثناءات القطاعات من بنك لآخر بضغطة واحدة.</p>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pb-2">
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-slate-600">من البنك المصدر:</label>
+                  <select
+                    value={cloneFromBank}
+                    onChange={(e) => setCloneFromBank(e.target.value)}
+                    className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-700 outline-none"
+                  >
+                    {banks.map(b => (
+                      <option key={b.id} value={b.id}>{b.nameAr}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-slate-600">إلى البنك المستهدف (سيتم مسح بياناته واستبدالها):</label>
+                  <select
+                    value={cloneToBank}
+                    onChange={(e) => setCloneToBank(e.target.value)}
+                    className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-700 outline-none"
+                  >
+                    {banks.map(b => (
+                      <option key={b.id} value={b.id}>{b.nameAr}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleCloneBankLevel}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold cursor-pointer transition-colors"
+                >
+                  تأكيد استنساخ البنك بالكامل
+                </button>
+              </div>
+            </div>
+
+          </div>
+        )}
+      </div>
+
+      {/* 4. Sticky Bottom Action Overlay Bar */}
+      <div className="fixed bottom-4 left-4 right-4 z-40 bg-white/95 backdrop-blur-md border border-slate-200 shadow-xl rounded-2xl p-3 flex flex-row items-center justify-between gap-4 font-sans max-w-5xl mx-auto animate-in slide-in-from-bottom-4 duration-300">
+        <div className="text-right space-y-0.5 hidden sm:block">
+          <span className="text-[10px] font-extrabold text-slate-400 block uppercase tracking-wider">الحالة الحالية لإدخالات التصفية</span>
+          <p className="text-[11px] font-bold text-slate-700">
+            يتم تعديل هوامش <span className="text-[#0057B8]">{(banks.find(b => b.id === selectedBank)?.nameAr) || selectedBank}</span> لـ <span className="text-emerald-700">{productTypesList.find(p => p.id === selectedProduct)?.nameAr || selectedProduct}</span>
+          </p>
+        </div>
+        <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+          <button
+            type="button"
+            onClick={() => setShowGeneralLogs(!showGeneralLogs)}
+            className="px-3.5 py-2 border border-slate-200 hover:bg-slate-55 rounded-xl text-xs font-bold text-slate-705 cursor-pointer flex gap-1 items-center"
+          >
+            <span>📜</span>
+            <span>{showGeneralLogs ? 'إخفاء السجل الشامل' : 'عرض السجل الشامل'}</span>
+          </button>
+          
+          <button
+            type="button"
+            onClick={handleSaveConfig}
+            className="px-6 py-2 bg-[#0057B8] hover:bg-[#004bb0] text-white rounded-xl text-xs font-extrabold transition-all shadow-md shadow-[#0057B8]/20 cursor-pointer flex items-center justify-center gap-1.5 hover:scale-[1.01]"
+          >
+            <span>💾 حفظ وتطبيق كافة الإعدادات</span>
+          </button>
+        </div>
+      </div>
+
+      {/* 5. Comprehensive Register of Margin Rows (Optional reviewing log list) */}
+      {showGeneralLogs && (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden text-right font-sans mt-2">
+          <div className="p-4 bg-slate-50 border-b border-gray-150 flex items-center justify-between">
+            <h4 className="text-xs font-extrabold text-slate-800 flex items-center gap-1.5">
+              <span>📋</span>
+              <span>السجل التفصيلي الشامل لكافة القواعد الفعالة في التصفية الحالية</span>
+            </h4>
+            <span className="text-[10px] font-medium text-slate-400">مراجعة عامة للهوامش الناتجة بناءً على استثناءات القطاع</span>
+          </div>
+
+          <div className="p-4 space-y-3">
+            <div className="overflow-x-auto border border-gray-200 rounded-lg max-h-[350px] overflow-y-auto">
+              <table className="w-full text-right text-xs text-[#111827] min-w-[750px]">
+                <thead className="bg-slate-50 text-gray-500 border-b border-gray-150 sticky top-0 z-10 font-bold">
                   <tr>
-                    <th className="p-4 font-bold text-right col-span-1">البنك</th>
-                    <th className="p-4 font-bold text-right col-span-1">نوع المنتج</th>
-                    <th className="p-4 font-bold text-right col-span-1">نوع الدعم</th>
-                    <th className="p-4 font-bold text-right col-span-1">القطاع</th>
-                    <th className="p-4 font-bold text-right col-span-1">مدة التمويل</th>
-                    <th className="p-4 font-bold text-center col-span-1">هامش الجدول %</th>
-                    <th className="p-4 font-bold text-center col-span-1">نسبة الاستثناء Bps</th>
-                    <th className="p-4 font-bold text-center col-span-1">الهامش النهائي %</th>
+                    <th className="p-2.5 font-bold text-right">البنك</th>
+                    <th className="p-2.5 font-bold text-right">نوع المنتج</th>
+                    <th className="p-2.5 font-bold text-right">نوع الدعم</th>
+                    <th className="p-2.5 font-bold text-right">القطاع</th>
+                    <th className="p-2.5 font-bold text-right">مدة التمويل</th>
+                    <th className="p-2.5 font-bold text-center">هامش الجدول %</th>
+                    <th className="p-2.5 font-bold text-center">نسبة الاستثناء Bps</th>
+                    <th className="p-2.5 font-bold text-center text-[#0057B8]">الهامش النهائي %</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50 text-slate-705 font-semibold">
+                <tbody className="divide-y divide-gray-150 text-slate-705 font-medium">
                   {(() => {
                     const list = getFilteredMarginRows();
                     if (list.length === 0) {
                       return (
                         <tr>
-                          <td colSpan={8} className="p-8 text-center text-gray-400 font-bold">
+                          <td colSpan={8} className="p-6 text-center text-gray-400 font-bold">
                             لا توجد سجلات مطابقة للتصفية الحالية.
                           </td>
                         </tr>
@@ -1601,13 +1561,13 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
 
                       return (
                         <tr key={row.id} className="hover:bg-slate-50/40">
-                          <td className="p-4 font-bold text-slate-800">{bankName}</td>
-                          <td className="p-4 text-slate-600">{productName}</td>
-                          <td className="p-4 text-slate-500">{supportName}</td>
-                          <td className="p-4 text-slate-900 font-bold">{row.sectorNameAr}</td>
-                          <td className="p-4 text-slate-700 font-mono">{durationLabel}</td>
-                          <td className="p-4 text-center text-slate-800 font-mono">{(row.baseMargin || 0).toFixed(2)}%</td>
-                          <td className={`p-4 text-center font-mono ${
+                          <td className="p-2.5 font-bold text-slate-800">{bankName}</td>
+                          <td className="p-2.5 text-slate-600">{productName}</td>
+                          <td className="p-2.5 text-slate-500">{supportName}</td>
+                          <td className="p-2.5 text-slate-900 font-bold">{row.sectorNameAr}</td>
+                          <td className="p-2.5 text-slate-700 font-mono">{durationLabel}</td>
+                          <td className="p-2.5 text-center text-slate-800 font-mono">{(row.baseMargin || 0).toFixed(2)}%</td>
+                          <td className={`p-2.5 text-center font-mono ${
                             row.exceptionBps > 0 
                               ? 'text-rose-500' 
                               : row.exceptionBps < 0 
@@ -1616,7 +1576,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                           }`}>
                             {row.exceptionBps > 0 ? `+${row.exceptionBps}` : row.exceptionBps} Bps
                           </td>
-                          <td className="p-4 text-center text-[#0057B8] font-mono font-extrabold text-sm">{(row.finalMarginSec || 0).toFixed(3)}%</td>
+                          <td className="p-2.5 text-center text-[#0057B8] font-mono font-black text-sm">{(row.finalMarginSec || 0).toFixed(3)}%</td>
                         </tr>
                       );
                     });
@@ -1625,8 +1585,11 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
               </table>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* Spacer for sticky overlay bottom menu */}
+      <div className="h-16"></div>
 
     </div>
   );
