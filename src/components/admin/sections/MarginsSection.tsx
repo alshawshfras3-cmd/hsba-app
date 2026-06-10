@@ -1188,7 +1188,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                 </button>
               </div>
 
-              <div className="overflow-x-auto border border-gray-200 rounded-xl max-h-[360px] overflow-y-auto scrollbar-thin">
+              <div className="overflow-x-auto border border-gray-200 rounded-xl">
                 <table className="min-w-full divide-y divide-gray-200 text-right text-xs">
                   <thead className="bg-slate-50 text-slate-600 font-bold sticky top-0 z-10">
                     <tr>
