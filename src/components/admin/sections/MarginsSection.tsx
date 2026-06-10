@@ -116,26 +116,34 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       };
     });
 
-    // Try finding rules specific to the selectedSector
-    let relevantRules = allNormalized.filter(r => 
+    // 1. Get rules matching bank, product, support, and sector
+    // We allow r.salaryTier to be selectedSalaryTier, or 'not_applicable', or undefined/general
+    let baseFiltered = allNormalized.filter(r => 
       r.bankId === selectedBank && 
       r.productId === selectedProduct && 
       (r.supportType === normSupport || r.supportType === 'all') &&
       (!r.isExceptionOnly) &&
       (r.sectorId === selectedSector) &&
-      (r.salaryTier === selectedSalaryTier || (!r.salaryTier && selectedSalaryTier === 'not_applicable'))
+      (!r.salaryTier || r.salaryTier === 'not_applicable' || r.salaryTier === selectedSalaryTier)
     );
 
     // If no sector-specific rules exist, fallback to general/all sector
-    if (relevantRules.length === 0) {
-      relevantRules = allNormalized.filter(r => 
+    if (baseFiltered.length === 0) {
+      baseFiltered = allNormalized.filter(r => 
         r.bankId === selectedBank && 
         r.productId === selectedProduct && 
         (r.supportType === normSupport || r.supportType === 'all') &&
         (!r.isExceptionOnly) &&
         (!r.sectorId || r.sectorId === 'all') &&
-        (r.salaryTier === selectedSalaryTier || (!r.salaryTier && selectedSalaryTier === 'not_applicable'))
+        (!r.salaryTier || r.salaryTier === 'not_applicable' || r.salaryTier === selectedSalaryTier)
       );
+    }
+
+    // Prioritize specific salaryTier rules if they exist
+    let relevantRules = baseFiltered.filter(r => r.salaryTier === selectedSalaryTier);
+    if (relevantRules.length === 0) {
+      // Fallback to general rules that have no salaryTier or 'not_applicable'
+      relevantRules = baseFiltered.filter(r => !r.salaryTier || r.salaryTier === 'not_applicable');
     }
 
     const yearsListFull = Array.from({ length: 26 }, (_, i) => 5 + i);
