@@ -586,6 +586,19 @@ export function calculateBanksFinancing(params: {
         marginRules,
         netSalary: solvedNetSalary
       });
+    } else {
+      marginResult = {
+        annualMargin: 0,
+        baseMargin: 0,
+        exceptionBps: 0,
+        ruleUsed: 'تمويل شخصي فقط - لا يوجد هامش عقاري',
+        bankName: bank.nameAr,
+        productName: 'تمويل شخصي فقط',
+        supportName: 'بدون دعم',
+        salaryTier: 'n_a',
+        selectedMarginYear: 0,
+        error: null
+      };
     }
 
     // 8. Personal loan calculation (if applicable)
@@ -1051,6 +1064,24 @@ export function calculateAll(params: {
 
   const normalizedProductId = normalizeProductId(productId);
 
+  const isPersonalOnly =
+    normalizedProductId === 'personal' ||
+    normalizedProductId === 'personal_only';
+
+  const hasRealEstate =
+    normalizedProductId === 'real_estate' ||
+    normalizedProductId === 'real_estate_only' ||
+    normalizedProductId === 'both' ||
+    normalizedProductId === 'real_estate_with_new_personal' ||
+    normalizedProductId === 'real_estate_with_existing_personal' ||
+    normalizedProductId === 'real_estate_with_personal_existing';
+
+  const hasPersonal =
+    normalizedProductId === 'personal' ||
+    normalizedProductId === 'personal_only' ||
+    normalizedProductId === 'both' ||
+    normalizedProductId === 'real_estate_with_new_personal';
+
   const isMilitarySector = (sectorId as string) === 'military';
 
   // Let's first resolve the net salary
@@ -1213,15 +1244,28 @@ export function calculateAll(params: {
   });
 
   // Calculate Margin and Personal Loan if needed
-  const marginResult = calculateMargin({
-    bankId,
-    productId: normalizedProductId,
-    supportType: 'none',
-    sectorId,
-    termMonths: termResult.totalMonths,
-    marginRules,
-    netSalary: solvedNetSalary
-  });
+  const marginResult = hasRealEstate
+    ? calculateMargin({
+        bankId,
+        productId: normalizedProductId,
+        supportType: 'none',
+        sectorId,
+        termMonths: termResult.totalMonths,
+        marginRules,
+        netSalary: solvedNetSalary
+      })
+    : {
+        annualMargin: 0,
+        baseMargin: 0,
+        exceptionBps: 0,
+        ruleUsed: 'تمويل شخصي فقط - لا يتم تطبيق هامش عقاري',
+        bankName: '',
+        productName: 'تمويل شخصي فقط',
+        supportName: 'بدون دعم',
+        salaryTier: 'n_a',
+        selectedMarginYear: 0,
+        error: null
+      };
   const annualMargin = marginResult.annualMargin;
 
   let personalInstallment = 0;
