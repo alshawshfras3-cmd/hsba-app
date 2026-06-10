@@ -594,12 +594,12 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
                         <button
                           onClick={() => toggleBankProduct(b.id, 'personalFinanceEnabled')}
                           className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${
-                            b.personalFinanceEnabled === true
+                            b.personalFinanceEnabled !== false
                               ? 'bg-emerald-100 text-emerald-700'
                               : 'bg-red-100 text-red-600'
                           }`}
                         >
-                          {b.personalFinanceEnabled === true ? 'مفعّل' : 'معطّل'}
+                          {b.personalFinanceEnabled !== false ? 'مفعّل' : 'معطّل'}
                         </button>
                       </td>
 
@@ -665,7 +665,7 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
                   <tbody className="divide-y divide-gray-100">
                     {banks.map((b) => {
                       const reEnabled = b.realEstateFinanceEnabled !== false;
-                      const peEnabled = b.personalFinanceEnabled === true;
+                      const peEnabled = b.personalFinanceEnabled !== false;
                       return (
                         <tr key={b.id} className="hover:bg-slate-50/30 transition-colors">
                           <td className="p-4 font-bold whitespace-nowrap">
@@ -766,7 +766,7 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
               const bankObj = banks.find(b => b.id === filterBank);
               if (!bankObj) return null;
               const reEnabled = bankObj.realEstateFinanceEnabled !== false;
-              const peEnabled = bankObj.personalFinanceEnabled === true;
+              const peEnabled = bankObj.personalFinanceEnabled !== false;
               return (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 leading-relaxed">
                   {/* Real Estate bounds card */}

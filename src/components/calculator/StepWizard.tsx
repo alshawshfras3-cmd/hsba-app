@@ -472,9 +472,9 @@ export default function StepWizard() {
       setExistingMonthlyObligations(0);
       setObligationRemainingMonths(0);
       if (realEstateSubType === 'real_estate_only') {
-        setProductId('real_estate');
+        setProductId('real_estate_only');
       } else if (realEstateSubType === 'real_estate_with_new_personal') {
-        setProductId('both');
+        setProductId('real_estate_with_new_personal');
       }
     }
   }, [mainFinanceType, realEstateSubType]);
@@ -1352,7 +1352,7 @@ export default function StepWizard() {
                     <label className="block text-xs font-bold text-gray-700">نوع منتج التمويل العقاري المطلوب:</label>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                       {[
-                        { id: 'real_estate', label: 'عقاري فقط', desc: 'للحصول على تمويل شراء المسكن أو العقار السكني المستقل.' },
+                        { id: 'real_estate_only', label: 'عقاري فقط', desc: 'للحصول على تمويل شراء المسكن أو العقار السكني المستقل.' },
                         { id: 'real_estate_with_new_personal', label: 'عقاري + شخصي جديد', desc: 'لدمج تمويل شخصي جديد مع العقاري لتكبير قوة الملاءمة والشراء.' },
                         { id: 'real_estate_with_existing_personal', label: 'عقاري + شخصي قائم', desc: 'إذا كان لديك تمويل شخصي مستمر حالياً وتريد قياسه كالتزام قائم.' }
                       ].map((prod) => {
@@ -1367,6 +1367,11 @@ export default function StepWizard() {
                                 setMainFinanceType('real_estate_with_existing_personal');
                               } else {
                                 setMainFinanceType('real_estate');
+                                if (prod.id === 'real_estate_only') {
+                                  setRealEstateSubType('real_estate_only');
+                                } else if (prod.id === 'real_estate_with_new_personal') {
+                                  setRealEstateSubType('real_estate_with_new_personal');
+                                }
                               }
                             }}
                             className={`p-4 rounded-xl border-2 text-right transition-all flex flex-col justify-between cursor-pointer min-h-[110px] ${

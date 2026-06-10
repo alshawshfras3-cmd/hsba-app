@@ -347,11 +347,14 @@ export function useSettings() {
       if (selectError) throw selectError;
 
       let appSettings = data?.value || {};
-      const cacheField = DB_TO_CACHE_KEY[key];
-      if (cacheField) {
-        appSettings[cacheField] = value;
-      } else {
-        appSettings[key] = value;
+      const cacheField = DB_TO_CACHE_KEY[key] || key;
+      appSettings[cacheField] = value;
+      
+      // Delete any snake_case version of the updated key inside app_settings
+      for (const snakeKey of Object.keys(DB_TO_CACHE_KEY)) {
+        if (DB_TO_CACHE_KEY[snakeKey] === cacheField && snakeKey !== cacheField) {
+          delete appSettings[snakeKey];
+        }
       }
 
       setSettings(prev => ({ ...prev, [key]: value }));

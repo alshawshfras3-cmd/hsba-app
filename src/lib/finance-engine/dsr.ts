@@ -17,10 +17,13 @@ export function mapProductIdToType(productId: string): 'real_estate_only' | 'rea
   return 'real_estate_only';
 }
 
-export function mapSupportType(supportType: string): 'none' | 'monthly' | 'down_payment' | 'not_applicable' {
+export function mapSupportType(supportType: string): 'none' | 'monthly' | 'downpayment' | 'not_applicable' {
   if (supportType === 'monthly') return 'monthly';
-  if (supportType === 'down_payment' || supportType === 'downpayment') return 'down_payment';
+  if (supportType === 'down_payment' || supportType === 'downpayment') return 'downpayment';
   if (supportType === 'not_applicable') return 'not_applicable';
+  if (supportType === 'unsupported' || supportType === 'no_support' || supportType === 'none') {
+    return 'none';
+  }
   return 'none';
 }
 
@@ -32,7 +35,7 @@ export function mapCustomerStage(phase: string): 'active_before_retirement' | 'r
 export function getDsrRule(params: {
   bankId: string;
   productType: 'real_estate_only' | 'real_estate_with_new_personal' | 'real_estate_with_existing_personal' | 'personal_only';
-  supportType: 'none' | 'monthly' | 'down_payment' | 'not_applicable';
+  supportType: 'none' | 'monthly' | 'downpayment' | 'not_applicable';
   customerStage: 'active_before_retirement' | 'retired_after_retirement';
   dsrRules: DsrRule[];
 }): DsrRule {

@@ -279,7 +279,7 @@ const defaultSectorsList = [
   { id: 'retired', nameAr: 'متقاعد', isActive: true, retirementAge: 0, notes: 'لا ينطبق (متقاعد حالي)' }
 ];
 
-export const ensureBankSectorPensionRules = (allBanks: Bank[], currentRules: BankSectorPensionRule[]): BankSectorPensionRule[] => {
+export const ensureBankSectorPensionRules = (allBanks: Bank[], currentRules: BankSectorPensionRule[], forceGenerate: boolean = false): BankSectorPensionRule[] => {
   const allowedSectors = ['gov_civil', 'military', 'semi_gov', 'companies', 'retired'];
   const sectorMigrationMap: Record<string, string> = {
     [['government', 'civilian'].join('_')]: 'gov_civil',
@@ -314,86 +314,88 @@ export const ensureBankSectorPensionRules = (allBanks: Bank[], currentRules: Ban
 
   const finalRules = [...deduped];
 
-  allBanks.forEach(bank => {
-    allowedSectors.forEach(sectorId => {
-      const alreadyExists = finalRules.some(r => r.bankId === bank.id && r.sectorId === sectorId);
-      
-      if (!alreadyExists) {
-        let salarySource: 'basic_only' | 'basic_housing' | 'net_salary' | 'manual' = 'basic_only';
-        let calcMethod: 'service_growth' | 'fixed_percentage' | 'direct' = 'service_growth';
-        let divisorYears = 40;
-        let growthRate = 0;
-        let growthMinYears = 0;
-        let growthMaxYears = 0;
-        let noGrowthAboveYears = 0;
-        let thresholdYears = 5;
-        let rateBelow = 70;
-        let rateAbove = 80;
-        let capAtApprovedSalary = true;
+  if (forceGenerate) {
+    allBanks.forEach(bank => {
+      allowedSectors.forEach(sectorId => {
+        const alreadyExists = finalRules.some(r => r.bankId === bank.id && r.sectorId === sectorId);
+        
+        if (!alreadyExists) {
+          let salarySource: 'basic_only' | 'basic_housing' | 'net_salary' | 'manual' = 'basic_only';
+          let calcMethod: 'service_growth' | 'fixed_percentage' | 'direct' = 'service_growth';
+          let divisorYears = 40;
+          let growthRate = 0;
+          let growthMinYears = 0;
+          let growthMaxYears = 0;
+          let noGrowthAboveYears = 0;
+          let thresholdYears = 5;
+          let rateBelow = 70;
+          let rateAbove = 80;
+          let capAtApprovedSalary = true;
 
-        if (sectorId === 'gov_civil') {
-          salarySource = 'basic_only';
-          calcMethod = 'service_growth';
-          divisorYears = 40;
-          growthRate = 2.5;
-          growthMinYears = 5;
-          growthMaxYears = 12;
-          noGrowthAboveYears = 25;
-          capAtApprovedSalary = true;
-        } else if (sectorId === 'military') {
-          salarySource = 'basic_only';
-          calcMethod = 'service_growth';
-          divisorYears = 35;
-          growthRate = 2.5;
-          growthMinYears = 5;
-          growthMaxYears = 12;
-          noGrowthAboveYears = 25;
-          capAtApprovedSalary = true;
-        } else if (sectorId === 'semi_gov') {
-          salarySource = 'basic_only';
-          calcMethod = 'service_growth';
-          divisorYears = 40;
-          growthRate = 1.25;
-          growthMinYears = 5;
-          growthMaxYears = 12;
-          noGrowthAboveYears = 25;
-          capAtApprovedSalary = true;
-        } else if (sectorId === 'companies') {
-          salarySource = 'basic_only';
-          calcMethod = 'service_growth';
-          divisorYears = 40;
-          growthRate = 0;
-          growthMinYears = 0;
-          growthMaxYears = 0;
-          noGrowthAboveYears = 0;
-          capAtApprovedSalary = true;
-        } else if (sectorId === 'retired') {
-          salarySource = 'manual';
-          calcMethod = 'direct';
-          capAtApprovedSalary = false;
+          if (sectorId === 'gov_civil') {
+            salarySource = 'basic_only';
+            calcMethod = 'service_growth';
+            divisorYears = 40;
+            growthRate = 2.5;
+            growthMinYears = 5;
+            growthMaxYears = 12;
+            noGrowthAboveYears = 25;
+            capAtApprovedSalary = true;
+          } else if (sectorId === 'military') {
+            salarySource = 'basic_only';
+            calcMethod = 'service_growth';
+            divisorYears = 35;
+            growthRate = 2.5;
+            growthMinYears = 5;
+            growthMaxYears = 12;
+            noGrowthAboveYears = 25;
+            capAtApprovedSalary = true;
+          } else if (sectorId === 'semi_gov') {
+            salarySource = 'basic_only';
+            calcMethod = 'service_growth';
+            divisorYears = 40;
+            growthRate = 1.25;
+            growthMinYears = 5;
+            growthMaxYears = 12;
+            noGrowthAboveYears = 25;
+            capAtApprovedSalary = true;
+          } else if (sectorId === 'companies') {
+            salarySource = 'basic_only';
+            calcMethod = 'service_growth';
+            divisorYears = 40;
+            growthRate = 0;
+            growthMinYears = 0;
+            growthMaxYears = 0;
+            noGrowthAboveYears = 0;
+            capAtApprovedSalary = true;
+          } else if (sectorId === 'retired') {
+            salarySource = 'manual';
+            calcMethod = 'direct';
+            capAtApprovedSalary = false;
+          }
+
+          finalRules.push({
+            id: `${bank.id}_${sectorId}`,
+            bankId: bank.id,
+            sectorId: sectorId,
+            isActive: true,
+            notes: '',
+            salarySource,
+            calcMethod,
+            divisorYears,
+            growthRate,
+            growthMinYears,
+            growthMaxYears,
+            noGrowthAboveYears,
+            thresholdYears,
+            rateBelow,
+            rateAbove,
+            capAtApprovedSalary
+          });
         }
-
-        finalRules.push({
-          id: `${bank.id}_${sectorId}`,
-          bankId: bank.id,
-          sectorId: sectorId,
-          isActive: true,
-          notes: '',
-          salarySource,
-          calcMethod,
-          divisorYears,
-          growthRate,
-          growthMinYears,
-          growthMaxYears,
-          noGrowthAboveYears,
-          thresholdYears,
-          rateBelow,
-          rateAbove,
-          capAtApprovedSalary
-        });
-      }
+      });
     });
-  });
+  }
 
   return finalRules;
 };
@@ -674,7 +676,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     if (hasSupabaseKeys) {
       try {
         const currentSettingsObject = {
-          // camelCase properties
+          // camelCase properties ONLY
           banks,
           products,
           militaryRanks,
@@ -694,21 +696,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           approvedSalaryRules: currentSettings.approvedSalaryRules || currentSettings.approvedSalaryDbRules || [],
           pensionDbRules: currentSettings.pensionDbRules || [],
           sectorMappings: currentSettings.sectorMappings || [],
-
-          // snake_case properties for dual-support
-          margin_rules: marginRules,
-          dsr_rules: dsrRules,
-          personal_finance_rules: personalRules,
-          product_acceptance: products,
-          military_ranks: militaryRanks,
-          pension_rules: pensionRules,
-          support_settings: supportSettings,
-          salary_rules: salaryRules,
-          term_rules: termRules,
-          advanced_rules: advancedRules,
-          hasba_custom_sectors: customSectors,
-          bank_sector_pension_rules: bankSectorRules,
-          pension_rules_library: pensionRulesLibrary,
         };
 
         const updated_by_user = user?.email || user?.id || null;
@@ -747,67 +734,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   };
 
   const reinitializeAllSettings = async () => {
-    const defaultData = getInitialSettings();
-    if (hasSupabaseKeys) {
-      try {
-        const currentSettingsObject = {
-          banks: defaultData.banks,
-          products: defaultData.products,
-          militaryRanks: defaultData.militaryRanks,
-          salaryRules: defaultData.salaryRules,
-          pensionRules: defaultData.pensionRules,
-          termRules: defaultData.termRules,
-          marginRules: defaultData.marginRules,
-          dsrRules: defaultData.dsrRules,
-          supportSettings: defaultData.supportSettings,
-          housingSupportTiers: defaultData.housingSupportTiers,
-          advancePaymentTiers: defaultData.advancePaymentTiers,
-          personalRules: defaultData.personalRules,
-          advancedRules: defaultData.advancedRules,
-          customSectors: defaultData.customSectors,
-          bankSectorRules: defaultData.bankSectorRules,
-          pensionRulesLibrary: defaultData.pensionRulesLibrary,
-          approvedSalaryRules: fallbackApprovedSalaryRules,
-          pensionDbRules: fallbackPensionRules,
-          sectorMappings: fallbackSectorMappings,
-
-          margin_rules: defaultData.marginRules,
-          dsr_rules: defaultData.dsrRules,
-          personal_finance_rules: defaultData.personalRules,
-          product_acceptance: defaultData.products,
-          military_ranks: defaultData.militaryRanks,
-          pension_rules: defaultData.pensionRules,
-          support_settings: defaultData.supportSettings,
-          salary_rules: defaultData.salaryRules,
-          term_rules: defaultData.termRules,
-          advanced_rules: defaultData.advancedRules,
-          hasba_custom_sectors: defaultData.customSectors,
-          bank_sector_pension_rules: defaultData.bankSectorRules,
-          pension_rules_library: defaultData.pensionRulesLibrary,
-        };
-
-        const updated_by_user = user?.email || user?.id || null;
-        const payload: any = {
-          key: 'app_settings',
-          value: currentSettingsObject,
-          source: 'reinit',
-          updated_at: new Date().toISOString()
-        };
-        if (updated_by_user) {
-          payload.updated_by = updated_by_user;
-        }
-
-        await supabase.from('system_settings').upsert(payload);
-        console.log("All settings successfully reinitialized in Supabase to default settings object");
-
-        applySettingsState(defaultData);
-      } catch (err) {
-        console.error("Failed to reinitialize settings in Supabase:", err);
-        throw err;
-      }
-    } else {
-      applySettingsState(defaultData);
-    }
+    throw new Error('إعادة تهيئة الإعدادات معطلة لحماية بيانات Supabase');
   };
 
   return (

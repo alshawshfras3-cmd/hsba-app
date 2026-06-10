@@ -361,7 +361,7 @@ export const BanksSection: React.FC<BanksSectionProps> = ({
           id: `${cleanId}_re_only_down_before`,
           bankId: cleanId,
           productType: 'real_estate_only',
-          supportType: 'down_payment',
+          supportType: 'downpayment',
           customerStage: 'active_before_retirement',
           dsrPercent: 55,
           deductExistingObligations: true,

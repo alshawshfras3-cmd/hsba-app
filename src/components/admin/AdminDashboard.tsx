@@ -274,7 +274,7 @@ export default function AdminDashboard() {
   const [copySourceBankId, setCopySourceBankId] = useState<string>('');
   const [isCopyBankModalOpen, setIsCopyBankModalOpen] = useState(false);
 
-  const ensureBankSectorPensionRules = (allBanks: Bank[], currentRules: BankSectorPensionRule[]): BankSectorPensionRule[] => {
+  const ensureBankSectorPensionRules = (allBanks: Bank[], currentRules: BankSectorPensionRule[], forceGenerate: boolean = false): BankSectorPensionRule[] => {
     const allowedSectors = ['gov_civil', 'military', 'semi_gov', 'companies', 'retired'];
     const sectorMigrationMap: Record<string, string> = {
       [['government', 'civilian'].join('_')]: 'gov_civil',
@@ -309,86 +309,88 @@ export default function AdminDashboard() {
 
     const finalRules = [...deduped];
 
-    allBanks.forEach(bank => {
-      allowedSectors.forEach(sectorId => {
-        const alreadyExists = finalRules.some(r => r.bankId === bank.id && r.sectorId === sectorId);
-        
-        if (!alreadyExists) {
-          let salarySource: 'basic_only' | 'basic_housing' | 'net_salary' | 'manual' = 'basic_only';
-          let calcMethod: 'service_growth' | 'fixed_percentage' | 'direct' = 'service_growth';
-          let divisorYears = 40;
-          let growthRate = 0;
-          let growthMinYears = 0;
-          let growthMaxYears = 0;
-          let noGrowthAboveYears = 0;
-          let thresholdYears = 5;
-          let rateBelow = 70;
-          let rateAbove = 80;
-          let capAtApprovedSalary = true;
+    if (forceGenerate) {
+      allBanks.forEach(bank => {
+        allowedSectors.forEach(sectorId => {
+          const alreadyExists = finalRules.some(r => r.bankId === bank.id && r.sectorId === sectorId);
+          
+          if (!alreadyExists) {
+            let salarySource: 'basic_only' | 'basic_housing' | 'net_salary' | 'manual' = 'basic_only';
+            let calcMethod: 'service_growth' | 'fixed_percentage' | 'direct' = 'service_growth';
+            let divisorYears = 40;
+            let growthRate = 0;
+            let growthMinYears = 0;
+            let growthMaxYears = 0;
+            let noGrowthAboveYears = 0;
+            let thresholdYears = 5;
+            let rateBelow = 70;
+            let rateAbove = 80;
+            let capAtApprovedSalary = true;
 
-          if (sectorId === 'gov_civil') {
-            salarySource = 'basic_only';
-            calcMethod = 'service_growth';
-            divisorYears = 40;
-            growthRate = 2.5;
-            growthMinYears = 5;
-            growthMaxYears = 12;
-            noGrowthAboveYears = 25;
-            capAtApprovedSalary = true;
-          } else if (sectorId === 'military') {
-            salarySource = 'basic_only';
-            calcMethod = 'service_growth';
-            divisorYears = 35;
-            growthRate = 2.5;
-            growthMinYears = 5;
-            growthMaxYears = 12;
-            noGrowthAboveYears = 25;
-            capAtApprovedSalary = true;
-          } else if (sectorId === 'semi_gov') {
-            salarySource = 'basic_only';
-            calcMethod = 'service_growth';
-            divisorYears = 40;
-            growthRate = 1.25;
-            growthMinYears = 5;
-            growthMaxYears = 12;
-            noGrowthAboveYears = 25;
-            capAtApprovedSalary = true;
-          } else if (sectorId === 'companies') {
-            salarySource = 'basic_only';
-            calcMethod = 'service_growth';
-            divisorYears = 40;
-            growthRate = 0;
-            growthMinYears = 0;
-            growthMaxYears = 0;
-            noGrowthAboveYears = 0;
-            capAtApprovedSalary = true;
-          } else if (sectorId === 'retired') {
-            salarySource = 'manual';
-            calcMethod = 'direct';
-            capAtApprovedSalary = false;
+            if (sectorId === 'gov_civil') {
+              salarySource = 'basic_only';
+              calcMethod = 'service_growth';
+              divisorYears = 40;
+              growthRate = 2.5;
+              growthMinYears = 5;
+              growthMaxYears = 12;
+              noGrowthAboveYears = 25;
+              capAtApprovedSalary = true;
+            } else if (sectorId === 'military') {
+              salarySource = 'basic_only';
+              calcMethod = 'service_growth';
+              divisorYears = 35;
+              growthRate = 2.5;
+              growthMinYears = 5;
+              growthMaxYears = 12;
+              noGrowthAboveYears = 25;
+              capAtApprovedSalary = true;
+            } else if (sectorId === 'semi_gov') {
+              salarySource = 'basic_only';
+              calcMethod = 'service_growth';
+              divisorYears = 40;
+              growthRate = 1.25;
+              growthMinYears = 5;
+              growthMaxYears = 12;
+              noGrowthAboveYears = 25;
+              capAtApprovedSalary = true;
+            } else if (sectorId === 'companies') {
+              salarySource = 'basic_only';
+              calcMethod = 'service_growth';
+              divisorYears = 40;
+              growthRate = 0;
+              growthMinYears = 0;
+              growthMaxYears = 0;
+              noGrowthAboveYears = 0;
+              capAtApprovedSalary = true;
+            } else if (sectorId === 'retired') {
+              salarySource = 'manual';
+              calcMethod = 'direct';
+              capAtApprovedSalary = false;
+            }
+
+            finalRules.push({
+              id: `${bank.id}_${sectorId}`,
+              bankId: bank.id,
+              sectorId: sectorId,
+              isActive: true,
+              notes: '',
+              salarySource,
+              calcMethod,
+              divisorYears,
+              growthRate,
+              growthMinYears,
+              growthMaxYears,
+              noGrowthAboveYears,
+              thresholdYears,
+              rateBelow,
+              rateAbove,
+              capAtApprovedSalary
+            });
           }
-
-          finalRules.push({
-            id: `${bank.id}_${sectorId}`,
-            bankId: bank.id,
-            sectorId: sectorId,
-            isActive: true,
-            notes: '',
-            salarySource,
-            calcMethod,
-            divisorYears,
-            growthRate,
-            growthMinYears,
-            growthMaxYears,
-            noGrowthAboveYears,
-            thresholdYears,
-            rateBelow,
-            rateAbove,
-            capAtApprovedSalary
-          });
-        }
+        });
       });
-    });
+    }
 
     return finalRules;
   };
@@ -751,143 +753,6 @@ export default function AdminDashboard() {
   const [newUserEmailStr, setNewUserEmailStr] = useState('');
   const [newUserRoleStr, setNewUserRoleStr] = useState<'owner' | 'manager' | 'employee' | 'user'>('user');
   const [newUserPlanStr, setNewUserPlanStr] = useState<'free' | 'premium' | 'enterprise'>('free');
-
-  // --- DSR Rules States & Management ---
-  const [filterDsrBank, setFilterDsrBank] = useState<string>('rajhi');
-  const [filterDsrSupport, setFilterDsrSupport] = useState<string>('all');
-  const [filterDsrStage, setFilterDsrStage] = useState<string>('all');
-  const [filterDsrStatus, setFilterDsrStatus] = useState<string>('all');
-
-  const [isDsrModalOpen, setIsDsrModalOpen] = useState(false);
-  const [editingDsrRule, setEditingDsrRule] = useState<DsrRule | null>(null);
-
-  // Form states for adding/editing a DSR Rule
-  const [formDsrBankId, setFormDsrBankId] = useState<string>('rajhi');
-  const [formDsrProductType, setFormDsrProductType] = useState<'real_estate_only' | 'real_estate_with_new_personal' | 'real_estate_with_existing_personal' | 'personal_only'>('real_estate_only');
-  const [formDsrSupportType, setFormDsrSupportType] = useState<'none' | 'monthly' | 'down_payment' | 'not_applicable'>('none');
-  const [formDsrCustomerStage, setFormDsrCustomerStage] = useState<'active_before_retirement' | 'retired_after_retirement'>('active_before_retirement');
-  const [formDsrPercentStr, setFormDsrPercentStr] = useState<string>('');
-  const [formDsrDeductExisting, setFormDsrDeductExisting] = useState<boolean>(true);
-  const [formDsrActive, setFormDsrActive] = useState<boolean>(true);
-  const [formDsrError, setFormDsrError] = useState<string>('');
-
-  const DSR_BANKS = banks.map(b => ({ id: b.id, nameAr: b.nameAr }));
-
-  const DSR_PRODUCT_TYPES = [
-    { id: 'real_estate_only', nameAr: 'تمويل عقاري' }
-  ];
-
-  const DSR_SUPPORT_TYPES = [
-    { id: 'none', nameAr: 'غير مدعوم' },
-    { id: 'monthly', nameAr: 'دعم شهري' },
-    { id: 'down_payment', nameAr: 'دعم دفعة' }
-  ];
-
-  const DSR_CUSTOMER_STAGES = [
-    { id: 'active_before_retirement', nameAr: 'موظف نشط (قبل التقاعد)' },
-    { id: 'retired_after_retirement', nameAr: 'متقاعد (بعد التقاعد)' }
-  ];
-
-  const handleOpenAddDsrModal = () => {
-    setEditingDsrRule(null);
-    setFormDsrBankId(filterDsrBank);
-    setFormDsrProductType('real_estate_only');
-    setFormDsrSupportType('none');
-    setFormDsrCustomerStage('active_before_retirement');
-    setFormDsrPercentStr('');
-    setFormDsrDeductExisting(true);
-    setFormDsrActive(true);
-    setFormDsrError('');
-    setIsDsrModalOpen(true);
-  };
-
-  const handleOpenEditDsrModal = (rule: DsrRule) => {
-    setEditingDsrRule(rule);
-    setFormDsrBankId(rule.bankId);
-    setFormDsrProductType(rule.productType);
-    setFormDsrSupportType(rule.supportType);
-    setFormDsrCustomerStage(rule.customerStage);
-    setFormDsrPercentStr(String(rule.dsrPercent));
-    setFormDsrDeductExisting(rule.deductExistingObligations);
-    setFormDsrActive(rule.active);
-    setFormDsrError('');
-    setIsDsrModalOpen(true);
-  };
-
-  const handleDeleteDsrRule = (id: string) => {
-    if (window.confirm('هل أنت متأكد من رغبتك في حذف قاعدة الاستقطاع هذه؟')) {
-      setDsrRules(prev => prev.filter(r => r.id !== id));
-      showToast('تم حذف قاعدة الاستقطاع بنجاح!', 'success');
-    }
-  };
-
-  const handleToggleDsrRuleActive = (id: string) => {
-    const targetRule = dsrRules.find(r => r.id === id);
-    if (targetRule && !targetRule.active) {
-      // Ensure no active duplicate exists with same bankId + supportType + customerStage
-      const duplicateExists = dsrRules.some(
-        r => r.id !== id &&
-             r.bankId === targetRule.bankId &&
-             r.supportType === targetRule.supportType &&
-             r.customerStage === targetRule.customerStage &&
-             r.active
-      );
-      if (duplicateExists) {
-        showToast('خطأ: تكرار غير مسموح. توجد قاعدة أخرى نشطة بنفس المفتاح لهذه الجهة التمويلية.', 'refuse');
-        return;
-      }
-    }
-    setDsrRules(prev => prev.map(r => r.id === id ? { ...r, active: !r.active } : r));
-    showToast('تم تحديث حالة تفعيل القاعدة بنجاح!', 'success');
-  };
-
-  const handleSaveDsrForm = () => {
-    const val = parseFloat(formDsrPercentStr);
-    if (isNaN(val) || val < 0 || val > 100) {
-      setFormDsrError('يرجى إدخال نسبة استقطاع صحيحة بين 0 و 100 %');
-      return;
-    }
-
-    const finalSupportType = formDsrSupportType === 'not_applicable' ? 'none' : formDsrSupportType;
-    const ruleId = editingDsrRule ? editingDsrRule.id : `dsr_rule_${Date.now()}`;
-
-    // Validate that no active duplicate will exist
-    if (formDsrActive) {
-      const duplicateExists = dsrRules.some(
-        r => r.id !== ruleId &&
-             r.bankId === formDsrBankId &&
-             r.productType === 'real_estate_only' &&
-             r.supportType === finalSupportType &&
-             r.customerStage === formDsrCustomerStage &&
-             r.active
-      );
-      if (duplicateExists) {
-        setFormDsrError('خطأ تكرار: توجد بالفعل قاعدة أخرى مسجلة ونشطة لمزيج (البنك + الدعم + المرحلة). لا يُسمح بأكثر من قاعدة نشطة للمفتاح نفسه.');
-        return;
-      }
-    }
-
-    const newRule: DsrRule = {
-      id: ruleId,
-      bankId: formDsrBankId,
-      productType: 'real_estate_only',
-      supportType: finalSupportType,
-      customerStage: formDsrCustomerStage,
-      dsrPercent: val,
-      deductExistingObligations: formDsrDeductExisting,
-      active: formDsrActive
-    };
-
-    if (editingDsrRule) {
-      setDsrRules(prev => prev.map(r => r.id === editingDsrRule.id ? newRule : r));
-      showToast('تم تعديل قاعدة DSR بنجاح!', 'success');
-    } else {
-      setDsrRules(prev => [newRule, ...prev]);
-      showToast('تم إضافة قاعدة DSR جديدة بنجاح!', 'success');
-    }
-
-    setIsDsrModalOpen(false);
-  };
 
   // --- Products Acceptance Rules States & Management ---
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -1685,7 +1550,7 @@ export default function AdminDashboard() {
           id: `${cleanId}_re_only_down_before`,
           bankId: cleanId,
           productType: 'real_estate_only',
-          supportType: 'down_payment',
+          supportType: 'downpayment',
           customerStage: 'active_before_retirement',
           dsrPercent: 55,
           deductExistingObligations: true,
@@ -2949,69 +2814,114 @@ export default function AdminDashboard() {
         )}
 
         {/* VIEW 5.5: BANK & SECTOR PENSION RULES MAPPING (TAB 6) */}
-        {adminSubPage === 'pension' && pensionActiveTab === 'bank_sector_rules' && (
-          <div className="bg-white rounded-2xl p-6 border border-slate-100 space-y-6 font-sans text-right" dir="rtl">
-            <div className="flex flex-col gap-4 p-5 bg-slate-50 rounded-2xl border border-slate-100">
-              <div className="space-y-2 w-full text-right" dir="rtl">
-                <label className="block text-xs font-bold text-gray-500">اختر البنك أو شركة التمويل 🏦</label>
-                <div className="flex flex-wrap gap-2">
-                  {banks.map((bank) => {
-                    const isSelected = bank.id === bankSectorRulesSelectedBankId;
-                    return (
-                      <button
-                        key={bank.id}
-                        type="button"
-                        onClick={() => setBankSectorRulesSelectedBankId(bank.id)}
-                        className={`px-4 py-2.5 text-xs font-extrabold rounded-xl transition-all cursor-pointer border ${
-                          isSelected
-                            ? 'bg-[#0057B8] text-white border-[#0057B8] shadow-sm transform scale-[1.02]'
-                            : 'bg-white hover:bg-slate-100 text-gray-750 border-gray-200 hover:border-gray-300'
-                        }`}
-                      >
-                        {bank.nameAr}
-                      </button>
-                    );
-                  })}
+        {adminSubPage === 'pension' && pensionActiveTab === 'bank_sector_rules' && (() => {
+          const allowedSectorsList = ['gov_civil', 'military', 'semi_gov', 'companies', 'retired'];
+          const expectedCount = banks.length * allowedSectorsList.length;
+          const currentCount = bankSectorRules.length;
+          const hasMissingSectorRules = currentCount < expectedCount;
+
+          return (
+            <div className="bg-white rounded-2xl p-6 border border-slate-100 space-y-6 font-sans text-right" dir="rtl">
+              {hasMissingSectorRules && (
+                <div className="p-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl flex items-center justify-between text-xs font-bold leading-relaxed mb-4">
+                  <span>⚠️ تنبيه: توجد قواعد قطاعية للرواتب ناقصة لبعض البنوك (عدد القواعد الحالية: {currentCount} من أصل {expectedCount}). يمكنك الضغط على زر "إنشاء القواعد الناقصة" لتوليدها تلقائياً وحفظها.</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const synchronized = ensureBankSectorPensionRules(banks, bankSectorRules, true);
+                      const missingCount = synchronized.length - bankSectorRules.length;
+                      if (missingCount > 0) {
+                        setBankSectorRules(synchronized);
+                        showToast(`تم إنشاء عدد ${missingCount} قاعدة ناقصة بنجاح! لا تنس النقر على زر حفظ تغييرات الربط لتأكيدها.`, "success");
+                      } else {
+                        showToast("جميع القواعد للقطاعات والبنوك مكتملة بالفعل!", "refuse");
+                      }
+                    }}
+                    className="bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 px-3 py-1.5 rounded-lg mr-4 transition-colors cursor-pointer whitespace-nowrap"
+                  >
+                    إنشاء الآن
+                  </button>
+                </div>
+              )}
+
+              <div className="flex flex-col gap-4 p-5 bg-slate-50 rounded-2xl border border-slate-100">
+                <div className="space-y-2 w-full text-right" dir="rtl">
+                  <label className="block text-xs font-bold text-gray-500">اختر البنك أو شركة التمويل 🏦</label>
+                  <div className="flex flex-wrap gap-2">
+                    {banks.map((bank) => {
+                      const isSelected = bank.id === bankSectorRulesSelectedBankId;
+                      return (
+                        <button
+                          key={bank.id}
+                          type="button"
+                          onClick={() => setBankSectorRulesSelectedBankId(bank.id)}
+                          className={`px-4 py-2.5 text-xs font-extrabold rounded-xl transition-all cursor-pointer border ${
+                            isSelected
+                              ? 'bg-[#0057B8] text-white border-[#0057B8] shadow-sm transform scale-[1.02]'
+                              : 'bg-white hover:bg-slate-100 text-gray-750 border-gray-200 hover:border-gray-300'
+                          }`}
+                        >
+                          {bank.nameAr}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 w-full justify-start md:justify-end border-t border-gray-200/60 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const otherBanks = banks.filter(b => b.id !== bankSectorRulesSelectedBankId);
+                      if (otherBanks.length === 0) {
+                        showToast("لا توجد بنوك أخرى للنسخ منها", "refuse");
+                        return;
+                      }
+                      setCopySourceBankId(otherBanks[0].id);
+                      setIsCopyBankModalOpen(true);
+                    }}
+                    className="bg-slate-100 hover:bg-slate-200 text-slate-705 px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all border border-slate-200 flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    نسخ الإعدادات من بنك آخر
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const synchronized = ensureBankSectorPensionRules(banks, bankSectorRules, true);
+                      const missingCount = synchronized.length - bankSectorRules.length;
+                      if (missingCount > 0) {
+                        setBankSectorRules(synchronized);
+                        showToast(`تم إنشاء عدد ${missingCount} قاعدة ناقصة بنجاح! لا تنس النقر على زر حفظ تغييرات الربط لتأكيدها.`, "success");
+                      } else {
+                        showToast("جميع القواعد للقطاعات والبنوك مكتملة بالفعل!", "refuse");
+                      }
+                    }}
+                    className="bg-sky-50 hover:bg-sky-100 text-sky-700 px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all border border-sky-200 flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    إنشاء القواعد الناقصة
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      saveBankSectorRulesToStorage(bankSectorRules);
+                      showToast("تم حفظ جميع قواعد البنوك والقطاعات بنجاح! 🎉", "success");
+                    }}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-xs font-extrabold transition-all shadow-md active:scale-95 flex items-center gap-1.5 cursor-pointer font-sans"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    حفظ تغييرات الربط
+                  </button>
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 w-full justify-start md:justify-end border-t border-gray-200/60 pt-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const otherBanks = banks.filter(b => b.id !== bankSectorRulesSelectedBankId);
-                    if (otherBanks.length === 0) {
-                      showToast("لا توجد بنوك أخرى للنسخ منها", "refuse");
-                      return;
-                    }
-                    setCopySourceBankId(otherBanks[0].id);
-                    setIsCopyBankModalOpen(true);
-                  }}
-                  className="bg-slate-100 hover:bg-slate-200 text-slate-705 px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all border border-slate-200 flex items-center gap-1.5 cursor-pointer"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  نسخ الإعدادات من بنك آخر
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    saveBankSectorRulesToStorage(bankSectorRules);
-                    showToast("تم حفظ جميع قواعد البنوك والقطاعات بنجاح! 🎉", "success");
-                  }}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-xs font-extrabold transition-all shadow-md active:scale-95 flex items-center gap-1.5 cursor-pointer font-sans"
-                >
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  حفظ تغييرات الربط
-                </button>
+              <div className="space-y-2">
+                <h3 className="text-sm font-extrabold text-[#111827]">قواعد احتساب الراتب التقاعدي للقطاعات</h3>
+                <p className="text-xs text-[#6B7280]">
+                  قم بضبط وحفظ تفاصيل ومعادلات الحساب لكل قطاع مناسب للبنك المحدد مباشرة دون تعقيد الربط أو مكتبات القوالب.
+                </p>
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <h3 className="text-sm font-extrabold text-[#111827]">قواعد احتساب الراتب التقاعدي للقطاعات</h3>
-              <p className="text-xs text-[#6B7280]">
-                قم بضبط وحفظ تفاصيل ومعادلات الحساب لكل قطاع مناسب للبنك المحدد مباشرة دون تعقيد الربط أو مكتبات القوالب.
-              </p>
-            </div>
 
             {/* Main Sector Mapping Table */}
             <div className="overflow-x-auto rounded-xl border border-gray-150">
@@ -3197,7 +3107,8 @@ export default function AdminDashboard() {
               </table>
             </div>
           </div>
-        )}
+          );
+        })()}
 
         {/* VIEW 5.3: PENSION RULE TESTER SANDBOX (TAB 4) */}
         {adminSubPage === 'pension' && pensionActiveTab === 'rule_test' && (

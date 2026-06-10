@@ -41,6 +41,11 @@ export function DiagnosticsPage() {
     sectorMappings: contextSectorMappings
   } = useAppState();
 
+  const allowedSectorsList = ['gov_civil', 'military', 'semi_gov', 'companies', 'retired'];
+  const expectedCount = banks.length * allowedSectorsList.length;
+  const currentCount = (bankSectorRules || []).length;
+  const hasMissingSectorRules = currentCount < expectedCount;
+
   // Load custom DB rules
   const [dbApprovedSalaryRules, setDbApprovedSalaryRules] = useState<ApprovedSalarySourceRule[]>(contextApprovedSalaryRules || []);
   const [dbPensionRules, setDbPensionRules] = useState<PensionCalculationRule[]>(contextPensionDbRules || []);
@@ -459,6 +464,18 @@ export function DiagnosticsPage() {
           </button>
         </div>
       </div>
+
+      {hasMissingSectorRules && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3" id="missing-sector-rules-warning">
+          <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div>
+            <h4 className="text-xs font-bold text-amber-800 text-right">تحذير: قواعد قطاعات الرواتب للتقاعد ناقصة</h4>
+            <p className="text-[11px] text-amber-700 mt-1 leading-relaxed text-right">
+              تم رصد عدد {currentCount} قاعدة ربط بين البنوك والقطاعات من أصل {expectedCount} متوقعة. القواعد الناقصة تعطل تشغيل الخصائص المخصصة من البنك وتعتمد على السلوك الافتراضي الاحتياطي. نوصي بتوليدها من قسم الربط بصفحة التقاعد وتأكيد حفظها.
+            </p>
+          </div>
+        </div>
+      )}
 
       {isFallbackWarning && (
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3" id="fallback-warning-box">

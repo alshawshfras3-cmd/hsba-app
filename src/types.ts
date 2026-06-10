@@ -146,7 +146,7 @@ export interface DsrRule {
   id: string;
   bankId: string;
   productType: 'real_estate_only' | 'real_estate_with_new_personal' | 'real_estate_with_existing_personal' | 'personal_only';
-  supportType: 'none' | 'monthly' | 'down_payment' | 'not_applicable';
+  supportType: 'none' | 'monthly' | 'downpayment' | 'not_applicable';
   customerStage: 'active_before_retirement' | 'retired_after_retirement';
   dsrPercent: number;
   deductExistingObligations: boolean;
