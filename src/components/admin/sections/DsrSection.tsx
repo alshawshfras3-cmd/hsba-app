@@ -29,9 +29,6 @@ export default function DsrSection({
 }: DsrSectionProps) {
   const formBanksList = banks.map(b => ({ id: b.id, nameAr: b.nameAr }));
 
-  const missingRules = getMissingDsrRulesList(banks, dsrRules);
-  const hasMissing = missingRules.length > 0;
-
   const [filterDsrBank, setFilterDsrBank] = useState<string>('rajhi');
   const [filterDsrProduct, setFilterDsrProduct] = useState<string>('all');
   const [filterDsrSupport, setFilterDsrSupport] = useState<string>('all');
@@ -192,20 +189,6 @@ export default function DsrSection({
           <span>إضافة قاعدة DSR</span>
         </button>
       </div>
-
-      {hasMissing && (
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 shadow-xs flex flex-row items-center justify-between gap-4 font-sans text-right" id="missing-dsr-rules-banner">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-            <div>
-              <h4 className="text-sm font-extrabold text-amber-900">توجد قواعد DSR ناقصة لهذا المنتج/الدعم/المرحلة</h4>
-              <p className="text-xs text-[#78350F] mt-1.5 leading-relaxed">
-                توجد {missingRules.length} قاعدة (قواعد) استقطاع DSR غير معرفة في لوحة التحكم لبعض المنتجات أو الجهات التمويلية. عدم وجود هذه القواعد قد يؤثر على دقة محاكاة الحساب الائتماني.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Quick Actions Bar */}
       <div className="bg-slate-50 border border-slate-150 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 font-sans">
