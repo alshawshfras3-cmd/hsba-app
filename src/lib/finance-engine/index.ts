@@ -41,7 +41,7 @@ import { calculateFinanceTerm } from './term';
 import { calculateHousingSupport } from './support';
 import { calculateDSR } from './dsr';
 import { calculateMargin } from './margin';
-import { calculatePersonalFinance } from './personal-finance';
+import { calculatePersonalFinance, getPersonalFinanceRule } from './personal-finance';
 import { calculateRealEstateFinance } from './real-estate-finance';
 import { runDiagnostics } from './diagnostics';
 import { 
@@ -484,11 +484,196 @@ export function calculateBanksFinancing(params: {
     const correctedPensionSalary = pensionCalculation.pensionSalary;
     const pensionDiagnostic = pensionCalculation.diagnostic;
 
+    if (isPersonalOnly) {
+      // 1. Check if bank supports personal finance
+      const bankSupportsPersonal = bank.personalFinanceEnabled !== false;
+      const isProductSupported = isProductEnabledForBank(bank, normalizedProductId, products);
+
+      // Check if we have an active personal rule
+      const customerStatus: 'active' | 'retired' = sectorId === 'retired' ? 'retired' : 'active';
+      const personalRule = getPersonalFinanceRule({
+        bankId: bank.id,
+        pathType: 'personal_only',
+        customerStatus: sectorId === 'retired' ? 'retired' : 'active_employee',
+        rules: personalRules
+      });
+
+      let status: 'approved' | 'rejected' | 'warning' = 'approved';
+      const messages: string[] = [];
+      const calculationSteps: string[] = [
+        'الخطوة 1: التحقق من قبول المنتج للتمويل الشخصي واشتراطات البنك الرئيسية.'
+      ];
+
+      // Validate eligibility and build clear refusal messages
+      if (!bankSupportsPersonal) {
+        status = 'rejected';
+        messages.push('التمويل الشخصي غير متوفر لدى هذه الجهة التمويلية.');
+      } else if (!isProductSupported) {
+        status = 'rejected';
+        messages.push('المنتج المطلوب (تمويل شخصي فقط) غير مفعّل لدى هذه الجهة.');
+      } else if (!personalRule || !personalRule.isActive) {
+        status = 'rejected';
+        messages.push('الهامش غير مهيأ لهذه الجهة التمويلية (البنك والمنتج ونوع الدعم والراتب) في لوحة التحكم.');
+        messages.unshift('لا يوجد عقد تمويل شخصي مفعّل في الإعدادات لهذا البنك وحالة العميل.');
+      } else {
+        calculationSteps.push('الخطوة 2: فحص شروط الدخل والسن لعقد التمويل الشخصي ومطابقتها للمدخلات.');
+        // If contract is active, check min salary
+        const minSalary = Number(personalRule.minSalary) || 0;
+        const maxSalary = personalRule.maxSalary !== undefined ? Number(personalRule.maxSalary) : undefined;
+        if (solvedNetSalary < minSalary) {
+          status = 'rejected';
+          messages.push(`تم رفض الطلب: صافي الراتب (${solvedNetSalary.toLocaleString('ar-SA')} ريال) أقل من الحد الأدنى المقبول للتمويل الشخصي لدى ${bank.nameAr} والمقدر بـ ${minSalary.toLocaleString('ar-SA')} ريال.`);
+        } else if (maxSalary !== undefined && maxSalary > 0 && solvedNetSalary > maxSalary) {
+          status = 'rejected';
+          messages.push(`تم رفض الطلب: صافي الراتب (${solvedNetSalary.toLocaleString('ar-SA')} ريال) أعلى من الحد الأقصى المقبول للتمويل الشخصي لدى ${bank.nameAr} والمقدر بـ ${maxSalary.toLocaleString('ar-SA')} ريال.`);
+        }
+
+        // Check age constraints from the rule
+        const minAge = Number(personalRule.minAge) || 18;
+        const maxAge = Number(personalRule.maxAge) || (customerStatus === 'retired' ? 75 : 65);
+        if (currentAgeYears < minAge) {
+          status = 'rejected';
+          messages.push(`تم رفض الطلب: عمر العميل (${currentAgeYears} سنة) أقل من الحد الأدنى المقبول للتمويل الشخصي لدى ${bank.nameAr} والبالغ ${minAge} سنة.`);
+        } else if (currentAgeYears >= maxAge) {
+          status = 'rejected';
+          messages.push(`تم رفض الطلب: عمر العميل (${currentAgeYears} سنة) يتجاوز الحد الأقصى المقبول للتمويل الشخصي لدى ${bank.nameAr} والبالغ ${maxAge} سنة.`);
+        }
+      }
+
+      let personalLoanAmount = 0;
+      let personalInstallment = 0;
+      let personalMonths = 0;
+      let personalRepayment = 0;
+      let personalProfit = 0;
+      let personalCalcResult: any = null;
+
+      if (status !== 'rejected' && personalRule) {
+        calculationSteps.push('الخطوة 3: احتساب قسط ومبلغ السداد وعوائد التمويل الشخصي.');
+        const maxAge = Number(personalRule.maxAge) || (customerStatus === 'retired' ? 75 : 65);
+        
+        const currentAgeMonths = ageInGregorianMonths;
+        const maxAgeAtEndMonths = maxAge * 12;
+        const remainingMonthsToMaxAge = Math.max(0, maxAgeAtEndMonths - currentAgeMonths);
+        const monthsBeforeRetirement = Math.max(0, Math.round(retirementAge * 12) - currentAgeMonths);
+
+        const personalCalc = calculatePersonalFinance({
+          netSalary: solvedNetSalary,
+          obligations,
+          sectorId,
+          bankId: bank.id,
+          rules: personalRules,
+          productId: normalizedProductId,
+          monthsBeforeRetirement,
+          remainingMonthsToMaxAge
+        });
+
+        personalCalcResult = personalCalc;
+        personalLoanAmount = personalCalc.personalFinanceAmount;
+        personalInstallment = personalCalc.monthlyInstallment;
+        personalMonths = personalCalc.termMonths;
+        personalRepayment = personalCalc.totalRepayment;
+        personalProfit = personalCalc.profitAmount;
+
+        const maxPF = bank.maxPersonalAmount !== undefined ? bank.maxPersonalAmount : 2000000;
+        const minPF = bank.minPersonalAmount !== undefined ? bank.minPersonalAmount : 10000;
+
+        if (personalLoanAmount > maxPF) {
+          const pRatio = maxPF / personalLoanAmount;
+          personalLoanAmount = maxPF;
+          personalInstallment = Math.round(personalInstallment * pRatio);
+          personalRepayment = personalInstallment * personalMonths;
+          personalProfit = personalRepayment - personalLoanAmount;
+        }
+
+        if (personalLoanAmount < minPF) {
+          status = 'rejected';
+          messages.unshift(`مرفوض — الحد الأدنى للتمويل ${minPF.toLocaleString('ar-SA')} ريال`);
+        } else if (personalInstallment <= 0) {
+          status = 'rejected';
+          messages.unshift('مرفوض — القسط الشهري المتاح للتمويل بعد الالتزامات صفر أو أقل.');
+        } else {
+          if (personalMonths < 1) {
+            status = 'rejected';
+            messages.unshift('مرفوض — لا يمكن منح تمويل لشهر واحد أو أقل بناءً على السن الأقصى وعمر العميل.');
+          }
+        }
+      }
+
+      const isEligible = status !== 'rejected';
+
+      if (isEligible && personalRule) {
+        messages.push(`تم قبول العميل مبدئيًا لدى ${bank.nameAr} لتمويل شخصي بقيمة ${personalLoanAmount.toLocaleString('ar-SA')} ريال على مدة ${personalMonths} شهر وبقسط شهري ${personalInstallment.toLocaleString('ar-SA')} ريال.`);
+        calculationSteps.push('النتيجة النهائية: تمت الموافقة ومطابقة جميع المعايير بنجاح.');
+      } else {
+        calculationSteps.push('النتيجة النهائية: العميل غير مؤهل لعدم استيفاء شروط القبول للتمويل الشخصي.');
+      }
+
+      results.push({
+        bankId: bank.id,
+        bankName: bank.nameAr,
+        logoColor: bank.logoColor,
+        logoText: bank.logoText,
+        status: status,
+        isEligible,
+        realEstateAmount: 0,
+        personalAmount: isEligible ? personalLoanAmount : 0,
+        housingSupportAmount: 0,
+        supportType: 'none',
+        totalPurchasingPower: isEligible ? personalLoanAmount : 0,
+        etizazAmount: 0,
+        monthlyInstallmentBeforeRetirement: isEligible ? personalInstallment : 0,
+        monthlyInstallmentAfterRetirement: 0,
+        monthlyInstallmentAfterPersonal: 0,
+        personalInstallmentAmount: isEligible ? personalInstallment : 0,
+        realEstateInstallmentOnly: 0,
+        termMonths: isEligible ? personalMonths : 0,
+        annualMargin: isEligible && personalCalcResult
+          ? (personalCalcResult.diagnostics?.flatRate ?? 4.8)
+          : (personalRule ? Number(personalRule.annualMargin) : 4.8),
+        dsrUsed: isEligible && personalCalcResult
+          ? (personalCalcResult.diagnostics?.dsr ?? (sectorId === 'retired' ? 25 : 33.33))
+          : (personalRule ? Number(personalRule.dsrPercentage) : 33.33),
+        personalCoefficient: isEligible && personalCalcResult ? personalCalcResult.multiplier : undefined,
+        personalTotalRepayment: isEligible && personalCalcResult ? personalCalcResult.totalRepayment : undefined,
+        personalProfitAmount: isEligible && personalCalcResult ? personalCalcResult.profitAmount : undefined,
+        personalCalculationMethod: isEligible && personalCalcResult ? personalCalcResult.calculationMethod : undefined,
+        personalDiagnostics: isEligible && personalCalcResult ? personalCalcResult.diagnostics : undefined,
+        rejectionReason: !isEligible ? (messages[0] || 'العميل غير مؤهل للتمويل الشخصي') : undefined,
+        netSalary: solvedNetSalary,
+        retirementAge: Math.round(displayRetirementAge),
+        pensionSalary: Math.round(correctedPensionSalary || 0),
+        pensionDiagnostic,
+        existingMonthlyObligations: 0,
+        obligationRemainingMonths: 0,
+        realEstateStage1: 0,
+        totalCustomerStage1: isEligible ? personalInstallment : 0,
+        realEstateStage2: 0,
+        realEstateStage3: 0,
+        stage1Months: 0,
+        stage2Months: 0,
+        stage3Months: 0,
+        diagnosticMessages: messages,
+        isAgeLimitingFactor: isEligible && personalMonths < (personalRule ? Number(personalRule.termMonths) : 60),
+        personalEligible: isEligible && bankSupportsPersonal,
+        supportsPersonal: bankSupportsPersonal,
+        diagnosticSteps: [
+          `[المنتج]: تمويل شخصي فقط.`,
+          `[تفاصيل السن]: العمر الحالي: ${currentAgeYears} سنة | القطاع: ${sectorId === 'retired' ? 'متقاعد' : 'موظف'}.`,
+          `[تفاصيل الراتب والخصومات]: صافي الراتب: ${solvedNetSalary.toLocaleString('ar-SA')} ريال | الالتزامات المدخلة: ${obligations.toLocaleString('ar-SA')} ريال.`,
+          ...(personalRule ? [
+            `[قوانين العقد]: نسبة الاستقطاع (DSR): ${personalRule.dsrPercentage}% | مدة التمويل المتاحة: ${personalRule.termMonths} شهر.`,
+            `[معلومات الاحتساب]: نوع المعادلة: ${personalRule.calculationMethod === 'pmt' ? 'القسط التناقصي (PMT)' : personalRule.calculationMethod === 'multiplier' ? 'المعامل المضاعف (Multiplier)' : 'النسبة الثابتة (Flat Rate)'}.`,
+            `[الهامش المالي]: ${personalRule.calculationMethod === 'multiplier' ? `معامل التخصيص: ${personalRule.financeCoefficient}` : `الهامش السنوي: ${personalRule.annualMargin}%`}`
+          ] : []),
+          ...calculationSteps
+        ]
+      });
+
+      continue;
+    }
+
     // 3. Obtain bank product acceptance criteria
-    const acceptanceProductId =
-      normalizedProductId === 'personal_only' || normalizedProductId === 'personal'
-        ? 'personal_only'
-        : 'real_estate_only';
+    const acceptanceProductId = 'real_estate_only';
 
     const acceptance = products.find(p =>
       p.bankId === bank.id &&
@@ -612,7 +797,7 @@ export function calculateBanksFinancing(params: {
 
     const bankSupportsPersonal = bank.personalFinanceEnabled !== false;
 
-    if (normalizedProductId === 'personal' || normalizedProductId === 'personal_only' || normalizedProductId === 'both' || normalizedProductId === 'real_estate_with_new_personal') {
+    if (normalizedProductId === 'both' || normalizedProductId === 'real_estate_with_new_personal') {
       if (bankSupportsPersonal) {
         const personalObls = obligations;
         const personalCalc = calculatePersonalFinance({
@@ -805,8 +990,6 @@ export function calculateBanksFinancing(params: {
       personalInstallment = Math.round(personalInstallment * pRatio);
       if (normalizedProductId === 'both' || normalizedProductId === 'real_estate_with_new_personal') {
         totalInstallmentStage1 = installmentBefore + personalInstallment;
-      } else if (normalizedProductId === 'personal' || normalizedProductId === 'personal_only') {
-        totalInstallmentStage1 = personalInstallment;
       }
       personalInstallmentDisplay = personalInstallment;
     }
