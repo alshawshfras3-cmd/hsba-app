@@ -366,6 +366,24 @@ export function calculateBanksFinancing(params: {
 
   const normalizedProductId = normalizeProductId(productId);
 
+  const isPersonalOnly =
+    normalizedProductId === 'personal' ||
+    normalizedProductId === 'personal_only';
+
+  const hasRealEstate =
+    normalizedProductId === 'real_estate' ||
+    normalizedProductId === 'real_estate_only' ||
+    normalizedProductId === 'both' ||
+    normalizedProductId === 'real_estate_with_new_personal' ||
+    normalizedProductId === 'real_estate_with_existing_personal' ||
+    normalizedProductId === 'real_estate_with_personal_existing';
+
+  const hasPersonal =
+    normalizedProductId === 'personal' ||
+    normalizedProductId === 'personal_only' ||
+    normalizedProductId === 'both' ||
+    normalizedProductId === 'real_estate_with_new_personal';
+
   const effectiveSectorId = sectorId;
 
   const isMilitarySector = (sectorId as string) === 'military';
@@ -557,15 +575,18 @@ export function calculateBanksFinancing(params: {
     });
 
     // 7. Calculate interest margins using interpolation
-    const marginResult = calculateMargin({
-      bankId: bank.id,
-      productId: normalizedProductId,
-      supportType,
-      sectorId,
-      termMonths: termResult.totalMonths,
-      marginRules,
-      netSalary: solvedNetSalary
-    });
+    let marginResult: any = null;
+    if (hasRealEstate) {
+      marginResult = calculateMargin({
+        bankId: bank.id,
+        productId: normalizedProductId,
+        supportType,
+        sectorId,
+        termMonths: termResult.totalMonths,
+        marginRules,
+        netSalary: solvedNetSalary
+      });
+    }
 
     // 8. Personal loan calculation (if applicable)
     let personalLoanAmount = 0;
@@ -747,9 +768,6 @@ export function calculateBanksFinancing(params: {
     const minPF = bank.minPersonalAmount !== undefined ? bank.minPersonalAmount : 10000;
     const maxPF = bank.maxPersonalAmount !== undefined ? bank.maxPersonalAmount : 2000000;
 
-    const hasRealEstate = (normalizedProductId === 'real_estate' || normalizedProductId === 'real_estate_only' || normalizedProductId === 'both' || normalizedProductId === 'real_estate_with_new_personal' || normalizedProductId === 'real_estate_with_existing_personal' || normalizedProductId === 'real_estate_with_personal_existing');
-    const hasPersonal = (normalizedProductId === 'personal' || normalizedProductId === 'personal_only' || normalizedProductId === 'both' || normalizedProductId === 'real_estate_with_new_personal');
-
     if (hasRealEstate && reLoanAmount > maxRE) {
       const ratio = maxRE / reLoanAmount;
       reLoanAmount = maxRE;
@@ -803,12 +821,11 @@ export function calculateBanksFinancing(params: {
       diag.messages.unshift(`[خطأ استقطاع DSR]: ${dsrError}`);
     }
 
-    if (marginResult?.error) {
+    if (hasRealEstate && marginResult?.error) {
       diag.status = 'rejected';
       diag.messages.unshift(marginResult.error);
     }
 
-    const isPersonalOnly = normalizedProductId === 'personal' || normalizedProductId === 'personal_only';
     if (isPersonalOnly && personalCalcResult?.diagnostics?.error) {
       diag.status = 'rejected';
       diag.messages.unshift(personalCalcResult.diagnostics.error);
@@ -877,7 +894,7 @@ export function calculateBanksFinancing(params: {
       termMonths: isPersonalOnly ? personalMonths : termResult.totalMonths,
       annualMargin: isPersonalOnly
         ? (personalCalcResult?.diagnostics?.flatRate ?? 4.8)
-        : marginResult.annualMargin,
+        : (marginResult?.annualMargin || 0),
       dsrUsed: isPersonalOnly
         ? (personalCalcResult?.diagnostics?.dsr ?? (sectorId === 'retired' ? 25 : 33.33))
         : dsrBeforeResult.dsrPercentage,
