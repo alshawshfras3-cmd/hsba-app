@@ -1,5 +1,19 @@
 import { MarginOutput, ProductId, SupportType, SectorId, MarginRule } from '../../types';
 
+export const getRuleInputMode = (r: MarginRule): 'yearly' | 'key_points' | 'duration_tiers' => {
+  if (r.marginInputMode) return r.marginInputMode;
+  if (r.fromMonth !== undefined || r.toMonth !== undefined) return 'duration_tiers';
+  const y = r.year || (r.toTermMonths ? r.toTermMonths / 12 : undefined);
+  if (y !== undefined) {
+    if ([5, 10, 15, 20, 25, 30].includes(y)) {
+      return 'key_points';
+    } else if (y >= 5 && y <= 30) {
+      return 'yearly';
+    }
+  }
+  return 'key_points';
+};
+
 export function calculateMargin(params: {
   bankId: string;
   productId: ProductId;
@@ -126,12 +140,25 @@ export function calculateMargin(params: {
   let marginType: 'fixed' | 'linear' = 'fixed';
   let annualMarginError: string | undefined = undefined;
 
-  // Find if there is a specified marginInputMode in the matched rules
-  const activeInputModeRule = rules.find(r => r.marginInputMode);
-  const activeInputMode: 'yearly' | 'key_points' | 'duration_tiers' = activeInputModeRule ? activeInputModeRule.marginInputMode as any : 'key_points';
+  // Find the active input mode
+  let activeInputMode: 'duration_tiers' | 'yearly' | 'key_points' = 'key_points';
+  const hasDurationTiers = rules.some(r => getRuleInputMode(r) === 'duration_tiers');
+  const hasYearly = rules.some(r => getRuleInputMode(r) === 'yearly');
+  const hasKeyPoints = rules.some(r => getRuleInputMode(r) === 'key_points');
+
+  if (hasDurationTiers) {
+    activeInputMode = 'duration_tiers';
+  } else if (hasYearly) {
+    activeInputMode = 'yearly';
+  } else if (hasKeyPoints) {
+    activeInputMode = 'key_points';
+  }
+
+  // Filter rules array to ONLY contain rules of this activeInputMode to prevent any mixing!
+  rules = rules.filter(r => getRuleInputMode(r) === activeInputMode);
 
   if (activeInputMode === 'duration_tiers') {
-    const tierRules = rules.filter(r => r.marginInputMode === 'duration_tiers' && r.fromMonth !== undefined && r.toMonth !== undefined);
+    const tierRules = rules.filter(r => getRuleInputMode(r) === 'duration_tiers' && r.fromMonth !== undefined && r.toMonth !== undefined);
     const matchedTier = tierRules.find(r => termMonths >= r.fromMonth! && termMonths <= r.toMonth!);
     if (matchedTier) {
       annualMargin = matchedTier.marginRate ?? 0;

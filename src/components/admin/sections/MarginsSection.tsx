@@ -9,6 +9,20 @@ function toEnglishDigits(str: string): string {
     .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776));
 }
 
+export const getRuleInputMode = (r: MarginRule): 'yearly' | 'key_points' | 'duration_tiers' => {
+  if (r.marginInputMode) return r.marginInputMode;
+  if (r.fromMonth !== undefined || r.toMonth !== undefined) return 'duration_tiers';
+  const y = r.year || (r.toTermMonths ? r.toTermMonths / 12 : undefined);
+  if (y !== undefined) {
+    if ([5, 10, 15, 20, 25, 30].includes(y)) {
+      return 'key_points';
+    } else if (y >= 5 && y <= 30) {
+      return 'yearly';
+    }
+  }
+  return 'key_points';
+};
+
 interface MarginsSectionProps {
   banks: Bank[];
   marginRules: MarginRule[];
@@ -146,11 +160,14 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       relevantRules = baseFiltered.filter(r => !r.salaryTier || r.salaryTier === 'not_applicable');
     }
 
+    // Filter relevantRules strictly by our active/selected selectedYearsMode
+    const modeRules = relevantRules.filter(r => getRuleInputMode(r) === selectedYearsMode);
+
     const yearsListFull = Array.from({ length: 26 }, (_, i) => 5 + i);
     const initialMargins: Record<number, string> = {};
 
     yearsListFull.forEach(year => {
-      const rY = relevantRules.find(r => r.year === year || r.toTermMonths === year * 12);
+      const rY = modeRules.find(r => r.year === year || r.toTermMonths === year * 12);
       if (rY) {
         initialMargins[year] = (rY.annualMargin !== undefined ? rY.annualMargin : (rY.baseMargin !== undefined ? Number((rY.baseMargin * 100).toFixed(3)) : rY.endMargin)).toString();
       } else {
@@ -159,27 +176,13 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     });
 
     let method: 'linear' | 'fixed' = 'fixed';
-    const foundMethodRule = relevantRules.find(r => r.calculationMethod || r.calcType);
+    const foundMethodRule = modeRules.find(r => r.calculationMethod || r.calcType);
     if (foundMethodRule) {
       method = (foundMethodRule.calculationMethod || foundMethodRule.calcType) as any;
     }
 
-    let inputMode: 'yearly' | 'key_points' | 'duration_tiers' = 'key_points';
-    const foundInputModeRule = relevantRules.find(r => r.marginInputMode);
-    if (foundInputModeRule) {
-      inputMode = foundInputModeRule.marginInputMode as any;
-    } else {
-      const hasIntermediate = relevantRules.some(r => {
-        const y = r.year || (r.toTermMonths / 12);
-        return y !== undefined && ![5, 10, 15, 20, 25, 30].includes(y);
-      });
-      if (hasIntermediate) {
-        inputMode = 'yearly';
-      }
-    }
-
     // Synchronize duration tiers
-    const tierRules = relevantRules.filter(r => r.marginInputMode === 'duration_tiers');
+    const tierRules = modeRules.filter(r => getRuleInputMode(r) === 'duration_tiers');
     const initialTiers = tierRules.map((r, idx) => ({
       id: r.id || `tier_${idx}_${Date.now()}`,
       fromMonth: r.fromMonth ?? r.fromTermMonths ?? 0,
@@ -193,7 +196,6 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
 
     setLocalMargins(initialMargins);
     setSelectedCalcMethod(method);
-    setSelectedYearsMode(inputMode);
 
     // Synchronize sector exceptions (bank level only)
     const initialExceptions: Record<string, string> = {};
@@ -208,7 +210,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     setLocalSectorExceptions(initialExceptions);
     setIsLoaded(true);
 
-  }, [selectedBank, selectedProduct, selectedSupport, selectedSalaryTier, selectedSector, marginRules]);
+  }, [selectedBank, selectedProduct, selectedSupport, selectedSalaryTier, selectedSector, selectedYearsMode, marginRules]);
 
   // Database updater to match exact core rules compatibility
   const updateGlobalRulesForCombo = (
@@ -227,17 +229,22 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     const remainingRules = marginRules.filter(r => {
       const normalizedSupportType = (r.supportType === 'down_payment' || r.supportType === 'downpayment') ? 'downpayment' : r.supportType;
       
-      const isBaseForCombo = r.bankId === targetBank &&
-                             r.productId === targetProduct &&
-                             normalizedSupportType === normSupport &&
-                             (r.sectorId === targetSector) &&
-                             (r.salaryTier === targetSalaryTier || (!r.salaryTier && targetSalaryTier === 'not_applicable')) &&
-                             !r.isExceptionOnly;
+      const isBaseComboMatch = r.bankId === targetBank &&
+                               r.productId === targetProduct &&
+                               normalizedSupportType === normSupport &&
+                               (r.sectorId === targetSector) &&
+                               (r.salaryTier === targetSalaryTier || (!r.salaryTier && targetSalaryTier === 'not_applicable')) &&
+                               !r.isExceptionOnly;
+
+      if (isBaseComboMatch) {
+        // Only exclude (delete) if the rule has the same inputMode
+        return getRuleInputMode(r) !== inputMode;
+      }
 
       const isExceptionForCombo = r.bankId === targetBank &&
                                   r.isExceptionOnly === true;
 
-      return !isBaseForCombo && !isExceptionForCombo;
+      return !isExceptionForCombo;
     });
 
     const newRulesForThisCombo: MarginRule[] = [];
@@ -383,6 +390,45 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
   // Main save action for basic margins + exceptions
   const handleSaveConfig = () => {
     try {
+      if (selectedYearsMode === 'duration_tiers') {
+        // Validate duration tiers
+        const parsedTiers = localTiers.map(t => ({
+          ...t,
+          fromNum: t.fromMonth === '' ? NaN : Number(t.fromMonth),
+          toNum: t.toMonth === '' ? NaN : Number(t.toMonth),
+          rateNum: t.marginRate === '' ? NaN : Number(t.marginRate)
+        }));
+
+        for (let i = 0; i < parsedTiers.length; i++) {
+          const t = parsedTiers[i];
+          if (isNaN(t.fromNum)) {
+            showToast('خطأ: حقل "من شهر" يجب أن يكون رقماً صالحاً.', 'refuse');
+            return;
+          }
+          if (isNaN(t.toNum)) {
+            showToast('خطأ: حقل "إلى شهر" يجب أن يكون رقماً صالحاً.', 'refuse');
+            return;
+          }
+          if (t.toNum < t.fromNum) {
+            showToast(`خطأ: شريحة غير صالحة (${t.fromMonth} إلى ${t.toMonth}). يجب أن يكون "إلى شهر" أكبر من أو يساوي "من شهر".`, 'refuse');
+            return;
+          }
+          if (isNaN(t.rateNum) || t.rateNum <= 0) {
+            showToast('خطأ: معدل الهامش يجب أن يكون رقماً عشرياً أكبر من الصفر.', 'refuse');
+            return;
+          }
+        }
+
+        // Overlap verification among active tiers
+        const activeTiers = parsedTiers.filter(t => t.active !== false).sort((a, b) => a.fromNum - b.fromNum);
+        for (let i = 1; i < activeTiers.length; i++) {
+          if (activeTiers[i].fromNum <= activeTiers[i-1].toNum) {
+            showToast(`خطأ: يوجد تداخل بين الشرائح (${activeTiers[i-1].fromNum} إلى ${activeTiers[i-1].toNum}) و (${activeTiers[i].fromNum} إلى ${activeTiers[i].toNum}).`, 'refuse');
+            return;
+          }
+        }
+      }
+
       updateGlobalRulesForCombo(
         selectedBank,
         selectedProduct,
