@@ -32,22 +32,6 @@ export default function DsrSection({
   const missingRules = getMissingDsrRulesList(banks, dsrRules);
   const hasMissing = missingRules.length > 0;
 
-  const handleAddMissingFromTemplate = () => {
-    const newlyAddedRules: DsrRule[] = missingRules.map((m, idx) => ({
-      id: `dsr_rule_gen_${Date.now()}_${idx}_${Math.random().toString(36).substr(2, 5)}`,
-      bankId: m.bankId,
-      productType: m.productType as any,
-      supportType: m.supportType as any,
-      customerStage: m.customerStage as any,
-      dsrPercent: getTemplateDsrPercent(m.productType, m.supportType, m.customerStage),
-      deductExistingObligations: true,
-      active: true
-    }));
-
-    setDsrRules(prev => [...prev, ...newlyAddedRules]);
-    showToast(`تمت إضافة ${newlyAddedRules.length} من القواعد الناقصة بنجاح! يرجى مراجعتها وتأكيد حفظ الإعدادات بالأسفل لاعتمادها بشكل دائم.`, 'success');
-  };
-
   const [filterDsrBank, setFilterDsrBank] = useState<string>('rajhi');
   const [filterDsrProduct, setFilterDsrProduct] = useState<string>('all');
   const [filterDsrSupport, setFilterDsrSupport] = useState<string>('all');
@@ -59,8 +43,8 @@ export default function DsrSection({
 
   // Form states for adding/editing a DSR Rule
   const [formDsrBankId, setFormDsrBankId] = useState<string>('rajhi');
-  const [formDsrProductType, setFormDsrProductType] = useState<'real_estate_only' | 'real_estate_with_new_personal' | 'real_estate_with_existing_personal' | 'personal_only'>('real_estate_only');
-  const [formDsrSupportType, setFormDsrSupportType] = useState<'none' | 'monthly' | 'downpayment' | 'not_applicable'>('none');
+  const [formDsrProductType, setFormDsrProductType] = useState<'real_estate_only' | 'real_estate_with_new_personal' | 'real_estate_with_existing_personal'>('real_estate_only');
+  const [formDsrSupportType, setFormDsrSupportType] = useState<'none' | 'monthly' | 'downpayment'>('none');
   const [formDsrCustomerStage, setFormDsrCustomerStage] = useState<'active_before_retirement' | 'retired_after_retirement'>('active_before_retirement');
   const [formDsrPercentStr, setFormDsrPercentStr] = useState<string>('');
   const [formDsrDeductExisting, setFormDsrDeductExisting] = useState<boolean>(true);
@@ -72,8 +56,7 @@ export default function DsrSection({
   const DSR_SUPPORT_TYPES = [
     { id: 'none', nameAr: 'غير مدعوم' },
     { id: 'monthly', nameAr: 'دعم شهري' },
-    { id: 'downpayment', nameAr: 'دعم دفعة' },
-    { id: 'not_applicable', nameAr: 'غير مطبق' }
+    { id: 'downpayment', nameAr: 'دعم دفعة' }
   ];
 
   const DSR_CUSTOMER_STAGES = [
@@ -86,7 +69,6 @@ export default function DsrSection({
       case 'real_estate_only': return 'عقاري فقط';
       case 'real_estate_with_new_personal': return 'عقاري + شخصي جديد';
       case 'real_estate_with_existing_personal': return 'عقاري مع شخصي قائم';
-      case 'personal_only': return 'شخصي فقط';
       default: return type;
     }
   };
@@ -107,8 +89,8 @@ export default function DsrSection({
   const handleOpenEditDsrModal = (rule: DsrRule) => {
     setEditingDsrRule(rule);
     setFormDsrBankId(rule.bankId);
-    setFormDsrProductType(rule.productType || 'real_estate_only');
-    setFormDsrSupportType(rule.supportType as any);
+    setFormDsrProductType((rule.productType || 'real_estate_only') as any);
+    setFormDsrSupportType((rule.supportType || 'none') as any);
     setFormDsrCustomerStage(rule.customerStage);
     setFormDsrPercentStr(String(rule.dsrPercent));
     setFormDsrDeductExisting(rule.deductExistingObligations);
@@ -153,7 +135,7 @@ export default function DsrSection({
     }
 
     const finalProductType = formDsrProductType || 'real_estate_only';
-    const finalSupportType = finalProductType === 'personal_only' ? 'not_applicable' : formDsrSupportType;
+    const finalSupportType = formDsrSupportType || 'none';
     const ruleId = editingDsrRule ? editingDsrRule.id : `dsr_rule_${Date.now()}`;
 
     // Validate that no active duplicate will exist
@@ -175,8 +157,8 @@ export default function DsrSection({
     const newRule: DsrRule = {
       id: ruleId,
       bankId: formDsrBankId,
-      productType: finalProductType,
-      supportType: finalSupportType,
+      productType: finalProductType as any,
+      supportType: finalSupportType as any,
       customerStage: formDsrCustomerStage,
       dsrPercent: val,
       deductExistingObligations: formDsrDeductExisting,
@@ -212,23 +194,16 @@ export default function DsrSection({
       </div>
 
       {hasMissing && (
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4 font-sans text-right" id="missing-dsr-rules-banner">
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 shadow-xs flex flex-row items-center justify-between gap-4 font-sans text-right" id="missing-dsr-rules-banner">
           <div className="flex items-start gap-3">
             <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
             <div>
               <h4 className="text-sm font-extrabold text-amber-900">توجد قواعد DSR ناقصة لهذا المنتج/الدعم/المرحلة</h4>
-              <p className="text-xs text-amber-705 mt-1.5 leading-relaxed">
-                توجد {missingRules.length} قاعدة (قواعد) استقطاع DSR غير معرفة في لوحة التحكم لبعض المنتجات أو الجهات التمويلية. عدم وجود هذه القواعد يعطل دقة محاكاة الحساب الائتماني. يمكنك إضافة القواعد الناقصة تلقائياً بنسبة استقطاع افتراضية ثم حفظ الإعدادات.
+              <p className="text-xs text-[#78350F] mt-1.5 leading-relaxed">
+                توجد {missingRules.length} قاعدة (قواعد) استقطاع DSR غير معرفة في لوحة التحكم لبعض المنتجات أو الجهات التمويلية. عدم وجود هذه القواعد قد يؤثر على دقة محاكاة الحساب الائتماني.
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={handleAddMissingFromTemplate}
-            className="px-4.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer whitespace-nowrap self-start md:self-center font-sans border-0 outline-none"
-          >
-            إضافة القواعد الناقصة من القالب
-          </button>
         </div>
       )}
 
@@ -297,7 +272,6 @@ export default function DsrSection({
             <option value="real_estate_only">عقاري فقط</option>
             <option value="real_estate_with_new_personal">عقاري + شخصي جديد</option>
             <option value="real_estate_with_existing_personal">عقاري مع شخصي قائم</option>
-            <option value="personal_only">شخصي فقط</option>
           </select>
         </div>
 
@@ -476,27 +450,6 @@ export default function DsrSection({
             </div>
 
             <div className="px-6 py-6 space-y-4 max-h-[70vh] overflow-y-auto">
-              {formDsrError && (
-                <div className="bg-red-50 text-red-700 text-xs px-4 py-3 rounded-2xl border border-red-100 font-semibold text-right">
-                  ⚠️ {formDsrError}
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Bank Select */}
-                <div className="space-y-1.5 text-right">
-                  <label className="block text-xs font-bold text-gray-600">البنك:</label>
-                  <select
-                    value={formDsrBankId}
-                    onChange={(e) => setFormDsrBankId(e.target.value)}
-                    className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 focus:outline-none outline-none"
-                  >
-                    {DSR_BANKS.map(b => (
-                      <option key={b.id} value={b.id}>{b.nameAr}</option>
-                    ))}
-                  </select>
-                </div>
-
                 {/* Product Type Select */}
                 <div className="space-y-1.5 text-right">
                   <label className="block text-xs font-bold text-gray-600">المنتج والتمويل:</label>
@@ -505,43 +458,28 @@ export default function DsrSection({
                     onChange={(e) => {
                       const selectedProd = e.target.value as any;
                       setFormDsrProductType(selectedProd);
-                      if (selectedProd === 'personal_only') {
-                        setFormDsrSupportType('not_applicable');
-                      } else if (formDsrSupportType === 'not_applicable') {
-                        setFormDsrSupportType('none');
-                      }
                     }}
                     className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 focus:outline-none outline-none"
                   >
                     <option value="real_estate_only">عقاري فقط</option>
                     <option value="real_estate_with_new_personal">عقاري + شخصي جديد</option>
                     <option value="real_estate_with_existing_personal">عقاري مع شخصي قائم</option>
-                    <option value="personal_only">شخصي فقط</option>
                   </select>
                 </div>
 
                 {/* Support Type Select */}
-                {formDsrProductType !== 'personal_only' ? (
-                  <div className="space-y-1.5 text-right font-sans">
-                    <label className="block text-xs font-bold text-gray-600">نوع الدعم السكني:</label>
-                    <select
-                      value={formDsrSupportType}
-                      onChange={(e) => setFormDsrSupportType(e.target.value as any)}
-                      className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 focus:outline-none outline-none"
-                    >
-                      {DSR_SUPPORT_TYPES.filter(s => s.id !== 'not_applicable').map(s => (
-                        <option key={s.id} value={s.id}>{s.nameAr}</option>
-                      ))}
-                    </select>
-                  </div>
-                ) : (
-                  <div className="space-y-1.5 text-right font-sans opacity-50">
-                    <label className="block text-xs font-bold text-gray-400">نوع الدعم السكني:</label>
-                    <div className="w-full bg-slate-100 border border-gray-250 rounded-xl px-3 py-2.5 text-xs text-gray-500 font-semibold mb-1">
-                      غير مطبق (تمويل شخصي فقط)
-                    </div>
-                  </div>
-                )}
+                <div className="space-y-1.5 text-right font-sans">
+                  <label className="block text-xs font-bold text-gray-600">نوع الدعم السكني:</label>
+                  <select
+                    value={formDsrSupportType}
+                    onChange={(e) => setFormDsrSupportType(e.target.value as any)}
+                    className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 focus:outline-none outline-none"
+                  >
+                    {DSR_SUPPORT_TYPES.map(s => (
+                      <option key={s.id} value={s.id}>{s.nameAr}</option>
+                    ))}
+                  </select>
+                </div>
 
                 {/* Customer Stage Select */}
                 <div className="space-y-1.5 text-right flex flex-col justify-end">
@@ -617,7 +555,6 @@ export default function DsrSection({
                   </div>
                 </div>
               </div>
-            </div>
 
             <div className="bg-gray-50 px-6 py-4 flex flex-row-reverse gap-3 border-t border-gray-100 font-bold text-xs">
               <button
