@@ -589,7 +589,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         pensionRules: settings.pension_rules || initialData.pensionRules,
         termRules: settings.term_rules || initialData.termRules,
         marginRules: upgradeMarginRules(settings.margin_rules || []),
-        dsrRules: normalizeDsrRules(settings.dsr_rules || initialData.dsrRules),
+        dsrRules: normalizeDsrRules(
+          (settings.dsrRules !== undefined && settings.dsrRules !== null)
+            ? settings.dsrRules
+            : ((settings.dsr_rules !== undefined && settings.dsr_rules !== null)
+              ? settings.dsr_rules
+              : initialData.dsrRules)
+        ),
         supportSettings: settings.support_settings || initialData.supportSettings,
         housingSupportTiers: housingSupportTiers.length > 0 ? housingSupportTiers : initialData.housingSupportTiers,
         advancePaymentTiers: advancePaymentTiers.length > 0 ? advancePaymentTiers : initialData.advancePaymentTiers,

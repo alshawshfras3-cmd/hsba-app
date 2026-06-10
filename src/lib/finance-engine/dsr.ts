@@ -47,7 +47,7 @@ export function getDsrRule(params: {
          r.productType === productType &&
          r.supportType === supportType &&
          r.customerStage === customerStage &&
-         r.active
+         r.active !== false
   );
 
   if (bankMatches.length > 1) {
@@ -65,7 +65,7 @@ export function getDsrRule(params: {
            r.productType === productType &&
            r.supportType === supportType &&
            r.customerStage === customerStage &&
-           r.active
+           r.active !== false
     );
 
     if (defaultMatches.length > 1) {
@@ -77,10 +77,34 @@ export function getDsrRule(params: {
     rule = defaultMatches[0];
   }
 
-  // 3. If still not found, throw error
+  // 3. If still not found, throw clean error & print complete diagnostics
   if (!rule) {
+    const matchingRulesByBank = dsrRules.filter(r => r.bankId === bankId || r.bankId === 'default');
+
+    console.warn(`[DSR MATCH DIAGNOSTICS]`);
+    console.warn(`Required parameters:`, { bankId, productType, supportType, customerStage });
+    console.warn(`All existing rules for this bank ("${bankId}")/default:`, matchingRulesByBank.map(r => ({
+      bankId: r.bankId,
+      productType: r.productType,
+      supportType: r.supportType,
+      customerStage: r.customerStage,
+      percent: r.dsrPercent,
+      active: r.active !== false
+    })));
+
+    const mismatchedProperties: string[] = [];
+    if (matchingRulesByBank.length > 0) {
+      if (!matchingRulesByBank.some(r => r.productType === productType)) mismatchedProperties.push(`نوع المنتج "${productType}"`);
+      if (!matchingRulesByBank.some(r => r.supportType === supportType)) mismatchedProperties.push(`نوع الدعم "${supportType}"`);
+      if (!matchingRulesByBank.some(r => r.customerStage === customerStage)) mismatchedProperties.push(`المرحلة "${customerStage}"`);
+    } else {
+      mismatchedProperties.push(`عدم وجود أي قواعد للبنك أو افتراضيات`);
+    }
+
+    const mismatchHint = mismatchedProperties.length > 0 ? ` (الاختلاف: مفقود ${mismatchedProperties.join('، ')})` : '';
+
     throw new Error(
-      `مفقود: لم يتم العثور على قاعدة DSR مناسبة للمدخلات التالية: البنك (${bankId})، الدعم (${supportType})، المرحلة (${customerStage}). يرجى إضافة قاعدة DSR وتفعيلها للبنك.`
+      `لا توجد قاعدة استقطاع عقاري لهذا المنتج/الدعم/المرحلة في لوحة التحكم.${mismatchHint}`
     );
   }
 

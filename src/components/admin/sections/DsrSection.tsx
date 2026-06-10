@@ -494,7 +494,7 @@ export default function DsrSection({
 
                 {/* Deduct obligations switch */}
                 <div className="space-y-1.5 text-right flex flex-col justify-end">
-                  <label className="block text-xs font-bold text-gray-605 mb-2">خصم الالتزامات القائمة:</label>
+                  <label className="block text-xs font-bold text-gray-600 mb-2">خصم الالتزامات القائمة:</label>
                   <div className="flex items-center gap-3">
                     <button
                       type="button"
@@ -517,7 +517,7 @@ export default function DsrSection({
 
                 {/* Active switch */}
                 <div className="space-y-1.5 text-right flex flex-col justify-end">
-                  <label className="block text-xs font-bold text-gray-605 mb-2">الحالة (مفعل):</label>
+                  <label className="block text-xs font-bold text-gray-600 mb-2">الحالة (مفعل):</label>
                   <div className="flex items-center gap-3">
                     <button
                       type="button"
