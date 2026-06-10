@@ -898,19 +898,19 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       {/* 2. Main Horizontal Dashboard Grid (Settings Right, Table Left) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
         
-        {/* Right Column: Settings Panel + Sector Exceptions (320px wide approximately on large screens) */}
-        <div className="lg:col-span-4 xl:col-span-3 space-y-4">
+        {/* Right Column: Settings Panel (Wider column to comfortably display segmented buttons) */}
+        <div className="lg:col-span-4 xl:col-span-4 space-y-4">
           
           {/* Settings Section Card */}
-          <div className="bg-white border border-gray-150 rounded-xl p-4 shadow-xs space-y-3">
+          <div className="bg-white border border-gray-150 rounded-xl p-4 shadow-xs space-y-4">
             <h3 className="text-xs font-black text-slate-800 border-b border-gray-100 pb-2 flex items-center gap-1.5">
               <span>⚙️</span>
               <span>لوحة التحكم والتصفية</span>
             </h3>
 
             {/* Bank Select */}
-            <div className="space-y-1">
-              <label className="block text-[10px] font-bold text-gray-500">البنك التمويلي:</label>
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-bold text-gray-500">البنك التمويلي:</label>
               <select
                 value={selectedBank}
                 onChange={(e) => setSelectedBank(e.target.value)}
@@ -922,37 +922,61 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
               </select>
             </div>
 
-            {/* Product Select */}
-            <div className="space-y-1">
-              <label className="block text-[10px] font-bold text-gray-500">المنتج:</label>
-              <select
-                value={selectedProduct}
-                onChange={(e) => setSelectedProduct(e.target.value as ProductId)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 text-xs font-bold text-slate-800 outline-none focus:ring-1 focus:ring-[#0057B8] cursor-pointer"
-              >
-                {productTypesList.map(p => (
-                  <option key={p.id} value={p.id}>{p.nameAr}</option>
-                ))}
-              </select>
+            {/* Product Select - Segmented Buttons */}
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-bold text-gray-500">المنتج والتمويل:</label>
+              <div className="flex flex-col gap-1">
+                {productTypesList.map(p => {
+                  const isSelected = selectedProduct === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setSelectedProduct(p.id as ProductId)}
+                      className={`px-3 py-2 rounded-lg border text-xs font-bold text-right transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-[#0057B8]/10 border-[#0057B8] text-[#0057B8] shadow-xs'
+                          : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
+                      }`}
+                    >
+                      {p.nameAr}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
-            {/* Support Select */}
-            <div className="space-y-1">
-              <label className="block text-[10px] font-bold text-gray-500">نوع الدعم:</label>
-              <select
-                value={selectedSupport}
-                onChange={(e) => setSelectedSupport(e.target.value as SupportType)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 text-xs font-bold text-slate-800 outline-none focus:ring-1 focus:ring-[#0057B8] cursor-pointer"
-              >
-                <option value="none">غير مدعوم</option>
-                <option value="monthly">دعم شهري</option>
-                <option value="downpayment">دعم دفعة</option>
-              </select>
+            {/* Support Select - Segmented Buttons */}
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-bold text-gray-500">نوع الدعم السكني:</label>
+              <div className="grid grid-cols-3 gap-1">
+                {[
+                  { id: 'none', label: 'غير مدعوم' },
+                  { id: 'monthly', label: 'دعم شهري' },
+                  { id: 'downpayment', label: 'دعم دفعة' }
+                ].map(s => {
+                  const isSelected = selectedSupport === s.id;
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => setSelectedSupport(s.id as SupportType)}
+                      className={`px-1 py-2 rounded-lg border text-[10px] font-bold text-center transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-[#0057B8]/10 border-[#0057B8] text-[#0057B8] shadow-xs'
+                          : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
+                      }`}
+                    >
+                      {s.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Sector Select */}
-            <div className="space-y-1">
-              <label className="block text-[10px] font-bold text-gray-500">القطاع الفعال:</label>
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-bold text-gray-500">القطاع الفعال:</label>
               <select
                 value={selectedSector}
                 onChange={(e) => setSelectedSector(e.target.value)}
@@ -964,70 +988,112 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
               </select>
             </div>
 
-            {/* Salary Tier Select */}
-            <div className="space-y-1">
-              <label className="block text-[10px] font-bold text-gray-500">فئة الراتب:</label>
+            {/* Salary Tier Select - Segmented Buttons */}
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-bold text-gray-500">فئة الراتب الشهري:</label>
               {selectedSupport === 'none' ? (
-                <div className="bg-slate-50 border border-slate-100 text-slate-400 rounded-lg px-2.5 py-2.5 text-[10px] font-bold leading-normal">
-                  🔒 فئة الراتب غير قابلة للتعيين لغير المدعوم (جدول عام)
+                <div className="bg-slate-50 border border-slate-100 text-slate-400 rounded-lg p-2.5 text-[11px] font-bold leading-normal text-center">
+                  🔒 الجدول العام لغير المدعوم (لا ينطبق)
                 </div>
               ) : (
-                <select
-                  value={selectedSalaryTier}
-                  onChange={(e) => setSelectedSalaryTier(e.target.value as any)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 text-xs font-bold text-slate-800 outline-none focus:ring-1 focus:ring-[#0057B8] cursor-pointer"
-                >
-                  <option value="below_25000">💵 أقل من 25,000</option>
-                  <option value="above_or_equal_25000">💰 25,000 فأكثر</option>
-                </select>
+                <div className="grid grid-cols-2 gap-1">
+                  {[
+                    { id: 'below_25000', label: '💵 أقل من ٢٥ ألف' },
+                    { id: 'above_or_equal_25000', label: '💰 ٢٥ ألف فأكثر' }
+                  ].map(t => {
+                    const isSelected = selectedSalaryTier === t.id;
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => setSelectedSalaryTier(t.id as any)}
+                        className={`px-1 py-1.5 rounded-lg border text-[10px] font-bold text-center transition-all cursor-pointer white-space-nowrap ${
+                          isSelected
+                            ? 'bg-[#0057B8]/10 border-[#0057B8] text-[#0057B8] shadow-xs'
+                            : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
+                        }`}
+                      >
+                        {t.label}
+                      </button>
+                    );
+                  })}
+                </div>
               )}
             </div>
 
-            {/* Show Mode Selector */}
-            <div className="space-y-1">
-              <label className="block text-[10px] font-bold text-gray-500">طريقة إدارة السنوات:</label>
-              <select
-                value={selectedYearsMode}
-                onChange={(e) => setSelectedYearsMode(e.target.value as any)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 text-xs font-bold text-slate-800 outline-none focus:ring-1 focus:ring-[#0057B8] cursor-pointer"
-              >
-                <option value="key_points">نقاط رئيسية (5/10/15/20/25/30 سنة)</option>
-                <option value="yearly">كل سنة مستقلة (5 إلى 30 سنة كاملة)</option>
-                <option value="duration_tiers">شرائح مدة التمويل (من شهر إلى شهر)</option>
-              </select>
+            {/* Show Mode Selector - Segmented Buttons */}
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-bold text-gray-500">طريقة إدارة وتوزيع السنوات:</label>
+              <div className="flex flex-col gap-1">
+                {[
+                  { id: 'key_points', label: '⏱️ نقاط رئيسية فقط (٣٠-٥)' },
+                  { id: 'yearly', label: '📆 كل سنة مستقلة (٣٠-٥)' },
+                  { id: 'duration_tiers', label: '📊 شرائح مدة التمويل بالأشهر' }
+                ].map(m => {
+                  const isSelected = selectedYearsMode === m.id;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setSelectedYearsMode(m.id as any)}
+                      className={`px-3 py-2 rounded-lg border text-xs font-bold text-right transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-[#0057B8]/10 border-[#0057B8] text-[#0057B8] shadow-xs'
+                          : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
+                      }`}
+                    >
+                      {m.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
-            {/* Calc Method Selector */}
-            <div className="space-y-1">
-              <label className="block text-[10px] font-bold text-gray-500">طريقة الحساب (النسب البينية):</label>
-              <select
-                value={selectedCalcMethod}
-                onChange={(e) => setSelectedCalcMethod(e.target.value as any)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 text-xs font-bold text-slate-800 outline-none focus:ring-1 focus:ring-[#0057B8] cursor-pointer"
-              >
-                <option value="fixed">ثابتة Fixed (بدون تدرج)</option>
-                <option value="linear">تدرج خطي Linear (انسيابي)</option>
-              </select>
+            {/* Calc Method Selector - Segmented Buttons */}
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-bold text-gray-500">طريقة الحساب والنسب البينية:</label>
+              <div className="grid grid-cols-2 gap-1">
+                {[
+                  { id: 'fixed', label: 'ثابتة Fixed' },
+                  { id: 'linear', label: 'تدرج خطي Linear' }
+                ].map(c => {
+                  const isSelected = selectedCalcMethod === c.id;
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => setSelectedCalcMethod(c.id as any)}
+                      className={`px-1 py-1.5 rounded-lg border text-[10px] font-bold text-center transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-[#0057B8]/10 border-[#0057B8] text-[#0057B8] shadow-xs'
+                          : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
+                      }`}
+                    >
+                      {c.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
-          {/* Sector Exceptions Section Card */}
-          <div className="bg-white border border-gray-150 rounded-xl p-4 shadow-xs space-y-2.5 text-right font-sans">
+          {/* Sector Exceptions Section Card: Formatted as a beautiful grid with no vertical scrollbar and full width of settings sidebar */}
+          <div className="bg-white border border-gray-150 rounded-xl p-4 shadow-xs space-y-3 text-right font-sans">
             <div className="border-b border-gray-100 pb-2">
-              <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+              <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                 <span>🛡️</span>
-                <span>استثناءات القطاعات الحالي</span>
+                <span>استثناءات القطاعات الفعالة للبنك (Bps)</span>
               </h4>
-              <p className="text-[9px] text-gray-400 leading-normal mt-0.5">
-                تُدخل كقيم نقاط أساس Bps (مؤثرة على كافة جداول البنك المحدّد).
+              <p className="text-[10px] text-gray-400 leading-normal mt-0.5">
+                أدخل نقاط الأساس لقطاعات البنك (مثال: هامش أقل بـ 0.50% يكتب -50 Bps).
               </p>
             </div>
 
-            <div className="space-y-2 max-h-[190px] overflow-y-auto pr-0.5 scrollbar-thin">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               {sectorsList.map((sec) => (
-                <div key={sec.id} className="flex items-center justify-between gap-2.5 bg-slate-50 border border-slate-150 p-2 rounded-lg">
-                  <span className="block text-xs font-bold text-slate-700 truncate">{sec.nameAr}</span>
-                  <div className="relative w-24 shrink-0">
+                <div key={sec.id} className="flex flex-col justify-between bg-slate-50 border border-slate-150 p-2.5 rounded-lg space-y-1 transition-all hover:bg-slate-100/50">
+                  <span className="block text-xs font-bold text-slate-800 truncate leading-none mb-1">{sec.nameAr}</span>
+                  <div className="relative">
                     <input
                       type="text"
                       inputMode="numeric"
@@ -1037,9 +1103,10 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                         valStr = valStr.replace(/[^0-9-]/g, '');
                         setLocalSectorExceptions(prev => ({ ...prev, [sec.id]: valStr }));
                       }}
-                      className="bg-white border border-gray-300 rounded-lg py-1 px-2 text-center text-xs font-bold font-mono focus:outline-none focus:ring-1 focus:ring-[#0057B8] text-slate-800"
+                      className="w-full bg-white border border-gray-300 rounded-lg py-1 pl-8 pr-2 text-center text-xs font-bold font-mono focus:outline-none focus:ring-1 focus:ring-[#0057B8] text-slate-800"
                       placeholder="0"
                     />
+                    <span className="absolute left-1.5 top-1.5 text-[9px] text-slate-400 font-bold font-mono">Bps</span>
                   </div>
                 </div>
               ))}
@@ -1049,7 +1116,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
         </div>
 
         {/* Left Column: Information Bar + Table Content (main workspace) */}
-        <div className="lg:col-span-8 xl:col-span-9 space-y-4">
+        <div className="lg:col-span-8 xl:col-span-8 space-y-4">
           
           {/* Live Selector Information Tags Bar */}
           <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 shadow-xs flex flex-wrap gap-2 items-center justify-between text-right font-sans">
@@ -1288,7 +1355,35 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
 
       </div>
 
-      {/* 3. Collapsible Cloning and Copying Section (Closed by default) */}
+      {/* 3. Natural Flow Footer Action Bar (Replaces the floating bar with a clean, fully-aligned static section) */}
+      <div className="bg-white border border-gray-150 rounded-xl p-4 shadow-xs flex flex-col md:flex-row items-center justify-between gap-4 font-sans text-right">
+        <div className="text-right space-y-1">
+          <span className="text-[10px] font-extrabold text-slate-400 block uppercase tracking-wider">الحالة الحالية لمستند الهوامش</span>
+          <p className="text-xs font-bold text-slate-700">
+            يتم تعديل هوامش <span className="text-[#0057B8] font-extrabold">{(banks.find(b => b.id === selectedBank)?.nameAr) || selectedBank}</span> لـ <span className="text-emerald-700 font-extrabold">{productTypesList.find(p => p.id === selectedProduct)?.nameAr || selectedProduct}</span> ({selectedSupport === 'none' ? 'غير مدعوم' : selectedSupport === 'monthly' ? 'دعم شهري' : 'دعم دفعة'})
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
+          <button
+            type="button"
+            onClick={() => setShowGeneralLogs(!showGeneralLogs)}
+            className="px-4 py-2 border border-slate-200 hover:bg-slate-50 rounded-lg text-xs font-bold text-slate-700 cursor-pointer flex gap-1.5 items-center transition-colors"
+          >
+            <span>📜</span>
+            <span>{showGeneralLogs ? 'إخفاء السجل الشامل' : 'عرض السجل الشامل'}</span>
+          </button>
+          
+          <button
+            type="button"
+            onClick={handleSaveConfig}
+            className="px-6 py-2 bg-[#0057B8] hover:bg-[#004bb0] text-white rounded-lg text-xs font-extrabold transition-all shadow-md shadow-[#0057B8]/10 cursor-pointer flex items-center justify-center gap-1.5 hover:scale-[1.01]"
+          >
+            <span>💾 حفظ وتطبيق كافة الإعدادات</span>
+          </button>
+        </div>
+      </div>
+
+      {/* 4. Collapsible Cloning and Copying Section (Closed by default) */}
       <div className="bg-white border border-gray-200 rounded-xl shadow-xs overflow-hidden text-right font-sans">
         <button
           type="button"
@@ -1486,33 +1581,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
         )}
       </div>
 
-      {/* 4. Sticky Bottom Action Overlay Bar */}
-      <div className="fixed bottom-4 left-4 right-4 z-40 bg-white/95 backdrop-blur-md border border-slate-200 shadow-xl rounded-2xl p-3 flex flex-row items-center justify-between gap-4 font-sans max-w-5xl mx-auto animate-in slide-in-from-bottom-4 duration-300">
-        <div className="text-right space-y-0.5 hidden sm:block">
-          <span className="text-[10px] font-extrabold text-slate-400 block uppercase tracking-wider">الحالة الحالية لإدخالات التصفية</span>
-          <p className="text-[11px] font-bold text-slate-700">
-            يتم تعديل هوامش <span className="text-[#0057B8]">{(banks.find(b => b.id === selectedBank)?.nameAr) || selectedBank}</span> لـ <span className="text-emerald-700">{productTypesList.find(p => p.id === selectedProduct)?.nameAr || selectedProduct}</span>
-          </p>
-        </div>
-        <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
-          <button
-            type="button"
-            onClick={() => setShowGeneralLogs(!showGeneralLogs)}
-            className="px-3.5 py-2 border border-slate-200 hover:bg-slate-55 rounded-xl text-xs font-bold text-slate-705 cursor-pointer flex gap-1 items-center"
-          >
-            <span>📜</span>
-            <span>{showGeneralLogs ? 'إخفاء السجل الشامل' : 'عرض السجل الشامل'}</span>
-          </button>
-          
-          <button
-            type="button"
-            onClick={handleSaveConfig}
-            className="px-6 py-2 bg-[#0057B8] hover:bg-[#004bb0] text-white rounded-xl text-xs font-extrabold transition-all shadow-md shadow-[#0057B8]/20 cursor-pointer flex items-center justify-center gap-1.5 hover:scale-[1.01]"
-          >
-            <span>💾 حفظ وتطبيق كافة الإعدادات</span>
-          </button>
-        </div>
-      </div>
+
 
       {/* 5. Comprehensive Register of Margin Rows (Optional reviewing log list) */}
       {showGeneralLogs && (
@@ -1587,9 +1656,6 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
           </div>
         </div>
       )}
-
-      {/* Spacer for sticky overlay bottom menu */}
-      <div className="h-16"></div>
 
     </div>
   );
