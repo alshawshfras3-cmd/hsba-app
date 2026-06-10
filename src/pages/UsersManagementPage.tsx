@@ -62,36 +62,20 @@ export function UsersManagementPage() {
       return;
     }
 
-    console.log('[USERS REST] START');
-    const url = `${supabaseUrl}/rest/v1/app_users?select=id,full_name,email,phone,is_blocked,status,created_at,updated_at&order=created_at.desc`;
-    console.log('[USERS REST] URL=' + url);
-
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), 15000);
-
     try {
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'apikey': supabaseAnonKey,
-          'Authorization': `Bearer ${supabaseAnonKey}`,
-          'Accept': 'application/json'
-        },
-        signal: controller.signal
-      });
+      const { data, error } = await supabase
+        .from('app_users')
+        .select('id, full_name, email, phone, is_blocked, status, created_at')
+        .order('created_at', { ascending: false });
 
-      const text = await response.text();
-
-      if (!response.ok) {
-        throw new Error(`REST app_users failed ${response.status}: ${text}`);
+      if (error) {
+        throw error;
       }
 
-      const data = text ? JSON.parse(text) : [];
-
-      console.log('[USERS REST] SUCCESS rows=' + data.length);
+      console.log('[USERS SDK] SUCCESS rows=' + (data?.length || 0));
 
       setUsers(
-        data.map((item: any) => ({
+        (data || []).map((item: any) => ({
           id: item.id,
           email: item.email || '',
           full_name: item.full_name || 'مستخدم غير معرّف',
@@ -102,15 +86,10 @@ export function UsersManagementPage() {
         }))
       );
     } catch (err: any) {
-      console.error('[USERS REST] FAILED message=' + (err?.message || err));
+      console.error('[USERS SDK] FAILED message=' + (err?.message || err));
       setUsers([]);
-      setErrorMsg(
-        err?.name === 'AbortError'
-          ? 'انتهت مهلة تحميل المستخدمين بعد 15 ثانية'
-          : `تعذر تحميل المستخدمين: ${err?.message || err}`
-      );
+      setErrorMsg(`تعذر تحميل المستخدمين: ${err?.message || err}`);
     } finally {
-      window.clearTimeout(timer);
       setLoading(false);
     }
   }
