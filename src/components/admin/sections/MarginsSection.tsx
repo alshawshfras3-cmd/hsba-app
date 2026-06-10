@@ -33,7 +33,10 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
   sectors
 }) => {
   const activeSectors = (sectors || []).filter(sec => sec.isActive !== false);
-  const sectorsList = activeSectors.map(sec => ({ id: sec.id, nameAr: sec.nameAr }));
+  const sectorsList = [
+    { id: 'all', nameAr: 'كل القطاعات' },
+    ...activeSectors.map(sec => ({ id: sec.id, nameAr: sec.nameAr }))
+  ];
 
   // 1. Selector States (Active single configuration)
   const [selectedBank, setSelectedBank] = useState<string>(banks[0]?.id || 'alahli');
@@ -86,7 +89,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
   // Handle default selected sector initialization
   useEffect(() => {
     if (sectorsList.length > 0 && !selectedSector) {
-      setSelectedSector(sectorsList[0].id);
+      setSelectedSector('all');
     }
   }, [sectorsList, selectedSector]);
 
@@ -353,7 +356,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     }
 
     const newExceptionRules: MarginRule[] = [];
-    sectorsList.forEach(secObj => {
+    sectorsList.filter(s => s.id !== 'all').forEach(secObj => {
       const secId = secObj.id;
       const parsedBps = parseInt(sectorExceptionsRecord[secId] || '0', 10);
       newExceptionRules.push({
@@ -821,7 +824,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
 
             if (relevantRules.length === 0) return;
 
-            sectorsList.forEach(sec => {
+            sectorsList.filter(s => s.id !== 'all').forEach(sec => {
               const yearsToIterate = selectedYearsMode === 'key_points' ? [5, 10, 15, 20, 25, 30] : Array.from({ length: 26 }, (_, i) => 5 + i);
               yearsToIterate.forEach(year => {
                 const result = calculateMargin({
@@ -1090,7 +1093,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              {sectorsList.map((sec) => (
+              {sectorsList.filter(s => s.id !== 'all').map((sec) => (
                 <div key={sec.id} className="flex flex-col justify-between bg-slate-50 border border-slate-150 p-2.5 rounded-lg space-y-1 transition-all hover:bg-slate-100/50">
                   <span className="block text-xs font-bold text-slate-800 truncate leading-none mb-1">{sec.nameAr}</span>
                   <div className="relative">
@@ -1165,7 +1168,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
               <div className="flex justify-between items-center border-b border-gray-100 pb-2">
                 <h3 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                   <span>📊</span>
-                  <span>شرائح مدة التمويل المحدّدة لهذه التصفية والقطاع (مدة بالأشهر)</span>
+                  <span>{selectedSector === 'all' ? 'جدول شرائح مدة التمويل العامة لجميع القطاعات (مدة بالأشهر)' : 'شرائح مدة التمويل المحدّدة لهذه التصفية والقطاع (مدة بالأشهر)'}</span>
                 </h3>
                 <button
                   type="button"
@@ -1295,7 +1298,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
             <div className="bg-white p-4 rounded-xl border border-gray-150 shadow-xs space-y-3 text-right font-sans">
               <h3 className="text-xs font-bold text-slate-800 flex items-center gap-1.5 border-b border-gray-100 pb-2">
                 <span>📊</span>
-                <span>جدول هوامش الأرباح السنوية المحددة للقطاع والتصفية الحالية</span>
+                <span>{selectedSector === 'all' ? 'جدول هوامش الأرباح السنوية العامة لجميع القطاعات' : 'جدول هوامش الأرباح السنوية المحددة للقطاع الحالي'}</span>
               </h3>
               
               {isLoaded && Object.values(localMargins).every(v => !v || v === '') && (
