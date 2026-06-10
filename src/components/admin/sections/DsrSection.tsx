@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Bank, DsrRule } from '../../../types';
-import { Plus, Edit, ToggleLeft, ToggleRight, Trash2 } from 'lucide-react';
+import { Plus, Edit, ToggleLeft, ToggleRight, Trash2, AlertTriangle } from 'lucide-react';
 import { normalizeNumberInput, parseNumberInput } from '../../../lib/number-input';
+import { getMissingDsrRulesList, getTemplateDsrPercent } from '../../../lib/settings/normalizeDsrRules';
 
 interface DsrSectionProps {
   banks: Bank[];
@@ -27,6 +28,25 @@ export default function DsrSection({
   setShowCopyModal
 }: DsrSectionProps) {
   const formBanksList = banks.map(b => ({ id: b.id, nameAr: b.nameAr }));
+
+  const missingRules = getMissingDsrRulesList(banks, dsrRules);
+  const hasMissing = missingRules.length > 0;
+
+  const handleAddMissingFromTemplate = () => {
+    const newlyAddedRules: DsrRule[] = missingRules.map((m, idx) => ({
+      id: `dsr_rule_gen_${Date.now()}_${idx}_${Math.random().toString(36).substr(2, 5)}`,
+      bankId: m.bankId,
+      productType: m.productType as any,
+      supportType: m.supportType as any,
+      customerStage: m.customerStage as any,
+      dsrPercent: getTemplateDsrPercent(m.productType, m.supportType, m.customerStage),
+      deductExistingObligations: true,
+      active: true
+    }));
+
+    setDsrRules(prev => [...prev, ...newlyAddedRules]);
+    showToast(`تمت إضافة ${newlyAddedRules.length} من القواعد الناقصة بنجاح! يرجى مراجعتها وتأكيد حفظ الإعدادات بالأسفل لاعتمادها بشكل دائم.`, 'success');
+  };
 
   const [filterDsrBank, setFilterDsrBank] = useState<string>('rajhi');
   const [filterDsrProduct, setFilterDsrProduct] = useState<string>('all');
@@ -190,6 +210,27 @@ export default function DsrSection({
           <span>إضافة قاعدة DSR</span>
         </button>
       </div>
+
+      {hasMissing && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4 font-sans text-right" id="missing-dsr-rules-banner">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <h4 className="text-sm font-extrabold text-amber-900">توجد قواعد DSR ناقصة لهذا المنتج/الدعم/المرحلة</h4>
+              <p className="text-xs text-amber-705 mt-1.5 leading-relaxed">
+                توجد {missingRules.length} قاعدة (قواعد) استقطاع DSR غير معرفة في لوحة التحكم لبعض المنتجات أو الجهات التمويلية. عدم وجود هذه القواعد يعطل دقة محاكاة الحساب الائتماني. يمكنك إضافة القواعد الناقصة تلقائياً بنسبة استقطاع افتراضية ثم حفظ الإعدادات.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleAddMissingFromTemplate}
+            className="px-4.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer whitespace-nowrap self-start md:self-center font-sans border-0 outline-none"
+          >
+            إضافة القواعد الناقصة من القالب
+          </button>
+        </div>
+      )}
 
       {/* Quick Actions Bar */}
       <div className="bg-slate-50 border border-slate-150 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 font-sans">

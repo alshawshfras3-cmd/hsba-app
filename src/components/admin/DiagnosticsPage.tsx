@@ -6,6 +6,7 @@ import {
   Coins, FileText, RefreshCw, Calculator, ShieldAlert,
   CheckCircle2, AlertTriangle, Play, HelpCircle as HelpIcon, ArrowLeftRight
 } from 'lucide-react';
+import { getMissingDsrRulesList, getTemplateDsrPercent } from '../../lib/settings/normalizeDsrRules';
 import { 
   fetchApprovedSalaryRules, 
   fetchPensionCalculationRules, 
@@ -31,6 +32,7 @@ export function DiagnosticsPage() {
     pensionRules,
     marginRules,
     dsrRules,
+    setDsrRules,
     supportSettings,
     personalRules,
     termRules,
@@ -40,6 +42,27 @@ export function DiagnosticsPage() {
     pensionDbRules: contextPensionDbRules,
     sectorMappings: contextSectorMappings
   } = useAppState();
+
+  const missingDsrRules = getMissingDsrRulesList(banks, dsrRules);
+  const hasMissingDsrRules = missingDsrRules.length > 0;
+  const [dsrGenSuccessMessage, setDsrGenSuccessMessage] = useState<string>('');
+
+  const handleAddMissingDsrFromTemplate = () => {
+    const newlyAddedRules = missingDsrRules.map((m, idx) => ({
+      id: `dsr_rule_gen_${Date.now()}_${idx}_${Math.random().toString(36).substr(2, 5)}`,
+      bankId: m.bankId,
+      productType: m.productType as any,
+      supportType: m.supportType as any,
+      customerStage: m.customerStage as any,
+      dsrPercent: getTemplateDsrPercent(m.productType, m.supportType, m.customerStage),
+      deductExistingObligations: true,
+      active: true
+    }));
+
+    setDsrRules(prev => [...prev, ...newlyAddedRules]);
+    setDsrGenSuccessMessage(`تمت إضافة ${newlyAddedRules.length} من قواعد استقطاع DSR الناقصة بنجاح! يرجى مراجعتها وتأكيد حفظ التغييرات للوحة الإعدادات بالأسفل.`);
+    setTimeout(() => setDsrGenSuccessMessage(''), 8000);
+  };
 
   const allowedSectorsList = ['gov_civil', 'military', 'semi_gov', 'companies', 'retired'];
   const expectedCount = banks.length * allowedSectorsList.length;
@@ -474,6 +497,30 @@ export function DiagnosticsPage() {
               تم رصد عدد {currentCount} قاعدة ربط بين البنوك والقطاعات من أصل {expectedCount} متوقعة. القواعد الناقصة تعطل تشغيل الخصائص المخصصة من البنك وتعتمد على السلوك الافتراضي الاحتياطي. نوصي بتوليدها من قسم الربط بصفحة التقاعد وتأكيد حفظها.
             </p>
           </div>
+        </div>
+      )}
+
+      {hasMissingDsrRules && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 font-sans text-right animate-pulse" id="missing-dsr-rules-diagnostic-banner">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <h4 className="text-sm font-extrabold text-amber-900">توجد قواعد DSR ناقصة لهذا المنتج/الدعم/المرحلة</h4>
+              <p className="text-xs text-amber-707 mt-1.5 leading-relaxed">
+                توجد {missingDsrRules.length} قاعدة (قواعد) استقطاع DSR غير معرفة في لوحة التحكم لبعض المنتجات أو الجهات التمويلية. عدم وجود هذه القواعد يعطل دقة محاكاة الحساب الائتماني. يمكنك إضافة القواعد الناقصة تلقائياً بنسبة استقطاع افتراضية ثم حفظ الإعدادات.
+              </p>
+              {dsrGenSuccessMessage && (
+                <p className="text-xs text-emerald-700 font-bold mt-2">✨ {dsrGenSuccessMessage}</p>
+              )}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleAddMissingDsrFromTemplate}
+            className="px-4.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer whitespace-nowrap self-start md:self-center font-sans border-0 outline-none"
+          >
+            إضافة القواعد الناقصة من القالب
+          </button>
         </div>
       )}
 
