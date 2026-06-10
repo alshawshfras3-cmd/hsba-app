@@ -458,8 +458,8 @@ export function calculateBanksFinancing(params: {
       retirementAgeCustom: retirementAge,
       pensionMultiplierCustom: matchedPensionRule?.pensionMultiplier,
       directPensionSalary: sectorId === 'retired' ? directPensionSalary : undefined,
-      ageCalcCalendar: matchedPensionRule?.ageCalcCalendar || 'gregorian',
-      serviceCalcCalendar: matchedPensionRule?.serviceCalcCalendar || 'gregorian',
+      ageCalcCalendar: bank.calendarType || matchedPensionRule?.ageCalcCalendar || 'gregorian',
+      serviceCalcCalendar: bank.calendarType || matchedPensionRule?.serviceCalcCalendar || 'gregorian',
       customSectors
     });
 
@@ -694,12 +694,12 @@ export function calculateBanksFinancing(params: {
     const isRuleApplied = !!matchedTermRule;
     const ruleSource = isRuleApplied ? 'termRule' : 'bankFallback';
 
-    const defaultLimits = BANK_DEFAULT_LIMITS[bank.id] || {
-      maxTermMonths: 360,
-      maxAgeAtEnd: 75,
-      monthsAfterRetirement: 120,
-      allowAfterRetirement: true,
-      calendarType: 'gregorian' as const
+    const defaultLimits = {
+      maxTermMonths: bank.maxTermMonths ?? (BANK_DEFAULT_LIMITS[bank.id]?.maxTermMonths ?? 360),
+      maxAgeAtEnd: bank.maxAgeAtEnd ?? (BANK_DEFAULT_LIMITS[bank.id]?.maxAgeAtEnd ?? 75),
+      monthsAfterRetirement: bank.monthsAfterRetirement ?? (BANK_DEFAULT_LIMITS[bank.id]?.monthsAfterRetirement ?? 120),
+      allowAfterRetirement: bank.allowAfterRetirement ?? (BANK_DEFAULT_LIMITS[bank.id]?.allowAfterRetirement ?? true),
+      calendarType: bank.calendarType ?? (BANK_DEFAULT_LIMITS[bank.id]?.calendarType ?? 'gregorian' as const)
     };
 
     const maxTermMonths = isRuleApplied ? matchedTermRule.maxTermMonths : defaultLimits.maxTermMonths;
@@ -1280,6 +1280,8 @@ export function calculateAll(params: {
   });
   const solvedNetSalary = netSalaryResult.netSalary;
 
+  const liveBank = (banks || []).find(b => b.id === bankId);
+
   // 2.5 Unified Pension Calculation
   const activeBankRetRules = combineToRetirementRules(approvedSalaryDbRules || [], pensionDbRules || []);
   
@@ -1313,8 +1315,8 @@ export function calculateAll(params: {
     retirementAgeCustom: displayRetirementAge,
     pensionMultiplierCustom: matchedPensionConfig?.pensionMultiplier,
     directPensionSalary: sectorId === 'retired' ? directPensionSalary : undefined,
-    ageCalcCalendar: matchedPensionConfig?.ageCalcCalendar || 'gregorian',
-    serviceCalcCalendar: matchedPensionConfig?.serviceCalcCalendar || 'gregorian',
+    ageCalcCalendar: liveBank?.calendarType || matchedPensionConfig?.ageCalcCalendar || 'gregorian',
+    serviceCalcCalendar: liveBank?.calendarType || matchedPensionConfig?.serviceCalcCalendar || 'gregorian',
     customSectors
   });
 
@@ -1370,12 +1372,12 @@ export function calculateAll(params: {
     termRules
   });
 
-  const defaultLimits = BANK_DEFAULT_LIMITS[bankId] || {
-    maxTermMonths: 300,
-    maxAgeAtEnd: 75,
-    monthsAfterRetirement: 180,
-    allowAfterRetirement: true,
-    calendarType: 'gregorian' as const
+  const defaultLimits = {
+    maxTermMonths: liveBank?.maxTermMonths ?? (BANK_DEFAULT_LIMITS[bankId]?.maxTermMonths ?? 300),
+    maxAgeAtEnd: liveBank?.maxAgeAtEnd ?? (BANK_DEFAULT_LIMITS[bankId]?.maxAgeAtEnd ?? 75),
+    monthsAfterRetirement: liveBank?.monthsAfterRetirement ?? (BANK_DEFAULT_LIMITS[bankId]?.monthsAfterRetirement ?? 180),
+    allowAfterRetirement: liveBank?.allowAfterRetirement ?? (BANK_DEFAULT_LIMITS[bankId]?.allowAfterRetirement ?? true),
+    calendarType: liveBank?.calendarType ?? (BANK_DEFAULT_LIMITS[bankId]?.calendarType ?? 'gregorian' as const)
   };
 
   const maxTermMonths = matchedTermRule ? matchedTermRule.maxTermMonths : defaultLimits.maxTermMonths;

@@ -1026,30 +1026,64 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
 
             {/* Show Mode Selector - Segmented Buttons */}
             <div className="space-y-1.5">
-              <label className="block text-[11px] font-bold text-gray-500">طريقة إدارة وتوزيع السنوات:</label>
-              <div className="flex flex-col gap-1">
-                {[
-                  { id: 'key_points', label: '⏱️ نقاط رئيسية فقط (٣٠-٥)' },
-                  { id: 'yearly', label: '📆 كل سنة مستقلة (٣٠-٥)' },
-                  { id: 'duration_tiers', label: '📊 شرائح مدة التمويل بالأشهر' }
-                ].map(m => {
-                  const isSelected = selectedYearsMode === m.id;
-                  return (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => setSelectedYearsMode(m.id as any)}
-                      className={`px-3 py-2 rounded-lg border text-xs font-bold text-right transition-all cursor-pointer ${
-                        isSelected
-                          ? 'bg-[#0057B8]/10 border-[#0057B8] text-[#0057B8] shadow-xs'
-                          : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
-                      }`}
-                    >
-                      {m.label}
-                    </button>
-                  );
-                })}
+              <label className="block text-[11px] font-bold text-gray-500">طريقة توزيع المدة:</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (selectedYearsMode === 'duration_tiers') {
+                      setSelectedYearsMode('key_points');
+                    }
+                  }}
+                  className={`px-3 py-2.5 rounded-xl border text-xs font-bold text-center transition-all cursor-pointer ${
+                    selectedYearsMode !== 'duration_tiers'
+                      ? 'bg-[#0057B8]/10 border-[#0057B8] text-[#0057B8] shadow-xs font-extrabold'
+                      : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
+                  }`}
+                >
+                  🗓️ سنوات
+                </button>
+                <button
+                  type="button"
+                  id="tab-duration-tiers"
+                  onClick={() => setSelectedYearsMode('duration_tiers')}
+                  className={`px-3 py-2.5 rounded-xl border text-xs font-bold text-center transition-all cursor-pointer ${
+                    selectedYearsMode === 'duration_tiers'
+                      ? 'bg-[#0057B8]/10 border-[#0057B8] text-[#0057B8] shadow-xs font-extrabold'
+                      : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
+                  }`}
+                >
+                  📊 شرائح أشهر
+                </button>
               </div>
+
+              {selectedYearsMode !== 'duration_tiers' && (
+                <div className="flex gap-2 items-center bg-slate-50 p-1.5 rounded-lg border border-slate-100 mt-1.5">
+                  <span className="text-[10px] text-gray-400 shrink-0 select-none">عرض الجدول:</span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedYearsMode('key_points')}
+                    className={`px-2 py-0.5 text-[10px] font-bold rounded ${
+                      selectedYearsMode === 'key_points'
+                        ? 'bg-white text-[#0057B8] shadow-xs border border-gray-200'
+                        : 'text-gray-500 hover:text-slate-800'
+                    }`}
+                  >
+                    نقاط رئيسية (٥،١٠،١٥...)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedYearsMode('yearly')}
+                    className={`px-2 py-0.5 text-[10px] font-bold rounded ${
+                      selectedYearsMode === 'yearly'
+                        ? 'bg-white text-[#0057B8] shadow-xs border border-gray-200'
+                        : 'text-gray-500 hover:text-slate-800'
+                    }`}
+                  >
+                    كل سنة مستقلة (٣٠-٥)
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Calc Method Selector - Segmented Buttons */}

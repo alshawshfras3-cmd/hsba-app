@@ -50,6 +50,7 @@ export const BanksSection: React.FC<BanksSectionProps> = ({
   const [instAllowAfterRetirement, setInstAllowAfterRetirement] = useState(true);
   const [instMonthsAfterRetirement, setInstMonthsAfterRetirement] = useState(120);
   const [instIsActive, setInstIsActive] = useState(true);
+  const [instCalendarType, setInstCalendarType] = useState<'hijri' | 'gregorian'>('gregorian');
   const [instInternalNotes, setInstInternalNotes] = useState('');
   const [instModalError, setInstModalError] = useState('');
 
@@ -66,6 +67,7 @@ export const BanksSection: React.FC<BanksSectionProps> = ({
     setInstAllowAfterRetirement(true);
     setInstMonthsAfterRetirement(120);
     setInstIsActive(true);
+    setInstCalendarType('gregorian');
     setInstInternalNotes('');
     setInstModalError('');
     setIsInstitutionModalOpen(true);
@@ -84,6 +86,7 @@ export const BanksSection: React.FC<BanksSectionProps> = ({
     setInstAllowAfterRetirement(bank.allowAfterRetirement || false);
     setInstMonthsAfterRetirement(bank.monthsAfterRetirement || 0);
     setInstIsActive(bank.isActive !== false);
+    setInstCalendarType(bank.calendarType || 'gregorian');
     setInstInternalNotes(bank.internalNotes || '');
     setInstModalError('');
     setIsInstitutionModalOpen(true);
@@ -114,7 +117,7 @@ export const BanksSection: React.FC<BanksSectionProps> = ({
       logoColor: instLogoColor,
       logoText: finalLogoText,
       isActive: instIsActive,
-      calendarType: instType === 'finance_company' ? 'hijri' : 'gregorian',
+      calendarType: instCalendarType,
       maxTermMonths: Number(instMaxTermMonths) || (instType === 'finance_company' ? 240 : 360),
       maxAgeAtEnd: Number(instMaxAgeAtEnd) || 75,
       monthsAfterRetirement: instAllowAfterRetirement ? (Number(instMonthsAfterRetirement) || 0) : 0,
@@ -508,13 +511,18 @@ export const BanksSection: React.FC<BanksSectionProps> = ({
                 </td>
                 <td className="p-4 font-mono text-[11px] text-gray-500">{bank.id}</td>
                 <td className="p-4">
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${
-                    bank.institutionType === 'finance_company' 
-                      ? 'bg-amber-50 text-amber-700 border border-amber-100' 
-                      : 'bg-[#0057B8]/10 text-[#0057B8] border border-[#0057B8]/20'
-                  }`}>
-                    {bank.institutionType === 'finance_company' ? 'شركة تمويل' : 'بنك'}
-                  </span>
+                  <div className="flex flex-col gap-1 items-start">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${
+                      bank.institutionType === 'finance_company' 
+                        ? 'bg-amber-50 text-amber-700 border border-amber-100' 
+                        : 'bg-[#0057B8]/10 text-[#0057B8] border border-[#0057B8]/20'
+                    }`}>
+                      {bank.institutionType === 'finance_company' ? 'شركة تمويل' : 'بنك'}
+                    </span>
+                    <span className="text-[10px] theme-text-gray font-bold">
+                      📅 تقويم {bank.calendarType === 'hijri' ? 'هجري' : 'ميلادي'}
+                    </span>
+                  </div>
                 </td>
                 <td className="p-4 text-center">
                   <button
@@ -644,16 +652,28 @@ export const BanksSection: React.FC<BanksSectionProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">اختصار الشعار (أقصى حد 4 أحرف):</label>
-                  <input
-                    type="text"
-                    maxLength={4}
-                    value={instLogoText}
-                    onChange={(e) => setInstLogoText(e.target.value)}
-                    placeholder="مثال: أهلي، راجحي"
+                  <label className="block text-xs font-bold text-gray-700 mb-1">نوع التقويم المعتمد لجهة التمويل:</label>
+                  <select
+                    value={instCalendarType}
+                    onChange={(e) => setInstCalendarType(e.target.value as 'hijri' | 'gregorian')}
                     className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-right"
-                  />
+                  >
+                    <option value="gregorian">ميلادي (شمسي)</option>
+                    <option value="hijri">هجري (قمري)</option>
+                  </select>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">اختصار الشعار (أقصى حد 4 أحرف):</label>
+                <input
+                  type="text"
+                  maxLength={4}
+                  value={instLogoText}
+                  onChange={(e) => setInstLogoText(e.target.value)}
+                  placeholder="مثال: أهلي، راجحي"
+                  className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-right"
+                />
               </div>
 
               <div>
