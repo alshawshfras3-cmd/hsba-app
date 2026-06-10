@@ -3,6 +3,12 @@ import { Copy } from 'lucide-react';
 import { Bank, ProductId, SupportType, SectorId, MarginRule, Sector } from '../../../types';
 import { calculateMargin } from '../../../lib/finance-engine/margin';
 
+function toEnglishDigits(str: string): string {
+  return str
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 1632))
+    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776));
+}
+
 interface MarginsSectionProps {
   banks: Bank[];
   marginRules: MarginRule[];
@@ -39,9 +45,9 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
   // 2. Local inputs for Edit Grid
   const [localTiers, setLocalTiers] = useState<Array<{
     id: string;
-    fromMonth: number;
-    toMonth: number;
-    marginRate: number;
+    fromMonth: number | string;
+    toMonth: number | string;
+    marginRate: number | string;
     notes?: string;
     active: boolean;
   }>>([]);
@@ -200,29 +206,33 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
 
     if (inputMode === 'duration_tiers') {
       localTiers.forEach((tier, index) => {
+        const numFrom = Number(tier.fromMonth) || 0;
+        const numTo = Number(tier.toMonth) || 0;
+        const numRate = Number(tier.marginRate) || 0;
+        
         newRulesForThisCombo.push({
-          id: tier.id || `tier_margin_${targetBank}_${targetProduct}_${normSupport}_${targetSalaryTier}_t${tier.fromMonth}_${tier.toMonth}_${index}`,
+          id: tier.id || `tier_margin_${targetBank}_${targetProduct}_${normSupport}_${targetSalaryTier}_t${numFrom}_${numTo}_${index}`,
           bankId: targetBank,
           productId: targetProduct,
           supportType: normSupport as any,
           sectorId: 'all',
-          fromTermMonths: tier.fromMonth,
-          toTermMonths: tier.toMonth,
-          startMargin: tier.marginRate,
-          endMargin: tier.marginRate,
+          fromTermMonths: numFrom,
+          toTermMonths: numTo,
+          startMargin: numRate,
+          endMargin: numRate,
           calcType: 'fixed',
           isActive: tier.active !== false,
           salaryTier: targetSalaryTier,
           productType: targetProduct as any,
           marginInputMode: 'duration_tiers',
           calculationMethod: 'fixed',
-          termMonths: tier.toMonth,
-          annualMargin: tier.marginRate,
+          termMonths: numTo,
+          annualMargin: numRate,
           exceptionBps: 0,
-          baseMargin: Number((tier.marginRate / 100).toFixed(6)),
-          fromMonth: tier.fromMonth,
-          toMonth: tier.toMonth,
-          marginRate: tier.marginRate,
+          baseMargin: Number((numRate / 100).toFixed(6)),
+          fromMonth: numFrom,
+          toMonth: numTo,
+          marginRate: numRate,
           active: tier.active !== false,
           notes: tier.notes || ''
         });
@@ -1020,9 +1030,9 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
             <table className="min-w-full divide-y divide-gray-200 text-right text-xs">
               <thead className="bg-slate-50 text-slate-650 font-bold">
                 <tr>
-                  <th scope="col" className="px-4 py-3 text-right">من شهر</th>
-                  <th scope="col" className="px-4 py-3 text-right">إلى شهر</th>
-                  <th scope="col" className="px-4 py-3 text-right">هامش الربح %</th>
+                  <th scope="col" className="px-4 py-3 text-center">من شهر</th>
+                  <th scope="col" className="px-4 py-3 text-center">إلى شهر</th>
+                  <th scope="col" className="px-4 py-3 text-center">هامش الربح %</th>
                   <th scope="col" className="px-4 py-3 text-right">ملاحظات اختيارية</th>
                   <th scope="col" className="px-4 py-3 text-center">حذف</th>
                 </tr>
@@ -1039,26 +1049,32 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                     <tr key={tier.id} className="hover:bg-slate-50/40 transition-colors">
                       <td className="px-4 py-2.5">
                         <input
-                          type="number"
+                          type="text"
+                          inputMode="numeric"
                           value={tier.fromMonth}
                           onChange={(e) => {
-                            const val = parseInt(e.target.value) || 0;
-                            setLocalTiers(prev => prev.map(t => t.id === tier.id ? { ...t, fromMonth: val } : t));
+                            const raw = toEnglishDigits(e.target.value);
+                            const clean = raw.replace(/[^0-9]/g, '');
+                            setLocalTiers(prev => prev.map(t => t.id === tier.id ? { ...t, fromMonth: clean } : t));
                           }}
-                          className="bg-white border border-gray-300 rounded-xl px-3 py-1.5 w-full text-xs font-bold text-center focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
-                          placeholder="مثال: 36"
+                          className="bg-white border border-gray-300 rounded-xl px-3 py-1.5 w-full text-xs font-bold font-mono text-center focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-slate-800"
+                          placeholder="36"
+                          dir="ltr"
                         />
                       </td>
                       <td className="px-4 py-2.5">
                         <input
-                          type="number"
+                          type="text"
+                          inputMode="numeric"
                           value={tier.toMonth}
                           onChange={(e) => {
-                            const val = parseInt(e.target.value) || 0;
-                            setLocalTiers(prev => prev.map(t => t.id === tier.id ? { ...t, toMonth: val } : t));
+                            const raw = toEnglishDigits(e.target.value);
+                            const clean = raw.replace(/[^0-9]/g, '');
+                            setLocalTiers(prev => prev.map(t => t.id === tier.id ? { ...t, toMonth: clean } : t));
                           }}
-                          className="bg-white border border-gray-300 rounded-xl px-3 py-1.5 w-full text-xs font-bold text-center focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
-                          placeholder="مثال: 60"
+                          className="bg-white border border-gray-300 rounded-xl px-3 py-1.5 w-full text-xs font-bold font-mono text-center focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-slate-800"
+                          placeholder="60"
+                          dir="ltr"
                         />
                       </td>
                       <td className="px-4 py-2.5">
@@ -1068,15 +1084,19 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                             inputMode="decimal"
                             value={tier.marginRate}
                             onChange={(e) => {
-                              const val = e.target.value;
-                              if (val === '' || /^[0-9]*\.?[0-9]*$/.test(val)) {
-                                setLocalTiers(prev => prev.map(t => t.id === tier.id ? { ...t, marginRate: parseFloat(val) || 0 } : t));
+                              const raw = toEnglishDigits(e.target.value);
+                              let clean = raw.replace(/[^0-9.]/g, '');
+                              const firstDotIdx = clean.indexOf('.');
+                              if (firstDotIdx !== -1) {
+                                clean = clean.substring(0, firstDotIdx + 1) + clean.substring(firstDotIdx + 1).replace(/\./g, '');
                               }
+                              setLocalTiers(prev => prev.map(t => t.id === tier.id ? { ...t, marginRate: clean } : t));
                             }}
-                            className="bg-white border border-gray-300 rounded-xl pl-8 pr-3 py-1.5 w-full text-xs font-bold text-left focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                            className="bg-white border border-gray-300 rounded-xl pl-8 pr-3 py-1.5 w-full text-xs font-bold font-mono text-center focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-slate-800"
                             placeholder="3.50"
+                            dir="ltr"
                           />
-                          <span className="absolute left-3 top-2 text-xs text-slate-400 font-bold">%</span>
+                          <span className="absolute left-3 top-2 text-xs text-slate-400 font-bold font-mono">%</span>
                         </div>
                       </td>
                       <td className="px-4 py-2.5">
@@ -1087,7 +1107,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                             const val = e.target.value;
                             setLocalTiers(prev => prev.map(t => t.id === tier.id ? { ...t, notes: val } : t));
                           }}
-                          className="bg-white border border-gray-300 rounded-xl px-3 py-1.5 w-full text-xs font-bold text-right focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                          className="bg-white border border-gray-300 rounded-xl px-3 py-1.5 w-full text-xs font-bold text-right focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-slate-800"
                           placeholder="مثال: شريحة تمويل متوسط الأجل"
                         />
                       </td>
