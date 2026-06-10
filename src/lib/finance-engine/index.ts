@@ -133,29 +133,24 @@ export function normalizeProductId(productId: string): ProductId {
 
 export function isProductEnabledForBank(bank: Bank, prodId: ProductId, activeProducts?: ProductAcceptance[]): boolean {
   const normId = normalizeProductId(prodId);
+  const acceptanceProductId =
+    normId === 'personal_only' || normId === 'personal'
+      ? 'personal_only'
+      : 'real_estate_only';
   
   if (activeProducts && Array.isArray(activeProducts)) {
     const matchedAcceptance = activeProducts.find(
-      p => p.bankId === bank.id && normalizeProductId(p.productId) === normId
+      p => p.bankId === bank.id && normalizeProductId(p.productId) === acceptanceProductId
     );
     if (matchedAcceptance) {
       return matchedAcceptance.isActive !== false;
     }
   }
 
-  if (normId === 'personal_only') {
+  if (acceptanceProductId === 'personal_only') {
     return bank.personalFinanceEnabled !== false;
   }
-  if (normId === 'real_estate_only') {
-    return bank.realEstateFinanceEnabled !== false;
-  }
-  if (normId === 'real_estate_with_new_personal') {
-    return bank.combinedFinanceEnabled !== false;
-  }
-  if (normId === 'real_estate_with_existing_personal') {
-    return bank.existingPersonalFinanceEnabled !== false;
-  }
-  return true;
+  return bank.realEstateFinanceEnabled !== false;
 }
 
 export function getMatchedTermRule(params: {
@@ -472,8 +467,15 @@ export function calculateBanksFinancing(params: {
     const pensionDiagnostic = pensionCalculation.diagnostic;
 
     // 3. Obtain bank product acceptance criteria
-    const ruleProductId = normalizeProductId(normalizedProductId);
-    const acceptance = products.find(p => p.bankId === bank.id && normalizeProductId(p.productId) === ruleProductId);
+    const acceptanceProductId =
+      normalizedProductId === 'personal_only' || normalizedProductId === 'personal'
+        ? 'personal_only'
+        : 'real_estate_only';
+
+    const acceptance = products.find(p =>
+      p.bankId === bank.id &&
+      normalizeProductId(p.productId) === acceptanceProductId
+    );
 
     // 4. Resolve Term Rule and calculate Mortgage duration limit
     const matchedTermRule = getMatchedTermRule({

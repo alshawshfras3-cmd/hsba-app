@@ -9,10 +9,10 @@ export function mapProductIdToType(productId: string): 'real_estate_only' | 'rea
     return 'real_estate_only';
   }
   if (p === 'both' || p === 'real_estate_with_new_personal') {
-    return 'real_estate_with_new_personal';
+    return 'real_estate_only';
   }
   if (p === 'real_estate_with_personal_existing' || p === 'real_estate_with_existing_personal') {
-    return 'real_estate_with_existing_personal';
+    return 'real_estate_only';
   }
   return 'real_estate_only';
 }
@@ -58,6 +58,20 @@ export function getDsrRule(params: {
 
   let rule = bankMatches[0];
 
+  // 1.5 Fallback matching for real-estate rules if specific combination isn't found
+  if (!rule && productType !== 'personal_only' && productType !== 'real_estate_only') {
+    const fallbackBankMatches = dsrRules.filter(
+      r => r.bankId === bankId &&
+           r.productType === 'real_estate_only' &&
+           r.supportType === supportType &&
+           r.customerStage === customerStage &&
+           r.active !== false
+    );
+    if (fallbackBankMatches.length === 1) {
+      rule = fallbackBankMatches[0];
+    }
+  }
+
   // 2. If specific rule not found, search the 'default' rule
   if (!rule) {
     const defaultMatches = dsrRules.filter(
@@ -75,6 +89,20 @@ export function getDsrRule(params: {
     }
 
     rule = defaultMatches[0];
+
+    // Default fallback search for real_estate_only if specific defaulted combination fails
+    if (!rule && productType !== 'personal_only' && productType !== 'real_estate_only') {
+      const fallbackDefaultMatches = dsrRules.filter(
+        r => r.bankId === 'default' &&
+             r.productType === 'real_estate_only' &&
+             r.supportType === supportType &&
+             r.customerStage === customerStage &&
+             r.active !== false
+      );
+      if (fallbackDefaultMatches.length === 1) {
+        rule = fallbackDefaultMatches[0];
+      }
+    }
   }
 
   // 3. If still not found, throw clean error & print complete diagnostics
