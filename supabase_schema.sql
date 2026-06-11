@@ -25,6 +25,16 @@ CREATE TABLE public.admins (
   user_id uuid PRIMARY KEY
 );
 
+-- دالة التحقق الآمنة من رتبة المسؤول لمنع التكرار اللانهائي في السياسات (is_admin)
+CREATE OR REPLACE FUNCTION public.is_admin(user_uuid uuid)
+RETURNS boolean AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.admins WHERE user_id = user_uuid
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
 -- 3. الجداول الأخرى الخاصة بالمعايير والحسبة لضمان تشغيل النظام
 CREATE TABLE IF NOT EXISTS public.institution_settings (
   id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -144,6 +154,14 @@ CREATE TABLE IF NOT EXISTS public.system_settings (
   updated_by text
 );
 
+DROP TABLE IF EXISTS public.app_settings_history CASCADE;
+
+CREATE TABLE public.app_settings_history (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  snapshot jsonb NOT NULL,
+  created_at timestamp with time zone DEFAULT now()
+);
+
 -- 4. الفهارس والقيود (Indexes & Constraints) لضمان الأداء السريع والصلابة
 CREATE INDEX IF NOT EXISTS app_users_email_idx ON public.app_users(email);
 CREATE INDEX IF NOT EXISTS rule_versions_table_record_idx ON public.rule_versions(table_name, record_id);
@@ -164,45 +182,49 @@ ALTER TABLE public.saved_results ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.housing_support_tiers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.advance_payment_tiers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.system_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.app_settings_history ENABLE ROW LEVEL SECURITY;
 
 -- 6. سياسات RLS النظيفة (الدخول للوحة التحكم والحسبة آمن بالكامل)
 -- سياسة المستخدمين:
 CREATE POLICY "Users can only read and write their own data" ON public.app_users FOR ALL USING (auth.uid() = id);
 
 -- سياسة المشرفين:
-CREATE POLICY "Admins full access" ON public.admins FOR ALL USING (auth.uid() = user_id OR auth.uid() IN (SELECT user_id FROM public.admins));
+-- لمنع التكرار اللانهائي، نستخدم الدالة الآمنة لتمكين القراءة الآمنة وقفل التعديل بالكامل
+CREATE POLICY "Only admins can select admins" ON public.admins FOR SELECT USING (public.is_admin(auth.uid()));
 
 CREATE POLICY "read_all" ON public.institution_settings FOR SELECT USING (true);
-CREATE POLICY "write_all" ON public.institution_settings FOR ALL USING (auth.uid() IN (SELECT user_id FROM public.admins));
+CREATE POLICY "write_all" ON public.institution_settings FOR ALL USING (public.is_admin(auth.uid()));
 
 CREATE POLICY "read_all" ON public.sector_classification_mapping FOR SELECT USING (true);
-CREATE POLICY "write_all" ON public.sector_classification_mapping FOR ALL USING (auth.uid() IN (SELECT user_id FROM public.admins));
+CREATE POLICY "write_all" ON public.sector_classification_mapping FOR ALL USING (public.is_admin(auth.uid()));
 
 CREATE POLICY "read_all" ON public.approved_salary_source_rules FOR SELECT USING (true);
-CREATE POLICY "write_all" ON public.approved_salary_source_rules FOR ALL USING (auth.uid() IN (SELECT user_id FROM public.admins));
+CREATE POLICY "write_all" ON public.approved_salary_source_rules FOR ALL USING (public.is_admin(auth.uid()));
 
 CREATE POLICY "read_all" ON public.pension_calculation_rules FOR SELECT USING (true);
-CREATE POLICY "write_all" ON public.pension_calculation_rules FOR ALL USING (auth.uid() IN (SELECT user_id FROM public.admins));
+CREATE POLICY "write_all" ON public.pension_calculation_rules FOR ALL USING (public.is_admin(auth.uid()));
 
 CREATE POLICY "read_all" ON public.retirement_term_rules FOR SELECT USING (true);
-CREATE POLICY "write_all" ON public.retirement_term_rules FOR ALL USING (auth.uid() IN (SELECT user_id FROM public.admins));
+CREATE POLICY "write_all" ON public.retirement_term_rules FOR ALL USING (public.is_admin(auth.uid()));
 
 CREATE POLICY "read_all" ON public.rule_versions FOR SELECT USING (true);
-CREATE POLICY "write_all" ON public.rule_versions FOR ALL USING (auth.uid() IN (SELECT user_id FROM public.admins));
+CREATE POLICY "write_all" ON public.rule_versions FOR ALL USING (public.is_admin(auth.uid()));
 
 CREATE POLICY "read_all" ON public.housing_support_tiers FOR SELECT USING (true);
-CREATE POLICY "write_all" ON public.housing_support_tiers FOR ALL USING (auth.uid() IN (SELECT user_id FROM public.admins));
+CREATE POLICY "write_all" ON public.housing_support_tiers FOR ALL USING (public.is_admin(auth.uid()));
 
 CREATE POLICY "read_all" ON public.advance_payment_tiers FOR SELECT USING (true);
-CREATE POLICY "write_all" ON public.advance_payment_tiers FOR ALL USING (auth.uid() IN (SELECT user_id FROM public.admins));
+CREATE POLICY "write_all" ON public.advance_payment_tiers FOR ALL USING (public.is_admin(auth.uid()));
 
+-- سياسات system_settings
 CREATE POLICY "Anyone can read system settings" ON public.system_settings FOR SELECT USING (true);
-CREATE POLICY "Only admins can modify settings"
-ON system_settings
-FOR ALL
-USING (
-  auth.uid() IN (SELECT user_id FROM admins)
-);
+CREATE POLICY "Only admins can insert system settings" ON public.system_settings FOR INSERT WITH CHECK (public.is_admin(auth.uid()));
+CREATE POLICY "Only admins can update system settings" ON public.system_settings FOR UPDATE USING (public.is_admin(auth.uid()));
+CREATE POLICY "Only admins can delete system settings" ON public.system_settings FOR DELETE USING (public.is_admin(auth.uid()));
+
+-- سياسات app_settings_history
+CREATE POLICY "Authenticated users can insert history snapshots" ON public.app_settings_history FOR INSERT WITH CHECK (auth.role() = 'authenticated' OR auth.uid() IS NOT NULL);
+CREATE POLICY "Only admins can select history snapshots" ON public.app_settings_history FOR SELECT USING (public.is_admin(auth.uid()));
 
 CREATE POLICY "users_select_own" ON public.saved_results FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "users_insert_own" ON public.saved_results FOR INSERT WITH CHECK (auth.uid() = user_id);

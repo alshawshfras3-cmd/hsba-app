@@ -13,10 +13,7 @@ import NumericInput from './NumericInput';
 import { 
   fetchApprovedSalaryRules, 
   fetchPensionCalculationRules, 
-  fetchSectorClassificationMappings,
-  fallbackApprovedSalaryRules,
-  fallbackPensionRules,
-  fallbackSectorMappings
+  fetchSectorClassificationMappings
 } from '../../lib/pensionDb';
 import { 
   ApprovedSalarySourceRule, 
@@ -406,9 +403,9 @@ export default function StepWizard() {
   }, [currentStep, flow, setActiveStepLabel, results]);
 
   // Pension DB Rules States
-  const approvedSalaryDbRules = contextApprovedSalaryRules || fallbackApprovedSalaryRules;
-  const pensionDbRules = contextPensionDbRules || fallbackPensionRules;
-  const sectorMappings = contextSectorMappings || fallbackSectorMappings;
+  const approvedSalaryDbRules = contextApprovedSalaryRules || [];
+  const pensionDbRules = contextPensionDbRules || [];
+  const sectorMappings = contextSectorMappings || [];
 
   // Dynamic Pension Calculation
   const pensionCalcObj = calculatePensionSalary({

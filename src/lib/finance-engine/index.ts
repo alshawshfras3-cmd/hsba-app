@@ -50,9 +50,6 @@ import {
   getStandardizedDate 
 } from '../date-utils';
 import { 
-  fallbackApprovedSalaryRules, 
-  fallbackPensionRules, 
-  fallbackSectorMappings,
   combineToRetirementRules
 } from '../pensionDb';
 
@@ -355,9 +352,9 @@ export function calculateBanksFinancing(params: {
     advancePaymentTiers,
     personalRules,
     termRules = [],
-    approvedSalaryDbRules = fallbackApprovedSalaryRules,
-    pensionDbRules = fallbackPensionRules,
-    sectorMappings = fallbackSectorMappings,
+    approvedSalaryDbRules = [],
+    pensionDbRules = [],
+    sectorMappings = [],
     bankSectorRules,
     customSectors
   } = params;
@@ -1236,9 +1233,9 @@ export function calculateAll(params: {
     personalRules,
     termRules,
 
-    approvedSalaryDbRules = fallbackApprovedSalaryRules,
-    pensionDbRules = fallbackPensionRules,
-    sectorMappings = fallbackSectorMappings,
+    approvedSalaryDbRules = [],
+    pensionDbRules = [],
+    sectorMappings = [],
     bankSectorRules,
     customSectors
   } = params;

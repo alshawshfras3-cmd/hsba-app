@@ -10,10 +10,7 @@ import { getMissingDsrRulesList, getTemplateDsrPercent } from '../../lib/setting
 import { 
   fetchApprovedSalaryRules, 
   fetchPensionCalculationRules, 
-  fetchSectorClassificationMappings,
-  fallbackApprovedSalaryRules,
-  fallbackPensionRules,
-  fallbackSectorMappings
+  fetchSectorClassificationMappings
 } from '../../lib/pensionDb';
 import { 
   ApprovedSalarySourceRule, 
@@ -92,18 +89,15 @@ export function DiagnosticsPage() {
 
   useEffect(() => {
     setLoadingDb(true);
-    const salary = contextApprovedSalaryRules || fallbackApprovedSalaryRules;
-    const pension = contextPensionDbRules || fallbackPensionRules;
-    const mappings = contextSectorMappings || fallbackSectorMappings;
+    const salary = contextApprovedSalaryRules || [];
+    const pension = contextPensionDbRules || [];
+    const mappings = contextSectorMappings || [];
 
     setDbApprovedSalaryRules(salary);
     setDbPensionRules(pension);
     setDbSectorMappings(mappings);
 
-    const isFallback = (salary === fallbackApprovedSalaryRules) ||
-                       (pension === fallbackPensionRules) ||
-                       (mappings === fallbackSectorMappings) ||
-                       (salary.length === 0) ||
+    const isFallback = (salary.length === 0) ||
                        (pension.length === 0) ||
                        (mappings.length === 0);
     setIsFallbackWarning(isFallback);

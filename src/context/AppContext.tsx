@@ -838,42 +838,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   };
 
   const restoreLastBackup = async () => {
-    try {
-      // 🔹 جلب آخر نسخة احتياطية
-      const { data, error } = await supabase
-        .from('app_settings_history')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-
-      if (error || !data?.snapshot) {
-        alert('لا توجد نسخة احتياطية متاحة');
-        return;
-      }
-
-      // 🔹 تأكيد المستخدم
-      const confirmRestore = window.confirm(
-        'هل أنت متأكد من استرجاع آخر نسخة؟ سيتم استبدال جميع الإعدادات الحالية.'
-      );
-
-      if (!confirmRestore) return;
-
-      // 🔹 استرجاع النسخة
-      await supabase.from('system_settings').upsert({
-        key: 'app_settings',
-        value: data.snapshot
-      });
-
-      alert('تم استرجاع النسخة بنجاح');
-
-      // 🔹 إعادة تحميل الصفحة لتحديث البيانات
-      window.location.reload();
-
-    } catch (err) {
-      console.error('[RESTORE ERROR]', err);
-      alert('حدث خطأ أثناء الاسترجاع');
-    }
+    alert('عملية استعادة النسخة الاحتياطية معطلة حالياً بشكل مباشر لضمان بقاء مصدر البيانات الفريد والآمن (system_settings -> app_settings). يمكن لمدير قاعدة البيانات استرجاعها يدوياً.');
   };
 
   const reinitializeAllSettings = async () => {
