@@ -31,31 +31,8 @@ export function normalizeMemoryProductId(id: string): string {
   return id;
 }
 
-const emptySettings: Record<string, any> = {
-  banks: [],
-  product_acceptance: [],
-  military_ranks: [],
-  salary_rules: [],
-  pension_rules: [],
-  term_rules: [],
-  margin_rules: [],
-  dsrRules: [],
-  dsr_rules: [],
-  support_settings: {},
-  personal_finance_rules: [],
-  advanced_rules: [],
-  hasba_custom_sectors: [],
-  bank_sector_pension_rules: [],
-  pension_rules_library: [],
-  housingSupportTiers: [],
-  advancePaymentTiers: [],
-  approvedSalaryRules: [],
-  pensionDbRules: [],
-  sectorMappings: [],
-};
-
 export function useSettings() {
-  const [settings, setSettings] = useState<Record<string, any>>(emptySettings);
+  const [settings, setSettings] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(false);
   const [initialized, setInitialized] = useState(true);
   const [supabaseFetched, setSupabaseFetched] = useState(!hasSupabaseKeys);
@@ -85,15 +62,20 @@ export function useSettings() {
       }
 
       if (!data || !data.value) {
-        throw new Error("Supabase settings not loaded");
+        console.warn('[SETTINGS] Supabase settings empty');
+        setSettings({});
+        setSupabaseLoadStatus('empty_db');
+        setSupabaseFetched(true);
+        setLoading(false);
+        return;
       }
 
       const appSettingsObj = data.value;
       console.log('[SETTINGS] key found in Supabase, using Supabase value: app_settings (source of truth)');
 
       const loadedMargins = appSettingsObj.marginRules ?? appSettingsObj.margin_rules ?? [];
-      if (!Array.isArray(loadedMargins) || loadedMargins.length === 0) {
-        throw new Error('خطأ حرج: جدول الهوامش (marginRules) فارغ أو مفقود في ملف الإعدادات المركزي (app_settings).');
+      if (!Array.isArray(loadedMargins)) {
+        throw new Error('marginRules invalid');
       }
 
       setSupabaseLoadStatus('success');
