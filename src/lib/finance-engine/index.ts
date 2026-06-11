@@ -40,7 +40,7 @@ import {
 import { calculateFinanceTerm } from './term';
 import { calculateHousingSupport } from './support';
 import { calculateDSR } from './dsr';
-import { calculateMargin } from './margin';
+import { calculateMargin, resolveConfiguredMarginMode } from './margin';
 import { calculatePersonalFinance, getPersonalFinanceRule } from './personal-finance';
 import { calculateRealEstateFinance } from './real-estate-finance';
 import { runDiagnostics } from './diagnostics';
@@ -86,7 +86,7 @@ export { calculatePensionSalary } from './pension';
 export { calculateFinanceTerm } from './term';
 export { calculateHousingSupport } from './support';
 export { calculateDSR } from './dsr';
-export { calculateMargin } from './margin';
+export { calculateMargin, resolveConfiguredMarginMode } from './margin';
 export { calculatePersonalFinance } from './personal-finance';
 export { calculateRealEstateFinance } from './real-estate-finance';
 export { runDiagnostics } from './diagnostics';
@@ -759,6 +759,15 @@ export function calculateBanksFinancing(params: {
     // 7. Calculate interest margins using interpolation
     let marginResult: any = null;
     if (hasRealEstate) {
+      const marginMode = resolveConfiguredMarginMode({
+        bankId: bank.id,
+        productId: normalizedProductId,
+        supportType,
+        sectorId,
+        marginRules,
+        netSalary: solvedNetSalary
+      });
+
       marginResult = calculateMargin({
         bankId: bank.id,
         productId: normalizedProductId,
@@ -766,7 +775,8 @@ export function calculateBanksFinancing(params: {
         sectorId,
         termMonths: termResult.totalMonths,
         marginRules,
-        netSalary: solvedNetSalary
+        netSalary: solvedNetSalary,
+        calculationMode: marginMode
       });
     } else {
       marginResult = {
@@ -1426,6 +1436,18 @@ export function calculateAll(params: {
   });
 
   // Calculate Margin and Personal Loan if needed
+  let secondMarginMode: 'duration_tiers' | 'yearly' | 'key_points' = 'key_points';
+  if (hasRealEstate) {
+    secondMarginMode = resolveConfiguredMarginMode({
+      bankId,
+      productId: normalizedProductId,
+      supportType: 'none',
+      sectorId,
+      marginRules,
+      netSalary: solvedNetSalary
+    });
+  }
+
   const marginResult = hasRealEstate
     ? calculateMargin({
         bankId,
@@ -1434,7 +1456,8 @@ export function calculateAll(params: {
         sectorId,
         termMonths: termResult.totalMonths,
         marginRules,
-        netSalary: solvedNetSalary
+        netSalary: solvedNetSalary,
+        calculationMode: secondMarginMode
       })
     : {
         annualMargin: 0,

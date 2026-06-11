@@ -981,7 +981,8 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                   sectorId: sec.id as SectorId,
                   termMonths: year * 12,
                   marginRules,
-                  netSalary: tier === 'below_25000' ? 20000 : tier === 'above_or_equal_25000' ? 30000 : undefined
+                  netSalary: tier === 'below_25000' ? 20000 : tier === 'above_or_equal_25000' ? 30000 : undefined,
+                  calculationMode: (selectedYearsMode === 'yearly' || selectedYearsMode === 'key_points') ? selectedYearsMode : 'key_points'
                 });
 
                 let matchedBaseRule = relevantRules.find(r => 

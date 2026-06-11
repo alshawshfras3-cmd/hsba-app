@@ -14,6 +14,84 @@ export const getRuleInputMode = (r: MarginRule): 'yearly' | 'key_points' | 'dura
   return 'key_points';
 };
 
+export function resolveConfiguredMarginMode(params: {
+  bankId: string;
+  productId: ProductId;
+  supportType: SupportType;
+  sectorId: SectorId;
+  marginRules: MarginRule[];
+  netSalary?: number;
+}): 'duration_tiers' | 'yearly' | 'key_points' {
+  let normProduct = params.productId;
+  if (normProduct === 'real_estate' || normProduct === 'real_estate_only') {
+    normProduct = 'real_estate_only';
+  } else if (normProduct === 'both' || normProduct === 'real_estate_with_new_personal') {
+    normProduct = 'real_estate_with_new_personal';
+  } else if (normProduct === 'real_estate_with_personal_existing' || normProduct === 'real_estate_with_existing_personal') {
+    normProduct = 'real_estate_with_existing_personal';
+  }
+
+  const normSup = (s?: string) => {
+    if (!s || s === 'none') return 'none';
+    if (s === 'down_payment' || s === 'downpayment') return 'downpayment';
+    return s;
+  };
+  const normSec = (s?: string) => (!s || s === 'all') ? 'all' : s;
+  const normSal = (t?: string) => (!t || t === 'not_applicable') ? 'not_applicable' : t;
+
+  let salaryTier: 'below_25000' | 'above_or_equal_25000' | 'not_applicable' = 'not_applicable';
+  if (normSup(params.supportType) !== 'none' && params.netSalary !== undefined) {
+    salaryTier = params.netSalary < 25000 ? 'below_25000' : 'above_or_equal_25000';
+  }
+
+  const targetSupportNorm = normSup(params.supportType);
+  const targetSalaryTierNorm = normSal(salaryTier);
+  const targetSectorNorm = normSec(params.sectorId);
+
+  let matchingRules = params.marginRules.filter(
+    r => r.bankId === params.bankId &&
+         r.productId === normProduct &&
+         (normSup(r.supportType) === 'all' || normSup(r.supportType) === targetSupportNorm) &&
+         (normSec(r.sectorId) === targetSectorNorm) &&
+         r.isActive &&
+         (normSal(r.salaryTier) === 'not_applicable' || normSal(r.salaryTier) === targetSalaryTierNorm) &&
+         !r.isExceptionOnly
+  );
+
+  if (matchingRules.length === 0) {
+    matchingRules = params.marginRules.filter(
+      r => r.bankId === params.bankId &&
+           r.productId === normProduct &&
+           (normSup(r.supportType) === 'all' || normSup(r.supportType) === targetSupportNorm) &&
+           (normSec(r.sectorId) === 'all') &&
+           r.isActive &&
+           (normSal(r.salaryTier) === 'not_applicable' || normSal(r.salaryTier) === targetSalaryTierNorm) &&
+           !r.isExceptionOnly
+    );
+  }
+
+  const specificRules = matchingRules.filter(r => normSal(r.salaryTier) === targetSalaryTierNorm);
+  if (specificRules.length > 0) {
+    matchingRules = specificRules;
+  }
+
+  if (matchingRules.length === 0) {
+    matchingRules = params.marginRules.filter(
+      r => r.bankId === 'all' &&
+           r.productId === normProduct &&
+           r.isActive &&
+           !r.isExceptionOnly
+    );
+  }
+
+  const withInputMode = matchingRules.find(r => r.marginInputMode);
+  if (withInputMode && withInputMode.marginInputMode) {
+    return withInputMode.marginInputMode as 'duration_tiers' | 'yearly' | 'key_points';
+  }
+
+  return 'key_points';
+}
+
 export function calculateMargin(params: {
   bankId: string;
   productId: ProductId;
@@ -22,8 +100,9 @@ export function calculateMargin(params: {
   termMonths: number;
   marginRules: MarginRule[];
   netSalary?: number;
+  calculationMode: 'duration_tiers' | 'yearly' | 'key_points';
 }): MarginOutput {
-  const { bankId, productId, supportType, sectorId, termMonths, marginRules, netSalary } = params;
+  const { bankId, productId, supportType, sectorId, termMonths, marginRules, netSalary, calculationMode } = params;
 
   // 1. Normalize productId to the values defined inside margin settings
   let normProduct: ProductId = productId;
@@ -153,127 +232,120 @@ export function calculateMargin(params: {
   let marginType: 'fixed' | 'linear' = 'fixed';
   let annualMarginError: string | undefined = undefined;
 
-  // Find the active input mode
-  let activeInputMode: 'duration_tiers' | 'yearly' | 'key_points' = 'key_points';
-  const hasDurationTiers = rules.some(r => getRuleInputMode(r) === 'duration_tiers');
-  const hasYearly = rules.some(r => getRuleInputMode(r) === 'yearly');
-  const hasKeyPoints = rules.some(r => getRuleInputMode(r) === 'key_points');
+  const activeInputMode = calculationMode;
 
-  if (hasDurationTiers) {
-    activeInputMode = 'duration_tiers';
-  } else if (hasYearly) {
-    activeInputMode = 'yearly';
-  } else if (hasKeyPoints) {
-    activeInputMode = 'key_points';
-  }
-
-  // Filter rules array to ONLY contain rules of this activeInputMode to prevent any mixing!
-  rules = rules.filter(r => getRuleInputMode(r) === activeInputMode);
-
-  if (activeInputMode === 'duration_tiers') {
-    const tierRules = rules.filter(r => getRuleInputMode(r) === 'duration_tiers' && r.fromMonth !== undefined && r.toMonth !== undefined);
-    const matchedTier = tierRules.find(r => termMonths >= r.fromMonth! && termMonths <= r.toMonth!);
-    if (matchedTier) {
-      annualMargin = matchedTier.marginRate ?? 0;
-      if (matchedTier.marginRate === undefined || matchedTier.marginRate === null) {
-        annualMarginError = "لا تتوفر شريحة هامش صالحة لهذه المدة (القيمة غير محددة).";
+  switch (activeInputMode) {
+    case 'duration_tiers': {
+      const tierRules = rules.filter(r => r.fromMonth !== undefined && r.toMonth !== undefined);
+      const matchedTier = tierRules.find(r => termMonths >= r.fromMonth! && termMonths <= r.toMonth!);
+      if (matchedTier) {
+        annualMargin = matchedTier.marginRate ?? 0;
+        if (matchedTier.marginRate === undefined || matchedTier.marginRate === null) {
+          annualMarginError = "لا تتوفر شريحة هامش صالحة لهذه المدة (القيمة غير محددة).";
+        }
+        ruleUsed = `هامش شريحة مدة التمويل (${matchedTier.fromMonth} إلى ${matchedTier.toMonth} شهر) بمعدل ${annualMargin}%.`;
+      } else {
+        annualMargin = 0;
+        annualMarginError = "لا توجد شريحة هامش مطابقة لمدة التمويل لهذا البنك.";
+        ruleUsed = `لم يتم العثور على شريحة مدة تمويل مطابقة لـ ${termMonths} شهر لهذا البنك.`;
       }
-      ruleUsed = `هامش شريحة مدة التمويل (${matchedTier.fromMonth} إلى ${matchedTier.toMonth} شهر) بمعدل ${annualMargin}%.`;
-    } else {
-      annualMargin = 0;
-      annualMarginError = "لا توجد شريحة هامش مطابقة لمدة التمويل لهذا البنك.";
-      ruleUsed = `لم يتم العثور على شريحة مدة تمويل مطابقة لـ ${termMonths} شهر لهذا البنك.`;
+      break;
     }
-  } else if (activeInputMode === 'key_points') {
-    const termYearsFloat = termMonths / 12;
-    if (termYearsFloat <= 5) {
-      const res = getMarginForExactMonths(60);
-      if (res.error) {
-        annualMarginError = `لا توجد قاعدة هامش مطابقة لسنة 5 (60 شهر) لهذه الجهة التمويلية.`;
-      }
-      annualMargin = res.margin;
-      ruleUsed = `هامش سنة 5 للجهة التمويلية بمعدل ${annualMargin}%.`;
-    } else if (termYearsFloat >= 30) {
-      const res = getMarginForExactMonths(360);
-      if (res.error) {
-        annualMarginError = `لا توجد قاعدة هامش مطابقة لسنة 30 (360 شهر) لهذه الجهة التمويلية.`;
-      }
-      annualMargin = res.margin;
-      ruleUsed = `هامش سنة 30 للجهة التمويلية بمعدل ${annualMargin}%.`;
-    } else {
-      const points = [5, 10, 15, 20, 25, 30];
-      const lowYear = points.reduce((prev, curr) => curr <= termYearsFloat ? curr : prev, 5);
-      const highYear = points.find(p => p >= termYearsFloat) || 30;
-
-      if (lowYear === highYear) {
-        const res = getMarginForExactMonths(lowYear * 12);
+    case 'key_points': {
+      const termYearsFloat = termMonths / 12;
+      if (termYearsFloat <= 5) {
+        const res = getMarginForExactMonths(60);
         if (res.error) {
-          annualMarginError = `لا توجد قاعدة هامش مطابقة لسنة ${lowYear} (${lowYear * 12} شهر) لهذه الجهة التمويلية.`;
+          annualMarginError = `لا توجد قاعدة هامش مطابقة لسنة 5 (60 شهر) لهذه الجهة التمويلية.`;
         }
         annualMargin = res.margin;
-        ruleUsed = `هامش سنة ${lowYear} للجهة التمويلية بمعدل ${annualMargin}%.`;
-      } else {
-        const lowMonths = lowYear * 12;
-        const highMonths = highYear * 12;
-        const resLow = getMarginForExactMonths(lowMonths);
-        const resHigh = getMarginForExactMonths(highMonths);
-
-        if (resLow.error || resHigh.error) {
-          annualMarginError = `لا توجد قاعدة هامش مطابقة للاستقراء بين سنة ${lowYear} وسنة ${highYear} لهذه الجهة التمويلية.`;
-        }
-        const mLow = resLow.margin;
-        const mHigh = resHigh.margin;
-
-        annualMargin = mLow + ((termMonths - lowMonths) / (highMonths - lowMonths)) * (mHigh - mLow);
-        marginType = 'linear';
-        ruleUsed = `هامش مستقرأ بين سنة ${lowYear} (${mLow}%) وسنة ${highYear} (${mHigh}%) بمعدل ${annualMargin.toFixed(3)}%.`;
-      }
-    }
-  } else {
-    // yearly mode
-    const termYearsFloat = termMonths / 12;
-    if (termYearsFloat <= 5) {
-      const res = getMarginForExactMonths(60);
-      if (res.error) {
-        annualMarginError = `لا توجد قاعدة هامش مطابقة لسنة 5 (60 شهر) لهذه الجهة التمويلية.`;
-      }
-      annualMargin = res.margin;
-      ruleUsed = `هامش سنة 5 للجهة التمويلية بمعدل ${annualMargin}%.`;
-    } else if (termYearsFloat >= 30) {
-      const res = getMarginForExactMonths(360);
-      if (res.error) {
-        annualMarginError = `لا توجد قاعدة هامش مطابقة لسنة 30 (360 شهر) لهذه الجهة التمويلية.`;
-      }
-      annualMargin = res.margin;
-      ruleUsed = `هامش سنة 30 للجهة التمويلية بمعدل ${annualMargin}%.`;
-    } else {
-      if (termMonths % 12 === 0) {
-        const res = getMarginForExactMonths(termMonths);
+        ruleUsed = `هامش سنة 5 للجهة التمويلية بمعدل ${annualMargin}%.`;
+      } else if (termYearsFloat >= 30) {
+        const res = getMarginForExactMonths(360);
         if (res.error) {
-          annualMarginError = `لا توجد قاعدة هامش مطابقة لسنة ${selectedMarginYear} (${termMonths} شهر) لهذه الجهة التمويلية.`;
+          annualMarginError = `لا توجد قاعدة هامش مطابقة لسنة 30 (360 شهر) لهذه الجهة التمويلية.`;
         }
         annualMargin = res.margin;
-        ruleUsed = `هامش سنة ${selectedMarginYear} للجهة التمويلية بمعدل ${annualMargin}%.`;
+        ruleUsed = `هامش سنة 30 للجهة التمويلية بمعدل ${annualMargin}%.`;
       } else {
-        const lowYear = Math.floor(termYearsFloat);
-        const highYear = Math.ceil(termYearsFloat);
-        const lowMonths = lowYear * 12;
-        const highMonths = highYear * 12;
+        const points = [5, 10, 15, 20, 25, 30];
+        const lowYear = points.reduce((prev, curr) => curr <= termYearsFloat ? curr : prev, 5);
+        const highYear = points.find(p => p >= termYearsFloat) || 30;
 
-        const resLow = getMarginForExactMonths(lowMonths);
-        const resHigh = getMarginForExactMonths(highMonths);
+        if (lowYear === highYear) {
+          const res = getMarginForExactMonths(lowYear * 12);
+          if (res.error) {
+            annualMarginError = `لا توجد قاعدة هامش مطابقة لسنة ${lowYear} (${lowYear * 12} شهر) لهذه الجهة التمويلية.`;
+          }
+          annualMargin = res.margin;
+          ruleUsed = `هامش سنة ${lowYear} للجهة التمويلية بمعدل ${annualMargin}%.`;
+        } else {
+          const lowMonths = lowYear * 12;
+          const highMonths = highYear * 12;
+          const resLow = getMarginForExactMonths(lowMonths);
+          const resHigh = getMarginForExactMonths(highMonths);
 
-        if (resLow.error || resHigh.error) {
-          annualMarginError = `لا توجد قاعدة هامش مطابقة للاستقراء بين سنة ${lowYear} وسنة ${highYear} لهذه الجهة التمويلية.`;
+          if (resLow.error || resHigh.error) {
+            annualMarginError = `لا توجد قاعدة هامش مطابقة للاستقراء بين سنة ${lowYear} وسنة ${highYear} لهذه الجهة التمويلية.`;
+          }
+          const mLow = resLow.margin;
+          const mHigh = resHigh.margin;
+
+          annualMargin = mLow + ((termMonths - lowMonths) / (highMonths - lowMonths)) * (mHigh - mLow);
+          marginType = 'linear';
+          ruleUsed = `هامش مستقرأ بين سنة ${lowYear} (${mLow}%) وسنة ${highYear} (${mHigh}%) بمعدل ${annualMargin.toFixed(3)}%.`;
         }
-        const mLow = resLow.margin;
-        const mHigh = resHigh.margin;
-
-        annualMargin = mLow + ((termMonths - lowMonths) / (highMonths - lowMonths)) * (mHigh - mLow);
-        marginType = 'linear';
-        ruleUsed = `هامش مستقرأ بين سنة ${lowYear} (${mLow}%) وسنة ${highYear} (${mHigh}%) بمعدل ${annualMargin.toFixed(3)}%.`;
       }
+      break;
     }
+    case 'yearly': {
+      const termYearsFloat = termMonths / 12;
+      if (termYearsFloat <= 5) {
+        const res = getMarginForExactMonths(60);
+        if (res.error) {
+          annualMarginError = `لا توجد قاعدة هامش مطابقة لسنة 5 (60 شهر) لهذه الجهة التمويلية.`;
+        }
+        annualMargin = res.margin;
+        ruleUsed = `هامش سنة 5 للجهة التمويلية بمعدل ${annualMargin}%.`;
+      } else if (termYearsFloat >= 30) {
+        const res = getMarginForExactMonths(360);
+        if (res.error) {
+          annualMarginError = `لا توجد قاعدة هامش مطابقة لسنة 30 (360 شهر) لهذه الجهة التمويلية.`;
+        }
+        annualMargin = res.margin;
+        ruleUsed = `هامش سنة 30 للجهة التمويلية بمعدل ${annualMargin}%.`;
+      } else {
+        if (termMonths % 12 === 0) {
+          const res = getMarginForExactMonths(termMonths);
+          if (res.error) {
+            annualMarginError = `لا توجد قاعدة هامش مطابقة لسنة ${selectedMarginYear} (${termMonths} شهر) لهذه الجهة التمويلية.`;
+          }
+          annualMargin = res.margin;
+          ruleUsed = `هامش سنة ${selectedMarginYear} للجهة التمويلية بمعدل ${annualMargin}%.`;
+        } else {
+          const lowYear = Math.floor(termYearsFloat);
+          const highYear = Math.ceil(termYearsFloat);
+          const lowMonths = lowYear * 12;
+          const highMonths = highYear * 12;
+
+          const resLow = getMarginForExactMonths(lowMonths);
+          const resHigh = getMarginForExactMonths(highMonths);
+
+          if (resLow.error || resHigh.error) {
+            annualMarginError = `لا توجد قاعدة هامش مطابقة للاستقراء بين سنة ${lowYear} وسنة ${highYear} لهذه الجهة التمويلية.`;
+          }
+          const mLow = resLow.margin;
+          const mHigh = resHigh.margin;
+
+          annualMargin = mLow + ((termMonths - lowMonths) / (highMonths - lowMonths)) * (mHigh - mLow);
+          marginType = 'linear';
+          ruleUsed = `هامش مستقرأ بين سنة ${lowYear} (${mLow}%) وسنة ${highYear} (${mHigh}%) بمعدل ${annualMargin.toFixed(3)}%.`;
+        }
+      }
+      break;
+    }
+    default:
+      throw new Error('Invalid calculation mode');
   }
 
   // Round margin to 3 decimal places
