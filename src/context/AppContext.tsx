@@ -445,33 +445,186 @@ const getInitialSettings = (): AdminSettings => {
   };
 };
 
+function isEqual(a: any, b: any) {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
 export function AppStateProvider({ children }: { children: ReactNode }) {
   const initialData = getInitialSettings();
 
-  const [banks, setBanks] = useState<Bank[]>(initialData.banks);
-  const [products, setProducts] = useState<ProductAcceptance[]>(initialData.products);
-  const [militaryRanks, setMilitaryRanks] = useState<MilitaryRank[]>(initialData.militaryRanks);
-  const [salaryRules, setSalaryRules] = useState<NetSalaryRule[]>(initialData.salaryRules);
-  const [pensionRules, setPensionRules] = useState<PensionRule[]>(initialData.pensionRules);
-  const [termRules, setTermRules] = useState<TermRule[]>(initialData.termRules);
-  const [marginRules, setMarginRules] = useState<MarginRule[]>(initialData.marginRules);
-  const [dsrRules, setDsrRules] = useState<DsrRule[]>(initialData.dsrRules);
-  const [supportSettings, setSupportSettings] = useState<SupportSettings>(initialData.supportSettings);
-  const [housingSupportTiers, setHousingSupportTiers] = useState<HousingSupportTier[]>(initialData.housingSupportTiers);
-  const [advancePaymentTiers, setAdvancePaymentTiers] = useState<AdvancePaymentTier[]>(initialData.advancePaymentTiers);
-  const [personalRules, setPersonalRules] = useState<PersonalFinanceRules[]>(initialData.personalRules);
-  const [advancedRules, setAdvancedRules] = useState<AdvancedRule[]>(initialData.advancedRules);
+  const [banks, setBanksState] = useState<Bank[]>(initialData.banks);
+  const setBanks = React.useCallback((val: Bank[] | ((prev: Bank[]) => Bank[])) => {
+    setBanksState(prev => {
+      const next = typeof val === 'function' ? val(prev) : val;
+      if (isEqual(prev, next)) return prev;
+      return next;
+    });
+  }, []);
 
-  const [approvedSalaryRules, setApprovedSalaryRules] = useState<any[]>([]);
-  const [pensionDbRules, setPensionDbRules] = useState<any[]>([]);
-  const [sectorMappings, setSectorMappings] = useState<any[]>([]);
+  const [products, setProductsState] = useState<ProductAcceptance[]>(initialData.products);
+  const setProducts = React.useCallback((val: ProductAcceptance[] | ((prev: ProductAcceptance[]) => ProductAcceptance[])) => {
+    setProductsState(prev => {
+      const next = typeof val === 'function' ? val(prev) : val;
+      if (isEqual(prev, next)) return prev;
+      return next;
+    });
+  }, []);
+
+  const [militaryRanks, setMilitaryRanksState] = useState<MilitaryRank[]>(initialData.militaryRanks);
+  const setMilitaryRanks = React.useCallback((val: MilitaryRank[] | ((prev: MilitaryRank[]) => MilitaryRank[])) => {
+    setMilitaryRanksState(prev => {
+      const next = typeof val === 'function' ? val(prev) : val;
+      if (isEqual(prev, next)) return prev;
+      return next;
+    });
+  }, []);
+
+  const [salaryRules, setSalaryRulesState] = useState<NetSalaryRule[]>(initialData.salaryRules);
+  const setSalaryRules = React.useCallback((val: NetSalaryRule[] | ((prev: NetSalaryRule[]) => NetSalaryRule[])) => {
+    setSalaryRulesState(prev => {
+      const next = typeof val === 'function' ? val(prev) : val;
+      if (isEqual(prev, next)) return prev;
+      return next;
+    });
+  }, []);
+
+  const [pensionRules, setPensionRulesState] = useState<PensionRule[]>(initialData.pensionRules);
+  const setPensionRules = React.useCallback((val: PensionRule[] | ((prev: PensionRule[]) => PensionRule[])) => {
+    setPensionRulesState(prev => {
+      const next = typeof val === 'function' ? val(prev) : val;
+      if (isEqual(prev, next)) return prev;
+      return next;
+    });
+  }, []);
+
+  const [termRules, setTermRulesState] = useState<TermRule[]>(initialData.termRules);
+  const setTermRules = React.useCallback((val: TermRule[] | ((prev: TermRule[]) => TermRule[])) => {
+    setTermRulesState(prev => {
+      const next = typeof val === 'function' ? val(prev) : val;
+      if (isEqual(prev, next)) return prev;
+      return next;
+    });
+  }, []);
+
+  const [marginRules, setMarginRulesState] = useState<MarginRule[]>(initialData.marginRules);
+  const setMarginRules = React.useCallback((val: MarginRule[] | ((prev: MarginRule[]) => MarginRule[])) => {
+    setMarginRulesState(prev => {
+      const next = typeof val === 'function' ? val(prev) : val;
+      if (isEqual(prev, next)) return prev;
+      return next;
+    });
+  }, []);
+
+  const [dsrRules, setDsrRulesState] = useState<DsrRule[]>(initialData.dsrRules);
+  const setDsrRules = React.useCallback((val: DsrRule[] | ((prev: DsrRule[]) => DsrRule[])) => {
+    setDsrRulesState(prev => {
+      const next = typeof val === 'function' ? val(prev) : val;
+      if (isEqual(prev, next)) return prev;
+      return next;
+    });
+  }, []);
+
+  const [supportSettings, setSupportSettingsState] = useState<SupportSettings>(initialData.supportSettings);
+  const setSupportSettings = React.useCallback((val: SupportSettings | ((prev: SupportSettings) => SupportSettings)) => {
+    setSupportSettingsState(prev => {
+      const next = typeof val === 'function' ? val(prev) : val;
+      if (isEqual(prev, next)) return prev;
+      return next;
+    });
+  }, []);
+
+  const [housingSupportTiers, setHousingSupportTiersState] = useState<HousingSupportTier[]>(initialData.housingSupportTiers);
+  const setHousingSupportTiers = React.useCallback((val: HousingSupportTier[] | ((prev: HousingSupportTier[]) => HousingSupportTier[])) => {
+    setHousingSupportTiersState(prev => {
+      const next = typeof val === 'function' ? val(prev) : val;
+      if (isEqual(prev, next)) return prev;
+      return next;
+    });
+  }, []);
+
+  const [advancePaymentTiers, setAdvancePaymentTiersState] = useState<AdvancePaymentTier[]>(initialData.advancePaymentTiers);
+  const setAdvancePaymentTiers = React.useCallback((val: AdvancePaymentTier[] | ((prev: AdvancePaymentTier[]) => AdvancePaymentTier[])) => {
+    setAdvancePaymentTiersState(prev => {
+      const next = typeof val === 'function' ? val(prev) : val;
+      if (isEqual(prev, next)) return prev;
+      return next;
+    });
+  }, []);
+
+  const [personalRules, setPersonalRulesState] = useState<PersonalFinanceRules[]>(initialData.personalRules);
+  const setPersonalRules = React.useCallback((val: PersonalFinanceRules[] | ((prev: PersonalFinanceRules[]) => PersonalFinanceRules[])) => {
+    setPersonalRulesState(prev => {
+      const next = typeof val === 'function' ? val(prev) : val;
+      if (isEqual(prev, next)) return prev;
+      return next;
+    });
+  }, []);
+
+  const [advancedRules, setAdvancedRulesState] = useState<AdvancedRule[]>(initialData.advancedRules);
+  const setAdvancedRules = React.useCallback((val: AdvancedRule[] | ((prev: AdvancedRule[]) => AdvancedRule[])) => {
+    setAdvancedRulesState(prev => {
+      const next = typeof val === 'function' ? val(prev) : val;
+      if (isEqual(prev, next)) return prev;
+      return next;
+    });
+  }, []);
+
+  const [approvedSalaryRules, setApprovedSalaryRulesState] = useState<any[]>([]);
+  const setApprovedSalaryRules = React.useCallback((val: any[] | ((prev: any[]) => any[])) => {
+    setApprovedSalaryRulesState(prev => {
+      const next = typeof val === 'function' ? val(prev) : val;
+      if (isEqual(prev, next)) return prev;
+      return next;
+    });
+  }, []);
+
+  const [pensionDbRules, setPensionDbRulesState] = useState<any[]>([]);
+  const setPensionDbRules = React.useCallback((val: any[] | ((prev: any[]) => any[])) => {
+    setPensionDbRulesState(prev => {
+      const next = typeof val === 'function' ? val(prev) : val;
+      if (isEqual(prev, next)) return prev;
+      return next;
+    });
+  }, []);
+
+  const [sectorMappings, setSectorMappingsState] = useState<any[]>([]);
+  const setSectorMappings = React.useCallback((val: any[] | ((prev: any[]) => any[])) => {
+    setSectorMappingsState(prev => {
+      const next = typeof val === 'function' ? val(prev) : val;
+      if (isEqual(prev, next)) return prev;
+      return next;
+    });
+  }, []);
 
   const [calculationLogs, setCalculationLogs] = useState<CalculationLog[]>(initialCalculationLogs);
   const [userSubscriptions, setUserSubscriptions] = useState<UserSubscription[]>(initialData.userSubscriptions || initialUserSubscriptions);
 
-  const [customSectors, setCustomSectors] = useState<any[]>(initialData.customSectors || defaultSectorsList);
-  const [bankSectorRules, setBankSectorRules] = useState<BankSectorPensionRule[]>(initialData.bankSectorRules || []);
-  const [pensionRulesLibrary, setPensionRulesLibrary] = useState<PensionLibraryRule[]>(initialData.pensionRulesLibrary || defaultLibraryRules);
+  const [customSectors, setCustomSectorsState] = useState<any[]>(initialData.customSectors || defaultSectorsList);
+  const setCustomSectors = React.useCallback((val: any[] | ((prev: any[]) => any[])) => {
+    setCustomSectorsState(prev => {
+      const next = typeof val === 'function' ? val(prev) : val;
+      if (isEqual(prev, next)) return prev;
+      return next;
+    });
+  }, []);
+
+  const [bankSectorRules, setBankSectorRulesState] = useState<BankSectorPensionRule[]>(initialData.bankSectorRules || []);
+  const setBankSectorRules = React.useCallback((val: BankSectorPensionRule[] | ((prev: BankSectorPensionRule[]) => BankSectorPensionRule[])) => {
+    setBankSectorRulesState(prev => {
+      const next = typeof val === 'function' ? val(prev) : val;
+      if (isEqual(prev, next)) return prev;
+      return next;
+    });
+  }, []);
+
+  const [pensionRulesLibrary, setPensionRulesLibraryState] = useState<PensionLibraryRule[]>(initialData.pensionRulesLibrary || defaultLibraryRules);
+  const setPensionRulesLibrary = React.useCallback((val: PensionLibraryRule[] | ((prev: PensionLibraryRule[]) => PensionLibraryRule[])) => {
+    setPensionRulesLibraryState(prev => {
+      const next = typeof val === 'function' ? val(prev) : val;
+      if (isEqual(prev, next)) return prev;
+      return next;
+    });
+  }, []);
 
   const [activeNav, setActiveNav] = useState<'calculator' | 'admin'>('calculator');
   const [adminSubPage, setAdminSubPage] = useState<string>('banks');
@@ -493,7 +646,14 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [results, setResults] = useState<any[] | null>(null);
   const [isMobileSettingsOpen, setIsMobileSettingsOpen] = useState<boolean>(false);
 
-  const [savedSettings, setSavedSettings] = useState<AdminSettings>(initialData);
+  const [savedSettings, setSavedSettingsState] = useState<AdminSettings>(initialData);
+  const setSavedSettings = React.useCallback((val: AdminSettings | ((prev: AdminSettings) => AdminSettings)) => {
+    setSavedSettingsState(prev => {
+      const next = typeof val === 'function' ? val(prev) : val;
+      if (isEqual(prev, next)) return prev;
+      return next;
+    });
+  }, []);
 
   // Helper helper to correctly apply partial or full settings update to state and savedSettings
   const applySettingsState = (data: Partial<AdminSettings>) => {
