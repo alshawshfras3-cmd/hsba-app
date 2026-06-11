@@ -239,8 +239,14 @@ export async function saveApprovedSalaryRule(rule: ApprovedSalarySourceRule): Pr
 
     if (selectError) throw selectError;
 
-    if (!data?.value || typeof data.value !== 'object' || Object.keys(data.value).length === 0) {
-      throw new Error('🚫 تم منع الحفظ: فشل قراءة app_settings من Supabase');
+    const hasValidSettings =
+      data?.value &&
+      typeof data.value === 'object' &&
+      Object.keys(data.value).length > 0;
+
+    if (!hasValidSettings) {
+      console.error('[SAFE GUARD] Failed to read app_settings from Supabase');
+      throw new Error('🚫 تم منع الحفظ: تعذر قراءة الإعدادات الحالية من Supabase');
     }
     const existing = data.value;
     let rules: ApprovedSalarySourceRule[] = [...(existing.approvedSalaryRules || existing.approvedSalaryDbRules || [])];
@@ -315,8 +321,14 @@ export async function savePensionCalculationRule(rule: PensionCalculationRule): 
 
     if (selectError) throw selectError;
 
-    if (!data?.value || typeof data.value !== 'object' || Object.keys(data.value).length === 0) {
-      throw new Error('🚫 تم منع الحفظ: فشل قراءة app_settings من Supabase');
+    const hasValidSettings =
+      data?.value &&
+      typeof data.value === 'object' &&
+      Object.keys(data.value).length > 0;
+
+    if (!hasValidSettings) {
+      console.error('[SAFE GUARD] Failed to read app_settings from Supabase');
+      throw new Error('🚫 تم منع الحفظ: تعذر قراءة الإعدادات الحالية من Supabase');
     }
     const existing = data.value;
     let rules: PensionCalculationRule[] = [...(existing.pensionDbRules || existing.pensionRules || [])];
@@ -391,8 +403,14 @@ export async function saveSectorClassificationMapping(mapping: SectorClassificat
 
     if (selectError) throw selectError;
 
-    if (!data?.value || typeof data.value !== 'object' || Object.keys(data.value).length === 0) {
-      throw new Error('🚫 تم منع الحفظ: فشل قراءة app_settings من Supabase');
+    const hasValidSettings =
+      data?.value &&
+      typeof data.value === 'object' &&
+      Object.keys(data.value).length > 0;
+
+    if (!hasValidSettings) {
+      console.error('[SAFE GUARD] Failed to read app_settings from Supabase');
+      throw new Error('🚫 تم منع الحفظ: تعذر قراءة الإعدادات الحالية من Supabase');
     }
     const existing = data.value;
     let mappings: SectorClassificationMapping[] = [...(existing.sectorMappings || existing.sectorClassificationMappings || [])];

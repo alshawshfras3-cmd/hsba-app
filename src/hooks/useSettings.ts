@@ -21,7 +21,6 @@ import {
   initialSalaryRules,
   initialPensionRules,
   initialTermRules,
-  initialMarginRules,
   initialDsrRules,
   initialSupportSettings,
   initialPersonalFinanceRules,
@@ -39,7 +38,6 @@ const defaultSectorsList = [
 
 const DEFAULTS: Record<string, any> = {
   banks: initialBanks,
-  margin_rules: initialMarginRules,
   dsr_rules: initialDsrRules,
   personal_finance_rules: initialPersonalFinanceRules,
   product_acceptance: initialProductAcceptance,
@@ -285,7 +283,7 @@ export function useSettings() {
           salaryRules: oldSettingsData['salary_rules'] || DEFAULTS['salary_rules'],
           pensionRules: oldSettingsData['pension_rules'] || DEFAULTS['pension_rules'],
           termRules: oldSettingsData['term_rules'] || DEFAULTS['term_rules'],
-          marginRules: oldSettingsData['margin_rules'] || DEFAULTS['margin_rules'],
+          marginRules: oldSettingsData['margin_rules'] || [],
           dsrRules: normalizeDsrRules(oldSettingsData['dsr_rules'] || DEFAULTS['dsr_rules']),
           supportSettings: oldSettingsData['support_settings'] || DEFAULTS['support_settings'],
           housingSupportTiers: oldTiers.length > 0 ? oldTiers : [...DEFAULT_HOUSING_SUPPORT_TIERS],

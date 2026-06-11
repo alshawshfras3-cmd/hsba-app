@@ -25,7 +25,6 @@ import {
   initialSalaryRules,
   initialPensionRules,
   initialTermRules,
-  initialMarginRules,
   initialDsrRules,
   initialSupportSettings,
   initialPersonalFinanceRules,
@@ -49,11 +48,6 @@ import { BankSectorPensionRule, PensionLibraryRule } from '../types/pension-rule
 import { defaultLibraryRules } from '../lib/finance-engine/pension';
 import { useSettings } from '../hooks/useSettings';
 import { normalizeDsrRules } from '../lib/settings/normalizeDsrRules';
-import {
-  fallbackApprovedSalaryRules,
-  fallbackPensionRules,
-  fallbackSectorMappings
-} from '../lib/pensionDb';
 
 interface AppContextType {
   banks: Bank[];
@@ -412,7 +406,7 @@ const getInitialSettings = (): AdminSettings => {
     salaryRules: initialSalaryRules,
     pensionRules: initialPensionRules,
     termRules: initialTermRules,
-    marginRules: initialMarginRules,
+    marginRules: [],
     dsrRules: initialDsrRules,
     supportSettings: initialSupportSettings,
     housingSupportTiers: [...DEFAULT_HOUSING_SUPPORT_TIERS],
@@ -443,9 +437,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [personalRules, setPersonalRules] = useState<PersonalFinanceRules[]>(initialData.personalRules);
   const [advancedRules, setAdvancedRules] = useState<AdvancedRule[]>(initialData.advancedRules);
 
-  const [approvedSalaryRules, setApprovedSalaryRules] = useState<any[]>(fallbackApprovedSalaryRules);
-  const [pensionDbRules, setPensionDbRules] = useState<any[]>(fallbackPensionRules);
-  const [sectorMappings, setSectorMappings] = useState<any[]>(fallbackSectorMappings);
+  const [approvedSalaryRules, setApprovedSalaryRules] = useState<any[]>([]);
+  const [pensionDbRules, setPensionDbRules] = useState<any[]>([]);
+  const [sectorMappings, setSectorMappings] = useState<any[]>([]);
 
   const [calculationLogs, setCalculationLogs] = useState<CalculationLog[]>(initialCalculationLogs);
   const [userSubscriptions, setUserSubscriptions] = useState<UserSubscription[]>(initialData.userSubscriptions || initialUserSubscriptions);
@@ -512,15 +506,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       pensionRules: clonedData.pensionRules ?? deepClone(initialData.pensionRules),
       termRules: clonedData.termRules ?? deepClone(initialData.termRules),
       marginRules: (() => {
-        if (Array.isArray(clonedData.marginRules) && clonedData.marginRules.length > 0) {
+        if (clonedData.marginRules !== undefined) {
           return upgradeMarginRules(clonedData.marginRules);
         }
-
-        if (marginRules.length > 0) {
-          return marginRules;
-        }
-
-        return [];
+        return marginRules;
       })(),
       dsrRules: clonedData.dsrRules ?? deepClone(initialData.dsrRules),
       supportSettings: clonedData.supportSettings ?? deepClone(initialData.supportSettings),
@@ -532,9 +521,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       customSectors: clonedData.customSectors ?? deepClone(initialData.customSectors),
       bankSectorRules: clonedData.bankSectorRules ?? deepClone(initialData.bankSectorRules),
       pensionRulesLibrary: clonedData.pensionRulesLibrary ?? deepClone(initialData.pensionRulesLibrary),
-      approvedSalaryRules: clonedData.approvedSalaryRules ?? clonedData.approvedSalaryDbRules ?? deepClone(fallbackApprovedSalaryRules),
-      pensionDbRules: clonedData.pensionDbRules ?? deepClone(fallbackPensionRules),
-      sectorMappings: clonedData.sectorMappings ?? deepClone(fallbackSectorMappings),
+      approvedSalaryRules: clonedData.approvedSalaryRules ?? clonedData.approvedSalaryDbRules ?? approvedSalaryRules,
+      pensionDbRules: clonedData.pensionDbRules ?? pensionDbRules,
+      sectorMappings: clonedData.sectorMappings ?? sectorMappings,
     };
     setSavedSettings(merged);
   };
@@ -631,9 +620,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           (settings.bank_sector_pension_rules !== undefined && settings.bank_sector_pension_rules !== null) ? settings.bank_sector_pension_rules : []
         ),
         pensionRulesLibrary: (settings.pension_rules_library !== undefined && settings.pension_rules_library !== null) ? settings.pension_rules_library : defaultLibraryRules,
-        approvedSalaryRules: (settings.approvedSalaryRules !== undefined && settings.approvedSalaryRules !== null) ? settings.approvedSalaryRules : fallbackApprovedSalaryRules,
-        pensionDbRules: (settings.pensionDbRules !== undefined && settings.pensionDbRules !== null) ? settings.pensionDbRules : fallbackPensionRules,
-        sectorMappings: (settings.sectorMappings !== undefined && settings.sectorMappings !== null) ? settings.sectorMappings : fallbackSectorMappings,
+        approvedSalaryRules: (settings.approvedSalaryRules !== undefined && settings.approvedSalaryRules !== null) ? settings.approvedSalaryRules : [],
+        pensionDbRules: (settings.pensionDbRules !== undefined && settings.pensionDbRules !== null) ? settings.pensionDbRules : [],
+        sectorMappings: (settings.sectorMappings !== undefined && settings.sectorMappings !== null) ? settings.sectorMappings : [],
       };
 
       // Guard: لو marginRules فارغ لكن Supabase load نجح → ابقَ على الـ state القديم

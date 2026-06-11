@@ -154,8 +154,14 @@ export async function saveHousingSupportTiers(tiers: HousingSupportTier[]): Prom
 
       if (selectError) throw selectError;
 
-      if (!data?.value || typeof data.value !== 'object' || Object.keys(data.value).length === 0) {
-        throw new Error('🚫 تم منع الحفظ: فشل قراءة app_settings من Supabase');
+      const hasValidSettings =
+        data?.value &&
+        typeof data.value === 'object' &&
+        Object.keys(data.value).length > 0;
+
+      if (!hasValidSettings) {
+        console.error('[SAFE GUARD] Failed to read app_settings from Supabase');
+        throw new Error('🚫 تم منع الحفظ: تعذر قراءة الإعدادات الحالية من Supabase');
       }
 
       const existing = data.value;
@@ -204,8 +210,14 @@ export async function saveAdvancePaymentTiers(tiers: AdvancePaymentTier[]): Prom
 
       if (selectError) throw selectError;
 
-      if (!data?.value || typeof data.value !== 'object' || Object.keys(data.value).length === 0) {
-        throw new Error('🚫 تم منع الحفظ: فشل قراءة app_settings من Supabase');
+      const hasValidSettings =
+        data?.value &&
+        typeof data.value === 'object' &&
+        Object.keys(data.value).length > 0;
+
+      if (!hasValidSettings) {
+        console.error('[SAFE GUARD] Failed to read app_settings from Supabase');
+        throw new Error('🚫 تم منع الحفظ: تعذر قراءة الإعدادات الحالية من Supabase');
       }
 
       const existing = data.value;
