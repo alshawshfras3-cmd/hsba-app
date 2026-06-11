@@ -154,8 +154,22 @@ export async function saveHousingSupportTiers(tiers: HousingSupportTier[]): Prom
 
       if (selectError) throw selectError;
 
-      let appSettings = data?.value || {};
-      appSettings.housingSupportTiers = tiers;
+      if (!data?.value || typeof data.value !== 'object' || Object.keys(data.value).length === 0) {
+        throw new Error('🚫 تم منع الحفظ: فشل قراءة app_settings من Supabase');
+      }
+
+      const existing = data.value;
+
+      // ⚠️ Guard: تأكد أن الكتابة لن تمسح الهوامش
+      const existingMargins = existing.marginRules ?? existing.margin_rules ?? [];
+      if (Array.isArray(existingMargins) && existingMargins.length > 5 && !existing.marginRules && !existing.margin_rules) {
+        console.warn('[housingSupportService] Warning: writing to app_settings without margins');
+      }
+
+      const appSettings = {
+        ...existing,
+        housingSupportTiers: tiers
+      };
 
       const { error: upsertError } = await supabase
         .from('system_settings')
@@ -190,8 +204,22 @@ export async function saveAdvancePaymentTiers(tiers: AdvancePaymentTier[]): Prom
 
       if (selectError) throw selectError;
 
-      let appSettings = data?.value || {};
-      appSettings.advancePaymentTiers = tiers;
+      if (!data?.value || typeof data.value !== 'object' || Object.keys(data.value).length === 0) {
+        throw new Error('🚫 تم منع الحفظ: فشل قراءة app_settings من Supabase');
+      }
+
+      const existing = data.value;
+
+      // ⚠️ Guard: تأكد أن الكتابة لن تمسح الهوامش
+      const existingMargins = existing.marginRules ?? existing.margin_rules ?? [];
+      if (Array.isArray(existingMargins) && existingMargins.length > 5 && !existing.marginRules && !existing.margin_rules) {
+        console.warn('[housingSupportService] Warning: writing to app_settings without margins');
+      }
+
+      const appSettings = {
+        ...existing,
+        advancePaymentTiers: tiers
+      };
 
       const { error: upsertError } = await supabase
         .from('system_settings')

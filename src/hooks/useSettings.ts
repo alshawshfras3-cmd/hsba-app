@@ -124,7 +124,7 @@ export function useSettings() {
   const [loading, setLoading] = useState(false);
   const [initialized, setInitialized] = useState(true);
   const [supabaseFetched, setSupabaseFetched] = useState(!hasSupabaseKeys);
-  const [supabaseLoadStatus, setSupabaseLoadStatus] = useState<'loading' | 'success' | 'failed' | 'empty_db'>(hasSupabaseKeys ? 'loading' : 'success');
+  const [supabaseLoadStatus, setSupabaseLoadStatus] = useState<'loading' | 'success' | 'failed' | 'empty_db' | 'read_only_protected'>(hasSupabaseKeys ? 'loading' : 'success');
   const [supabaseLoadError, setSupabaseLoadError] = useState<string | null>(null);
 
   // Fetch all system settings from Supabase
@@ -154,6 +154,13 @@ export function useSettings() {
         if (data.value && typeof data.value === 'object' && Object.keys(data.value).length > 0) {
           appSettingsObj = data.value;
           console.log('[SETTINGS] key found in Supabase, using Supabase value: app_settings (source of truth)');
+          
+          const loadedMargins = appSettingsObj.marginRules ?? appSettingsObj.margin_rules ?? [];
+          if (!Array.isArray(loadedMargins) || loadedMargins.length === 0) {
+            console.warn('[SETTINGS] ⚠️ app_settings loaded from Supabase but marginRules is EMPTY!');
+            console.warn('[SETTINGS] This may indicate a previous accidental overwrite. Check Supabase.');
+          }
+          
           setSupabaseLoadStatus('success');
         } else {
           console.log('[SETTINGS] Key exists in Supabase but is empty (e.g. empty object)');
@@ -296,6 +303,24 @@ export function useSettings() {
 
         // 4. Save key = 'app_settings' to make it available for future loads
         try {
+          // ⚠️ Guard: لا تكتب في Supabase لو القواعد الأساسية فارغة
+          // هذا يمنع محو البيانات بسبب cold start أو timeout
+          const hasMinimalData = (
+            Array.isArray(appSettingsObj.marginRules) && appSettingsObj.marginRules.length > 0
+          ) || (
+            Array.isArray(appSettingsObj.margin_rules) && appSettingsObj.margin_rules.length > 0
+          );
+          
+          if (!hasMinimalData) {
+            console.warn('[SETTINGS] Migration aborted: marginRules is empty. Refusing to overwrite Supabase with empty seeds.');
+            // ⚠️ هذه ليست حالة نجاح — الحفظ ممنوع حتى يُعاد تحميل Supabase بنجاح
+            // لا تستخدم 'success' هنا لأن ذلك يسمح بالحفظ لاحقًا رغم أن التحميل غير آمن
+            setSupabaseLoadStatus('read_only_protected');
+            setSupabaseFetched(true);
+            setLoading(false);
+            return;
+          }
+
           const { error: insertErr } = await supabase.from('system_settings').insert({
             key: 'app_settings',
             value: appSettingsObj,
@@ -323,7 +348,11 @@ export function useSettings() {
         salary_rules: appSettingsObj.salaryRules ?? appSettingsObj.salary_rules ?? [],
         pension_rules: appSettingsObj.pensionRules ?? appSettingsObj.pension_rules ?? [],
         term_rules: appSettingsObj.termRules ?? appSettingsObj.term_rules ?? [],
-        margin_rules: appSettingsObj.marginRules ?? appSettingsObj.margin_rules ?? [],
+        ...(
+          appSettingsObj.marginRules !== undefined || appSettingsObj.margin_rules !== undefined
+            ? { margin_rules: appSettingsObj.marginRules ?? appSettingsObj.margin_rules }
+            : {}
+        ),
         dsrRules: normalizeDsrRules(appSettingsObj.dsrRules ?? appSettingsObj.dsr_rules ?? []),
         dsr_rules: normalizeDsrRules(appSettingsObj.dsrRules ?? appSettingsObj.dsr_rules ?? []),
         support_settings: appSettingsObj.supportSettings ?? appSettingsObj.support_settings ?? {},
@@ -361,8 +390,8 @@ export function useSettings() {
 
   // Save specific settings to Supabase (backward compatibility fallback)
   const saveSetting = useCallback(async (key: string, value: any) => {
-    if (supabaseLoadStatus === 'failed') {
-      throw new Error('تعذر الحفظ لأن تحميل الإعدادات من قاعدة البيانات فشل في وقت سابق.');
+    if (supabaseLoadStatus === 'failed' || supabaseLoadStatus === 'read_only_protected') {
+      throw new Error('تعذر الحفظ لأن تحميل الإعدادات من قاعدة البيانات فشل في وقت سابق أو أن النظام قيد حماية القراءة فقط.');
     }
     // Redirect granular saves to write inside 'app_settings' key directly!
     try {
@@ -374,7 +403,11 @@ export function useSettings() {
 
       if (selectError) throw selectError;
 
-      let appSettings = data?.value || {};
+      if (!data?.value || typeof data.value !== 'object' || Object.keys(data.value).length === 0) {
+        throw new Error('🚫 تم منع الحفظ: فشل قراءة app_settings من Supabase');
+      }
+
+      let appSettings = data.value;
       const cacheField = DB_TO_CACHE_KEY[key] || key;
       appSettings[cacheField] = value;
       
@@ -386,6 +419,22 @@ export function useSettings() {
       }
 
       setSettings(prev => ({ ...prev, [key]: value }));
+
+      const currentMarginRulesInPayload = appSettings.marginRules ?? appSettings.margin_rules ?? [];
+      if (Array.isArray(currentMarginRulesInPayload) && currentMarginRulesInPayload.length === 0) {
+        // تحقق من Supabase قبل الكتابة
+        const { data: currentDb } = await supabase
+          .from('system_settings')
+          .select('value')
+          .eq('key', 'app_settings')
+          .maybeSingle();
+        
+        const dbMargins = currentDb?.value?.marginRules ?? currentDb?.value?.margin_rules ?? [];
+        if (Array.isArray(dbMargins) && dbMargins.length > 5) {
+          console.error('[SETTINGS] saveSetting blocked: payload has empty marginRules but DB has', dbMargins.length, 'margins');
+          throw new Error('تم منع الحفظ: الهوامش في الـ payload فارغة بينما Supabase يحتوي بيانات حقيقية.');
+        }
+      }
 
       if (hasSupabaseKeys) {
         await supabase.from('system_settings').upsert({
@@ -411,7 +460,12 @@ export function useSettings() {
     fetchSettings,
     saveSetting,
     banks: settings.banks !== undefined && settings.banks !== null ? settings.banks : DEFAULTS.banks,
-    marginRules: (settings.margin_rules !== undefined && settings.margin_rules !== null ? settings.margin_rules : DEFAULTS.margin_rules).map((r: any) => ({ ...r, productId: normalizeMemoryProductId(r.productId) })),
+    marginRules: settings.margin_rules !== undefined && settings.margin_rules !== null
+      ? (settings.margin_rules as any[]).map((r: any) => ({
+          ...r,
+          productId: normalizeMemoryProductId(r.productId)
+        }))
+      : undefined,
     dsrRules: normalizeDsrRules(settings.dsrRules !== undefined && settings.dsrRules !== null ? settings.dsrRules : (settings.dsr_rules !== undefined && settings.dsr_rules !== null ? settings.dsr_rules : DEFAULTS.dsr_rules)).map((r: any) => ({ ...r, productType: normalizeMemoryProductId(r.productType || r.productId) })),
     personalRules: (settings.personal_finance_rules !== undefined && settings.personal_finance_rules !== null ? settings.personal_finance_rules : DEFAULTS.personal_finance_rules).map((r: any) => ({ ...r, productId: normalizeMemoryProductId(r.productId) })),
     products: (settings.product_acceptance !== undefined && settings.product_acceptance !== null ? settings.product_acceptance : DEFAULTS.product_acceptance).map((r: any) => ({ ...r, productId: normalizeMemoryProductId(r.productId) })),

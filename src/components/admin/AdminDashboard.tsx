@@ -106,7 +106,7 @@ export default function AdminDashboard() {
     userSubscriptions, setUserSubscriptions,
     termRules, setTermRules,
     adminSubPage, setAdminSubPage,
-    hasUnsavedChanges, saveChanges, cancelChanges, reinitializeAllSettings,
+    hasUnsavedChanges, saveChanges, cancelChanges, reinitializeAllSettings, restoreLastBackup,
     customSectors: sectors, setCustomSectors: setSectors,
     bankSectorRules, setBankSectorRules,
     pensionRulesLibrary: libraryRules, setPensionRulesLibrary: setLibraryRules,
@@ -1732,6 +1732,15 @@ export default function AdminDashboard() {
           >
             <Lock className="w-3.5 h-3.5 shrink-0" />
             <span>تسجيل الخروج الآمن</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={restoreLastBackup}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 mt-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold transition-all border border-rose-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-rose-500/50"
+          >
+            <RefreshCw className="w-3.5 h-3.5 shrink-0 text-rose-500" />
+            <span>استرجاع آخر نسخة</span>
           </button>
         </div>
       </aside>

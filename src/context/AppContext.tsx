@@ -118,6 +118,7 @@ interface AppContextType {
   saveChanges: (overrideMarginRules?: MarginRule[]) => Promise<void>;
   cancelChanges: () => void;
   reinitializeAllSettings: () => Promise<void>;
+  restoreLastBackup: () => Promise<void>;
 
   supabaseLoadStatus: 'loading' | 'success' | 'failed' | 'empty_db';
   supabaseLoadError: string | null;
@@ -510,7 +511,17 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       salaryRules: clonedData.salaryRules ?? deepClone(initialData.salaryRules),
       pensionRules: clonedData.pensionRules ?? deepClone(initialData.pensionRules),
       termRules: clonedData.termRules ?? deepClone(initialData.termRules),
-      marginRules: clonedData.marginRules ? upgradeMarginRules(clonedData.marginRules) : deepClone(initialData.marginRules),
+      marginRules: (() => {
+        if (Array.isArray(clonedData.marginRules) && clonedData.marginRules.length > 0) {
+          return upgradeMarginRules(clonedData.marginRules);
+        }
+
+        if (marginRules.length > 0) {
+          return marginRules;
+        }
+
+        return [];
+      })(),
       dsrRules: clonedData.dsrRules ?? deepClone(initialData.dsrRules),
       supportSettings: clonedData.supportSettings ?? deepClone(initialData.supportSettings),
       housingSupportTiers: clonedData.housingSupportTiers ?? deepClone(initialData.housingSupportTiers),
@@ -593,7 +604,14 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         salaryRules: (settings.salary_rules !== undefined && settings.salary_rules !== null) ? settings.salary_rules : initialData.salaryRules,
         pensionRules: (settings.pension_rules !== undefined && settings.pension_rules !== null) ? settings.pension_rules : initialData.pensionRules,
         termRules: (settings.term_rules !== undefined && settings.term_rules !== null) ? settings.term_rules : initialData.termRules,
-        marginRules: upgradeMarginRules((settings.margin_rules !== undefined && settings.margin_rules !== null) ? settings.margin_rules : []),
+        marginRules: (() => {
+          const raw = settings.margin_rules ?? settings.marginRules ?? null;
+          if (raw === null || raw === undefined) {
+            console.warn('[SYNC] margin_rules missing from settings — keeping existing state');
+            return marginRules; // ← ابقَ على الـ state الحالي
+          }
+          return upgradeMarginRules(raw);
+        })(),
         dsrRules: normalizeDsrRules(
           (settings.dsrRules !== undefined && settings.dsrRules !== null)
             ? settings.dsrRules
@@ -617,6 +635,18 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         pensionDbRules: (settings.pensionDbRules !== undefined && settings.pensionDbRules !== null) ? settings.pensionDbRules : fallbackPensionRules,
         sectorMappings: (settings.sectorMappings !== undefined && settings.sectorMappings !== null) ? settings.sectorMappings : fallbackSectorMappings,
       };
+
+      // Guard: لو marginRules فارغ لكن Supabase load نجح → ابقَ على الـ state القديم
+      if (
+        supabaseLoadStatus === 'success' &&
+        Array.isArray(merged.marginRules) &&
+        merged.marginRules.length === 0 &&
+        Array.isArray(marginRules) &&
+        marginRules.length > 0
+      ) {
+        console.warn('[SYNC GUARD] marginRules arrived empty from settings but state has', marginRules.length, 'rules. Keeping existing state.');
+        merged.marginRules = marginRules; // ابقَ على الـ state الحالي
+      }
 
       applySettingsState(merged);
       setHasSynced(true);
@@ -685,8 +715,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   }, [currentSettings, savedSettings, isSettingsLoading]);
 
   const saveChanges = async (overrideMarginRules?: MarginRule[]) => {
-    if (supabaseLoadStatus === 'failed') {
-      throw new Error('لا يمكن حفظ التغييرات لأن تحميل البيانات من قاعدة البيانات (Supabase) فشل. تم قفل الحفظ لضمان عدم تلف البيانات المتواجدة على الخادم.');
+    if (supabaseLoadStatus === 'read_only_protected' || supabaseLoadStatus === 'failed') {
+      throw new Error('الحفظ محظور: لم يتم تحميل الإعدادات من Supabase بنجاح أو أن النظام قيد حماية القراءة فقط. أعد تحميل الصفحة.');
     }
 
     const clonedCurrent = deepClone(currentSettings);
@@ -694,25 +724,48 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     if (hasSupabaseKeys) {
       try {
         let dbMarginCount = 0;
+        let dbFetchSucceeded = false;
         try {
           const { data: dbData } = await supabase
             .from('system_settings')
             .select('value')
             .eq('key', 'app_settings')
             .maybeSingle();
-          if (dbData && dbData.value) {
-            const dbRules = dbData.value.marginRules ?? dbData.value.margin_rules ?? [];
-            dbMarginCount = Array.isArray(dbRules) ? dbRules.length : 0;
+          if (dbData) {
+            if (dbData.value) {
+              const dbRules = dbData.value.marginRules ?? dbData.value.margin_rules ?? [];
+              dbMarginCount = Array.isArray(dbRules) ? dbRules.length : 0;
+            }
+            dbFetchSucceeded = true;
+          } else {
+            // No record exists in DB yet, which is valid for a completely new DB
+            dbFetchSucceeded = true;
           }
         } catch (fetchErr) {
           console.error("Safeguard: failed to pre-fetch database margin count:", fetchErr);
         }
 
         const currentMarginCount = Array.isArray(overrideMarginRules || marginRules) ? (overrideMarginRules || marginRules).length : 0;
-        
+
+        console.log('[SAFE GUARD]', {
+          dbMarginCount,
+          currentMarginCount,
+          loadStatus: supabaseLoadStatus
+        });
+
+        // Fail closed — لو فشل جلب Supabase → امنع الحفظ فوراً
+        if (!dbFetchSucceeded) {
+          throw new Error('🚫 تم منع الحفظ: فشل قراءة Supabase');
+        }
+
         // If DB has a substantial number of margins and current count is less than 70% of DB
         if (dbMarginCount > 10 && currentMarginCount < dbMarginCount * 0.7) {
           throw new Error(`حماية سلامة البيانات: تم منع الحفظ بسبب تفاوت كبير في عدد الهوامش! يحتوي السيرفر على (${dbMarginCount}) هامش بينما تحتوي النسخة الحالية على (${currentMarginCount}) هوامش فقط (أقل من 70%). لمنع تصفير القواعد بالخطأ، يرجى إعادة تحميل الصفحة واستعادتها.`);
+        }
+
+        // Guard إضافي — state فارغ + Supabase ممتلئ:
+        if (currentMarginCount === 0 && dbMarginCount > 0) {
+          throw new Error('🚫 تم منع الحفظ: state فارغ سيحذف البيانات');
         }
 
         const currentSettingsObject = {
@@ -749,6 +802,28 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           payload.updated_by = updated_by_user;
         }
 
+        // 🔹 Backup قبل الحفظ
+        try {
+          const { data: currentSettings } = await supabase
+            .from('system_settings')
+            .select('value')
+            .eq('key', 'app_settings')
+            .maybeSingle();
+
+          if (currentSettings?.value) {
+            await supabase.from('app_settings_history').insert({
+              snapshot: currentSettings.value
+            });
+
+            console.log('[BACKUP] Snapshot saved before update');
+          } else {
+            console.warn('[BACKUP] No existing app_settings found, skipping backup');
+          }
+        } catch (backupErr) {
+          console.error('[BACKUP ERROR]', backupErr);
+          // لا توقف الحفظ — فقط سجل الخطأ
+        }
+
         const { error } = await supabase.from('system_settings').upsert(payload);
         if (error) {
           throw error;
@@ -771,6 +846,45 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   const cancelChanges = () => {
     applySettingsState(deepClone(savedSettings));
+  };
+
+  const restoreLastBackup = async () => {
+    try {
+      // 🔹 جلب آخر نسخة احتياطية
+      const { data, error } = await supabase
+        .from('app_settings_history')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error || !data?.snapshot) {
+        alert('لا توجد نسخة احتياطية متاحة');
+        return;
+      }
+
+      // 🔹 تأكيد المستخدم
+      const confirmRestore = window.confirm(
+        'هل أنت متأكد من استرجاع آخر نسخة؟ سيتم استبدال جميع الإعدادات الحالية.'
+      );
+
+      if (!confirmRestore) return;
+
+      // 🔹 استرجاع النسخة
+      await supabase.from('system_settings').upsert({
+        key: 'app_settings',
+        value: data.snapshot
+      });
+
+      alert('تم استرجاع النسخة بنجاح');
+
+      // 🔹 إعادة تحميل الصفحة لتحديث البيانات
+      window.location.reload();
+
+    } catch (err) {
+      console.error('[RESTORE ERROR]', err);
+      alert('حدث خطأ أثناء الاسترجاع');
+    }
   };
 
   const reinitializeAllSettings = async () => {
@@ -837,6 +951,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         hasUnsavedChanges,
         saveChanges,
         cancelChanges,
+        restoreLastBackup,
         reinitializeAllSettings,
 
         supabaseLoadStatus,

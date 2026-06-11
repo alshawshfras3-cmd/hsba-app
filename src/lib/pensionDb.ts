@@ -239,8 +239,11 @@ export async function saveApprovedSalaryRule(rule: ApprovedSalarySourceRule): Pr
 
     if (selectError) throw selectError;
 
-    let appSettings = data?.value || {};
-    let rules: ApprovedSalarySourceRule[] = appSettings.approvedSalaryRules || appSettings.approvedSalaryDbRules || [];
+    if (!data?.value || typeof data.value !== 'object' || Object.keys(data.value).length === 0) {
+      throw new Error('🚫 تم منع الحفظ: فشل قراءة app_settings من Supabase');
+    }
+    const existing = data.value;
+    let rules: ApprovedSalarySourceRule[] = [...(existing.approvedSalaryRules || existing.approvedSalaryDbRules || [])];
 
     const index = rules.findIndex((r: any) => r.bankId === rule.bankId && r.sectorId === rule.sectorId);
     if (index >= 0) {
@@ -249,8 +252,11 @@ export async function saveApprovedSalaryRule(rule: ApprovedSalarySourceRule): Pr
       rules.push(rule);
     }
 
-    appSettings.approvedSalaryRules = rules;
-    appSettings.approvedSalaryDbRules = rules;
+    const appSettings = {
+      ...existing,
+      approvedSalaryRules: rules,
+      approvedSalaryDbRules: rules
+    };
 
     const { error: upsertError } = await supabase
       .from('system_settings')
@@ -309,8 +315,11 @@ export async function savePensionCalculationRule(rule: PensionCalculationRule): 
 
     if (selectError) throw selectError;
 
-    let appSettings = data?.value || {};
-    let rules: PensionCalculationRule[] = appSettings.pensionDbRules || appSettings.pensionRules || [];
+    if (!data?.value || typeof data.value !== 'object' || Object.keys(data.value).length === 0) {
+      throw new Error('🚫 تم منع الحفظ: فشل قراءة app_settings من Supabase');
+    }
+    const existing = data.value;
+    let rules: PensionCalculationRule[] = [...(existing.pensionDbRules || existing.pensionRules || [])];
 
     const index = rules.findIndex((r: any) => r.bankId === rule.bankId && r.sectorId === rule.sectorId);
     if (index >= 0) {
@@ -319,8 +328,11 @@ export async function savePensionCalculationRule(rule: PensionCalculationRule): 
       rules.push(rule);
     }
 
-    appSettings.pensionDbRules = rules;
-    appSettings.pensionRules = rules;
+    const appSettings = {
+      ...existing,
+      pensionDbRules: rules,
+      pensionRules: rules
+    };
 
     const { error: upsertError } = await supabase
       .from('system_settings')
@@ -379,8 +391,11 @@ export async function saveSectorClassificationMapping(mapping: SectorClassificat
 
     if (selectError) throw selectError;
 
-    let appSettings = data?.value || {};
-    let mappings: SectorClassificationMapping[] = appSettings.sectorMappings || appSettings.sectorClassificationMappings || [];
+    if (!data?.value || typeof data.value !== 'object' || Object.keys(data.value).length === 0) {
+      throw new Error('🚫 تم منع الحفظ: فشل قراءة app_settings من Supabase');
+    }
+    const existing = data.value;
+    let mappings: SectorClassificationMapping[] = [...(existing.sectorMappings || existing.sectorClassificationMappings || [])];
 
     const index = mappings.findIndex((r: any) => r.bankId === mapping.bankId && r.sectorId === mapping.sectorId);
     if (index >= 0) {
@@ -389,8 +404,11 @@ export async function saveSectorClassificationMapping(mapping: SectorClassificat
       mappings.push(mapping);
     }
 
-    appSettings.sectorMappings = mappings;
-    appSettings.sectorClassificationMappings = mappings;
+    const appSettings = {
+      ...existing,
+      sectorMappings: mappings,
+      sectorClassificationMappings: mappings
+    };
 
     const { error: upsertError } = await supabase
       .from('system_settings')
