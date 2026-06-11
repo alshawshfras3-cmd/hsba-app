@@ -248,6 +248,10 @@ function normalizeBeforeCompare(val: any): any {
   if (typeof val === 'object') {
     const res: any = {};
     const keys = Object.keys(val).sort();
+    
+    // Check if this object is a MarginRule or MarginException to apply specific filters
+    const isMarginRule = ('bankId' in val) && (('productId' in val) || ('isExceptionOnly' in val));
+
     for (const key of keys) {
       if ([
         'updated_at',
@@ -259,6 +263,27 @@ function normalizeBeforeCompare(val: any): any {
       ].includes(key)) {
         continue;
       }
+      
+      // For MarginRules, ignore purely UI metadata/transient keys and generated/arbitrary IDs
+      if (isMarginRule && [
+        'id',
+        'productType',
+        'marginInputMode',
+        'calculationMethod',
+        'year',
+        'termMonths',
+        'annualMargin',
+        'fromMonth',
+        'toMonth',
+        'marginRate',
+        'notes',
+        'active',
+        'isActive',
+        'yearPoint'
+      ].includes(key)) {
+        continue;
+      }
+
       const v = val[key];
       if (v !== undefined && v !== null) {
         res[key] = normalizeBeforeCompare(v);
