@@ -708,9 +708,6 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     const normSrcSupport = (srcSupport as string) === 'down_payment' || srcSupport === 'downpayment' ? 'downpayment' : srcSupport;
     const normDstSupport = (dstSupport as string) === 'down_payment' || dstSupport === 'downpayment' ? 'downpayment' : dstSupport;
 
-    // Try both with/without salary tier to get the rules of the source
-    const srcSalaryTier = normSrcSupport === 'none' ? 'not_applicable' : 'below_25000';
-
     const relevantSrcRules = marginRules.map(r => {
       let pId = r.productId as string;
       if (pId === 'real_estate') pId = 'real_estate_only';
@@ -729,8 +726,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       r.bankId === srcBank && 
       r.productId === srcProduct && 
       (r.supportType === normSrcSupport || r.supportType === 'all') &&
-      (!r.isExceptionOnly) &&
-      (r.salaryTier === srcSalaryTier || (!r.salaryTier && srcSalaryTier === 'not_applicable') || r.salaryTier === 'not_applicable' || !r.salaryTier)
+      (!r.isExceptionOnly)
     );
 
     // Resolve target parameters
@@ -743,71 +739,89 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     const shouldCopyKeyPoints = copyTableType === 'key_points' || copyTableType === 'all';
     const shouldCopyYearly = copyTableType === 'yearly' || copyTableType === 'all';
 
+    // Helper to target the correct source salary tier matching the target salary tier
+    const getSrcSalaryTierForTarget = (targetTier: string) => {
+      if (normSrcSupport === 'none') {
+        return 'not_applicable';
+      }
+      if (targetTier === 'above_or_equal_25000') {
+        return 'above_or_equal_25000';
+      }
+      return 'below_25000';
+    };
+
     // 1. Process Duration Tiers
     if (shouldCopyTiers) {
-      const tierRules = relevantSrcRules.filter(r => r.marginInputMode === 'duration_tiers');
-      if (tierRules.length > 0) {
-        targetSalaryTiers.forEach(targetSalaryTier => {
-          tierRules.forEach((srcRule, idx) => {
-            newRulesForDst.push({
-              id: `copied_tier_${dstBank}_${dstProduct}_${normDstSupport}_${targetSalaryTier}_t${srcRule.fromMonth}_${srcRule.toMonth}_${idx}_${Date.now()}`,
-              bankId: dstBank,
-              productId: dstProduct,
-              supportType: normDstSupport as any,
-              sectorId: 'all',
-              fromTermMonths: srcRule.fromMonth!,
-              toTermMonths: srcRule.toMonth!,
-              startMargin: srcRule.marginRate!,
-              endMargin: srcRule.marginRate!,
-              calcType: 'fixed',
-              isActive: srcRule.active !== false && srcRule.isActive !== false,
-              salaryTier: targetSalaryTier,
-              productType: dstProduct as any,
-              marginInputMode: 'duration_tiers',
-              calculationMethod: 'fixed',
-              termMonths: srcRule.toMonth!,
-              annualMargin: srcRule.marginRate!,
-              exceptionBps: 0,
-              baseMargin: Number((srcRule.marginRate! / 100).toFixed(6)),
-              fromMonth: srcRule.fromMonth!,
-              toMonth: srcRule.toMonth!,
-              marginRate: srcRule.marginRate!,
-              active: srcRule.active !== false && srcRule.isActive !== false,
-              notes: srcRule.notes || ''
-            });
+      targetSalaryTiers.forEach(targetSalaryTier => {
+        const matchingSrcTier = getSrcSalaryTierForTarget(targetSalaryTier);
+        const tierRules = relevantSrcRules.filter(r => 
+          (r.marginInputMode === 'duration_tiers' || getRuleInputMode(r) === 'duration_tiers') &&
+          (r.salaryTier === matchingSrcTier || (!r.salaryTier && matchingSrcTier === 'not_applicable') || r.salaryTier === 'not_applicable' || !r.salaryTier)
+        );
+
+        tierRules.forEach((srcRule, idx) => {
+          newRulesForDst.push({
+            id: `copied_tier_${dstBank}_${dstProduct}_${normDstSupport}_${targetSalaryTier}_t${srcRule.fromMonth || srcRule.fromTermMonths || 0}_${srcRule.toMonth || srcRule.toTermMonths || 9999}_${idx}_${Date.now()}`,
+            bankId: dstBank,
+            productId: dstProduct,
+            supportType: normDstSupport as any,
+            sectorId: 'all',
+            fromTermMonths: (srcRule.fromMonth !== undefined ? srcRule.fromMonth : srcRule.fromTermMonths)!,
+            toTermMonths: (srcRule.toMonth !== undefined ? srcRule.toMonth : srcRule.toTermMonths)!,
+            startMargin: (srcRule.marginRate !== undefined ? srcRule.marginRate : srcRule.annualMargin)!,
+            endMargin: (srcRule.marginRate !== undefined ? srcRule.marginRate : srcRule.annualMargin)!,
+            calcType: 'fixed',
+            isActive: srcRule.active !== false && srcRule.isActive !== false,
+            salaryTier: targetSalaryTier,
+            productType: dstProduct as any,
+            marginInputMode: 'duration_tiers',
+            calculationMethod: 'fixed',
+            termMonths: (srcRule.toMonth !== undefined ? srcRule.toMonth : srcRule.toTermMonths)!,
+            annualMargin: (srcRule.marginRate !== undefined ? srcRule.marginRate : srcRule.annualMargin)!,
+            exceptionBps: 0,
+            baseMargin: Number((((srcRule.marginRate !== undefined ? srcRule.marginRate : srcRule.annualMargin) || 0) / 100).toFixed(6)),
+            fromMonth: (srcRule.fromMonth !== undefined ? srcRule.fromMonth : srcRule.fromTermMonths)!,
+            toMonth: (srcRule.toMonth !== undefined ? srcRule.toMonth : srcRule.toTermMonths)!,
+            marginRate: (srcRule.marginRate !== undefined ? srcRule.marginRate : srcRule.annualMargin)!,
+            active: srcRule.active !== false && srcRule.isActive !== false,
+            notes: srcRule.notes || ''
           });
         });
-      }
+      });
     }
 
     // 2. Process Key Points
     if (shouldCopyKeyPoints) {
-      const srcKeyPointRules = relevantSrcRules.filter(r => r.marginInputMode === 'key_points' || (!r.marginInputMode && [5, 10, 15, 20, 25, 30].includes(r.year || r.toTermMonths/12)));
-      
-      const srcMarginsKeyPoints: Record<number, string> = {};
-      [5, 10, 15, 20, 25, 30].forEach(year => {
-        const rY = srcKeyPointRules.find(r => r.year === year || r.toTermMonths === year * 12);
-        if (rY) {
-          srcMarginsKeyPoints[year] = (rY.annualMargin !== undefined ? rY.annualMargin : (rY.baseMargin !== undefined ? Number((rY.baseMargin * 100).toFixed(3)) : rY.endMargin)).toLocaleString('en-US', {useGrouping: false});
-        } else {
-          srcMarginsKeyPoints[year] = '';
+      targetSalaryTiers.forEach(targetSalaryTier => {
+        const matchingSrcTier = getSrcSalaryTierForTarget(targetSalaryTier);
+        const srcKeyPointRules = relevantSrcRules.filter(r => 
+          (r.marginInputMode === 'key_points' || getRuleInputMode(r) === 'key_points' || (!r.marginInputMode && [5, 10, 15, 20, 25, 30].includes(r.year || r.toTermMonths/12))) &&
+          (r.salaryTier === matchingSrcTier || (!r.salaryTier && matchingSrcTier === 'not_applicable') || r.salaryTier === 'not_applicable' || !r.salaryTier)
+        );
+
+        const srcMarginsKeyPoints: Record<number, string> = {};
+        [5, 10, 15, 20, 25, 30].forEach(year => {
+          const rY = srcKeyPointRules.find(r => r.year === year || r.toTermMonths === year * 12);
+          if (rY) {
+            srcMarginsKeyPoints[year] = (rY.annualMargin !== undefined ? rY.annualMargin : (rY.baseMargin !== undefined ? Number((rY.baseMargin * 100).toFixed(3)) : rY.endMargin)).toLocaleString('en-US', {useGrouping: false});
+          } else {
+            srcMarginsKeyPoints[year] = '';
+          }
+        });
+
+        let methodKey: 'linear' | 'fixed' = 'fixed';
+        const foundMethodRule = srcKeyPointRules.find(r => r.calculationMethod || r.calcType);
+        if (foundMethodRule) {
+          methodKey = (foundMethodRule.calculationMethod || foundMethodRule.calcType) as any;
         }
-      });
 
-      let methodKey: 'linear' | 'fixed' = 'fixed';
-      const foundMethodRule = srcKeyPointRules.find(r => r.calculationMethod || r.calcType);
-      if (foundMethodRule) {
-        methodKey = (foundMethodRule.calculationMethod || foundMethodRule.calcType) as any;
-      }
+        const filledYears = [5, 10, 15, 20, 25, 30].filter(year => {
+          const val = srcMarginsKeyPoints[year];
+          return val !== undefined && val !== '' && !isNaN(parseFloat(val)) && parseFloat(val) > 0;
+        });
+        filledYears.sort((a, b) => a - b);
 
-      const filledYears = [5, 10, 15, 20, 25, 30].filter(year => {
-        const val = srcMarginsKeyPoints[year];
-        return val !== undefined && val !== '' && !isNaN(parseFloat(val)) && parseFloat(val) > 0;
-      });
-      filledYears.sort((a, b) => a - b);
-
-      if (filledYears.length > 0) {
-        targetSalaryTiers.forEach(targetSalaryTier => {
+        if (filledYears.length > 0) {
           const definitions: Array<{ from: number, to: number, start: number, end: number, calcType: 'fixed' | 'linear', yearPoint: number }> = [];
 
           for (let i = 0; i < filledYears.length; i++) {
@@ -880,39 +894,43 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
               baseMargin: Number((def.end / 100).toFixed(6))
             });
           });
-        });
-      }
+        }
+      });
     }
 
     // 3. Process Yearly Independent
     if (shouldCopyYearly) {
-      const srcYearlyRules = relevantSrcRules.filter(r => r.marginInputMode === 'yearly' || (!r.marginInputMode && r.year && r.year >= 5 && r.year <= 30 && ![5, 10, 15, 20, 25, 30].includes(r.year)));
-      
-      const srcMarginsYearly: Record<number, string> = {};
-      const yearsListFullForYearly = Array.from({ length: 26 }, (_, i) => 5 + i);
-      yearsListFullForYearly.forEach(year => {
-        const rY = srcYearlyRules.find(r => r.year === year || r.toTermMonths === year * 12);
-        if (rY) {
-          srcMarginsYearly[year] = (rY.annualMargin !== undefined ? rY.annualMargin : (rY.baseMargin !== undefined ? Number((rY.baseMargin * 100).toFixed(3)) : rY.endMargin)).toLocaleString('en-US', {useGrouping: false});
-        } else {
-          srcMarginsYearly[year] = '';
+      targetSalaryTiers.forEach(targetSalaryTier => {
+        const matchingSrcTier = getSrcSalaryTierForTarget(targetSalaryTier);
+        const srcYearlyRules = relevantSrcRules.filter(r => 
+          (r.marginInputMode === 'yearly' || getRuleInputMode(r) === 'yearly' || (!r.marginInputMode && r.year && r.year >= 5 && r.year <= 30 && ![5, 10, 15, 20, 25, 30].includes(r.year))) &&
+          (r.salaryTier === matchingSrcTier || (!r.salaryTier && matchingSrcTier === 'not_applicable') || r.salaryTier === 'not_applicable' || !r.salaryTier)
+        );
+
+        const srcMarginsYearly: Record<number, string> = {};
+        const yearsListFullForYearly = Array.from({ length: 26 }, (_, i) => 5 + i);
+        yearsListFullForYearly.forEach(year => {
+          const rY = srcYearlyRules.find(r => r.year === year || r.toTermMonths === year * 12);
+          if (rY) {
+            srcMarginsYearly[year] = (rY.annualMargin !== undefined ? rY.annualMargin : (rY.baseMargin !== undefined ? Number((rY.baseMargin * 100).toFixed(3)) : rY.endMargin)).toLocaleString('en-US', {useGrouping: false});
+          } else {
+            srcMarginsYearly[year] = '';
+          }
+        });
+
+        let methodYearly: 'linear' | 'fixed' = 'fixed';
+        const foundMethodRule = srcYearlyRules.find(r => r.calculationMethod || r.calcType);
+        if (foundMethodRule) {
+          methodYearly = (foundMethodRule.calculationMethod || foundMethodRule.calcType) as any;
         }
-      });
 
-      let methodYearly: 'linear' | 'fixed' = 'fixed';
-      const foundMethodRule = srcYearlyRules.find(r => r.calculationMethod || r.calcType);
-      if (foundMethodRule) {
-        methodYearly = (foundMethodRule.calculationMethod || foundMethodRule.calcType) as any;
-      }
+        const filledYears = yearsListFullForYearly.filter(year => {
+          const val = srcMarginsYearly[year];
+          return val !== undefined && val !== '' && !isNaN(parseFloat(val)) && parseFloat(val) > 0;
+        });
+        filledYears.sort((a, b) => a - b);
 
-      const filledYears = yearsListFullForYearly.filter(year => {
-        const val = srcMarginsYearly[year];
-        return val !== undefined && val !== '' && !isNaN(parseFloat(val)) && parseFloat(val) > 0;
-      });
-      filledYears.sort((a, b) => a - b);
-
-      if (filledYears.length > 0) {
-        targetSalaryTiers.forEach(targetSalaryTier => {
+        if (filledYears.length > 0) {
           const definitions: Array<{ from: number, to: number, start: number, end: number, calcType: 'fixed' | 'linear', yearPoint: number }> = [];
 
           for (let i = 0; i < filledYears.length; i++) {
@@ -985,8 +1003,8 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
               baseMargin: Number((def.end / 100).toFixed(6))
             });
           });
-        });
-      }
+        }
+      });
     }
 
     const remainingRules = marginRules.filter(r => {
@@ -1000,8 +1018,8 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
 
       if (!isTargetBaseRule) return true;
 
-      const rMode = r.marginInputMode;
-      const isKeyPointsRule = rMode === 'key_points' || (!rMode && [5, 10, 15, 20, 25, 30].includes(r.year || r.toTermMonths/12));
+      const rMode = r.marginInputMode || getRuleInputMode(r);
+      const isKeyPointsRule = rMode === 'key_points';
       const rIsTiers = rMode === 'duration_tiers';
       const rIsYearly = rMode === 'yearly';
 
