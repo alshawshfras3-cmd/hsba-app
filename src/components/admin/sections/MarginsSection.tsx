@@ -62,7 +62,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
   const [selectedSupport, setSelectedSupport] = useState<SupportType>('none');
   const [selectedSalaryTier, setSelectedSalaryTier] = useState<'below_25000' | 'above_or_equal_25000' | 'not_applicable'>('not_applicable');
   const [selectedSector, setSelectedSector] = useState<string>('');
-  const [selectedYearsMode, setSelectedYearsMode] = useState<'yearly' | 'key_points' | 'duration_tiers'>('key_points');
+  const [selectedYearsMode, setSelectedYearsMode] = useState<'yearly' | 'key_points' | 'duration_tiers' | ''>('');
   const [selectedCalcMethod, setSelectedCalcMethod] = useState<'linear' | 'fixed'>('fixed');
 
   // 2. Local inputs for Edit Grid
@@ -79,6 +79,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
 
   const [isLoaded, setIsLoaded] = useState(false);
   const lastUpdatedRulesRef = useRef<MarginRule[] | null>(null);
+  const lastLoadedKeyRef = useRef<string>('');
   const [isSavingToCloud, setIsSavingToCloud] = useState(false);
 
   // Auxiliary UI States
@@ -130,9 +131,15 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
   // Synchronize local states when selection changes or marginRules are updated
   useEffect(() => {
     if (!selectedBank) return;
-    if (lastUpdatedRulesRef.current === marginRules) {
+
+    const currentKey = `${selectedBank}_${selectedProduct}_${selectedSupport}_${selectedSalaryTier}_${selectedSector}`;
+
+    // Bypass loader if we are just reflecting our own user edits within the same active combo
+    if (currentKey === lastLoadedKeyRef.current && lastUpdatedRulesRef.current === marginRules) {
       return;
     }
+
+    lastLoadedKeyRef.current = currentKey;
 
     const normSupportVal = normSupport(selectedSupport);
 
@@ -169,6 +176,19 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       return true;
     });
 
+    // Seek the calculation mode for this combination
+    let determinedMode: 'yearly' | 'key_points' | 'duration_tiers' | '' = '';
+    
+    if (matchingRules.length > 0) {
+      // Find the first rule that defines marginInputMode explicitly, or get the mode statically
+      const withInputMode = matchingRules.find(r => r.marginInputMode);
+      if (withInputMode && withInputMode.marginInputMode) {
+        determinedMode = withInputMode.marginInputMode as any;
+      } else {
+        determinedMode = getRuleInputMode(matchingRules[0]);
+      }
+    }
+
     // Now, get rules for the selected sector
     let sectorRules = matchingRules.filter(r => normSector(r.sectorId) === normSector(targetSector));
 
@@ -177,43 +197,54 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       sectorRules = matchingRules.filter(r => normSector(r.sectorId) === 'all');
     }
 
-    // 1. Load years margins (for yearly / key_points) independently of selected mode to avoid wiping
-    const yearsRules = sectorRules.filter(r => !isTiersRule(r));
-    const yearsListFull = Array.from({ length: 26 }, (_, i) => 5 + i);
-    const initialMargins: Record<number, string> = {};
+    if (determinedMode !== '') {
+      // 1. Load years margins (for yearly / key_points) independently of selected mode to avoid wiping
+      const yearsRules = sectorRules.filter(r => !isTiersRule(r));
+      const yearsListFull = Array.from({ length: 26 }, (_, i) => 5 + i);
+      const initialMargins: Record<number, string> = {};
 
-    yearsListFull.forEach(year => {
-      const rY = yearsRules.find(r => r.year === year || r.toTermMonths === year * 12);
-      if (rY) {
-        initialMargins[year] = (rY.annualMargin !== undefined ? rY.annualMargin : (rY.baseMargin !== undefined ? Number((rY.baseMargin * 100).toFixed(3)) : rY.endMargin)).toString();
-      } else {
-        initialMargins[year] = '';
+      yearsListFull.forEach(year => {
+        const rY = yearsRules.find(r => r.year === year || r.toTermMonths === year * 12);
+        if (rY) {
+          initialMargins[year] = (rY.annualMargin !== undefined ? rY.annualMargin : (rY.baseMargin !== undefined ? Number((rY.baseMargin * 100).toFixed(3)) : rY.endMargin)).toString();
+        } else {
+          initialMargins[year] = '';
+        }
+      });
+      setLocalMargins(initialMargins);
+
+      // 2. Load duration tiers independently of selected mode to avoid wiping
+      const tierRules = sectorRules.filter(r => isTiersRule(r));
+      const initialTiers = tierRules.map((r, idx) => ({
+        id: r.id || `tier_${idx}_${Date.now()}`,
+        fromMonth: r.fromMonth ?? r.fromTermMonths ?? 0,
+        toMonth: r.toMonth ?? r.toTermMonths ?? 0,
+        marginRate: r.marginRate ?? r.endMargin ?? 3.50,
+        notes: r.notes || '',
+        active: r.active !== false && r.isActive !== false
+      }));
+      initialTiers.sort((a, b) => a.fromMonth - b.fromMonth);
+      setLocalTiers(initialTiers);
+
+      // 3. Load calculation method
+      let method: 'linear' | 'fixed' = 'fixed';
+      const foundMethodRule = yearsRules.find(r => r.calculationMethod || r.calcType);
+      if (foundMethodRule) {
+        method = (foundMethodRule.calculationMethod || foundMethodRule.calcType) as any;
       }
-    });
-    setLocalMargins(initialMargins);
-
-    // 2. Load duration tiers independently of selected mode to avoid wiping
-    const tierRules = sectorRules.filter(r => isTiersRule(r));
-    const initialTiers = tierRules.map((r, idx) => ({
-      id: r.id || `tier_${idx}_${Date.now()}`,
-      fromMonth: r.fromMonth ?? r.fromTermMonths ?? 0,
-      toMonth: r.toMonth ?? r.toTermMonths ?? 0,
-      marginRate: r.marginRate ?? r.endMargin ?? 3.50,
-      notes: r.notes || '',
-      active: r.active !== false && r.isActive !== false
-    }));
-    initialTiers.sort((a, b) => a.fromMonth - b.fromMonth);
-    setLocalTiers(initialTiers);
-
-    // 3. Load calculation method
-    let method: 'linear' | 'fixed' = 'fixed';
-    const foundMethodRule = yearsRules.find(r => r.calculationMethod || r.calcType);
-    if (foundMethodRule) {
-      method = (foundMethodRule.calculationMethod || foundMethodRule.calcType) as any;
+      setSelectedCalcMethod(method);
+      
+      // 4. Update selectedYearsMode to the resolved mode
+      setSelectedYearsMode(determinedMode);
+    } else {
+      // No config found for this combination -> Clear and set to empty
+      setLocalMargins({});
+      setLocalTiers([]);
+      setSelectedCalcMethod('fixed');
+      setSelectedYearsMode('');
     }
-    setSelectedCalcMethod(method);
 
-    // 4. Synchronize sector exceptions (bank level exception list)
+    // 5. Synchronize sector exceptions (bank level exception list) independently of config presence
     const initialExceptions: Record<string, string> = {};
     sectorsList.forEach(sec => {
       const exRule = marginRules.find(r =>
@@ -239,8 +270,11 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     marginsRecord: Record<number, string>,
     sectorExceptionsRecord: Record<string, string>,
     method: 'linear' | 'fixed' = 'fixed',
-    inputMode: 'yearly' | 'key_points' | 'duration_tiers' = 'key_points'
+    inputMode: 'yearly' | 'key_points' | 'duration_tiers' | '' = 'key_points'
   ) => {
+    if (inputMode === '') {
+      return marginRules;
+    }
     const normSupportVal = normSupport(targetSupport);
 
     const remainingRules = marginRules.filter(r => {
@@ -251,14 +285,10 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                                normSalaryTier(r.salaryTier) === normSalaryTier(targetSalaryTier) &&
                                !r.isExceptionOnly;
 
+      // COMPLETELY DELETE ALL EXISTING MARGIN RULES (both duration tiers and years)
+      // for this exact combo so we don't leak stale leftovers when we switch modes!
       if (isBaseComboMatch) {
-        // If we are saving duration tiers, we only delete existing duration tiers
-        if (inputMode === 'duration_tiers') {
-          return !isTiersRule(r);
-        } else {
-          // If we are saving years, we delete existing years rules (not duration tiers)
-          return isTiersRule(r);
-        }
+        return false;
       }
 
       const isExceptionForCombo = r.bankId === targetBank &&
@@ -413,6 +443,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
   // Auto-synchronize local changes directly to parent to trigger global "hasUnsavedChanges" banner
   useEffect(() => {
     if (!isLoaded) return;
+    if (selectedYearsMode === '') return; // Guard: No mode selected/loaded, do not write empty state to global
     updateGlobalRulesForCombo(
       selectedBank,
       selectedProduct,
@@ -1133,12 +1164,12 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    if (selectedYearsMode === 'duration_tiers') {
+                    if (selectedYearsMode === 'duration_tiers' || selectedYearsMode === '') {
                       setSelectedYearsMode('key_points');
                     }
                   }}
                   className={`px-3 py-2.5 rounded-xl border text-xs font-bold text-center transition-all cursor-pointer ${
-                    selectedYearsMode !== 'duration_tiers'
+                    selectedYearsMode === 'key_points' || selectedYearsMode === 'yearly'
                       ? 'bg-[#0057B8]/10 border-[#0057B8] text-[#0057B8] shadow-xs font-extrabold'
                       : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
                   }`}
@@ -1159,7 +1190,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                 </button>
               </div>
 
-              {selectedYearsMode !== 'duration_tiers' && (
+              {(selectedYearsMode === 'key_points' || selectedYearsMode === 'yearly') && (
                 <div className="flex gap-2 items-center bg-slate-50 p-1.5 rounded-lg border border-slate-100 mt-1.5">
                   <span className="text-[10px] text-gray-400 shrink-0 select-none">عرض الجدول:</span>
                   <button
@@ -1283,13 +1314,22 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
               </span>
 
               <span className="bg-slate-100 border border-slate-200 text-slate-700 text-[11px] px-2.5 py-1 rounded-lg font-bold">
-                ⏱️ {selectedYearsMode === 'key_points' ? 'نقاط رئيسية' : selectedYearsMode === 'yearly' ? 'كل سنة مستقلة' : 'شرائح مدة'}
+                ⏱️ {selectedYearsMode === 'key_points' ? 'نقاط رئيسية' : selectedYearsMode === 'yearly' ? 'كل سنة مستقلة' : selectedYearsMode === 'duration_tiers' ? 'شرائح مدة' : 'طريقة التوزيع غير محددة بعد'}
               </span>
             </div>
           </div>
 
           {/* Margins Inputs Table/Grid */}
-          {selectedYearsMode === 'duration_tiers' ? (
+          {selectedYearsMode === '' ? (
+            <div className="bg-amber-50/60 border border-amber-200/80 rounded-xl p-10 text-center space-y-4 font-sans max-w-2xl mx-auto my-4">
+              <div className="text-4xl text-amber-500 flex justify-center">⚠️</div>
+              <h3 className="text-sm font-black text-amber-950">لا توجد هوامش محفوظة لجهة التمويل والمنتج والدعم الحاليين</h3>
+              <p className="text-xs text-amber-800 leading-relaxed max-w-md mx-auto">
+                لوحة التحكم لا تحتوي على تهيئة محفوظة لهذه التركيبة حالياً. 
+                يرجى البدء باختيار "طريقة توزيع المدة" من القائمة الجانبية (سنوات 🗓️ أو شرائح أشهر 📊) لتظهر لك حقول إدخال وتعديل هوامش الربح.
+              </p>
+            </div>
+          ) : selectedYearsMode === 'duration_tiers' ? (
             <div className="bg-white p-4 rounded-xl border border-gray-150 shadow-xs space-y-3 text-right font-sans">
               <div className="flex justify-between items-center border-b border-gray-100 pb-2">
                 <h3 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
