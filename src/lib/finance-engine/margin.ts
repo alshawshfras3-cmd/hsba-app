@@ -51,15 +51,28 @@ export function calculateMargin(params: {
   let selectedMarginYear = Math.round(termMonths / 12);
   selectedMarginYear = Math.min(Math.max(selectedMarginYear, 5), 30);
 
+  // Normalization helpers inside calculator
+  const normSec = (s?: string) => (!s || s === 'all') ? 'all' : s;
+  const normSup = (s?: string) => {
+    if (!s || s === 'none') return 'none';
+    if (s === 'down_payment' || s === 'downpayment') return 'downpayment';
+    return s;
+  };
+  const normSal = (t?: string) => (!t || t === 'not_applicable') ? 'not_applicable' : t;
+
+  const targetSupportNorm = normSup(normSupport);
+  const targetSalaryTierNorm = normSal(salaryTier);
+  const targetSectorNorm = normSec(sectorId);
+
   // Filter base rules (which are our margin rules across years)
   // Try matching exact sectorId first
   let rules = marginRules.filter(
     r => r.bankId === bankId &&
          r.productId === normProduct &&
-         (r.supportType === 'all' || r.supportType === normSupport) &&
-         (r.sectorId === sectorId) &&
+         (normSup(r.supportType) === 'all' || normSup(r.supportType) === targetSupportNorm) &&
+         (normSec(r.sectorId) === targetSectorNorm) &&
          r.isActive &&
-         (!r.salaryTier || r.salaryTier === 'not_applicable' || r.salaryTier === salaryTier) &&
+         (normSal(r.salaryTier) === 'not_applicable' || normSal(r.salaryTier) === targetSalaryTierNorm) &&
          !r.isExceptionOnly
   );
 
@@ -68,16 +81,16 @@ export function calculateMargin(params: {
     rules = marginRules.filter(
       r => r.bankId === bankId &&
            r.productId === normProduct &&
-           (r.supportType === 'all' || r.supportType === normSupport) &&
-           (r.sectorId === 'all' || !r.sectorId) &&
+           (normSup(r.supportType) === 'all' || normSup(r.supportType) === targetSupportNorm) &&
+           (normSec(r.sectorId) === 'all') &&
            r.isActive &&
-           (!r.salaryTier || r.salaryTier === 'not_applicable' || r.salaryTier === salaryTier) &&
+           (normSal(r.salaryTier) === 'not_applicable' || normSal(r.salaryTier) === targetSalaryTierNorm) &&
            !r.isExceptionOnly
     );
   }
 
   // If we have rules that explicitly specify our target salaryTier, prioritize them
-  const specificRules = rules.filter(r => r.salaryTier === salaryTier);
+  const specificRules = rules.filter(r => normSal(r.salaryTier) === targetSalaryTierNorm);
   if (specificRules.length > 0) {
     rules = specificRules;
   }

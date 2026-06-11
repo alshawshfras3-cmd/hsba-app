@@ -124,14 +124,18 @@ export function useSettings() {
   const [loading, setLoading] = useState(false);
   const [initialized, setInitialized] = useState(true);
   const [supabaseFetched, setSupabaseFetched] = useState(!hasSupabaseKeys);
+  const [supabaseLoadStatus, setSupabaseLoadStatus] = useState<'loading' | 'success' | 'failed' | 'empty_db'>(hasSupabaseKeys ? 'loading' : 'success');
+  const [supabaseLoadError, setSupabaseLoadError] = useState<string | null>(null);
 
   // Fetch all system settings from Supabase
   const fetchSettings = useCallback(async () => {
     if (!hasSupabaseKeys) {
       setSupabaseFetched(true);
+      setSupabaseLoadStatus('success');
       return;
     }
 
+    setLoading(true);
     try {
       console.log('[SUPABASE LOAD] Fetching app_settings');
       // Fetch key = 'app_settings'
@@ -146,11 +150,19 @@ export function useSettings() {
       }
 
       let appSettingsObj: any = null;
-      if (data && data.value) {
-        appSettingsObj = data.value;
-        console.log('[SETTINGS] key found in Supabase, using Supabase value: app_settings (source of truth)');
+      if (data) {
+        if (data.value && typeof data.value === 'object' && Object.keys(data.value).length > 0) {
+          appSettingsObj = data.value;
+          console.log('[SETTINGS] key found in Supabase, using Supabase value: app_settings (source of truth)');
+          setSupabaseLoadStatus('success');
+        } else {
+          console.log('[SETTINGS] Key exists in Supabase but is empty (e.g. empty object)');
+          setSupabaseLoadStatus('empty_db');
+          appSettingsObj = data.value || {};
+        }
       } else {
-        console.log('[SETTINGS] key missing, inserting seed_initial: app_settings');
+        console.log('[SETTINGS] key missing entirely in Supabase table system_settings. Initializing with seeds...');
+        setSupabaseLoadStatus('empty_db');
         
         // 1. Read values from old database tables with separate try-catches
         let oldTiers: any[] = [];
@@ -284,50 +296,62 @@ export function useSettings() {
 
         // 4. Save key = 'app_settings' to make it available for future loads
         try {
-          await supabase.from('system_settings').insert({
+          const { error: insertErr } = await supabase.from('system_settings').insert({
             key: 'app_settings',
             value: appSettingsObj,
             source: 'seed_initial',
             updated_at: new Date().toISOString()
           });
+          if (insertErr) {
+            throw insertErr;
+          }
           console.log('[SUPABASE SAVE] Created consolidated app_settings from migration successfully');
+          setSupabaseLoadStatus('success');
         } catch (saveErr) {
           console.error("Migration: failed to save app_settings to system_settings table:", saveErr);
+          throw saveErr;
         }
       }
 
       // Convert appSettingsObj to settings mapping
+      // If we loaded successfully from Supabase, use database property or empty list.
+      // DONT fallback to seeds/DEFAULTS to avoid merging!
       const settingsMap: Record<string, any> = {
-        banks: appSettingsObj.banks,
-        product_acceptance: appSettingsObj.products ?? appSettingsObj.product_acceptance,
-        military_ranks: appSettingsObj.militaryRanks ?? appSettingsObj.military_ranks,
-        salary_rules: appSettingsObj.salaryRules ?? appSettingsObj.salary_rules,
-        pension_rules: appSettingsObj.pensionRules ?? appSettingsObj.pension_rules,
-        term_rules: appSettingsObj.termRules ?? appSettingsObj.term_rules,
-        margin_rules: appSettingsObj.marginRules ?? appSettingsObj.margin_rules,
-        dsrRules: normalizeDsrRules(appSettingsObj.dsrRules ?? appSettingsObj.dsr_rules),
-        dsr_rules: normalizeDsrRules(appSettingsObj.dsrRules ?? appSettingsObj.dsr_rules),
-        support_settings: appSettingsObj.supportSettings ?? appSettingsObj.support_settings,
-        personal_finance_rules: appSettingsObj.personalRules ?? appSettingsObj.personal_finance_rules,
-        advanced_rules: appSettingsObj.advancedRules ?? appSettingsObj.advanced_rules,
-        hasba_custom_sectors: appSettingsObj.customSectors ?? appSettingsObj.hasba_custom_sectors,
-        bank_sector_pension_rules: appSettingsObj.bankSectorRules ?? appSettingsObj.bank_sector_pension_rules,
-        pension_rules_library: appSettingsObj.pensionRulesLibrary ?? appSettingsObj.pension_rules_library,
+        banks: appSettingsObj.banks ?? [],
+        product_acceptance: appSettingsObj.products ?? appSettingsObj.product_acceptance ?? [],
+        military_ranks: appSettingsObj.militaryRanks ?? appSettingsObj.military_ranks ?? [],
+        salary_rules: appSettingsObj.salaryRules ?? appSettingsObj.salary_rules ?? [],
+        pension_rules: appSettingsObj.pensionRules ?? appSettingsObj.pension_rules ?? [],
+        term_rules: appSettingsObj.termRules ?? appSettingsObj.term_rules ?? [],
+        margin_rules: appSettingsObj.marginRules ?? appSettingsObj.margin_rules ?? [],
+        dsrRules: normalizeDsrRules(appSettingsObj.dsrRules ?? appSettingsObj.dsr_rules ?? []),
+        dsr_rules: normalizeDsrRules(appSettingsObj.dsrRules ?? appSettingsObj.dsr_rules ?? []),
+        support_settings: appSettingsObj.supportSettings ?? appSettingsObj.support_settings ?? {},
+        personal_finance_rules: appSettingsObj.personalRules ?? appSettingsObj.personal_finance_rules ?? [],
+        advanced_rules: appSettingsObj.advancedRules ?? appSettingsObj.advanced_rules ?? [],
+        hasba_custom_sectors: appSettingsObj.customSectors ?? appSettingsObj.hasba_custom_sectors ?? defaultSectorsList,
+        bank_sector_pension_rules: appSettingsObj.bankSectorRules ?? appSettingsObj.bank_sector_pension_rules ?? [],
+        pension_rules_library: appSettingsObj.pensionRulesLibrary ?? appSettingsObj.pension_rules_library ?? [],
         
-        housingSupportTiers: appSettingsObj.housingSupportTiers ?? appSettingsObj.housing_support_tiers,
-        advancePaymentTiers: appSettingsObj.advancePaymentTiers ?? appSettingsObj.advance_payment_tiers,
-        approvedSalaryRules: appSettingsObj.approvedSalaryRules ?? appSettingsObj.approvedSalaryDbRules ?? appSettingsObj.approved_salary_rules ?? appSettingsObj.approved_salary_db_rules,
-        pensionDbRules: appSettingsObj.pensionDbRules ?? appSettingsObj.pension_db_rules,
-        sectorMappings: appSettingsObj.sectorMappings ?? appSettingsObj.sector_mappings,
+        housingSupportTiers: appSettingsObj.housingSupportTiers ?? appSettingsObj.housing_support_tiers ?? [],
+        advancePaymentTiers: appSettingsObj.advancePaymentTiers ?? appSettingsObj.advance_payment_tiers ?? [],
+        approvedSalaryRules: appSettingsObj.approvedSalaryRules ?? appSettingsObj.approvedSalaryDbRules ?? appSettingsObj.approved_salary_rules ?? appSettingsObj.approved_salary_db_rules ?? [],
+        pensionDbRules: appSettingsObj.pensionDbRules ?? appSettingsObj.pension_db_rules ?? [],
+        sectorMappings: appSettingsObj.sectorMappings ?? appSettingsObj.sector_mappings ?? [],
       };
 
       setSettings(settingsMap);
       setSupabaseFetched(true);
+      setLoading(false);
 
     } catch (err: any) {
-      console.warn(`[SUPABASE LOAD] table=system_settings status=fallback-loaded message=${err?.message || err}`);
-      console.warn('Fallback settings on fetch failure in background:', err);
+      const errMsg = err?.message || String(err);
+      console.error('[SUPABASE LOAD ERROR] table=system_settings status=failed message=', errMsg);
+      setSupabaseLoadStatus('failed');
+      setSupabaseLoadError(errMsg);
+      // Set to true so loading spinner can close, but AppContext details error state to prevent overriding!
       setSupabaseFetched(true);
+      setLoading(false);
     }
   }, []);
 
@@ -337,6 +361,9 @@ export function useSettings() {
 
   // Save specific settings to Supabase (backward compatibility fallback)
   const saveSetting = useCallback(async (key: string, value: any) => {
+    if (supabaseLoadStatus === 'failed') {
+      throw new Error('تعذر الحفظ لأن تحميل الإعدادات من قاعدة البيانات فشل في وقت سابق.');
+    }
     // Redirect granular saves to write inside 'app_settings' key directly!
     try {
       const { data, error: selectError } = await supabase
@@ -372,13 +399,15 @@ export function useSettings() {
     } catch (err) {
       console.error('saveSetting failed to update centralized app_settings:', err);
     }
-  }, []);
+  }, [supabaseLoadStatus]);
 
   return {
     settings,
     loading,
     initialized,
     supabaseFetched,
+    supabaseLoadStatus,
+    supabaseLoadError,
     fetchSettings,
     saveSetting,
     banks: settings.banks !== undefined && settings.banks !== null ? settings.banks : DEFAULTS.banks,

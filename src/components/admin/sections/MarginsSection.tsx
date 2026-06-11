@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Copy } from 'lucide-react';
+import { Copy, Loader2 } from 'lucide-react';
 import { Bank, ProductId, SupportType, SectorId, MarginRule, Sector } from '../../../types';
 import { calculateMargin } from '../../../lib/finance-engine/margin';
 
@@ -29,6 +29,8 @@ interface MarginsSectionProps {
   setMarginRules: React.Dispatch<React.SetStateAction<MarginRule[]>>;
   showToast: (msg: string, type: 'success' | 'refuse') => void;
   sectors: Sector[];
+  saveChanges?: (overrideMarginRules?: MarginRule[]) => Promise<void>;
+  supabaseLoadStatus?: 'loading' | 'success' | 'failed' | 'empty_db';
 }
 
 const productTypesList = [
@@ -44,7 +46,9 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
   marginRules,
   setMarginRules,
   showToast,
-  sectors
+  sectors,
+  saveChanges,
+  supabaseLoadStatus
 }) => {
   const activeSectors = (sectors || []).filter(sec => sec.isActive !== false);
   const sectorsList = [
@@ -74,6 +78,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
   const [localSectorExceptions, setLocalSectorExceptions] = useState<Record<string, string>>({});
 
   const [isLoaded, setIsLoaded] = useState(false);
+  const [isSavingToCloud, setIsSavingToCloud] = useState(false);
 
   // Auxiliary UI States
   const [showCloneCard, setShowCloneCard] = useState(false);
@@ -107,11 +112,25 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     }
   }, [sectorsList, selectedSector]);
 
+  // Normalization helper definitions
+  const normSector = (s?: string) => (!s || s === 'all') ? 'all' : s;
+  const normSupport = (s?: string) => {
+    if (!s || s === 'none') return 'none';
+    if (s === 'down_payment' || s === 'downpayment') return 'downpayment';
+    return s;
+  };
+  const normSalaryTier = (t?: string) => (!t || t === 'not_applicable') ? 'not_applicable' : t;
+
+  const isTiersRule = (r: MarginRule) => {
+    const mode = getRuleInputMode(r);
+    return mode === 'duration_tiers';
+  };
+
   // Synchronize local states when selection changes or marginRules are updated
   useEffect(() => {
     if (!selectedBank) return;
 
-    const normSupport = (selectedSupport as string) === 'down_payment' || selectedSupport === 'downpayment' ? 'downpayment' : selectedSupport;
+    const normSupportVal = normSupport(selectedSupport);
 
     // Normalize all rules to clean official product IDs and support types upon reading
     const allNormalized = marginRules.map(r => {
@@ -130,59 +149,47 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       };
     });
 
-    // 1. Get rules matching bank, product, support, and sector
-    // We allow r.salaryTier to be selectedSalaryTier, or 'not_applicable', or undefined/general
-    let baseFiltered = allNormalized.filter(r => 
-      r.bankId === selectedBank && 
-      r.productId === selectedProduct && 
-      (r.supportType === normSupport || r.supportType === 'all') &&
-      (!r.isExceptionOnly) &&
-      (r.sectorId === selectedSector) &&
-      (!r.salaryTier || r.salaryTier === 'not_applicable' || r.salaryTier === selectedSalaryTier)
-    );
+    const targetBank = selectedBank;
+    const targetProduct = selectedProduct;
+    const targetSupport = normSupportVal;
+    const targetSalaryTier = selectedSalaryTier;
+    const targetSector = selectedSector;
 
-    // If no sector-specific rules exist, fallback to general/all sector
-    if (baseFiltered.length === 0) {
-      baseFiltered = allNormalized.filter(r => 
-        r.bankId === selectedBank && 
-        r.productId === selectedProduct && 
-        (r.supportType === normSupport || r.supportType === 'all') &&
-        (!r.isExceptionOnly) &&
-        (!r.sectorId || r.sectorId === 'all') &&
-        (!r.salaryTier || r.salaryTier === 'not_applicable' || r.salaryTier === selectedSalaryTier)
-      );
+    // Filter rules matching core values: bank, product, support, and salary tier with clean normalization
+    const matchingRules = allNormalized.filter(r => {
+      if (r.isExceptionOnly) return false;
+      if (r.bankId !== targetBank) return false;
+      if (r.productId !== targetProduct) return false;
+      if (normSupport(r.supportType) !== normSupport(targetSupport)) return false;
+      if (normSalaryTier(r.salaryTier) !== normSalaryTier(targetSalaryTier)) return false;
+      return true;
+    });
+
+    // Now, get rules for the selected sector
+    let sectorRules = matchingRules.filter(r => normSector(r.sectorId) === normSector(targetSector));
+
+    // Fallback to 'all' sector rules if no specific sector rules exist
+    if (sectorRules.length === 0 && normSector(targetSector) !== 'all') {
+      sectorRules = matchingRules.filter(r => normSector(r.sectorId) === 'all');
     }
 
-    // Prioritize specific salaryTier rules if they exist
-    let relevantRules = baseFiltered.filter(r => r.salaryTier === selectedSalaryTier);
-    if (relevantRules.length === 0) {
-      // Fallback to general rules that have no salaryTier or 'not_applicable'
-      relevantRules = baseFiltered.filter(r => !r.salaryTier || r.salaryTier === 'not_applicable');
-    }
-
-    // Filter relevantRules strictly by our active/selected selectedYearsMode
-    const modeRules = relevantRules.filter(r => getRuleInputMode(r) === selectedYearsMode);
-
+    // 1. Load years margins (for yearly / key_points) independently of selected mode to avoid wiping
+    const yearsRules = sectorRules.filter(r => !isTiersRule(r));
     const yearsListFull = Array.from({ length: 26 }, (_, i) => 5 + i);
     const initialMargins: Record<number, string> = {};
 
     yearsListFull.forEach(year => {
-      const rY = modeRules.find(r => r.year === year || r.toTermMonths === year * 12);
+      const rY = yearsRules.find(r => r.year === year || r.toTermMonths === year * 12);
       if (rY) {
         initialMargins[year] = (rY.annualMargin !== undefined ? rY.annualMargin : (rY.baseMargin !== undefined ? Number((rY.baseMargin * 100).toFixed(3)) : rY.endMargin)).toString();
       } else {
         initialMargins[year] = '';
       }
     });
+    setLocalMargins(initialMargins);
 
-    let method: 'linear' | 'fixed' = 'fixed';
-    const foundMethodRule = modeRules.find(r => r.calculationMethod || r.calcType);
-    if (foundMethodRule) {
-      method = (foundMethodRule.calculationMethod || foundMethodRule.calcType) as any;
-    }
-
-    // Synchronize duration tiers
-    const tierRules = modeRules.filter(r => getRuleInputMode(r) === 'duration_tiers');
+    // 2. Load duration tiers independently of selected mode to avoid wiping
+    const tierRules = sectorRules.filter(r => isTiersRule(r));
     const initialTiers = tierRules.map((r, idx) => ({
       id: r.id || `tier_${idx}_${Date.now()}`,
       fromMonth: r.fromMonth ?? r.fromTermMonths ?? 0,
@@ -194,10 +201,15 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     initialTiers.sort((a, b) => a.fromMonth - b.fromMonth);
     setLocalTiers(initialTiers);
 
-    setLocalMargins(initialMargins);
+    // 3. Load calculation method
+    let method: 'linear' | 'fixed' = 'fixed';
+    const foundMethodRule = yearsRules.find(r => r.calculationMethod || r.calcType);
+    if (foundMethodRule) {
+      method = (foundMethodRule.calculationMethod || foundMethodRule.calcType) as any;
+    }
     setSelectedCalcMethod(method);
 
-    // Synchronize sector exceptions (bank level only)
+    // 4. Synchronize sector exceptions (bank level exception list)
     const initialExceptions: Record<string, string> = {};
     sectorsList.forEach(sec => {
       const exRule = marginRules.find(r =>
@@ -208,9 +220,10 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       initialExceptions[sec.id] = exRule && exRule.exceptionBps !== undefined ? exRule.exceptionBps.toString() : '0';
     });
     setLocalSectorExceptions(initialExceptions);
+    
     setIsLoaded(true);
 
-  }, [selectedBank, selectedProduct, selectedSupport, selectedSalaryTier, selectedSector, selectedYearsMode, marginRules]);
+  }, [selectedBank, selectedProduct, selectedSupport, selectedSalaryTier, selectedSector, marginRules]);
 
   // Database updater to match exact core rules compatibility
   const updateGlobalRulesForCombo = (
@@ -224,21 +237,24 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     method: 'linear' | 'fixed' = 'fixed',
     inputMode: 'yearly' | 'key_points' | 'duration_tiers' = 'key_points'
   ) => {
-    const normSupport = (targetSupport as string) === 'down_payment' || targetSupport === 'downpayment' ? 'downpayment' : targetSupport;
+    const normSupportVal = normSupport(targetSupport);
 
     const remainingRules = marginRules.filter(r => {
-      const normalizedSupportType = (r.supportType === 'down_payment' || r.supportType === 'downpayment') ? 'downpayment' : r.supportType;
-      
       const isBaseComboMatch = r.bankId === targetBank &&
                                r.productId === targetProduct &&
-                               normalizedSupportType === normSupport &&
-                               (r.sectorId === targetSector) &&
-                               (r.salaryTier === targetSalaryTier || (!r.salaryTier && targetSalaryTier === 'not_applicable')) &&
+                               normSupport(r.supportType) === normSupportVal &&
+                               normSector(r.sectorId) === normSector(targetSector) &&
+                               normSalaryTier(r.salaryTier) === normSalaryTier(targetSalaryTier) &&
                                !r.isExceptionOnly;
 
       if (isBaseComboMatch) {
-        // Only exclude (delete) if the rule has the same inputMode
-        return getRuleInputMode(r) !== inputMode;
+        // If we are saving duration tiers, we only delete existing duration tiers
+        if (inputMode === 'duration_tiers') {
+          return !isTiersRule(r);
+        } else {
+          // If we are saving years, we delete existing years rules (not duration tiers)
+          return isTiersRule(r);
+        }
       }
 
       const isExceptionForCombo = r.bankId === targetBank &&
@@ -256,10 +272,10 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
         const numRate = Number(tier.marginRate) || 0;
         
         newRulesForThisCombo.push({
-          id: tier.id || `tier_margin_${targetBank}_${targetProduct}_${normSupport}_${targetSector}_${targetSalaryTier}_t${numFrom}_${numTo}_${index}`,
+          id: tier.id || `tier_margin_${targetBank}_${targetProduct}_${normSupportVal}_${targetSector}_${targetSalaryTier}_t${numFrom}_${numTo}_${index}`,
           bankId: targetBank,
           productId: targetProduct,
-          supportType: normSupport as any,
+          supportType: normSupportVal as any,
           sectorId: targetSector as any,
           fromTermMonths: numFrom,
           toTermMonths: numTo,
@@ -345,10 +361,10 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
 
         definitions.forEach((def, index) => {
           newRulesForThisCombo.push({
-            id: `gen_margin_${targetBank}_${targetProduct}_${normSupport}_${targetSector}_${targetSalaryTier}_t${def.from}_${def.to}_${index}`,
+            id: `gen_margin_${targetBank}_${targetProduct}_${normSupportVal}_${targetSector}_${targetSalaryTier}_t${def.from}_${def.to}_${index}`,
             bankId: targetBank,
             productId: targetProduct,
-            supportType: normSupport as any,
+            supportType: normSupportVal as any,
             sectorId: targetSector as any,
             fromTermMonths: def.from,
             toTermMonths: def.to,
@@ -384,14 +400,18 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       } as any);
     });
 
-    setMarginRules([...remainingRules, ...newRulesForThisCombo, ...newExceptionRules]);
+    const updatedRules = [...remainingRules, ...newRulesForThisCombo, ...newExceptionRules];
+    setMarginRules(updatedRules);
+    return updatedRules;
   };
 
   // Main save action for basic margins + exceptions
-  const handleSaveConfig = () => {
+  const handleSaveConfig = async () => {
+    if (isSavingToCloud) return;
+
     try {
       if (selectedYearsMode === 'duration_tiers') {
-        // Validate duration tiers
+        // Validate duration tiers - exclude inactive rows completely from mandatory rating or overlap errors
         const parsedTiers = localTiers.map(t => ({
           ...t,
           fromNum: t.fromMonth === '' ? NaN : Number(t.fromMonth),
@@ -399,14 +419,16 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
           rateNum: t.marginRate === '' ? NaN : Number(t.marginRate)
         }));
 
-        for (let i = 0; i < parsedTiers.length; i++) {
-          const t = parsedTiers[i];
+        const activeTiers = parsedTiers.filter(t => t.active !== false);
+
+        for (let i = 0; i < activeTiers.length; i++) {
+          const t = activeTiers[i];
           if (isNaN(t.fromNum)) {
-            showToast('خطأ: حقل "من شهر" يجب أن يكون رقماً صالحاً.', 'refuse');
+            showToast('خطأ: حقل "من شهر" يجب أن يكون رقماً صالحاً في الشرائح النشطة.', 'refuse');
             return;
           }
           if (isNaN(t.toNum)) {
-            showToast('خطأ: حقل "إلى شهر" يجب أن يكون رقماً صالحاً.', 'refuse');
+            showToast('خطأ: حقل "إلى شهر" يجب أن يكون رقماً صالحاً في الشرائح النشطة.', 'refuse');
             return;
           }
           if (t.toNum < t.fromNum) {
@@ -414,22 +436,22 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
             return;
           }
           if (isNaN(t.rateNum) || t.rateNum <= 0) {
-            showToast('خطأ: معدل الهامش يجب أن يكون رقماً عشرياً أكبر من الصفر.', 'refuse');
+            showToast('خطأ: معدل الهامش يجب أن يكون رقماً عشرياً أكبر من الصفر في الشرائح النشطة.', 'refuse');
             return;
           }
         }
 
-        // Overlap verification among active tiers
-        const activeTiers = parsedTiers.filter(t => t.active !== false).sort((a, b) => a.fromNum - b.fromNum);
-        for (let i = 1; i < activeTiers.length; i++) {
-          if (activeTiers[i].fromNum <= activeTiers[i-1].toNum) {
-            showToast(`خطأ: يوجد تداخل بين الشرائح (${activeTiers[i-1].fromNum} إلى ${activeTiers[i-1].toNum}) و (${activeTiers[i].fromNum} إلى ${activeTiers[i].toNum}).`, 'refuse');
+        // Overlap verification strictly among active tiers
+        const sortedActiveTiers = [...activeTiers].sort((a, b) => a.fromNum - b.fromNum);
+        for (let i = 1; i < sortedActiveTiers.length; i++) {
+          if (sortedActiveTiers[i].fromNum <= sortedActiveTiers[i-1].toNum) {
+            showToast(`خطأ: يوجد تداخل بين الشرائح (${sortedActiveTiers[i-1].fromNum} إلى ${sortedActiveTiers[i-1].toNum}) و (${sortedActiveTiers[i].fromNum} إلى ${sortedActiveTiers[i].toNum}).`, 'refuse');
             return;
           }
         }
       }
 
-      updateGlobalRulesForCombo(
+      const updatedRules = updateGlobalRulesForCombo(
         selectedBank,
         selectedProduct,
         selectedSupport,
@@ -440,10 +462,25 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
         selectedCalcMethod,
         selectedYearsMode
       );
-      showToast('تم حفظ وتطبيق الإعدادات للمنتج واستثناءات القطاعات بنجاح!', 'success');
-    } catch (e) {
+
+      if (saveChanges) {
+        setIsSavingToCloud(true);
+        try {
+          await saveChanges(updatedRules);
+          showToast('🟢 تم حفظ وتطبيق الإعدادات بنجاح ومزامنتها مباشرة في قاعدة البيانات السحابية (Supabase) بشكل نهائي!', 'success');
+        } catch (cloudErr: any) {
+          console.error("Cloud save failed inside MarginsSection:", cloudErr);
+          const errMsg = cloudErr?.message || cloudErr || '';
+          showToast(`⚠️ تم تطبيق التغييرات محلياً في الرام، ولكن فشلت المزامنة مع السيرفر: ${errMsg.substring(0, 100)}. يرجى تكرار المحاولة أو النقر على زر الحفظ العام.`, 'refuse');
+        } finally {
+          setIsSavingToCloud(false);
+        }
+      } else {
+        showToast('✔️ تم حفظ وتطبيق الإعداد قبل قليل في الذاكرة بنجاح! نذكرك أن الحفظ مؤقت ويحتاج الضغط على زر الحفظ النهائي لحفظه بالأعلى.', 'success');
+      }
+    } catch (e: any) {
       console.error(e);
-      showToast('حدث خطأ أثناء حفظ أو تطبيق البيانات.', 'refuse');
+      showToast(`حدث خطأ أثناء حفظ أو تطبيق البيانات: ${e?.message || e}`, 'refuse');
     }
   };
 
@@ -944,10 +981,20 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
           {/* Main Actions Sticky Header */}
           <button
             type="button"
+            disabled={isSavingToCloud}
             onClick={handleSaveConfig}
-            className="px-5 py-2.5 bg-[#0057B8] hover:bg-[#004bb0] text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-[#0057B8]/10 cursor-pointer flex items-center justify-center gap-1.5"
+            className={`px-5 py-2.5 bg-[#0057B8] text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-[#0057B8]/10 cursor-pointer flex items-center justify-center gap-1.5 ${isSavingToCloud ? 'opacity-80 cursor-not-allowed' : 'hover:bg-[#004bb0]'}`}
           >
-            <span>💾 حفظ وتطبيق الإعدادات</span>
+            {isSavingToCloud ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>جاري حفظ الهوامش...</span>
+              </>
+            ) : (
+              <>
+                <span>💾 حفظ وتطبيق الإعدادات</span>
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -1242,10 +1289,18 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
             <div className="shrink-0 flex gap-2">
               <button
                 type="button"
+                disabled={isSavingToCloud}
                 onClick={handleSaveConfig}
-                className="px-4 py-1.5 bg-[#0057B8] hover:bg-[#004bb0] text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
+                className={`px-4 py-1.5 bg-[#0057B8] text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center justify-center gap-1 ${isSavingToCloud ? 'opacity-80 cursor-not-allowed' : 'hover:bg-[#004bb0]'}`}
               >
-                حفظ الجدول
+                {isSavingToCloud ? (
+                  <>
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    <span>جاري الحفظ...</span>
+                  </>
+                ) : (
+                  <span>حفظ الجدول</span>
+                )}
               </button>
             </div>
           </div>
@@ -1466,10 +1521,20 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
           
           <button
             type="button"
+            disabled={isSavingToCloud}
             onClick={handleSaveConfig}
-            className="px-6 py-2 bg-[#0057B8] hover:bg-[#004bb0] text-white rounded-lg text-xs font-extrabold transition-all shadow-md shadow-[#0057B8]/10 cursor-pointer flex items-center justify-center gap-1.5 hover:scale-[1.01]"
+            className={`px-6 py-2 bg-[#0057B8] text-white rounded-lg text-xs font-extrabold transition-all shadow-md shadow-[#0057B8]/10 cursor-pointer flex items-center justify-center gap-1.5 hover:scale-[1.01] ${isSavingToCloud ? 'opacity-80 cursor-not-allowed' : 'hover:bg-[#004bb0]'}`}
           >
-            <span>💾 حفظ وتطبيق كافة الإعدادات</span>
+            {isSavingToCloud ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>جاري حفظ كافة الإعدادات...</span>
+              </>
+            ) : (
+              <>
+                <span>💾 حفظ وتطبيق كافة الإعدادات</span>
+              </>
+            )}
           </button>
         </div>
       </div>

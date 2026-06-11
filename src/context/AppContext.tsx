@@ -115,9 +115,12 @@ interface AppContextType {
   setIsMobileSettingsOpen: (val: boolean) => void;
 
   hasUnsavedChanges: boolean;
-  saveChanges: () => void;
+  saveChanges: (overrideMarginRules?: MarginRule[]) => Promise<void>;
   cancelChanges: () => void;
   reinitializeAllSettings: () => Promise<void>;
+
+  supabaseLoadStatus: 'loading' | 'success' | 'failed' | 'empty_db';
+  supabaseLoadError: string | null;
 
   // Supabase Auth and Roles state
   user: any;
@@ -539,11 +542,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     loading: settingsLoading,
     initialized: settingsInitialized,
     supabaseFetched,
+    supabaseLoadStatus,
+    supabaseLoadError,
   } = useSettings();
 
   const [tiersLoaded, setTiersLoaded] = useState(false);
   const [hasSynced, setHasSynced] = useState(false);
-  const isSettingsLoading = settingsLoading || !supabaseFetched || !tiersLoaded || !hasSynced;
+  const isSettingsLoading = (settingsLoading || !supabaseFetched || !tiersLoaded || !hasSynced) && supabaseLoadStatus !== 'failed';
 
   // Load housing support tiers and advance payment tiers once on mount
   useEffect(() => {
@@ -679,11 +684,37 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     }
   }, [currentSettings, savedSettings, isSettingsLoading]);
 
-  const saveChanges = async () => {
+  const saveChanges = async (overrideMarginRules?: MarginRule[]) => {
+    if (supabaseLoadStatus === 'failed') {
+      throw new Error('لا يمكن حفظ التغييرات لأن تحميل البيانات من قاعدة البيانات (Supabase) فشل. تم قفل الحفظ لضمان عدم تلف البيانات المتواجدة على الخادم.');
+    }
+
     const clonedCurrent = deepClone(currentSettings);
     // Save dynamically to centralized 'app_settings' in system_settings table
     if (hasSupabaseKeys) {
       try {
+        let dbMarginCount = 0;
+        try {
+          const { data: dbData } = await supabase
+            .from('system_settings')
+            .select('value')
+            .eq('key', 'app_settings')
+            .maybeSingle();
+          if (dbData && dbData.value) {
+            const dbRules = dbData.value.marginRules ?? dbData.value.margin_rules ?? [];
+            dbMarginCount = Array.isArray(dbRules) ? dbRules.length : 0;
+          }
+        } catch (fetchErr) {
+          console.error("Safeguard: failed to pre-fetch database margin count:", fetchErr);
+        }
+
+        const currentMarginCount = Array.isArray(overrideMarginRules || marginRules) ? (overrideMarginRules || marginRules).length : 0;
+        
+        // If DB has a substantial number of margins and current count is less than 70% of DB
+        if (dbMarginCount > 10 && currentMarginCount < dbMarginCount * 0.7) {
+          throw new Error(`حماية سلامة البيانات: تم منع الحفظ بسبب تفاوت كبير في عدد الهوامش! يحتوي السيرفر على (${dbMarginCount}) هامش بينما تحتوي النسخة الحالية على (${currentMarginCount}) هوامش فقط (أقل من 70%). لمنع تصفير القواعد بالخطأ، يرجى إعادة تحميل الصفحة واستعادتها.`);
+        }
+
         const currentSettingsObject = {
           // camelCase properties ONLY
           banks,
@@ -692,7 +723,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           salaryRules,
           pensionRules,
           termRules,
-          marginRules,
+          marginRules: overrideMarginRules || marginRules,
           dsrRules,
           supportSettings,
           housingSupportTiers,
@@ -807,6 +838,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         saveChanges,
         cancelChanges,
         reinitializeAllSettings,
+
+        supabaseLoadStatus,
+        supabaseLoadError,
 
         // Auth
         user,

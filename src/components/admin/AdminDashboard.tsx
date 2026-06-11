@@ -109,7 +109,8 @@ export default function AdminDashboard() {
     hasUnsavedChanges, saveChanges, cancelChanges, reinitializeAllSettings,
     customSectors: sectors, setCustomSectors: setSectors,
     bankSectorRules, setBankSectorRules,
-    pensionRulesLibrary: libraryRules, setPensionRulesLibrary: setLibraryRules
+    pensionRulesLibrary: libraryRules, setPensionRulesLibrary: setLibraryRules,
+    supabaseLoadStatus, supabaseLoadError
   } = useAppState();
 
   if (isSettingsLoading) {
@@ -1747,6 +1748,28 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {supabaseLoadStatus === 'failed' && (
+          <div className="mb-6 p-4 border border-red-350 bg-red-50 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 text-xs font-bold text-red-900 border-dashed">
+            <div className="flex items-start gap-3">
+              <span className="text-xl shrink-0">⚠️</span>
+              <div className="space-y-1 text-right">
+                <p className="font-extrabold text-sm text-red-700">خطأ حرج: فشل تحميل الإعدادات من قاعدة بيانات Supabase!</p>
+                <p className="text-red-700 font-medium leading-relaxed">
+                  تفاصيل الخطأ: {supabaseLoadError || 'انقطع الاتصال بالخادم'}.
+                  لتجنب مسح أو تصفير أي هوامش أو إعدادات مسجلة مسبقاً، تم قفل ميزة حفظ التعديلات وإلغاء تفعيلها مؤقتاً لضمان بقاء البيانات سليمة.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="px-4 py-1.5 bg-red-600 border border-transparent hover:bg-red-700 text-white rounded-lg select-none cursor-pointer text-[11px] font-black shrink-0 transition-all shadow-md shadow-red-600/10"
+            >
+              🔄 إعادة الاتصال بالخادم وتحميل الصفحة
+            </button>
+          </div>
+        )}
+
         {/* Unsaved Changes Banner Bar */}
         {hasUnsavedChanges && (
           <div className="fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 text-white py-4 px-6 md:px-8 shadow-[0_-10px_40px_rgba(0,0,0,0.15)] z-50 animate-fade-in">
@@ -1770,7 +1793,12 @@ export default function AdminDashboard() {
                 <button
                   type="button"
                   id="admin-save-btn"
+                  disabled={supabaseLoadStatus === 'failed'}
                   onClick={async () => {
+                    if (supabaseLoadStatus === 'failed') {
+                      showToast('فشل في حفظ التغييرات: تم تعطيل الكتابة لحماية الهوامش والإعدادات.', 'refuse');
+                      return;
+                    }
                     try {
                       await saveChanges();
                       showToast('تم حفظ الإعدادات بنجاح', 'success');
@@ -1780,7 +1808,11 @@ export default function AdminDashboard() {
                       showToast(`فشل في حفظ التغييرات: ${msg}`, 'refuse');
                     }
                   }}
-                  className="px-5 py-2 bg-[#0057B8] hover:bg-[#004bb0] text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer border border-[#0057B8]"
+                  className={`px-5 py-2 text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer border ${
+                    supabaseLoadStatus === 'failed'
+                      ? 'bg-slate-350 text-slate-500 border-slate-300 cursor-not-allowed opacity-50'
+                      : 'bg-[#0057B8] hover:bg-[#004bb0] text-white border-[#0057B8]'
+                  }`}
                 >
                   حفظ التغييرات
                 </button>
@@ -4161,6 +4193,8 @@ export default function AdminDashboard() {
             setMarginRules={setMarginRules}
             showToast={showToast}
             sectors={sectors}
+            saveChanges={saveChanges}
+            supabaseLoadStatus={supabaseLoadStatus}
           />
         )}
 
