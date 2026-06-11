@@ -289,7 +289,7 @@ export default function SupportSection({
                           }}
                           className="p-1 px-2.5 bg-[#0057B8] text-white rounded-lg text-[10px] font-bold"
                         >
-                          حفظ
+                          تطبيق
                         </button>
                         <button
                           type="button"
@@ -472,11 +472,11 @@ export default function SupportSection({
 
                             setAdvancePaymentTiers(advancePaymentTiers.map(t => t.id === br.id ? { ...t, salary_threshold: threshold_val, amount: amt_val } : t).sort((a,b) => a.salary_threshold - b.salary_threshold));
                             setEditAdvanceTierId(null);
-                            showToast('تم حفظ شريحة دعم الدفعة!', 'success');
+                            showToast('تم تحديث شريحة دعم الدفعة!', 'success');
                           }}
                           className="p-1 px-2.5 bg-[#0057B8] text-white rounded-lg text-[10px] font-bold"
                         >
-                          حفظ
+                          تطبيق
                         </button>
                         <button
                           type="button"

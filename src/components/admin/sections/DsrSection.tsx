@@ -545,7 +545,7 @@ export default function DsrSection({
                 onClick={handleSaveDsrForm}
                 className="bg-[#0057B8] hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm hover:shadow cursor-pointer font-sans"
               >
-                {editingDsrRule ? 'تعديل القاعدة' : 'حفظ وإضافة'}
+                {editingDsrRule ? 'تطبيق التعديل' : 'إضافة'}
               </button>
               <button
                 type="button"

@@ -1109,7 +1109,7 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
                 onClick={saveProductRule}
                 className="bg-[#0057B8] hover:bg-[#00418A] text-white px-6 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-sm shadow-[#0057B8]/10"
               >
-                حفظ القاعدة
+                تطبيق القاعدة
               </button>
               <button
                 type="button"

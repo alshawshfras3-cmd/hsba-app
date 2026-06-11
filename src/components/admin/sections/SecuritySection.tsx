@@ -275,7 +275,7 @@ export function SecuritySection() {
               {passwordLoading ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
               ) : (
-                <span>حفظ كلمة المرور</span>
+                <span>تحديث كلمة المرور</span>
               )}
             </button>
           </form>

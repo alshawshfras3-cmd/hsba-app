@@ -272,30 +272,11 @@ export default function PensionCalcTab({
                         ...r,
                         calculationMethod: methodType as any
                       } : r));
-                      showToast('تم تعديل الطريقة مؤقتاً بالمسودة! انقر على حفظ لمزامنة التغيير.', 'success');
+                      showToast('تم تعديل الطريقة مؤقتاً بالمسودة! انقر على حفظ التغييرات من الشريط السفلي لمزامنة التغيير.', 'success');
                     }}
                     className="bg-white border border-gray-200 hover:border-[#0057B8] text-gray-700 hover:text-[#0057B8] px-5 py-2.5 rounded-xl transition-all cursor-pointer shadow-xs"
                   >
                     🔄 تغيير طريقة الحساب للبنك
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      try {
-                        const rulesToSave = pensionDbRules.filter(r => r.bankId === selectedPensionBankTabId);
-                        for (const rule of rulesToSave) {
-                          await savePensionCalculationRule(rule);
-                        }
-                        showToast('تم حفظ تغييرات محددات المعاش والراتب التقاعدي بنجاح!', 'success');
-                      } catch (err: any) {
-                        console.error(err);
-                        showToast('فشل المزامنة مع الجداول: ' + (err.message || err), 'refuse');
-                      }
-                    }}
-                    className="bg-[#0057B8] hover:bg-blue-750 text-white px-6 py-2.5 rounded-xl transition-all cursor-pointer shadow-sm hover:shadow"
-                  >
-                    حفظ التغييرات
                   </button>
                 </div>
               </div>

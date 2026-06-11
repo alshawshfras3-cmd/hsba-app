@@ -747,7 +747,7 @@ export const BanksSection: React.FC<BanksSectionProps> = ({
                 onClick={saveInstitution}
                 className="px-5 py-2 bg-[#0057B8] hover:bg-[#00418A] text-white rounded-xl text-xs font-bold shadow-sm shadow-[#0057B8]/20 cursor-pointer"
               >
-                {editingInstitution ? 'تعديل وحفظ كمسودة' : 'حفظ وإضافة'}
+                {editingInstitution ? 'تطبيق التعديلات' : 'إضافة جهة التمويل'}
               </button>
             </div>
           </div>

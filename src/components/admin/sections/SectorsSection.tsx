@@ -407,7 +407,7 @@ export const SectorsSection: React.FC<SectorsSectionProps> = ({
                 onClick={saveSector}
                 className="bg-[#0057B8] hover:bg-blue-700 text-white px-5 py-2 rounded-xl text-xs font-bold transition-all shadow-sm hover:shadow cursor-pointer"
               >
-                حفظ التعديلات
+                تطبيق التعديلات
               </button>
               <button
                 type="button"
@@ -537,7 +537,7 @@ export const SectorsSection: React.FC<SectorsSectionProps> = ({
                 onClick={saveRank}
                 className="bg-[#0057B8] hover:bg-blue-700 text-white px-5 py-2 rounded-xl text-xs font-bold transition-all shadow-sm hover:shadow cursor-pointer"
               >
-                {editingRank ? 'حفظ التعديلات' : 'إضافة رتبة'}
+                {editingRank ? 'تطبيق التعديلات' : 'إضافة رتبة'}
               </button>
               <button
                 type="button"

@@ -2015,24 +2015,7 @@ export default function AdminDashboard() {
                     + إضافة قطاع
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      try {
-                        const rulesToSave = approvedSalaryDbRules.filter(r => r.bankId === selectedSalaryBankId);
-                        for (const rule of rulesToSave) {
-                          await saveApprovedSalaryRule(rule);
-                        }
-                        showToast('تم حفظ تغييرات الرواتب المعتمدة بنجاح للبنك وزيادة الاستجابة فورياً!', 'success');
-                      } catch (err: any) {
-                        console.error(err);
-                        showToast('فشل المزامنة مع الجداول في Supabase: ' + (err.message || err), 'refuse');
-                      }
-                    }}
-                    className="bg-[#0057B8] hover:bg-blue-750 text-white px-6 py-2.5 rounded-xl transition-all cursor-pointer shadow-sm hover:shadow"
-                  >
-                    حفظ التغييرات
-                  </button>
+
                 </div>
               </div>
             )}
@@ -2384,24 +2367,7 @@ export default function AdminDashboard() {
                           🔄 تغيير طريقة الحساب للبنك
                         </button>
 
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            try {
-                              const rulesToSave = pensionDbRules.filter(r => r.bankId === selectedPensionBankTabId);
-                              for (const rule of rulesToSave) {
-                                await savePensionCalculationRule(rule);
-                              }
-                              showToast('تم حفظ تغييرات محددات المعاش والراتب التقاعدي بنجاح!', 'success');
-                            } catch (err: any) {
-                              console.error(err);
-                              showToast('فشل المزامنة مع الجداول: ' + (err.message || err), 'refuse');
-                            }
-                          }}
-                          className="bg-[#0057B8] hover:bg-blue-750 text-white px-6 py-2.5 rounded-xl transition-all cursor-pointer shadow-sm hover:shadow"
-                        >
-                          حفظ التغييرات
-                        </button>
+
                       </div>
                     </div>
                   );
@@ -2924,7 +2890,7 @@ export default function AdminDashboard() {
                       const missingCount = synchronized.length - bankSectorRules.length;
                       if (missingCount > 0) {
                         setBankSectorRules(synchronized);
-                        showToast(`تم إنشاء عدد ${missingCount} قاعدة ناقصة بنجاح! لا تنس النقر على زر حفظ تغييرات الربط لتأكيدها.`, "success");
+                        showToast(`تم إنشاء عدد ${missingCount} قاعدة ناقصة بنجاح! لا تنس النقر على زر حفظ التغييرات من الشريط السفلي لتأكيدها.`, "success");
                       } else {
                         showToast("جميع القواعد للقطاعات والبنوك مكتملة بالفعل!", "refuse");
                       }
@@ -2933,17 +2899,6 @@ export default function AdminDashboard() {
                   >
                     <Plus className="w-3.5 h-3.5" />
                     إنشاء القواعد الناقصة
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      saveBankSectorRulesToStorage(bankSectorRules);
-                      showToast("تم حفظ جميع قواعد البنوك والقطاعات بنجاح! 🎉", "success");
-                    }}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-xs font-extrabold transition-all shadow-md active:scale-95 flex items-center gap-1.5 cursor-pointer font-sans"
-                  >
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    حفظ تغييرات الربط
                   </button>
                 </div>
               </div>
@@ -4599,11 +4554,11 @@ export default function AdminDashboard() {
                     setBankSectorRules(updated);
                     setIsBankSectorModalOpen(false);
                     setEditingBankSectorRule(null);
-                    showToast("تم تحديث قواعد البنك والقطاع بنجاح! للثبات النهائي يرجى نقر زر حفظ تغييرات الربط بالأعلى.", "success");
+                    showToast("تم تحديث قواعد البنك والقطاع بنجاح محلياً! للتثبيت السحابي، اضغط على زر حفظ التغييرات من الشريط الأسافلي.", "success");
                   }}
                   className="bg-[#0057B8] hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer"
                 >
-                  حفظ التعديلات
+                  تطبيق التعديلات
                 </button>
                 <button
                   type="button"
@@ -5008,11 +4963,11 @@ export default function AdminDashboard() {
                     saveLibraryRulesToStorage(updated);
                     setIsLibraryModalOpen(false);
                     setEditingLibraryRule(null);
-                    showToast("تم حفظ قالب قاعدة التقاعد بنجاح بالمكتبة! 🎉", "success");
+                    showToast("تم تحديث قالب قاعدة التقاعد بالمكتبة بنجاح! لا تنس نقر زر حفظ التغييرات بالشريط السفلي لتطبيق كامل التعديلات.", "success");
                   }}
                   className="bg-[#0057B8] hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-sm"
                 >
-                  حفظ القاعدة
+                  تطبيق وتحديث القالب
                 </button>
                 <button
                   type="button"

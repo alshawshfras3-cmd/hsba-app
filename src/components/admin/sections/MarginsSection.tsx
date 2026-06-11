@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Copy, Loader2 } from 'lucide-react';
 import { Bank, ProductId, SupportType, SectorId, MarginRule, Sector } from '../../../types';
 import { calculateMargin } from '../../../lib/finance-engine/margin';
@@ -78,6 +78,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
   const [localSectorExceptions, setLocalSectorExceptions] = useState<Record<string, string>>({});
 
   const [isLoaded, setIsLoaded] = useState(false);
+  const lastUpdatedRulesRef = useRef<MarginRule[] | null>(null);
   const [isSavingToCloud, setIsSavingToCloud] = useState(false);
 
   // Auxiliary UI States
@@ -129,6 +130,9 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
   // Synchronize local states when selection changes or marginRules are updated
   useEffect(() => {
     if (!selectedBank) return;
+    if (lastUpdatedRulesRef.current === marginRules) {
+      return;
+    }
 
     const normSupportVal = normSupport(selectedSupport);
 
@@ -401,9 +405,26 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     });
 
     const updatedRules = [...remainingRules, ...newRulesForThisCombo, ...newExceptionRules];
+    lastUpdatedRulesRef.current = updatedRules;
     setMarginRules(updatedRules);
     return updatedRules;
   };
+
+  // Auto-synchronize local changes directly to parent to trigger global "hasUnsavedChanges" banner
+  useEffect(() => {
+    if (!isLoaded) return;
+    updateGlobalRulesForCombo(
+      selectedBank,
+      selectedProduct,
+      selectedSupport,
+      selectedSector,
+      selectedSalaryTier,
+      localMargins,
+      localSectorExceptions,
+      selectedCalcMethod,
+      selectedYearsMode
+    );
+  }, [localMargins, localTiers, localSectorExceptions, selectedCalcMethod, selectedYearsMode, isLoaded]);
 
   // Main save action for basic margins + exceptions
   const handleSaveConfig = async () => {
@@ -977,26 +998,6 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
             إدارة هوامش التمويل الأساسية ومزامنة كافة استثناءات القطاعات في واجهة واحدة متكاملة.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          {/* Main Actions Sticky Header */}
-          <button
-            type="button"
-            disabled={isSavingToCloud}
-            onClick={handleSaveConfig}
-            className={`px-5 py-2.5 bg-[#0057B8] text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-[#0057B8]/10 cursor-pointer flex items-center justify-center gap-1.5 ${isSavingToCloud ? 'opacity-80 cursor-not-allowed' : 'hover:bg-[#004bb0]'}`}
-          >
-            {isSavingToCloud ? (
-              <>
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                <span>جاري حفظ الهوامش...</span>
-              </>
-            ) : (
-              <>
-                <span>💾 حفظ وتطبيق الإعدادات</span>
-              </>
-            )}
-          </button>
-        </div>
       </div>
 
       {/* 2. Main Horizontal Dashboard Grid (Settings Right, Table Left) */}
@@ -1285,24 +1286,6 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                 ⏱️ {selectedYearsMode === 'key_points' ? 'نقاط رئيسية' : selectedYearsMode === 'yearly' ? 'كل سنة مستقلة' : 'شرائح مدة'}
               </span>
             </div>
-
-            <div className="shrink-0 flex gap-2">
-              <button
-                type="button"
-                disabled={isSavingToCloud}
-                onClick={handleSaveConfig}
-                className={`px-4 py-1.5 bg-[#0057B8] text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center justify-center gap-1 ${isSavingToCloud ? 'opacity-80 cursor-not-allowed' : 'hover:bg-[#004bb0]'}`}
-              >
-                {isSavingToCloud ? (
-                  <>
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                    <span>جاري الحفظ...</span>
-                  </>
-                ) : (
-                  <span>حفظ الجدول</span>
-                )}
-              </button>
-            </div>
           </div>
 
           {/* Margins Inputs Table/Grid */}
@@ -1517,24 +1500,6 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
           >
             <span>📜</span>
             <span>{showGeneralLogs ? 'إخفاء السجل الشامل' : 'عرض السجل الشامل'}</span>
-          </button>
-          
-          <button
-            type="button"
-            disabled={isSavingToCloud}
-            onClick={handleSaveConfig}
-            className={`px-6 py-2 bg-[#0057B8] text-white rounded-lg text-xs font-extrabold transition-all shadow-md shadow-[#0057B8]/10 cursor-pointer flex items-center justify-center gap-1.5 hover:scale-[1.01] ${isSavingToCloud ? 'opacity-80 cursor-not-allowed' : 'hover:bg-[#004bb0]'}`}
-          >
-            {isSavingToCloud ? (
-              <>
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                <span>جاري حفظ كافة الإعدادات...</span>
-              </>
-            ) : (
-              <>
-                <span>💾 حفظ وتطبيق كافة الإعدادات</span>
-              </>
-            )}
           </button>
         </div>
       </div>
