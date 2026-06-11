@@ -224,9 +224,12 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
 
       // الآن فقط نحدد mode
       if (sectorRules.length > 0) {
+        const withCalcMode = sectorRules.find(r => r.calculationMode);
         const withInputMode = sectorRules.find(r => r.marginInputMode);
 
-        if (withInputMode && withInputMode.marginInputMode) {
+        if (withCalcMode && withCalcMode.calculationMode) {
+          determinedMode = withCalcMode.calculationMode as any;
+        } else if (withInputMode && withInputMode.marginInputMode) {
           determinedMode = withInputMode.marginInputMode as any;
         } else {
           determinedMode = getRuleInputMode(sectorRules[0]);
@@ -260,7 +263,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
         initialTiers.sort((a, b) => a.fromMonth - b.fromMonth);
 
         // 3. Load calculation method
-        const foundMethodRule = yearsRules.find(r => r.calculationMethod || r.calcType);
+        const foundMethodRule = sectorRules.find(r => r.calculationMethod || r.calcType);
         if (foundMethodRule) {
           method = (foundMethodRule.calculationMethod || foundMethodRule.calcType) as any;
         }
@@ -375,6 +378,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
           salaryTier: targetSalaryTier,
           productType: targetProduct as any,
           marginInputMode: 'duration_tiers',
+          calculationMode: 'duration_tiers',
           calculationMethod: 'fixed',
           termMonths: numTo,
           annualMargin: numRate,
@@ -464,6 +468,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
             salaryTier: targetSalaryTier,
             productType: targetProduct as any,
             marginInputMode: inputMode as any,
+            calculationMode: inputMode as any,
             calculationMethod: method,
             year: def.yearPoint,
             termMonths: def.to === 9999 ? (def.yearPoint * 12) : def.to,

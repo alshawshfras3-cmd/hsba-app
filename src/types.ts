@@ -133,6 +133,7 @@ export interface MarginRule {
   // NEW internal keys/metadata fields
   productType?: 'real_estate_only' | 'real_estate_with_new_personal' | 'real_estate_with_existing_personal';
   marginInputMode?: 'yearly' | 'key_points' | 'duration_tiers';
+  calculationMode?: 'yearly' | 'key_points' | 'duration_tiers';
   calculationMethod?: 'fixed' | 'linear';
   year?: number;
   termMonths?: number;
