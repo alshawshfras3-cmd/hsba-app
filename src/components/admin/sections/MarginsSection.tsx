@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Copy, Loader2 } from 'lucide-react';
 import { Bank, ProductId, SupportType, SectorId, MarginRule, Sector } from '../../../types';
 import { calculateMargin } from '../../../lib/finance-engine/margin';
@@ -82,6 +82,22 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
   const lastLoadedKeyRef = useRef<string>('');
   const [isSavingToCloud, setIsSavingToCloud] = useState(false);
 
+  // Hydration ref to block auto synchronization during table initialization or selection changes
+  const isHydratingRef = useRef(false);
+
+  // 1. Isolated states to track edited margins and check dirty status independently of settings
+  const [marginData, setMarginData] = useState<any[]>([]);
+  const [initialMarginData, setInitialMarginData] = useState<string>('[]');
+  const marginDataRef = useRef<any[]>([]);
+
+  useEffect(() => {
+    marginDataRef.current = marginData;
+  }, [marginData]);
+
+  const isDirty = useMemo(() => {
+    return JSON.stringify(marginData) !== initialMarginData;
+  }, [marginData, initialMarginData]);
+
   // Auxiliary UI States
   const [showCloneCard, setShowCloneCard] = useState(false);
   const [cloneFromBank, setCloneFromBank] = useState('alahli');
@@ -139,128 +155,163 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       return;
     }
 
+    // Mark as hydrating to avoid auto-synchronization and false un-saved prompts
+    isHydratingRef.current = true;
+
     lastLoadedKeyRef.current = currentKey;
 
-    const normSupportVal = normSupport(selectedSupport);
-
-    // Normalize all rules to clean official product IDs and support types upon reading
-    const allNormalized = marginRules.map(r => {
-      let pId = r.productId as string;
-      if (pId === 'real_estate') pId = 'real_estate_only';
-      else if (pId === 'both') pId = 'real_estate_with_new_personal';
-      else if (pId === 'real_estate_with_personal_existing') pId = 'real_estate_with_existing_personal';
-
-      let sType = r.supportType as string;
-      if (sType === 'down_payment') sType = 'downpayment';
-
-      return {
-        ...r,
-        productId: pId as ProductId,
-        supportType: sType as SupportType
-      };
-    });
-
-    const targetBank = selectedBank;
-    const targetProduct = selectedProduct;
-    const targetSupport = normSupportVal;
-    const targetSalaryTier = selectedSalaryTier;
-    const targetSector = selectedSector;
-
-    // Filter rules matching core values: bank, product, support, and salary tier with clean normalization
-    const matchingRules = allNormalized.filter(r => {
-      if (r.isExceptionOnly) return false;
-      if (r.bankId !== targetBank) return false;
-      if (r.productId !== targetProduct) return false;
-      if (normSupport(r.supportType) !== normSupport(targetSupport)) return false;
-      if (normSalaryTier(r.salaryTier) !== normSalaryTier(targetSalaryTier)) return false;
-      return true;
-    });
-
-    // أولاً: فلترة القطاع
-    let sectorRules = matchingRules.filter(
-      r => normSector(r.sectorId) === normSector(targetSector)
-    );
-
-    // fallback فقط إذا ما فيه قطاع
-    if (sectorRules.length === 0 && normSector(targetSector) !== 'all') {
-      sectorRules = matchingRules.filter(
-        r => normSector(r.sectorId) === 'all'
-      );
-    }
-
-    // الآن فقط نحدد mode
+    let initialMargins: Record<number, string> = {};
+    let initialTiers: any[] = [];
+    let initialExceptions: Record<string, string> = {};
+    let method: 'linear' | 'fixed' = 'fixed';
     let determinedMode: 'yearly' | 'key_points' | 'duration_tiers' | '' = '';
 
-    if (sectorRules.length > 0) {
-      const withInputMode = sectorRules.find(r => r.marginInputMode);
+    const existingCombo = marginDataRef.current.find(item => item.key === currentKey);
 
-      if (withInputMode && withInputMode.marginInputMode) {
-        determinedMode = withInputMode.marginInputMode as any;
-      } else {
-        determinedMode = getRuleInputMode(sectorRules[0]);
-      }
-    }
-
-    if (determinedMode !== '') {
-      // 1. Load years margins (for yearly / key_points) independently of selected mode to avoid wiping
-      const yearsRules = sectorRules.filter(r => !isTiersRule(r));
-      const yearsListFull = Array.from({ length: 26 }, (_, i) => 5 + i);
-      const initialMargins: Record<number, string> = {};
-
-      yearsListFull.forEach(year => {
-        const rY = yearsRules.find(r => r.year === year || r.toTermMonths === year * 12);
-        if (rY) {
-          initialMargins[year] = (rY.annualMargin !== undefined ? rY.annualMargin : (rY.baseMargin !== undefined ? Number((rY.baseMargin * 100).toFixed(3)) : rY.endMargin)).toString();
-        } else {
-          initialMargins[year] = '';
-        }
-      });
-      setLocalMargins(initialMargins);
-
-      // 2. Load duration tiers independently of selected mode to avoid wiping
-      const tierRules = sectorRules.filter(r => isTiersRule(r));
-      const initialTiers = tierRules.map((r, idx) => ({
-        id: r.id || `tier_${idx}_${Date.now()}`,
-        fromMonth: r.fromMonth ?? r.fromTermMonths ?? 0,
-        toMonth: r.toMonth ?? r.toTermMonths ?? 0,
-        marginRate: r.marginRate ?? r.endMargin ?? 3.50,
-        notes: r.notes || '',
-        active: r.active !== false && r.isActive !== false
-      }));
-      initialTiers.sort((a, b) => a.fromMonth - b.fromMonth);
-      setLocalTiers(initialTiers);
-
-      // 3. Load calculation method
-      let method: 'linear' | 'fixed' = 'fixed';
-      const foundMethodRule = yearsRules.find(r => r.calculationMethod || r.calcType);
-      if (foundMethodRule) {
-        method = (foundMethodRule.calculationMethod || foundMethodRule.calcType) as any;
-      }
-      setSelectedCalcMethod(method);
-      
-      // 4. Update selectedYearsMode to the resolved mode
-      setSelectedYearsMode(determinedMode);
+    if (existingCombo) {
+      initialMargins = { ...existingCombo.localMargins };
+      initialTiers = [...existingCombo.localTiers];
+      initialExceptions = { ...existingCombo.localSectorExceptions };
+      method = existingCombo.selectedCalcMethod;
+      determinedMode = existingCombo.selectedYearsMode;
     } else {
-      // No config found for this combination -> Clear and set to empty
-      setLocalMargins({});
-      setLocalTiers([]);
-      setSelectedCalcMethod('fixed');
-      setSelectedYearsMode('');
+      const normSupportVal = normSupport(selectedSupport);
+
+      // Normalize all rules to clean official product IDs and support types upon reading
+      const allNormalized = marginRules.map(r => {
+        let pId = r.productId as string;
+        if (pId === 'real_estate') pId = 'real_estate_only';
+        else if (pId === 'both') pId = 'real_estate_with_new_personal';
+        else if (pId === 'real_estate_with_personal_existing') pId = 'real_estate_with_existing_personal';
+
+        let sType = r.supportType as string;
+        if (sType === 'down_payment') sType = 'downpayment';
+
+        return {
+          ...r,
+          productId: pId as ProductId,
+          supportType: sType as SupportType
+        };
+      });
+
+      const targetBank = selectedBank;
+      const targetProduct = selectedProduct;
+      const targetSupport = normSupportVal;
+      const targetSalaryTier = selectedSalaryTier;
+      const targetSector = selectedSector;
+
+      // Filter rules matching core values: bank, product, support, and salary tier with clean normalization
+      const matchingRules = allNormalized.filter(r => {
+        if (r.isExceptionOnly) return false;
+        if (r.bankId !== targetBank) return false;
+        if (r.productId !== targetProduct) return false;
+        if (normSupport(r.supportType) !== normSupport(targetSupport)) return false;
+        if (normSalaryTier(r.salaryTier) !== normSalaryTier(targetSalaryTier)) return false;
+        return true;
+      });
+
+      // أولاً: فلترة القطاع
+      let sectorRules = matchingRules.filter(
+        r => normSector(r.sectorId) === normSector(targetSector)
+      );
+
+      // fallback فقط إذا ما فيه قطاع
+      if (sectorRules.length === 0 && normSector(targetSector) !== 'all') {
+        sectorRules = matchingRules.filter(
+          r => normSector(r.sectorId) === 'all'
+        );
+      }
+
+      // الآن فقط نحدد mode
+      if (sectorRules.length > 0) {
+        const withInputMode = sectorRules.find(r => r.marginInputMode);
+
+        if (withInputMode && withInputMode.marginInputMode) {
+          determinedMode = withInputMode.marginInputMode as any;
+        } else {
+          determinedMode = getRuleInputMode(sectorRules[0]);
+        }
+      }
+
+      if (determinedMode !== '') {
+        // 1. Load years margins (for yearly / key_points) independently of selected mode to avoid wiping
+        const yearsRules = sectorRules.filter(r => !isTiersRule(r));
+        const yearsListFull = Array.from({ length: 26 }, (_, i) => 5 + i);
+
+        yearsListFull.forEach(year => {
+          const rY = yearsRules.find(r => r.year === year || r.toTermMonths === year * 12);
+          if (rY) {
+            initialMargins[year] = (rY.annualMargin !== undefined ? rY.annualMargin : (rY.baseMargin !== undefined ? Number((rY.baseMargin * 100).toFixed(3)) : rY.endMargin)).toString();
+          } else {
+            initialMargins[year] = '';
+          }
+        });
+
+        // 2. Load duration tiers independently of selected mode to avoid wiping
+        const tierRules = sectorRules.filter(r => isTiersRule(r));
+        initialTiers = tierRules.map((r, idx) => ({
+          id: r.id || `tier_${idx}_${Date.now()}`,
+          fromMonth: r.fromMonth ?? r.fromTermMonths ?? 0,
+          toMonth: r.toMonth ?? r.toTermMonths ?? 0,
+          marginRate: r.marginRate ?? r.endMargin ?? 3.50,
+          notes: r.notes || '',
+          active: r.active !== false && r.isActive !== false
+        }));
+        initialTiers.sort((a, b) => a.fromMonth - b.fromMonth);
+
+        // 3. Load calculation method
+        const foundMethodRule = yearsRules.find(r => r.calculationMethod || r.calcType);
+        if (foundMethodRule) {
+          method = (foundMethodRule.calculationMethod || foundMethodRule.calcType) as any;
+        }
+      }
+
+      // 5. Synchronize sector exceptions (bank level exception list) independently of config presence
+      sectorsList.forEach(sec => {
+        const exRule = marginRules.find(r =>
+          r.bankId === selectedBank &&
+          r.sectorId === sec.id &&
+          r.isExceptionOnly === true
+        );
+        initialExceptions[sec.id] = exRule && exRule.exceptionBps !== undefined ? exRule.exceptionBps.toString() : '0';
+      });
     }
 
-    // 5. Synchronize sector exceptions (bank level exception list) independently of config presence
-    const initialExceptions: Record<string, string> = {};
-    sectorsList.forEach(sec => {
-      const exRule = marginRules.find(r =>
-        r.bankId === selectedBank &&
-        r.sectorId === sec.id &&
-        r.isExceptionOnly === true
-      );
-      initialExceptions[sec.id] = exRule && exRule.exceptionBps !== undefined ? exRule.exceptionBps.toString() : '0';
-    });
+    setLocalMargins(initialMargins);
+    setLocalTiers(initialTiers);
+    setSelectedCalcMethod(method);
+    setSelectedYearsMode(determinedMode);
     setLocalSectorExceptions(initialExceptions);
-    
+
+    // Save/update this newly loaded combo in both marginData and initialMarginData arrays
+    const loadedCombo = {
+      key: currentKey,
+      localMargins: initialMargins,
+      localTiers: initialTiers,
+      localSectorExceptions: initialExceptions,
+      selectedCalcMethod: method,
+      selectedYearsMode: determinedMode
+    };
+
+    setMarginData(prev => {
+      const exists = prev.find(item => item.key === currentKey);
+      if (exists) return prev;
+      return [...prev, loadedCombo];
+    });
+
+    setInitialMarginData(prevStr => {
+      const prevArray = JSON.parse(prevStr || '[]');
+      const exists = prevArray.find((item: any) => item.key === currentKey);
+      if (exists) return prevStr;
+      return JSON.stringify([...prevArray, loadedCombo]);
+    });
+
     setIsLoaded(true);
+
+    // Reset hydrating flag in next tick so that downstream update effects run with hydrating=true during this tick
+    setTimeout(() => {
+      isHydratingRef.current = false;
+    }, 0);
 
   }, [selectedBank, selectedProduct, selectedSupport, selectedSalaryTier, selectedSector, marginRules]);
 
@@ -444,10 +495,58 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     return updatedRules;
   };
 
-  // Auto-synchronize local changes directly to parent to trigger global "hasUnsavedChanges" banner
+  // Update marginData entry for currentKey when local editing states change
   useEffect(() => {
     if (!isLoaded) return;
+    if (isHydratingRef.current) return;
+    const currentKey = `${selectedBank}_${selectedProduct}_${selectedSupport}_${selectedSalaryTier}_${selectedSector}`;
+
+    const activeComboData = {
+      key: currentKey,
+      localMargins,
+      localTiers,
+      localSectorExceptions,
+      selectedCalcMethod,
+      selectedYearsMode
+    };
+
+    setMarginData(prev => {
+      const exists = prev.find(item => item.key === currentKey);
+      if (exists) {
+        if (JSON.stringify(exists) === JSON.stringify(activeComboData)) {
+          return prev;
+        }
+        return prev.map(item => item.key === currentKey ? activeComboData : item);
+      }
+      return [...prev, activeComboData];
+    });
+  }, [localMargins, localTiers, localSectorExceptions, selectedCalcMethod, selectedYearsMode, isLoaded, selectedBank, selectedProduct, selectedSupport, selectedSalaryTier, selectedSector]);
+
+  // Auto-synchronize local changes directly to parent to trigger global "hasUnsavedChanges" banner only when dirty
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (isHydratingRef.current) return;
     if (selectedYearsMode === '') return; // Guard: No mode selected/loaded, do not write empty state to global
+
+    const currentKey = `${selectedBank}_${selectedProduct}_${selectedSupport}_${selectedSalaryTier}_${selectedSector}`;
+    const activeCombo = {
+      key: currentKey,
+      localMargins,
+      localTiers,
+      localSectorExceptions,
+      selectedCalcMethod,
+      selectedYearsMode
+    };
+
+    const initialArr = JSON.parse(initialMarginData || '[]');
+    const initialCombo = initialArr.find((item: any) => item.key === currentKey);
+    const isComboDirty = !initialCombo || JSON.stringify(activeCombo) !== JSON.stringify(initialCombo);
+
+    if (!isComboDirty) {
+      // Not dirty, so do not update parent global state. This keeps reference equality of marginRules on navigation!
+      return;
+    }
+
     updateGlobalRulesForCombo(
       selectedBank,
       selectedProduct,
@@ -459,7 +558,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       selectedCalcMethod,
       selectedYearsMode
     );
-  }, [localMargins, localTiers, localSectorExceptions, selectedCalcMethod, selectedYearsMode, isLoaded]);
+  }, [localMargins, localTiers, localSectorExceptions, selectedCalcMethod, selectedYearsMode, isLoaded, initialMarginData, selectedBank, selectedProduct, selectedSupport, selectedSector, selectedSalaryTier]);
 
   // Main save action for basic margins + exceptions
   const handleSaveConfig = async () => {
@@ -519,10 +618,27 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
         selectedYearsMode
       );
 
+      const currentKey = `${selectedBank}_${selectedProduct}_${selectedSupport}_${selectedSalaryTier}_${selectedSector}`;
+      const latestCombo = {
+        key: currentKey,
+        localMargins,
+        localTiers,
+        localSectorExceptions,
+        selectedCalcMethod,
+        selectedYearsMode
+      };
+
+      const updatedMarginData = marginData.map(item => item.key === currentKey ? latestCombo : item);
+
       if (saveChanges) {
         setIsSavingToCloud(true);
         try {
           await saveChanges(updatedRules);
+          
+          // Clear local dirty state
+          setMarginData(updatedMarginData);
+          setInitialMarginData(JSON.stringify(updatedMarginData));
+
           showToast('🟢 تم حفظ وتطبيق الإعدادات بنجاح ومزامنتها مباشرة في قاعدة البيانات السحابية (Supabase) بشكل نهائي!', 'success');
         } catch (cloudErr: any) {
           console.error("Cloud save failed inside MarginsSection:", cloudErr);
@@ -532,6 +648,9 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
           setIsSavingToCloud(false);
         }
       } else {
+        // Clear local dirty state even when local RAM-only save
+        setMarginData(updatedMarginData);
+        setInitialMarginData(JSON.stringify(updatedMarginData));
         showToast('✔️ تم حفظ وتطبيق الإعداد قبل قليل في الذاكرة بنجاح! نذكرك أن الحفظ مؤقت ويحتاج الضغط على زر الحفظ النهائي لحفظه بالأعلى.', 'success');
       }
     } catch (e: any) {
@@ -1538,6 +1657,24 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
+          {isDirty && (
+            <button
+              type="button"
+              onClick={handleSaveConfig}
+              disabled={isSavingToCloud}
+              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-all shadow-md shrink-0 flex items-center gap-1.5 cursor-pointer"
+            >
+              {isSavingToCloud ? (
+                <span>جاري الحفظ والمزامنة...</span>
+              ) : (
+                <>
+                  <span>💾</span>
+                  <span>حفظ ومزامنة الهوامش المعدلة</span>
+                </>
+              )}
+            </button>
+          )}
+
           <button
             type="button"
             onClick={() => setShowGeneralLogs(!showGeneralLogs)}

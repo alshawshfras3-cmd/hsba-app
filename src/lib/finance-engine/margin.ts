@@ -210,11 +210,10 @@ export function calculateMargin(params: {
       r => targetMonths >= r.fromTermMonths && targetMonths <= r.toTermMonths
     );
     if (!matchedRule) {
-      if (rules.length > 0) {
-        // Fallback to the last available rule as it is still part of the configured DB rules
-        return { margin: rules[rules.length - 1].endMargin };
-      }
-      return { margin: 0, error: "لا تتوفر قاعدة هامش لهذه المدة." };
+      return {
+        margin: 0,
+        error: "لا توجد قاعدة هامش مطابقة لهذه المدة."
+      };
     }
     if (matchedRule.calcType === 'linear' && matchedRule.toTermMonths > matchedRule.fromTermMonths) {
       const t = targetMonths;
@@ -353,12 +352,14 @@ export function calculateMargin(params: {
 
   // Determine if it is a real estate product and calculate exception adjustments
   const isRealEstate = normProduct !== 'personal' && normProduct !== 'personal_only';
-  // Find the sector exception rule matching bank + sector only (independent of product/support)
-  const matchedExceptionRule = marginRules.find(
-    r => r.bankId === bankId &&
-         r.sectorId === sectorId &&
-         r.exceptionBps !== undefined &&
-         r.isActive !== false
+  // Find the sector exception rule matching bank + sector only
+  const matchedExceptionRule = rules.find(
+    r =>
+      r.bankId === bankId &&
+      r.sectorId === sectorId &&
+      r.productId === normProduct &&
+      r.isActive !== false &&
+      r.exceptionBps !== undefined
   );
   const exceptionBps = isRealEstate && matchedExceptionRule ? (matchedExceptionRule.exceptionBps ?? 0) : 0;
   const finalMarginPercent = Number((baseMarginPercent - (exceptionBps / 100)).toFixed(3));
