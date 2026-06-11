@@ -47,6 +47,29 @@ export function AccountPage() {
 
 
 
+  // Admin verification state
+  const [hasAdminAccess, setHasAdminAccess] = useState(false);
+
+  React.useEffect(() => {
+    async function verifyAdminAccess() {
+      if (!hasSupabaseKeys || !user) return;
+      try {
+        const { data, error } = await supabase
+          .from('admins')
+          .select('user_id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        
+        if (data && !error) {
+          setHasAdminAccess(true);
+        }
+      } catch (err) {
+        console.error("Could not fetch admin details:", err);
+      }
+    }
+    verifyAdminAccess();
+  }, [user]);
+
   const handleVibrate = () => {
     if (window.navigator && window.navigator.vibrate) {
       window.navigator.vibrate(12);
@@ -225,7 +248,6 @@ export function AccountPage() {
   };
 
   const displayFullName = profile?.full_name || user?.user_metadata?.full_name || user?.user_metadata?.username || 'مستخدم حسبة';
-  const hasAdminAccess = user?.email?.toLowerCase().trim() === 'admin@hesba.com';
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 text-right select-none animate-fade-in text-[#1E293B] dark:text-slate-100 min-h-screen transition-colors duration-200" dir="rtl">
@@ -406,12 +428,7 @@ export function AccountPage() {
               <button
                 onClick={() => {
                   handleVibrate();
-                  const adminSession = sessionStorage.getItem('hesba_admin_session');
-                  if (adminSession) {
-                    location.navigate('/admin/dashboard');
-                  } else {
-                    location.navigate('/admin');
-                  }
+                  location.navigate('/admin');
                 }}
                 className="w-full p-4 hover:bg-indigo-50/50 dark:hover:bg-slate-900 rounded-2xl border border-slate-150 dark:border-slate-800 transition-all flex items-center justify-between group cursor-pointer text-right"
               >

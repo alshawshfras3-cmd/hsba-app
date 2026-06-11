@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation } from '../../hooks/useLocation';
 import { ShieldAlert, Loader2 } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 
 interface GuardProps {
   children: React.ReactNode;
@@ -12,40 +13,54 @@ export function AdminDashboardGuard({ children }: GuardProps) {
   const [isAllowed, setIsAllowed] = useState(false);
 
   useEffect(() => {
-    const checkSession = () => {
+    let active = true;
+
+    async function checkSession() {
       try {
-        const sessionStr = sessionStorage.getItem('hesba_admin_session');
-
-        if (sessionStr) {
-          const session = JSON.parse(sessionStr);
-
-          if (session && session.isAdmin === true) {
-            setIsAllowed(true);
+        const { data: { user }, error: userErr } = await supabase.auth.getUser();
+        if (userErr || !user) {
+          if (active) {
+            setIsAllowed(false);
             setLoading(false);
-            return true;
           }
+          return;
         }
-      } catch (e) {
-        console.error('Invalid admin session:', e);
+
+        // Verify user exists in the admins table
+        const { data: adminRow, error: adminErr } = await supabase
+          .from('admins')
+          .select('user_id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (active) {
+          if (adminErr || !adminRow) {
+            setIsAllowed(false);
+          } else {
+            setIsAllowed(true);
+          }
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error('Verify admin session failed:', err);
+        if (active) {
+          setIsAllowed(false);
+          setLoading(false);
+        }
       }
+    }
 
-      return false;
-    };
+    checkSession();
 
-    if (checkSession()) return;
-
-    const timer = setTimeout(() => {
-      if (!checkSession()) {
-        setIsAllowed(false);
-        setLoading(false);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT' || event === 'USER_UPDATED') {
+        checkSession();
       }
-    }, 200);
-
-    window.addEventListener('hesba-admin-session-changed', checkSession);
+    });
 
     return () => {
-      clearTimeout(timer);
-      window.removeEventListener('hesba-admin-session-changed', checkSession);
+      active = false;
+      subscription.unsubscribe();
     };
   }, []);
 

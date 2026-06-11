@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase, hasSupabaseKeys } from '../lib/supabase';
 import { Shield, User, Mail, Calendar, AlertCircle, Loader2 } from 'lucide-react';
-import { getAdminCredentials } from '../lib/adminCredentials';
 
 type AppUser = {
   id: string;
@@ -20,22 +19,29 @@ export function UsersManagementPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showBlockedOnly, setShowBlockedOnly] = useState('all'); // all, active, blocked
 
-  const [adminEmail, setAdminEmail] = useState('admin@hesba.com');
+  const [adminUserIds, setAdminUserIds] = useState<string[]>([]);
+  const [currentAdminUserId, setCurrentAdminUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    // 1. Load admin email as safe background task
-    async function loadAdminEmailBackground() {
+    async function loadAdminContext() {
       try {
-        const credentials = await getAdminCredentials();
-        const currentAdminEmail = credentials.admin_email.toLowerCase().trim();
-        setAdminEmail(currentAdminEmail);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          setCurrentAdminUserId(user.id);
+        }
+
+        const { data: adminsList } = await supabase
+          .from('admins')
+          .select('user_id');
+        
+        if (adminsList) {
+          setAdminUserIds(adminsList.map(a => a.user_id));
+        }
       } catch (e) {
-        console.warn("Could not load admin credentials in background:", e);
+        console.warn("Could not load current admin context:", e);
       }
     }
-    loadAdminEmailBackground();
-
-    // 2. Fetch users directly
+    loadAdminContext();
     fetchUsersAndAdminEmail();
   }, []);
 
@@ -95,9 +101,8 @@ export function UsersManagementPage() {
   }
 
   async function toggleBlockStatus(userId: string, email: string, currentlyBlocked: boolean) {
-    const emailLower = email.toLowerCase().trim();
-    if (emailLower === adminEmail || emailLower === 'admin@hesba.com') {
-      alert('ممنوع تماماً حظر حساب مالك أو مسؤول النظام الأساسي!');
+    if (adminUserIds.includes(userId) || userId === currentAdminUserId) {
+      alert('ممنوع تماماً حظر حساب مسؤول أو مشرف نظام الحسبة!');
       return;
     }
 
@@ -134,8 +139,7 @@ export function UsersManagementPage() {
 
   // Filter users
   const filteredUsers = users.filter(u => {
-    const emailLower = u.email.toLowerCase().trim();
-    if (emailLower === adminEmail || emailLower === 'admin@hesba.com') {
+    if (adminUserIds.includes(u.id) || u.id === currentAdminUserId || u.email.toLowerCase().trim() === 'admin@hesba.com') {
       return false;
     }
 

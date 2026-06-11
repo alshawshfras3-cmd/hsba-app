@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useLocation } from '../hooks/useLocation';
 import { Lock, Mail, Loader2, ShieldAlert, AlertCircle } from 'lucide-react';
-import { getAdminCredentials } from '../lib/adminCredentials';
+import { supabase } from '../lib/supabase';
 
 export function AdminLoginPage() {
   const { navigate } = useLocation();
@@ -11,17 +11,25 @@ export function AdminLoginPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   React.useEffect(() => {
-    const adminSession = sessionStorage.getItem('hesba_admin_session');
-    if (adminSession) {
+    async function checkCurrentAdminSession() {
       try {
-        const parsed = JSON.parse(adminSession);
-        if (parsed && parsed.isAdmin) {
-          navigate('/admin/dashboard');
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: adminRow } = await supabase
+            .from('admins')
+            .select('user_id')
+            .eq('user_id', user.id)
+            .maybeSingle();
+
+          if (adminRow) {
+            navigate('/admin/dashboard');
+          }
         }
-      } catch (e) {
-        console.error(e);
+      } catch (err) {
+        console.error('Session check failed:', err);
       }
     }
+    checkCurrentAdminSession();
   }, [navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -30,42 +38,40 @@ export function AdminLoginPage() {
     setErrorMsg(null);
 
     try {
-      const creds = await getAdminCredentials();
-      const cleanIdentifier = email.trim().toLowerCase();
+      const cleanEmail = email.trim().toLowerCase();
+      
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password: password
+      });
 
-      const identifierOk =
-        cleanIdentifier === creds.admin_email.toLowerCase() ||
-        cleanIdentifier === creds.admin_username.toLowerCase();
-
-      const passwordOk = password === creds.admin_password;
-
-      if (!identifierOk || !passwordOk) {
-        setErrorMsg('اسم المستخدم أو كلمة المرور غير صحيحة');
+      if (error) {
+        setErrorMsg('البريد الإلكتروني أو كلمة المرور غير صحيحة');
         return;
       }
 
-      const session = {
-        isAdmin: true,
-        identifier: cleanIdentifier,
-        loginAt: new Date().toISOString(),
-      };
-
-      sessionStorage.setItem('hesba_admin_session', JSON.stringify(session));
-
-      const saved = sessionStorage.getItem('hesba_admin_session');
-      if (!saved) {
-        setErrorMsg('تعذر إنشاء جلسة لوحة التحكم');
+      const userId = data?.user?.id;
+      if (!userId) {
+        setErrorMsg('فشل الحصول على بيانات المستخدم المعرفية');
         return;
       }
 
-      window.dispatchEvent(new Event('hesba-admin-session-changed'));
+      const { data: adminRow, error: adminErr } = await supabase
+        .from('admins')
+        .select('user_id')
+        .eq('user_id', userId)
+        .maybeSingle();
 
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      if (adminErr || !adminRow) {
+        setErrorMsg('غير مصرح لك بدخول لوحة التحكم (البريد ليس مسجلاً كمشرف)');
+        await supabase.auth.signOut();
+        return;
+      }
 
       navigate('/admin/dashboard');
     } catch (err) {
       console.error('Admin login error:', err);
-      setErrorMsg('حدث خطأ أثناء تسجيل الدخول');
+      setErrorMsg('حدث خطأ غير متوقع أثناء تسجيل الدخول');
     } finally {
       setLoading(false);
     }
@@ -98,14 +104,14 @@ export function AdminLoginPage() {
         {/* Email form */}
         <form onSubmit={handleLogin} className="space-y-5" autoComplete="off">
           <div className="space-y-1.5">
-            <label className="text-[11px] font-bold text-slate-700 block">اسم المستخدم أو البريد الإلكتروني</label>
+            <label className="text-[11px] font-bold text-slate-700 block">البريد الإلكتروني</label>
             <div className="relative">
               <input
-                type="text"
+                type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="اسم المستخدم أو البريد الإلكتروني"
+                placeholder="أدخل بريدك الإلكتروني"
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:border-amber-500 text-xs font-semibold rounded-xl focus:ring-1 focus:ring-amber-500 outline-none transition-all pr-11 text-right"
                 dir="rtl"
                 autoComplete="off"

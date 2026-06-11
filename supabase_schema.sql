@@ -18,21 +18,12 @@ CREATE TABLE public.app_users (
   updated_at timestamp with time zone DEFAULT now()
 );
 
--- 2. جدول إعدادات دخول لوحة التحكم المستقل لمدير المنصة (admin_settings)
-DROP TABLE IF EXISTS public.admin_settings CASCADE;
+-- 2. جدول مشرفي لوحة التحكم بالصلاحيات الأمنية (admins)
+DROP TABLE IF EXISTS public.admins CASCADE;
 
-CREATE TABLE public.admin_settings (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  admin_username text DEFAULT 'admin',
-  admin_email text DEFAULT 'admin@hesba.com',
-  admin_password text DEFAULT 'hesba989',
-  updated_at timestamp with time zone DEFAULT now()
+CREATE TABLE public.admins (
+  user_id uuid PRIMARY KEY
 );
-
--- إدراج حساب المشرف الافتراضي عند الإنشاء في حال خلو الجدول
-INSERT INTO public.admin_settings (admin_username, admin_email, admin_password)
-VALUES ('admin', 'admin@hesba.com', 'hesba989')
-ON CONFLICT DO NOTHING;
 
 -- 3. الجداول الأخرى الخاصة بالمعايير والحسبة لضمان تشغيل النظام
 CREATE TABLE IF NOT EXISTS public.institution_settings (
@@ -162,7 +153,7 @@ CREATE INDEX IF NOT EXISTS saved_results_created_idx ON public.saved_results(cre
 
 -- 5. تفعيل RLS على كافة الجداول لضمان الأمان
 ALTER TABLE public.app_users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.admin_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.admins ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.institution_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sector_classification_mapping ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.approved_salary_source_rules ENABLE ROW LEVEL SECURITY;
@@ -175,41 +166,43 @@ ALTER TABLE public.advance_payment_tiers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.system_settings ENABLE ROW LEVEL SECURITY;
 
 -- 6. سياسات RLS النظيفة (الدخول للوحة التحكم والحسبة آمن بالكامل)
-CREATE POLICY "allow_select" ON public.app_users FOR SELECT USING (true);
-CREATE POLICY "allow_insert" ON public.app_users FOR INSERT WITH CHECK (true);
-CREATE POLICY "allow_update" ON public.app_users FOR UPDATE USING (true);
-CREATE POLICY "allow_delete" ON public.app_users FOR DELETE USING (true);
+-- سياسة المستخدمين:
+CREATE POLICY "Users can only read and write their own data" ON public.app_users FOR ALL USING (auth.uid() = id);
 
-CREATE POLICY "allow_select" ON public.admin_settings FOR SELECT USING (true);
-CREATE POLICY "allow_update" ON public.admin_settings FOR UPDATE USING (true);
-CREATE POLICY "allow_insert" ON public.admin_settings FOR INSERT WITH CHECK (true);
+-- سياسة المشرفين:
+CREATE POLICY "Admins full access" ON public.admins FOR ALL USING (auth.uid() = user_id OR auth.uid() IN (SELECT user_id FROM public.admins));
 
 CREATE POLICY "read_all" ON public.institution_settings FOR SELECT USING (true);
-CREATE POLICY "write_all" ON public.institution_settings FOR ALL USING (true);
+CREATE POLICY "write_all" ON public.institution_settings FOR ALL USING (auth.uid() IN (SELECT user_id FROM public.admins));
 
 CREATE POLICY "read_all" ON public.sector_classification_mapping FOR SELECT USING (true);
-CREATE POLICY "write_all" ON public.sector_classification_mapping FOR ALL USING (true);
+CREATE POLICY "write_all" ON public.sector_classification_mapping FOR ALL USING (auth.uid() IN (SELECT user_id FROM public.admins));
 
 CREATE POLICY "read_all" ON public.approved_salary_source_rules FOR SELECT USING (true);
-CREATE POLICY "write_all" ON public.approved_salary_source_rules FOR ALL USING (true);
+CREATE POLICY "write_all" ON public.approved_salary_source_rules FOR ALL USING (auth.uid() IN (SELECT user_id FROM public.admins));
 
 CREATE POLICY "read_all" ON public.pension_calculation_rules FOR SELECT USING (true);
-CREATE POLICY "write_all" ON public.pension_calculation_rules FOR ALL USING (true);
+CREATE POLICY "write_all" ON public.pension_calculation_rules FOR ALL USING (auth.uid() IN (SELECT user_id FROM public.admins));
 
 CREATE POLICY "read_all" ON public.retirement_term_rules FOR SELECT USING (true);
-CREATE POLICY "write_all" ON public.retirement_term_rules FOR ALL USING (true);
+CREATE POLICY "write_all" ON public.retirement_term_rules FOR ALL USING (auth.uid() IN (SELECT user_id FROM public.admins));
 
 CREATE POLICY "read_all" ON public.rule_versions FOR SELECT USING (true);
-CREATE POLICY "write_all" ON public.rule_versions FOR ALL USING (true);
+CREATE POLICY "write_all" ON public.rule_versions FOR ALL USING (auth.uid() IN (SELECT user_id FROM public.admins));
 
 CREATE POLICY "read_all" ON public.housing_support_tiers FOR SELECT USING (true);
-CREATE POLICY "write_all" ON public.housing_support_tiers FOR ALL USING (true);
+CREATE POLICY "write_all" ON public.housing_support_tiers FOR ALL USING (auth.uid() IN (SELECT user_id FROM public.admins));
 
 CREATE POLICY "read_all" ON public.advance_payment_tiers FOR SELECT USING (true);
-CREATE POLICY "write_all" ON public.advance_payment_tiers FOR ALL USING (true);
+CREATE POLICY "write_all" ON public.advance_payment_tiers FOR ALL USING (auth.uid() IN (SELECT user_id FROM public.admins));
 
-CREATE POLICY "read_system_settings" ON public.system_settings FOR SELECT USING (true);
-CREATE POLICY "write_system_settings" ON public.system_settings FOR ALL USING (true);
+CREATE POLICY "Anyone can read system settings" ON public.system_settings FOR SELECT USING (true);
+CREATE POLICY "Only admins can modify settings"
+ON system_settings
+FOR ALL
+USING (
+  auth.uid() IN (SELECT user_id FROM admins)
+);
 
 CREATE POLICY "users_select_own" ON public.saved_results FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "users_insert_own" ON public.saved_results FOR INSERT WITH CHECK (auth.uid() = user_id);
@@ -250,9 +243,17 @@ $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 CREATE OR REPLACE FUNCTION public.delete_user_by_admin(target_user_id uuid)
 RETURNS void AS $$
 BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM public.admins WHERE user_id = auth.uid()
+  )
+  THEN RAISE EXCEPTION 'Not authorized';
+  END IF;
+
   DELETE FROM auth.users WHERE id = target_user_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+REVOKE EXECUTE ON FUNCTION public.delete_user_by_admin(uuid) FROM public;
 
 -- 8. تعبئة البيانات الافتراضية للمعايير والبنوك الافتراضية
 INSERT INTO public.approved_salary_source_rules (bank_id, sector_id, salary_source, multiplier, description_ar)
