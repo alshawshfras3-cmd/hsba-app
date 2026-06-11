@@ -176,25 +176,29 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       return true;
     });
 
-    // Seek the calculation mode for this combination
+    // أولاً: فلترة القطاع
+    let sectorRules = matchingRules.filter(
+      r => normSector(r.sectorId) === normSector(targetSector)
+    );
+
+    // fallback فقط إذا ما فيه قطاع
+    if (sectorRules.length === 0 && normSector(targetSector) !== 'all') {
+      sectorRules = matchingRules.filter(
+        r => normSector(r.sectorId) === 'all'
+      );
+    }
+
+    // الآن فقط نحدد mode
     let determinedMode: 'yearly' | 'key_points' | 'duration_tiers' | '' = '';
-    
-    if (matchingRules.length > 0) {
-      // Find the first rule that defines marginInputMode explicitly, or get the mode statically
-      const withInputMode = matchingRules.find(r => r.marginInputMode);
+
+    if (sectorRules.length > 0) {
+      const withInputMode = sectorRules.find(r => r.marginInputMode);
+
       if (withInputMode && withInputMode.marginInputMode) {
         determinedMode = withInputMode.marginInputMode as any;
       } else {
-        determinedMode = getRuleInputMode(matchingRules[0]);
+        determinedMode = getRuleInputMode(sectorRules[0]);
       }
-    }
-
-    // Now, get rules for the selected sector
-    let sectorRules = matchingRules.filter(r => normSector(r.sectorId) === normSector(targetSector));
-
-    // Fallback to 'all' sector rules if no specific sector rules exist
-    if (sectorRules.length === 0 && normSector(targetSector) !== 'all') {
-      sectorRules = matchingRules.filter(r => normSector(r.sectorId) === 'all');
     }
 
     if (determinedMode !== '') {
