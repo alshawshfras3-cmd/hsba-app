@@ -237,16 +237,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  async function checkAdminStatus(): Promise<boolean> {
-    if (!hasSupabaseKeys) {
-      return true;
-    }
-    const { data, error } = await supabase.rpc('is_current_user_admin');
-    if (error) {
-      console.error('Admin RPC check failed:', error);
-      return false;
-    }
-    return data === true;
+  async function checkAdminStatus(userId: string): Promise<boolean> {
+    console.log("[AUTH_DEBUG] checkAdminStatus bypassed.");
+    return false;
   }
 
   useEffect(() => {
@@ -279,8 +272,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           } catch (e) {
             console.error(e);
           }
-          const isAdminUser = await checkAdminStatus();
-          console.log("[AUTH_DEBUG] initializeAuth: setting isAdminInDb on RPC basis:", isAdminUser);
+          const isAdminUser = session.user.app_metadata?.role === 'admin' || isOwnerEmail(session.user.email);
+          console.log("[AUTH_DEBUG] initializeAuth: setting isAdminInDb on app_metadata basis:", isAdminUser);
           if (active) {
             setIsAdminInDb(isAdminUser);
             try {
@@ -352,26 +345,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           } catch (e) {
             console.error(e);
           }
-          checkAdminStatus().then((isAdminUser) => {
-            console.log("[AUTH_DEBUG] onAuthStateChange: setting isAdminInDb on RPC basis:", isAdminUser);
-            if (active) {
-              setIsAdminInDb(isAdminUser);
-              try {
-                sessionStorage.setItem('hesba_is_admin', isAdminUser ? 'true' : 'false');
-              } catch {}
-              setLoading(false);
-            }
-          }).catch((err) => {
-            console.error("[AUTH_DEBUG] onAuthStateChange Error:", err);
-            if (active) {
-              setIsAdminInDb(false);
-              try {
-                sessionStorage.setItem('hesba_is_admin', 'false');
-              } catch {}
-              setLoading(false);
-            }
-          });
-
+          const isAdminUser = session.user.app_metadata?.role === 'admin' || isOwnerEmail(session.user.email);
+          console.log("[AUTH_DEBUG] onAuthStateChange: setting isAdminInDb on app_metadata basis:", isAdminUser);
+          if (active) {
+            setIsAdminInDb(isAdminUser);
+            try {
+              sessionStorage.setItem('hesba_is_admin', isAdminUser ? 'true' : 'false');
+            } catch {}
+          }
+          if (active) {
+            setLoading(false);
+          }
           // Fetch profile asynchronously in background
           const uid = session.user.id;
           const uemail = session.user.email;
@@ -397,7 +381,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return e === 'admin@hesba.com';
   };
 
-  const isAdmin = isAdminInDb;
+  const isAdmin = user?.app_metadata?.role === 'admin' || isOwnerEmail(user?.email);
   const isOwner = isAdmin;
   const isStaff = isAdmin;
   const isCustomer = !isAdmin;
@@ -485,16 +469,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(data.session);
       setUser(data.user);
 
-      // Now verify admin status using RPC
-      const isActuallyAdmin = await checkAdminStatus();
-      if (!isActuallyAdmin) {
-        // Sign out immediately and throw error
-        await supabase.auth.signOut();
-        clearLocalAuthState();
-        throw new Error('غير مصرح لك بدخول لوحة التحكم');
-      }
-
-      setIsAdminInDb(true);
+      // Check admin status on app_metadata or email basis
+      const adminStatus = data.user.app_metadata?.role === 'admin' || isOwnerEmail(data.user.email);
+      setIsAdminInDb(adminStatus);
 
       // Run background task
       const currentUserId = data.user.id;
@@ -530,13 +507,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         sessionStorage.setItem('hesba_permissions_checked', 'true');
         sessionStorage.setItem('hesba_calculator_permissions', 'true');
-        sessionStorage.setItem('hesba_is_admin', 'true');
+        sessionStorage.setItem('hesba_is_admin', adminStatus ? 'true' : 'false');
       } catch {}
 
       setLoading(false);
       return {
         user: data.user,
-        isAdmin: true
+        isAdmin: adminStatus
       };
     } catch (err) {
       setLoading(false);

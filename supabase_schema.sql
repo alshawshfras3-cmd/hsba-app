@@ -22,8 +22,7 @@ CREATE TABLE public.app_users (
 DROP TABLE IF EXISTS public.admins CASCADE;
 
 CREATE TABLE public.admins (
-  user_id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  created_at timestamptz DEFAULT now()
+  user_id uuid PRIMARY KEY
 );
 
 -- دالة التحقق الآمنة من رتبة المسؤول لمنع التكرار اللانهائي في السياسات (is_admin)
@@ -35,23 +34,6 @@ BEGIN
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
-
--- دالة التحقق الآمنة للمستخدم الحالي لمنع الاستغلال والحفاظ على أفضل ممارسات الحماية الأمنية
-CREATE OR REPLACE FUNCTION public.is_current_user_admin()
-RETURNS boolean
-LANGUAGE sql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT EXISTS (
-    SELECT 1
-    FROM public.admins
-    WHERE user_id = auth.uid()
-  );
-$$;
-
-REVOKE ALL ON FUNCTION public.is_current_user_admin() FROM public;
-GRANT EXECUTE ON FUNCTION public.is_current_user_admin() TO authenticated;
 
 -- 3. الجداول الأخرى الخاصة بالمعايير والحسبة لضمان تشغيل النظام
 CREATE TABLE IF NOT EXISTS public.institution_settings (
@@ -207,13 +189,8 @@ ALTER TABLE public.app_settings_history ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can only read and write their own data" ON public.app_users FOR ALL USING (auth.uid() = id);
 
 -- سياسة المشرفين:
-DROP POLICY IF EXISTS "Only admins can select admins" ON public.admins;
-DROP POLICY IF EXISTS "admins can read own admin row" ON public.admins;
-CREATE POLICY "admins can read own admin row"
-ON public.admins
-FOR SELECT
-TO authenticated
-USING (auth.uid() = user_id);
+-- لمنع التكرار اللانهائي، نستخدم الدالة الآمنة لتمكين القراءة الآمنة وقفل التعديل بالكامل
+CREATE POLICY "Only admins can select admins" ON public.admins FOR SELECT USING (public.is_admin(auth.uid()));
 
 CREATE POLICY "read_all" ON public.institution_settings FOR SELECT USING (true);
 CREATE POLICY "write_all" ON public.institution_settings FOR ALL USING (public.is_admin(auth.uid()));
