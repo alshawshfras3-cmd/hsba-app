@@ -26,7 +26,7 @@ interface AuthContextType {
   isManager: boolean;
   canAccessDashboard: boolean;
   signInWithGoogle: () => Promise<void>;
-  signInWithEmail: (email: string, password: string) => Promise<void>;
+  signInWithEmail: (email: string, password: string) => Promise<any>;
   signUpWithEmail: (email: string, password: string, fullName: string) => Promise<any>;
   signOut: () => Promise<void>;
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
@@ -75,6 +75,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return sessionStorage.getItem('hesba_is_admin') === 'true';
     } catch { return false; }
   });
+
+  function clearLocalAuthState() {
+    setUser(null);
+    setProfile(null);
+    setSession(null);
+    setIsSuspendedUser(false);
+    setIsAdminInDb(false);
+    setLoading(false);
+
+    try {
+      sessionStorage.removeItem('hesba_cached_user');
+      sessionStorage.removeItem('hesba_cached_profile');
+      sessionStorage.removeItem('hesba_permissions_checked');
+      sessionStorage.removeItem('hesba_calculator_permissions');
+      sessionStorage.removeItem('hesba_is_admin');
+    } catch (e) {
+      console.error(e);
+    }
+  }
 
   async function fetchProfile(userId: string, email?: string, userMetadata?: any) {
     if (!hasSupabaseKeys) return;
@@ -351,22 +370,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setLoading(false);
           }
         } else {
-          // No user — no async work needed, clear state immediately
-          setProfile(null);
-          if (active) {
-            console.log("[AUTH_DEBUG] onAuthStateChange: No user session, setting isAdminInDb false");
-            setIsAdminInDb(false);
-          }
-          try {
-            sessionStorage.removeItem('hesba_cached_user');
-            sessionStorage.removeItem('hesba_cached_profile');
-            sessionStorage.removeItem('hesba_permissions_checked');
-            sessionStorage.removeItem('hesba_calculator_permissions');
-            sessionStorage.removeItem('hesba_is_admin');
-          } catch (e) {
-            console.error(e);
-          }
-          // Do NOT call setLoading here — loading was never set to true for this branch
+          clearLocalAuthState();
+          setLoading(false);
         }
       }
     );
@@ -422,39 +427,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function signInWithEmail(email: string, password: string) {
+    setLoading(true);
     const emailLower = email.trim().toLowerCase();
-    const isOwner = isOwnerEmail(emailLower);
+    const isOwnerFlg = isOwnerEmail(emailLower);
 
     if (!hasSupabaseKeys) {
       // Mock email password for Preview
-      setUser({
+      const mockUser = {
         id: 'mock_email_user',
         email: emailLower,
         user_metadata: {
-          full_name: isOwner ? 'مدير المنصة' : emailLower.split('@')[0],
+          full_name: isOwnerFlg ? 'مدير المنصة' : emailLower.split('@')[0],
         }
-      } as any);
+      } as any;
+      setUser(mockUser);
       setProfile({
         id: 'mock_email_user',
         email: emailLower,
-        full_name: isOwner ? 'مدير المنصة' : emailLower.split('@')[0],
+        full_name: isOwnerFlg ? 'مدير المنصة' : emailLower.split('@')[0],
         avatar_url: null,
         role: 'user',
         is_blocked: false
       });
-      setIsAdminInDb(isOwner);
+      setIsAdminInDb(isOwnerFlg);
       setIsSuspendedUser(false);
-      return;
+      setLoading(false);
+      try {
+        sessionStorage.setItem('hesba_permissions_checked', 'true');
+        sessionStorage.setItem('hesba_calculator_permissions', 'true');
+        sessionStorage.setItem('hesba_is_admin', isOwnerFlg ? 'true' : 'false');
+      } catch {}
+
+      return {
+        user: mockUser,
+        isAdmin: isOwnerFlg
+      };
     }
 
-    // Intercept real database suspension prior to completing auth
-    const { data, error } = await supabase.auth.signInWithPassword({ email: emailLower, password });
-    if (error) throw error;
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email: emailLower, password });
+      if (error) throw error;
 
-    if (data?.user) {
+      if (!data?.user) {
+        throw new Error('فشل الحصول على بيانات المستخدم المعرفية');
+      }
+
+      setSession(data.session);
+      setUser(data.user);
+
       // Upsert into app_users immediately upon successful login!
       try {
-        const { error: profileError } = await supabase
+        await supabase
           .from('app_users')
           .upsert({
             id: data.user.id,
@@ -467,12 +490,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }, {
             onConflict: 'id'
           });
-        if (profileError) {
-          console.error('Failed to upsert user profile on sign in:', profileError);
-        }
       } catch (err) {
         console.error('Failed to run sign in profile sync logic:', err);
       }
+
+      // Fetch profile
+      await fetchProfile(data.user.id, data.user.email, data.user.user_metadata);
+
+      // Check admin status
+      const adminStatus = await checkAdminStatus(data.user.id);
+      setIsAdminInDb(adminStatus);
 
       // Fetch their profile and check status immediately across both tables
       let isBlocked = false;
@@ -499,11 +526,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.warn("Could not check suspension status from DB", err);
       }
         
-      if (isBlocked && !isOwner) {
-        await supabase.auth.signOut();
+      if (isBlocked && !isOwnerFlg) {
         setIsSuspendedUser(true);
+        setLoading(false);
+        await signOut();
         throw new Error("تم إيقاف هذا الحساب بواسطة الإدارة");
       }
+
+      try {
+        sessionStorage.setItem('hesba_permissions_checked', 'true');
+        sessionStorage.setItem('hesba_calculator_permissions', 'true');
+        sessionStorage.setItem('hesba_is_admin', adminStatus ? 'true' : 'false');
+      } catch {}
+
+      setLoading(false);
+      return {
+        user: data.user,
+        isAdmin: adminStatus
+      };
+    } catch (err) {
+      setLoading(false);
+      throw err;
     }
   }
 
@@ -563,23 +606,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function signOut() {
+    clearLocalAuthState();
+
     if (hasSupabaseKeys) {
-      await supabase.auth.signOut();
+      try {
+        await Promise.race([
+          supabase.auth.signOut(),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('signOut timeout')), 4000)
+          )
+        ]);
+      } catch (authErr) {
+        console.warn('Supabase signOut failed/timed out, local state already cleared:', authErr);
+      }
     }
-    setUser(null);
-    setProfile(null);
-    setSession(null);
-    setIsSuspendedUser(false);
-    setIsAdminInDb(false);
-    try {
-      sessionStorage.removeItem('hesba_cached_user');
-      sessionStorage.removeItem('hesba_cached_profile');
-      sessionStorage.removeItem('hesba_permissions_checked');
-      sessionStorage.removeItem('hesba_calculator_permissions');
-      sessionStorage.removeItem('hesba_is_admin');
-    } catch (e) {
-      console.error(e);
-    }
+
+    clearLocalAuthState();
   }
 
   return (

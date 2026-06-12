@@ -1,36 +1,21 @@
 import React, { useState } from 'react';
 import { useLocation } from '../hooks/useLocation';
 import { Lock, Mail, Loader2, ShieldAlert, AlertCircle } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 
 export function AdminLoginPage() {
   const { navigate } = useLocation();
+  const { signInWithEmail, signOut, canAccessDashboard, loading: authLoading, user } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   React.useEffect(() => {
-    async function checkCurrentAdminSession() {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { data: adminRow } = await supabase
-            .from('admins')
-            .select('user_id')
-            .eq('user_id', user.id)
-            .maybeSingle();
-
-          if (adminRow) {
-            navigate('/admin/dashboard');
-          }
-        }
-      } catch (err) {
-        console.error('Session check failed:', err);
-      }
+    if (!authLoading && canAccessDashboard) {
+      navigate('/admin/dashboard');
     }
-    checkCurrentAdminSession();
-  }, [navigate]);
+  }, [canAccessDashboard, authLoading, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,38 +25,24 @@ export function AdminLoginPage() {
     try {
       const cleanEmail = email.trim().toLowerCase();
       
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: cleanEmail,
-        password: password
-      });
+      // Perform general sign in (handles both mock path and real supabase path)
+      const result = await signInWithEmail(cleanEmail, password);
 
-      if (error) {
-        setErrorMsg('البريد الإلكتروني أو كلمة المرور غير صحيحة');
-        return;
-      }
-
-      const userId = data?.user?.id;
-      if (!userId) {
-        setErrorMsg('فشل الحصول على بيانات المستخدم المعرفية');
-        return;
-      }
-
-      const { data: adminRow, error: adminErr } = await supabase
-        .from('admins')
-        .select('user_id')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      if (adminErr || !adminRow) {
+      if (!result?.isAdmin) {
         setErrorMsg('غير مصرح لك بدخول لوحة التحكم (البريد ليس مسجلاً كمشرف)');
-        await supabase.auth.signOut();
+        await signOut();
         return;
       }
 
       navigate('/admin/dashboard');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Admin login error:', err);
-      setErrorMsg('حدث خطأ غير متوقع أثناء تسجيل الدخول');
+      const errMsg = err?.message || '';
+      if (errMsg.includes('Invalid login credentials') || errMsg.includes('Email or password') || errMsg.includes('غير صحيحة')) {
+        setErrorMsg('البريد الإلكتروني أو كلمة المرور غير صحيحة');
+      } else {
+        setErrorMsg(errMsg || 'حدث خطأ غير متوقع أثناء تسجيل الدخول');
+      }
     } finally {
       setLoading(false);
     }

@@ -107,7 +107,7 @@ export default function AdminDashboard() {
     userSubscriptions, setUserSubscriptions,
     termRules, setTermRules,
     adminSubPage, setAdminSubPage,
-    hasUnsavedChanges, saveChanges, cancelChanges, reinitializeAllSettings, restoreLastBackup,
+    hasUnsavedChanges, saveChanges, cancelChanges, reinitializeAllSettings, restoreLastBackup, signOut,
     customSectors: sectors, setCustomSectors: setSectors,
     bankSectorRules, setBankSectorRules,
     pensionRulesLibrary: libraryRules, setPensionRulesLibrary: setLibraryRules,
@@ -1725,7 +1725,9 @@ export default function AdminDashboard() {
             onClick={() => {
               const confirmOut = window.confirm("هل ترغب في تسجيل الخروج الآمن من لوحة تحكم معايير الحسبة؟");
               if (confirmOut) {
-                supabase.auth.signOut().then(() => {
+                signOut().then(() => {
+                  window.location.href = '/admin';
+                }).catch(() => {
                   window.location.href = '/admin';
                 });
               }

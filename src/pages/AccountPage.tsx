@@ -132,7 +132,6 @@ export function AccountPage() {
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    setFullNameInput(profile?.full_name || user?.user_metadata?.full_name || '');
     if (!newPassword) {
       setPasswordMessage({ type: 'error', text: 'يرجى إدخال كلمة مرور جديدة.' });
       return;
@@ -152,7 +151,12 @@ export function AccountPage() {
 
     try {
       if (hasSupabaseKeys) {
-        const { error } = await supabase.auth.updateUser({ password: newPassword });
+        const { error } = await Promise.race([
+          supabase.auth.updateUser({ password: newPassword }),
+          new Promise<any>((_, reject) =>
+            setTimeout(() => reject(new Error('انتهت مهلة تحديث كلمة المرور، حاول مرة أخرى')), 8000)
+          )
+        ]);
         if (error) throw error;
         setPasswordMessage({ type: 'success', text: 'تم تحديث كلمة المرور الجديدة بنجاح فوري!' });
         setNewPassword('');
