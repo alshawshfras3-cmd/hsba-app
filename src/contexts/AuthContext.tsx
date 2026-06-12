@@ -333,12 +333,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
 
-        // Always set loading=true during auth state changes regardless of prior session cache.
-        // Skipping this when hasChecked=true causes Guard to see loading=false before
-        // checkAdminStatus completes, incorrectly kicking the admin back to /admin.
-        setLoading(true);
-
         if (session?.user) {
+          // There is async work — set loading=true to block Guard
+          setLoading(true);
           try {
             sessionStorage.setItem('hesba_cached_user', JSON.stringify(session.user));
           } catch (e) {
@@ -350,7 +347,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (active) {
             setIsAdminInDb(adminStatus);
           }
+          if (active) {
+            setLoading(false);
+          }
         } else {
+          // No user — no async work needed, clear state immediately
           setProfile(null);
           if (active) {
             console.log("[AUTH_DEBUG] onAuthStateChange: No user session, setting isAdminInDb false");
@@ -365,10 +366,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           } catch (e) {
             console.error(e);
           }
-        }
-        if (active) {
-          console.log("[AUTH_DEBUG] onAuthStateChange processing finished, setting loading=false");
-          setLoading(false);
+          // Do NOT call setLoading here — loading was never set to true for this branch
         }
       }
     );
