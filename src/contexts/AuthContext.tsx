@@ -238,30 +238,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function checkAdminStatus(userId: string): Promise<boolean> {
-    console.log("[AUTH_DEBUG] checkAdminStatus called for userId:", userId);
-    if (!hasSupabaseKeys) {
-      console.log("[AUTH_DEBUG] checkAdminStatus: No Supabase keys, returning false");
-      return false;
-    }
-    try {
-      console.log("[AUTH_DEBUG] Querying 'admins' table for user_id:", userId);
-      const { data, error } = await supabase
-        .from('admins')
-        .select('user_id')
-        .eq('user_id', userId)
-        .maybeSingle();
-      
-      console.log("[AUTH_DEBUG] admins query result:", { data, error });
-      const result = !error && !!data;
-      console.log("[AUTH_DEBUG] checkAdminStatus outcome:", result);
-      try {
-        sessionStorage.setItem('hesba_is_admin', result ? 'true' : 'false');
-      } catch {}
-      return result;
-    } catch (e) {
-      console.error("[AUTH_DEBUG] checkAdminStatus query exception:", e);
-      return false;
-    }
+    console.log("[AUTH_DEBUG] checkAdminStatus bypassed.");
+    return false;
   }
 
   useEffect(() => {
@@ -295,10 +273,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.error(e);
           }
           await fetchProfile(session.user.id, session.user.email, session.user.user_metadata);
-          const adminStatus = await checkAdminStatus(session.user.id);
-          console.log("[AUTH_DEBUG] initializeAuth: setting isAdminInDb to:", adminStatus);
+          const isAdminUser = session.user.app_metadata?.role === 'admin' || isOwnerEmail(session.user.email);
+          console.log("[AUTH_DEBUG] initializeAuth: setting isAdminInDb on app_metadata basis:", isAdminUser);
           if (active) {
-            setIsAdminInDb(adminStatus);
+            setIsAdminInDb(isAdminUser);
+            try {
+              sessionStorage.setItem('hesba_is_admin', isAdminUser ? 'true' : 'false');
+            } catch {}
           }
         } else {
           if (active) {
@@ -361,10 +342,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.error(e);
           }
           await fetchProfile(session.user.id, session.user.email, session.user.user_metadata);
-          const adminStatus = await checkAdminStatus(session.user.id);
-          console.log("[AUTH_DEBUG] onAuthStateChange: setting isAdminInDb to:", adminStatus);
+          const isAdminUser = session.user.app_metadata?.role === 'admin' || isOwnerEmail(session.user.email);
+          console.log("[AUTH_DEBUG] onAuthStateChange: setting isAdminInDb on app_metadata basis:", isAdminUser);
           if (active) {
-            setIsAdminInDb(adminStatus);
+            setIsAdminInDb(isAdminUser);
+            try {
+              sessionStorage.setItem('hesba_is_admin', isAdminUser ? 'true' : 'false');
+            } catch {}
           }
           if (active) {
             setLoading(false);
@@ -387,16 +371,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return e === 'admin@hesba.com';
   };
 
-  const isAdmin = isAdminInDb;
-  const isOwner = isAdminInDb;
-  const isStaff = isAdminInDb;
-  const isCustomer = !isAdminInDb;
+  const isAdmin = user?.app_metadata?.role === 'admin' || isOwnerEmail(user?.email);
+  const isOwner = isAdmin;
+  const isStaff = isAdmin;
+  const isCustomer = !isAdmin;
 
-  const canAccessDashboard = isAdminInDb;
+  const canAccessDashboard = isAdmin;
 
   // For compatibility with legacy checks
-  const legacyIsAdmin = isAdminInDb;
-  const legacyIsManager = isAdminInDb;
+  const legacyIsAdmin = isAdmin;
+  const legacyIsManager = isAdmin;
 
   async function signInWithGoogle() {
     if (!hasSupabaseKeys) {
@@ -497,8 +481,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Fetch profile
       await fetchProfile(data.user.id, data.user.email, data.user.user_metadata);
 
-      // Check admin status
-      const adminStatus = await checkAdminStatus(data.user.id);
+      // Check admin status on app_metadata or email basis
+      const adminStatus = data.user.app_metadata?.role === 'admin' || isOwnerEmail(data.user.email);
       setIsAdminInDb(adminStatus);
 
       // Fetch their profile and check status immediately across both tables
