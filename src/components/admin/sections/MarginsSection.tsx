@@ -166,119 +166,111 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     let method: 'linear' | 'fixed' = 'fixed';
     let determinedMode: 'yearly' | 'key_points' | 'duration_tiers' | '' = '';
 
-    const existingCombo = marginDataRef.current.find(item => item.key === currentKey);
+    const normSupportVal = normSupport(selectedSupport);
 
-    if (existingCombo) {
-      initialMargins = { ...existingCombo.localMargins };
-      initialTiers = [...existingCombo.localTiers];
-      initialExceptions = { ...existingCombo.localSectorExceptions };
-      method = existingCombo.selectedCalcMethod;
-      determinedMode = existingCombo.selectedYearsMode;
-    } else {
-      const normSupportVal = normSupport(selectedSupport);
+    // Normalize all rules to clean official product IDs and support types upon reading
+    const allNormalized = marginRules.map(r => {
+      let pId = r.productId as string;
+      if (pId === 'real_estate') pId = 'real_estate_only';
+      else if (pId === 'both') pId = 'real_estate_with_new_personal';
+      else if (pId === 'real_estate_with_personal_existing') pId = 'real_estate_with_existing_personal';
 
-      // Normalize all rules to clean official product IDs and support types upon reading
-      const allNormalized = marginRules.map(r => {
-        let pId = r.productId as string;
-        if (pId === 'real_estate') pId = 'real_estate_only';
-        else if (pId === 'both') pId = 'real_estate_with_new_personal';
-        else if (pId === 'real_estate_with_personal_existing') pId = 'real_estate_with_existing_personal';
+      let sType = r.supportType as string;
+      if (sType === 'down_payment') sType = 'downpayment';
 
-        let sType = r.supportType as string;
-        if (sType === 'down_payment') sType = 'downpayment';
+      return {
+        ...r,
+        productId: pId as ProductId,
+        supportType: sType as SupportType
+      };
+    });
 
-        return {
-          ...r,
-          productId: pId as ProductId,
-          supportType: sType as SupportType
-        };
-      });
+    const targetBank = selectedBank;
+    const targetProduct = selectedProduct;
+    const targetSupport = normSupportVal;
+    const targetSalaryTier = selectedSalaryTier;
+    const targetSector = selectedSector;
 
-      const targetBank = selectedBank;
-      const targetProduct = selectedProduct;
-      const targetSupport = normSupportVal;
-      const targetSalaryTier = selectedSalaryTier;
-      const targetSector = selectedSector;
+    // Filter rules matching core values: bank, product, support, and salary tier with clean normalization
+    const matchingRules = allNormalized.filter(r => {
+      if (r.isExceptionOnly) return false;
+      if (r.bankId !== targetBank) return false;
+      if (r.productId !== targetProduct) return false;
+      if (normSupport(r.supportType) !== normSupport(targetSupport)) return false;
+      if (normSalaryTier(r.salaryTier) !== normSalaryTier(targetSalaryTier)) return false;
+      return true;
+    });
 
-      // Filter rules matching core values: bank, product, support, and salary tier with clean normalization
-      const matchingRules = allNormalized.filter(r => {
-        if (r.isExceptionOnly) return false;
-        if (r.bankId !== targetBank) return false;
-        if (r.productId !== targetProduct) return false;
-        if (normSupport(r.supportType) !== normSupport(targetSupport)) return false;
-        if (normSalaryTier(r.salaryTier) !== normSalaryTier(targetSalaryTier)) return false;
-        return true;
-      });
+    // أولاً: فلترة القطاع
+    let sectorRules = matchingRules.filter(
+      r => normSector(r.sectorId) === normSector(targetSector)
+    );
 
-      // أولاً: فلترة القطاع
-      let sectorRules = matchingRules.filter(
-        r => normSector(r.sectorId) === normSector(targetSector)
+    // fallback فقط إذا ما فيه قطاع
+    if (sectorRules.length === 0 && normSector(targetSector) !== 'all') {
+      sectorRules = matchingRules.filter(
+        r => normSector(r.sectorId) === 'all'
       );
-
-      // fallback فقط إذا ما فيه قطاع
-      if (sectorRules.length === 0 && normSector(targetSector) !== 'all') {
-        sectorRules = matchingRules.filter(
-          r => normSector(r.sectorId) === 'all'
-        );
-      }
-
-      // الآن فقط نحدد mode
-      if (sectorRules.length > 0) {
-        const withCalcMode = sectorRules.find(r => r.calculationMode);
-        const withInputMode = sectorRules.find(r => r.marginInputMode);
-
-        if (withCalcMode && withCalcMode.calculationMode) {
-          determinedMode = withCalcMode.calculationMode as any;
-        } else if (withInputMode && withInputMode.marginInputMode) {
-          determinedMode = withInputMode.marginInputMode as any;
-        } else {
-          determinedMode = getRuleInputMode(sectorRules[0]);
-        }
-      }
-
-      if (determinedMode !== '') {
-        // 1. Load years margins (for yearly / key_points) independently of selected mode to avoid wiping
-        const yearsRules = sectorRules.filter(r => !isTiersRule(r));
-        const yearsListFull = Array.from({ length: 26 }, (_, i) => 5 + i);
-
-        yearsListFull.forEach(year => {
-          const rY = yearsRules.find(r => r.year === year || r.toTermMonths === year * 12);
-          if (rY) {
-            initialMargins[year] = (rY.annualMargin !== undefined ? rY.annualMargin : (rY.baseMargin !== undefined ? Number((rY.baseMargin * 100).toFixed(3)) : rY.endMargin)).toString();
-          } else {
-            initialMargins[year] = '';
-          }
-        });
-
-        // 2. Load duration tiers independently of selected mode to avoid wiping
-        const tierRules = sectorRules.filter(r => isTiersRule(r));
-        initialTiers = tierRules.map((r, idx) => ({
-          id: r.id || `tier_${idx}_${Date.now()}`,
-          fromMonth: r.fromMonth ?? r.fromTermMonths ?? 0,
-          toMonth: r.toMonth ?? r.toTermMonths ?? 0,
-          marginRate: r.marginRate ?? r.endMargin ?? 3.50,
-          notes: r.notes || '',
-          active: r.active !== false && r.isActive !== false
-        }));
-        initialTiers.sort((a, b) => a.fromMonth - b.fromMonth);
-
-        // 3. Load calculation method
-        const foundMethodRule = sectorRules.find(r => r.calculationMethod || r.calcType);
-        if (foundMethodRule) {
-          method = (foundMethodRule.calculationMethod || foundMethodRule.calcType) as any;
-        }
-      }
-
-      // 5. Synchronize sector exceptions (bank level exception list) independently of config presence
-      sectorsList.forEach(sec => {
-        const exRule = marginRules.find(r =>
-          r.bankId === selectedBank &&
-          r.sectorId === sec.id &&
-          r.isExceptionOnly === true
-        );
-        initialExceptions[sec.id] = exRule && exRule.exceptionBps !== undefined ? exRule.exceptionBps.toString() : '0';
-      });
     }
+
+    // الآن فقط نحدد mode
+    if (sectorRules.length > 0) {
+      const withCalcMode = sectorRules.find(r => r.calculationMode);
+      const withInputMode = sectorRules.find(r => r.marginInputMode);
+
+      if (withCalcMode && withCalcMode.calculationMode) {
+        determinedMode = withCalcMode.calculationMode as any;
+      } else if (withInputMode && withInputMode.marginInputMode) {
+        determinedMode = withInputMode.marginInputMode as any;
+      } else {
+        determinedMode = getRuleInputMode(sectorRules[0]);
+      }
+    } else {
+      determinedMode = '';
+    }
+
+    if (determinedMode !== '') {
+      // 1. Load years margins (for yearly / key_points) independently of selected mode to avoid wiping
+      const yearsRules = sectorRules.filter(r => !isTiersRule(r));
+      const yearsListFull = Array.from({ length: 26 }, (_, i) => 5 + i);
+
+      yearsListFull.forEach(year => {
+        const rY = yearsRules.find(r => r.year === year || r.toTermMonths === year * 12);
+        if (rY) {
+          initialMargins[year] = (rY.annualMargin !== undefined ? rY.annualMargin : (rY.baseMargin !== undefined ? Number((rY.baseMargin * 100).toFixed(3)) : rY.endMargin)).toString();
+        } else {
+          initialMargins[year] = '';
+        }
+      });
+
+      // 2. Load duration tiers independently of selected mode to avoid wiping
+      const tierRules = sectorRules.filter(r => isTiersRule(r));
+      initialTiers = tierRules.map((r, idx) => ({
+        id: r.id || `tier_${idx}_${Date.now()}`,
+        fromMonth: r.fromMonth ?? r.fromTermMonths ?? 0,
+        toMonth: r.toMonth ?? r.toTermMonths ?? 0,
+        marginRate: r.marginRate ?? r.endMargin ?? 3.50,
+        notes: r.notes || '',
+        active: r.active !== false && r.isActive !== false
+      }));
+      initialTiers.sort((a, b) => a.fromMonth - b.fromMonth);
+
+      // 3. Load calculation method
+      const foundMethodRule = sectorRules.find(r => r.calculationMethod || r.calcType);
+      if (foundMethodRule) {
+        method = (foundMethodRule.calculationMethod || foundMethodRule.calcType) as any;
+      }
+    }
+
+    // 5. Synchronize sector exceptions (bank level exception list) independently of config presence
+    sectorsList.forEach(sec => {
+      const exRule = marginRules.find(r =>
+        r.bankId === selectedBank &&
+        r.sectorId === sec.id &&
+        r.isExceptionOnly === true
+      );
+      initialExceptions[sec.id] = exRule && exRule.exceptionBps !== undefined ? exRule.exceptionBps.toString() : '0';
+    });
 
     setLocalMargins(initialMargins);
     setLocalTiers(initialTiers);
@@ -297,16 +289,14 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     };
 
     setMarginData(prev => {
-      const exists = prev.find(item => item.key === currentKey);
-      if (exists) return prev;
-      return [...prev, loadedCombo];
+      const filtered = prev.filter(item => item.key !== currentKey);
+      return [...filtered, loadedCombo];
     });
 
     setInitialMarginData(prevStr => {
       const prevArray = JSON.parse(prevStr || '[]');
-      const exists = prevArray.find((item: any) => item.key === currentKey);
-      if (exists) return prevStr;
-      return JSON.stringify([...prevArray, loadedCombo]);
+      const filtered = prevArray.filter((item: any) => item.key !== currentKey);
+      return JSON.stringify([...filtered, loadedCombo]);
     });
 
     setIsLoaded(true);
