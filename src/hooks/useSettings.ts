@@ -36,7 +36,7 @@ export function useSettings() {
   const [loading, setLoading] = useState(false);
   const [initialized, setInitialized] = useState(true);
   const [supabaseFetched, setSupabaseFetched] = useState(!hasSupabaseKeys);
-  const [supabaseLoadStatus, setSupabaseLoadStatus] = useState<'loading' | 'success' | 'failed' | 'empty_db' | 'read_only_protected'>(hasSupabaseKeys ? 'loading' : 'success');
+  const [supabaseLoadStatus, setSupabaseLoadStatus] = useState<'loading' | 'success' | 'failed' | 'empty_db' | 'read_only_protected' | 'slow_connection'>(hasSupabaseKeys ? 'loading' : 'success');
   const [supabaseLoadError, setSupabaseLoadError] = useState<string | null>(null);
 
   // Fetch all system settings from Supabase
@@ -49,7 +49,7 @@ export function useSettings() {
 
     setLoading(true);
     let appSettingsObj: any = null;
-    let didTimeout = false;
+    let didTimeoutOrSlow = false;
 
     try {
       console.log('[SUPABASE LOAD] Fetching app_settings (via shared cached loader with 10s timeout)');
@@ -59,23 +59,24 @@ export function useSettings() {
       setSupabaseLoadStatus('success');
     } catch (err: any) {
       const errMsg = err?.message || String(err);
-      const isTimeout = err?.isTimeout || errMsg.includes('timeout') || errMsg.includes('مهلة');
+      const isTimeout = err?.isTimeout || errMsg.includes('timeout') || errMsg.includes('مهلة') || errMsg.includes('delay') || errMsg.includes('slow');
       
       console.warn('[SUPABASE LOAD WARNING] Could not fetch settings directly:', errMsg);
       
       // Attempt to salvage from sync cache (sessionStorage/memory)
       const cached = getCachedAppSettingsSync();
       if (cached) {
-        console.log('[SUPABASE LOAD] Salvaged app_settings from local cache. Continuing cleanly.');
+        console.log('[SUPABASE LOAD] Salvaged app_settings from local cache. Setting status to slow_connection.');
         appSettingsObj = cached;
-        // Keep status as success (so save is NOT disabled, but we logged a warning)
-        setSupabaseLoadStatus('success');
+        // Mark as slow_connection so the dashboard is functional with local cache but friendly alert is shown
+        setSupabaseLoadStatus('slow_connection');
+        didTimeoutOrSlow = true;
       } else {
         // Absolutely no cache and no database response
         if (isTimeout) {
-          didTimeout = true;
-          console.warn('[SUPABASE LOAD TIME-OUT] Slow database response. Keeping status as loading with background-retries.');
-          setSupabaseLoadStatus('loading'); // do NOT mark as failed so save is not permanently locked
+          didTimeoutOrSlow = true;
+          console.warn('[SUPABASE LOAD TIME-OUT] Slow database response and no local cache either. Setting slow_connection.');
+          setSupabaseLoadStatus('slow_connection'); // do NOT mark as failed so save is not permanently locked
         } else {
           // Real database query failure
           setSupabaseLoadStatus('failed');
@@ -114,12 +115,46 @@ export function useSettings() {
       } catch (err) {
         console.error('[SETTINGS ERROR] Could not parse loaded appSettingsObj:', err);
       }
-    } else if (didTimeout) {
-      // If we timed out and have no settings at all, start an asynchronous quiet retry loop in the background!
+    }
+
+    if (didTimeoutOrSlow) {
+      // If we timed out or have a slow connection status, start an asynchronous quiet retry loop in the background!
       console.log('[SUPABASE LOAD RETRY] Starting silent background retries...');
-      setTimeout(() => {
-        fetchSettings();
-      }, 5000);
+      setTimeout(async () => {
+        try {
+          const value = await fetchAppSettingsShared(15000); // retry again with 15s timeout
+          if (value) {
+            console.log('[SUPABASE LOAD RETRY SUCCESS] Successfully loaded app_settings in background. Upgrading status to success!');
+            setSupabaseLoadStatus('success');
+            const settingsMap: Record<string, any> = {
+              banks: value.banks ?? [],
+              product_acceptance: value.products ?? value.product_acceptance ?? [],
+              military_ranks: value.militaryRanks ?? value.military_ranks ?? [],
+              salary_rules: value.salaryRules ?? value.salary_rules ?? [],
+              pension_rules: value.pensionRules ?? value.pension_rules ?? [],
+              term_rules: value.termRules ?? value.term_rules ?? [],
+              margin_rules: value.marginRules ?? value.margin_rules ?? [],
+              dsrRules: normalizeDsrRules(value.dsrRules ?? value.dsr_rules ?? []),
+              dsr_rules: normalizeDsrRules(value.dsrRules ?? value.dsr_rules ?? []),
+              support_settings: value.supportSettings ?? value.support_settings ?? {},
+              personal_finance_rules: value.personalRules ?? value.personal_finance_rules ?? [],
+              advanced_rules: value.advancedRules ?? value.advanced_rules ?? [],
+              hasba_custom_sectors: value.customSectors ?? value.hasba_custom_sectors ?? [],
+              bank_sector_pension_rules: value.bankSectorRules ?? value.bank_sector_pension_rules ?? [],
+              pension_rules_library: value.pensionRulesLibrary ?? value.pension_rules_library ?? [],
+              
+              housingSupportTiers: value.housingSupportTiers ?? value.housing_support_tiers ?? [],
+              advancePaymentTiers: value.advancePaymentTiers ?? value.advance_payment_tiers ?? [],
+              approvedSalaryRules: value.approvedSalaryRules ?? value.approvedSalaryDbRules ?? value.approved_salary_rules ?? value.approved_salary_db_rules ?? [],
+              pensionDbRules: value.pensionDbRules ?? value.pension_db_rules ?? [],
+              sectorMappings: value.sectorMappings ?? value.sector_mappings ?? [],
+            };
+            setSettings(settingsMap);
+          }
+        } catch (retryErr) {
+          console.warn('[SUPABASE LOAD RETRY FAILED] Background retry failed, keeping slow_connection status:', retryErr);
+        }
+      }, 7000);
     }
 
     setSupabaseFetched(true);
@@ -198,6 +233,7 @@ export function useSettings() {
     initialized,
     supabaseFetched,
     supabaseLoadStatus,
+    setSupabaseLoadStatus,
     supabaseLoadError,
     fetchSettings,
     saveSetting,

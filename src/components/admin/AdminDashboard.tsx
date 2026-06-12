@@ -1761,7 +1761,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {supabaseLoadStatus === 'loading' && (
+        {supabaseLoadStatus === 'slow_connection' && (
           <div className="mb-6 p-4 border border-amber-300 bg-amber-50 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 text-xs font-bold text-amber-900 border-dashed animate-pulse">
             <div className="flex items-start gap-3">
               <span className="text-xl shrink-0">⚠️</span>

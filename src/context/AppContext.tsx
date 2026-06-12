@@ -114,7 +114,7 @@ interface AppContextType {
   reinitializeAllSettings: () => Promise<void>;
   restoreLastBackup: () => Promise<void>;
 
-  supabaseLoadStatus: 'loading' | 'success' | 'failed' | 'empty_db';
+  supabaseLoadStatus: 'loading' | 'success' | 'failed' | 'empty_db' | 'read_only_protected' | 'slow_connection';
   supabaseLoadError: string | null;
 
   // Supabase Auth and Roles state
@@ -724,6 +724,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     initialized: settingsInitialized,
     supabaseFetched,
     supabaseLoadStatus,
+    setSupabaseLoadStatus,
     supabaseLoadError,
   } = useSettings();
 
@@ -731,6 +732,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [hasSynced, setHasSynced] = useState(false);
   const [forceReady, setForceReady] = useState(false);
   const [supabaseValuesSynced, setSupabaseValuesSynced] = useState(false);
+  const syncedForStatusRef = useRef<string>('');
   
   const isSettingsLoading = !forceReady && (settingsLoading || !supabaseFetched || !tiersLoaded || !hasSynced) && supabaseLoadStatus !== 'failed';
 
@@ -782,7 +784,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   // Sync settings when loaded from the useSettings hook
   useEffect(() => {
-    if (settingsInitialized && supabaseFetched && tiersLoaded && !supabaseValuesSynced) {
+    const meritsSync = !supabaseValuesSynced || (supabaseLoadStatus === 'success' && syncedForStatusRef.current !== 'success');
+
+    if (settingsInitialized && supabaseFetched && tiersLoaded && meritsSync) {
       const merged: AdminSettings = {
         banks: (settings.banks !== undefined && settings.banks !== null) ? settings.banks : initialData.banks,
         products: (settings.product_acceptance !== undefined && settings.product_acceptance !== null) ? settings.product_acceptance : initialData.products,
@@ -837,6 +841,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       applySettingsState(merged);
       setHasSynced(true);
       setSupabaseValuesSynced(true);
+      syncedForStatusRef.current = supabaseLoadStatus || '';
     }
   }, [settingsInitialized, supabaseFetched, tiersLoaded, settings, supabaseValuesSynced, housingSupportTiers, advancePaymentTiers, supabaseLoadStatus]);
 
@@ -913,11 +918,22 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         let dbMarginCount = 0;
         let dbFetchSucceeded = false;
         try {
-          const { data: dbData } = await supabase
+          const fetchPromise = supabase
             .from('system_settings')
             .select('value')
             .eq('key', 'app_settings')
             .maybeSingle();
+
+          const response = await Promise.race([
+            fetchPromise,
+            new Promise<any>((_, reject) =>
+              setTimeout(() => reject(new Error('timeout')), supabaseLoadStatus === 'slow_connection' ? 6000 : 25000)
+            )
+          ]);
+
+          const { data: dbData, error } = response;
+          if (error) throw error;
+
           if (dbData) {
             if (dbData.value) {
               const dbRules = dbData.value.marginRules ?? dbData.value.margin_rules ?? [];
@@ -928,8 +944,15 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
             // No record exists in DB yet, which is valid for a completely new DB
             dbFetchSucceeded = true;
           }
-        } catch (fetchErr) {
+
+          if (supabaseLoadStatus === 'slow_connection') {
+            setSupabaseLoadStatus('success');
+          }
+        } catch (fetchErr: any) {
           console.error("Safeguard: failed to pre-fetch database margin count:", fetchErr);
+          if (supabaseLoadStatus === 'slow_connection' || fetchErr?.message === 'timeout') {
+            throw new Error('تعذر التأكد من آخر نسخة في Supabase، أعد المحاولة بعد استقرار الاتصال.');
+          }
         }
 
         const currentMarginCount = Array.isArray(overrideMarginRules || marginRules) ? (overrideMarginRules || marginRules).length : 0;

@@ -30,7 +30,7 @@ interface MarginsSectionProps {
   showToast: (msg: string, type: 'success' | 'refuse') => void;
   sectors: Sector[];
   saveChanges?: (overrideMarginRules?: MarginRule[]) => Promise<void>;
-  supabaseLoadStatus?: 'loading' | 'success' | 'failed' | 'empty_db';
+  supabaseLoadStatus?: 'loading' | 'success' | 'failed' | 'empty_db' | 'read_only_protected' | 'slow_connection';
 }
 
 const productTypesList = [
