@@ -50,12 +50,17 @@ export function useSettings() {
     setLoading(true);
     try {
       console.log('[SUPABASE LOAD] Fetching app_settings');
-      // Fetch key = 'app_settings'
-      const { data, error } = await supabase
-        .from('system_settings')
-        .select('*')
-        .eq('key', 'app_settings')
-        .maybeSingle();
+      // Fetch key = 'app_settings' with a 2-second timeout
+      const { data, error } = await Promise.race([
+        supabase
+          .from('system_settings')
+          .select('*')
+          .eq('key', 'app_settings')
+          .maybeSingle(),
+        new Promise<any>((_, reject) =>
+          setTimeout(() => reject(new Error('انتهت مهلة تحميل الإعدادات من قاعدة البيانات الرئيسية (2 ثانية)')), 2000)
+        )
+      ]);
 
       if (error) {
         throw error;

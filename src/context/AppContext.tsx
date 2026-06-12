@@ -729,7 +729,22 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   const [tiersLoaded, setTiersLoaded] = useState(false);
   const [hasSynced, setHasSynced] = useState(false);
-  const isSettingsLoading = (settingsLoading || !supabaseFetched || !tiersLoaded || !hasSynced) && supabaseLoadStatus !== 'failed';
+  const [forceReady, setForceReady] = useState(false);
+  
+  const isSettingsLoading = !forceReady && (settingsLoading || !supabaseFetched || !tiersLoaded || !hasSynced) && supabaseLoadStatus !== 'failed';
+
+  // Master safety timeout to guarantee the control panel loading screen closed within 2.2 seconds.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (settingsLoading || !supabaseFetched || !tiersLoaded || !hasSynced) {
+        console.warn('[MASTER TIMER] Dashboard settings took too long to load (>2.2s). Activating forceReady override.');
+        setTiersLoaded(true);
+        setHasSynced(true);
+        setForceReady(true);
+      }
+    }, 2200);
+    return () => clearTimeout(timer);
+  }, [settingsLoading, supabaseFetched, tiersLoaded, hasSynced]);
 
   // Load housing support tiers and advance payment tiers once on mount
   useEffect(() => {

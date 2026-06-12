@@ -74,11 +74,16 @@ export async function fetchHousingSupportTiers(): Promise<HousingSupportTier[]> 
   if (hasSupabaseKeys) {
     try {
       console.log('[SUPPORT] START fetchHousingSupportTiers');
-      const { data, error } = await supabase
-        .from('system_settings')
-        .select('value')
-        .eq('key', 'app_settings')
-        .maybeSingle();
+      const { data, error } = await Promise.race([
+        supabase
+          .from('system_settings')
+          .select('value')
+          .eq('key', 'app_settings')
+          .maybeSingle(),
+        new Promise<any>((_, reject) =>
+          setTimeout(() => reject(new Error('timeout')), 2000)
+        )
+      ]);
 
       if (error) throw error;
 
@@ -112,11 +117,16 @@ export async function fetchAdvancePaymentTiers(): Promise<AdvancePaymentTier[]> 
   if (hasSupabaseKeys) {
     try {
       console.log('[SUPPORT] START fetchAdvancePaymentTiers');
-      const { data, error } = await supabase
-        .from('system_settings')
-        .select('value')
-        .eq('key', 'app_settings')
-        .maybeSingle();
+      const { data, error } = await Promise.race([
+        supabase
+          .from('system_settings')
+          .select('value')
+          .eq('key', 'app_settings')
+          .maybeSingle(),
+        new Promise<any>((_, reject) =>
+          setTimeout(() => reject(new Error('timeout')), 2000)
+        )
+      ]);
 
       if (error) throw error;
 
