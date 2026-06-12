@@ -716,11 +716,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   // Consume from custom AuthProvider
   const { user, setUser, profile, isOwner, isAdmin, isStaff, canAccessDashboard, signOut, loading: authLoading } = useAuth();
   
-  const getNormalizedRole = () => {
-    if (profile?.email === 'admin@hesba.com' || user?.email === 'admin@hesba.com') return 'admin';
-    return 'user';
-  };
-  const userRole = getNormalizedRole();
+  const userRole: 'admin' | 'user' = isAdmin ? 'admin' : 'user';
 
   const {
     settings,

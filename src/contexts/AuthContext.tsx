@@ -70,6 +70,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(() => getCachedProfile());
   const [loading, setLoading] = useState(() => !isCheckedInSession());
   const [isSuspendedUser, setIsSuspendedUser] = useState(false);
+  const [isAdminInDb, setIsAdminInDb] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem('hesba_is_admin') === 'true';
+    } catch { return false; }
+  });
 
   async function fetchProfile(userId: string, email?: string, userMetadata?: any) {
     if (!hasSupabaseKeys) return;
@@ -176,14 +181,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setIsSuspendedUser(false);
         }
 
-        const targetRole = isOwnerEmail ? 'admin' : 'user';
+        const targetRole: UserRole = 'user';
         
         const profObj: UserProfile = {
           id: profileData.id,
           email: lowercaseEmail,
           full_name: profileData.full_name || profileData.username || null,
           avatar_url: null,
-          role: targetRole as UserRole,
+          role: targetRole,
           is_blocked: profileData.is_blocked === true
         };
         setProfile(profObj);
@@ -209,7 +214,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: email || '',
         full_name: userMetadata?.full_name || userMetadata?.username || null,
         avatar_url: userMetadata?.avatar_url || null,
-        role: isOwnerEmail ? 'admin' : 'user',
+        role: 'user',
         is_blocked: false
       };
       setProfile(profObj);
@@ -220,6 +225,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (e) {
         console.error(e);
       }
+    }
+  }
+
+  async function checkAdminStatus(userId: string): Promise<boolean> {
+    if (!hasSupabaseKeys) return false;
+    try {
+      const { data, error } = await supabase
+        .from('admins')
+        .select('user_id')
+        .eq('user_id', userId)
+        .maybeSingle();
+      const result = !error && !!data;
+      try {
+        sessionStorage.setItem('hesba_is_admin', result ? 'true' : 'false');
+      } catch {}
+      return result;
+    } catch {
+      return false;
     }
   }
 
@@ -237,6 +260,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!hasSupabaseKeys) {
       setLoading(false);
       clearTimeout(safetyTimer);
+      const cachedUser = getCachedUser();
+      if (cachedUser) {
+        const isOwner = cachedUser.email?.toLowerCase().trim() === 'admin@hesba.com';
+        setIsAdminInDb(isOwner);
+      }
       return;
     }
 
@@ -266,6 +294,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.error(e);
           }
           await fetchProfile(session.user.id, session.user.email, session.user.user_metadata);
+          const adminStatus = await checkAdminStatus(session.user.id);
+          if (active) {
+            setIsAdminInDb(adminStatus);
+          }
+        } else {
+          if (active) {
+            setIsAdminInDb(false);
+            try { sessionStorage.removeItem('hesba_is_admin'); } catch {}
+          }
         }
         try {
           sessionStorage.setItem('hesba_permissions_checked', 'true');
@@ -284,12 +321,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setSession(null);
             setUser(null);
             setProfile(null);
+            setIsAdminInDb(false);
           }
           try {
             sessionStorage.removeItem('hesba_cached_user');
             sessionStorage.removeItem('hesba_cached_profile');
             sessionStorage.removeItem('hesba_permissions_checked');
             sessionStorage.removeItem('hesba_calculator_permissions');
+            sessionStorage.removeItem('hesba_is_admin');
           } catch (e) {
             console.error(e);
           }
@@ -318,13 +357,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.error(e);
           }
           await fetchProfile(session.user.id, session.user.email, session.user.user_metadata);
+          const adminStatus = await checkAdminStatus(session.user.id);
+          if (active) {
+            setIsAdminInDb(adminStatus);
+          }
         } else {
           setProfile(null);
+          if (active) {
+            setIsAdminInDb(false);
+          }
           try {
             sessionStorage.removeItem('hesba_cached_user');
             sessionStorage.removeItem('hesba_cached_profile');
             sessionStorage.removeItem('hesba_permissions_checked');
             sessionStorage.removeItem('hesba_calculator_permissions');
+            sessionStorage.removeItem('hesba_is_admin');
           } catch (e) {
             console.error(e);
           }
@@ -345,16 +392,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return e === 'admin@hesba.com';
   };
 
-  const isAdmin = isOwnerEmail(user?.email);
-  const isOwner = isAdmin;
-  const isStaff = isAdmin;
-  const isCustomer = !isAdmin;
+  const isAdmin = isAdminInDb;
+  const isOwner = isAdminInDb;
+  const isStaff = isAdminInDb;
+  const isCustomer = !isAdminInDb;
 
-  const canAccessDashboard = isAdmin;
+  const canAccessDashboard = isAdminInDb;
 
   // For compatibility with legacy checks
-  const legacyIsAdmin = isAdmin;
-  const legacyIsManager = isAdmin;
+  const legacyIsAdmin = isAdminInDb;
+  const legacyIsManager = isAdminInDb;
 
   async function signInWithGoogle() {
     if (!hasSupabaseKeys) {
@@ -372,9 +419,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: mockEmail,
         full_name: 'مدير المنصة',
         avatar_url: null,
-        role: 'admin',
+        role: 'user',
         is_blocked: false
       });
+      setIsAdminInDb(true);
       return;
     }
     await supabase.auth.signInWithOAuth({
@@ -401,9 +449,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: emailLower,
         full_name: isOwner ? 'مدير المنصة' : emailLower.split('@')[0],
         avatar_url: null,
-        role: isOwner ? 'admin' : 'user',
+        role: 'user',
         is_blocked: false
       });
+      setIsAdminInDb(isOwner);
       setIsSuspendedUser(false);
       return;
     }
@@ -485,9 +534,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: emailLower,
         full_name: fullName,
         avatar_url: null,
-        role: isOwner ? 'admin' : 'user',
+        role: 'user',
         is_blocked: false
       });
+      setIsAdminInDb(isOwner);
       return { user: mockUser, session: { access_token: 'mock_token' } };
     }
     const { data, error } = await supabase.auth.signUp({
@@ -530,11 +580,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setProfile(null);
     setSession(null);
     setIsSuspendedUser(false);
+    setIsAdminInDb(false);
     try {
       sessionStorage.removeItem('hesba_cached_user');
       sessionStorage.removeItem('hesba_cached_profile');
       sessionStorage.removeItem('hesba_permissions_checked');
       sessionStorage.removeItem('hesba_calculator_permissions');
+      sessionStorage.removeItem('hesba_is_admin');
     } catch (e) {
       console.error(e);
     }
