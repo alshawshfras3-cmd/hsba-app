@@ -134,7 +134,7 @@ function AppContent() {
     } catch {
       return false;
     }
-  }, []);
+  }, [loading]);
 
   if (loading && !hasDraft && !hasChecked) {
     return (

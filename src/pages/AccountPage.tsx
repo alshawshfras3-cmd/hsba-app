@@ -25,7 +25,7 @@ import {
 
 export function AccountPage() {
   const { user, signOut, userSubscriptions } = useAppState();
-  const { profile } = useAuth();
+  const { profile, canAccessDashboard } = useAuth();
   const location = useLocation();
 
   // Profile states
@@ -47,28 +47,8 @@ export function AccountPage() {
 
 
 
-  // Admin verification state
-  const [hasAdminAccess, setHasAdminAccess] = useState(false);
-
-  React.useEffect(() => {
-    async function verifyAdminAccess() {
-      if (!hasSupabaseKeys || !user) return;
-      try {
-        const { data, error } = await supabase
-          .from('admins')
-          .select('user_id')
-          .eq('user_id', user.id)
-          .maybeSingle();
-        
-        if (data && !error) {
-          setHasAdminAccess(true);
-        }
-      } catch (err) {
-        console.error("Could not fetch admin details:", err);
-      }
-    }
-    verifyAdminAccess();
-  }, [user]);
+  // Admin access derived from AuthContext — no independent DB query needed
+  const hasAdminAccess = canAccessDashboard;
 
   const handleVibrate = () => {
     if (window.navigator && window.navigator.vibrate) {

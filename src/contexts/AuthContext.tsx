@@ -333,13 +333,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
 
-        const hasChecked = sessionStorage.getItem('hesba_permissions_checked') === 'true' ||
-                           sessionStorage.getItem('hesba_calculator_permissions') === 'true';
-
-        // Only show full loading if we haven't checked once in this session
-        if (!hasChecked) {
-          setLoading(true);
-        }
+        // Always set loading=true during auth state changes regardless of prior session cache.
+        // Skipping this when hasChecked=true causes Guard to see loading=false before
+        // checkAdminStatus completes, incorrectly kicking the admin back to /admin.
+        setLoading(true);
 
         if (session?.user) {
           try {
