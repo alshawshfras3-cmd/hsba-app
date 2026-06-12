@@ -272,7 +272,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           } catch (e) {
             console.error(e);
           }
-          await fetchProfile(session.user.id, session.user.email, session.user.user_metadata);
           const isAdminUser = session.user.app_metadata?.role === 'admin' || isOwnerEmail(session.user.email);
           console.log("[AUTH_DEBUG] initializeAuth: setting isAdminInDb on app_metadata basis:", isAdminUser);
           if (active) {
@@ -281,6 +280,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               sessionStorage.setItem('hesba_is_admin', isAdminUser ? 'true' : 'false');
             } catch {}
           }
+          // Fetch profile asynchronously in background
+          const uid = session.user.id;
+          const uemail = session.user.email;
+          const umeta = session.user.user_metadata;
+          setTimeout(() => {
+            fetchProfile(uid, uemail, umeta);
+          }, 0);
         } else {
           if (active) {
             console.log("[AUTH_DEBUG] initializeAuth: No user session found, setting isAdminInDb false");
@@ -327,21 +333,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     initializeAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         console.log("[AUTH_DEBUG] onAuthStateChange event received:", event, "session user ID:", session?.user?.id || 'none');
         if (!active) return;
         setSession(session);
         setUser(session?.user ?? null);
 
         if (session?.user) {
-          // There is async work — set loading=true to block Guard
-          setLoading(true);
           try {
             sessionStorage.setItem('hesba_cached_user', JSON.stringify(session.user));
           } catch (e) {
             console.error(e);
           }
-          await fetchProfile(session.user.id, session.user.email, session.user.user_metadata);
           const isAdminUser = session.user.app_metadata?.role === 'admin' || isOwnerEmail(session.user.email);
           console.log("[AUTH_DEBUG] onAuthStateChange: setting isAdminInDb on app_metadata basis:", isAdminUser);
           if (active) {
@@ -353,6 +356,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (active) {
             setLoading(false);
           }
+          // Fetch profile asynchronously in background
+          const uid = session.user.id;
+          const uemail = session.user.email;
+          const umeta = session.user.user_metadata;
+          setTimeout(() => {
+            fetchProfile(uid, uemail, umeta);
+          }, 0);
         } else {
           clearLocalAuthState();
           setLoading(false);
@@ -459,63 +469,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(data.session);
       setUser(data.user);
 
-      // Upsert into app_users immediately upon successful login!
-      try {
-        await supabase
-          .from('app_users')
-          .upsert({
-            id: data.user.id,
-            email: data.user.email?.toLowerCase().trim() || emailLower,
-            full_name: data.user.user_metadata?.full_name || '',
-            phone: data.user.user_metadata?.phone || '',
-            status: 'active',
-            last_login_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }, {
-            onConflict: 'id'
-          });
-      } catch (err) {
-        console.error('Failed to run sign in profile sync logic:', err);
-      }
-
-      // Fetch profile
-      await fetchProfile(data.user.id, data.user.email, data.user.user_metadata);
-
       // Check admin status on app_metadata or email basis
       const adminStatus = data.user.app_metadata?.role === 'admin' || isOwnerEmail(data.user.email);
       setIsAdminInDb(adminStatus);
 
-      // Fetch their profile and check status immediately across both tables
-      let isBlocked = false;
-      try {
-        const { data: prof, error: profErr } = await supabase
-          .from('app_users')
-          .select('is_blocked')
-          .eq('id', data.user.id)
-          .maybeSingle();
-        if (!profErr && prof) {
-          isBlocked = prof.is_blocked === true;
-        } else {
-          // Try user_profiles
-          const { data: profLegacy, error: profLegacyErr } = await supabase
-            .from('user_profiles')
-            .select('is_blocked, role')
-            .eq('id', data.user.id)
-            .maybeSingle();
-          if (!profLegacyErr && profLegacy) {
-            isBlocked = profLegacy.is_blocked === true || profLegacy.role === 'suspended';
-          }
+      // Run background task
+      const currentUserId = data.user.id;
+      const currentUserEmail = data.user.email;
+      const currentUserMeta = data.user.user_metadata;
+      setTimeout(async () => {
+        try {
+          // Upsert into app_users immediately upon successful login in the background
+          await supabase
+            .from('app_users')
+            .upsert({
+              id: currentUserId,
+              email: currentUserEmail?.toLowerCase().trim() || emailLower,
+              full_name: currentUserMeta?.full_name || '',
+              phone: currentUserMeta?.phone || '',
+              status: 'active',
+              last_login_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            }, {
+              onConflict: 'id'
+            });
+        } catch (err) {
+          console.error('Failed async app_users upsert:', err);
         }
-      } catch (err) {
-        console.warn("Could not check suspension status from DB", err);
-      }
-        
-      if (isBlocked && !isOwnerFlg) {
-        setIsSuspendedUser(true);
-        setLoading(false);
-        await signOut();
-        throw new Error("تم إيقاف هذا الحساب بواسطة الإدارة");
-      }
+
+        try {
+          await fetchProfile(currentUserId, currentUserEmail, currentUserMeta);
+        } catch (err) {
+          console.error('Failed async profile fetch:', err);
+        }
+      }, 0);
 
       try {
         sessionStorage.setItem('hesba_permissions_checked', 'true');

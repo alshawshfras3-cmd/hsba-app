@@ -149,6 +149,8 @@ export function AccountPage() {
     setPasswordLoading(true);
     setPasswordMessage(null);
 
+    console.log('[PASSWORD_UPDATE] start');
+
     try {
       if (hasSupabaseKeys) {
         const { error } = await Promise.race([
@@ -159,11 +161,13 @@ export function AccountPage() {
         ]);
         if (error) throw error;
         setPasswordMessage({ type: 'success', text: 'تم تحديث كلمة المرور الجديدة بنجاح فوري!' });
+        console.log('[PASSWORD_UPDATE] success');
         setNewPassword('');
         setConfirmPassword('');
       } else {
         await new Promise(resolve => setTimeout(resolve, 800));
         setPasswordMessage({ type: 'success', text: 'محاكاة: تم تحديث الباسورد بنجاح في النسخة المحلية!' });
+        console.log('[PASSWORD_UPDATE] success');
         setNewPassword('');
         setConfirmPassword('');
       }
@@ -171,6 +175,7 @@ export function AccountPage() {
       console.error(err);
       setPasswordMessage({ type: 'error', text: err.message || 'حدث خطأ أثناء محاولة تحديث الرقم السري.' });
     } finally {
+      console.log('[PASSWORD_UPDATE] finally');
       setPasswordLoading(false);
     }
   };

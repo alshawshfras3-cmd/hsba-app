@@ -27,7 +27,7 @@ export const supabase = createClient(safeUrl, safeKey);
 if (hasSupabaseKeys) {
   const match = supabaseUrl.match(/^https:\/\/(.*?)\.supabase\.(co|net)/);
   const prefix = match ? match[1] : supabaseUrl.substring(0, 25);
-  console.log(`[SUPABASE CONNECT] URL prefix confirmed: "${prefix}" (expected: "yeppasileupalanwxzzm")`);
+  console.log(`[SUPABASE CONNECT] URL prefix confirmed: "${prefix}" (expected: "yeppasileupalanwzxzm")`);
 } else {
   console.log('[SUPABASE CONNECT] Running in offline fallback mode (missing/placeholder keys)');
 }
