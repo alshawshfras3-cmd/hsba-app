@@ -1,4 +1,4 @@
-import { supabase, hasSupabaseKeys } from './supabase';
+import { supabase, hasSupabaseKeys, fetchAppSettingsShared } from './supabase';
 import { HousingSupportTier, AdvancePaymentTier } from '../types';
 
 // Default static lists based on confirmed Al-Rajhi guidelines
@@ -73,23 +73,12 @@ export function getAdvancePayment(S: number, tiers: AdvancePaymentTier[] = DEFAU
 export async function fetchHousingSupportTiers(): Promise<HousingSupportTier[]> {
   if (hasSupabaseKeys) {
     try {
-      console.log('[SUPPORT] START fetchHousingSupportTiers');
-      const { data, error } = await Promise.race([
-        supabase
-          .from('system_settings')
-          .select('value')
-          .eq('key', 'app_settings')
-          .maybeSingle(),
-        new Promise<any>((_, reject) =>
-          setTimeout(() => reject(new Error('timeout')), 2000)
-        )
-      ]);
+      console.log('[SUPPORT] START fetchHousingSupportTiers (using shared app_settings fetch)');
+      const value = await fetchAppSettingsShared(10000);
 
-      if (error) throw error;
-
-      if (data && data.value && Array.isArray(data.value.housingSupportTiers)) {
-        console.log(`[SUPABASE LOAD] table=housing_support_tiers status=success rows=${data.value.housingSupportTiers.length}`);
-        return data.value.housingSupportTiers.map((item: any) => ({
+      if (value && Array.isArray(value.housingSupportTiers)) {
+        console.log(`[SUPABASE LOAD] table=housing_support_tiers status=success rows=${value.housingSupportTiers.length}`);
+        return value.housingSupportTiers.map((item: any) => ({
           id: item.id,
           min_salary: Number(item.min_salary),
           max_salary: Number(item.max_salary),
@@ -116,23 +105,12 @@ export async function fetchHousingSupportTiers(): Promise<HousingSupportTier[]> 
 export async function fetchAdvancePaymentTiers(): Promise<AdvancePaymentTier[]> {
   if (hasSupabaseKeys) {
     try {
-      console.log('[SUPPORT] START fetchAdvancePaymentTiers');
-      const { data, error } = await Promise.race([
-        supabase
-          .from('system_settings')
-          .select('value')
-          .eq('key', 'app_settings')
-          .maybeSingle(),
-        new Promise<any>((_, reject) =>
-          setTimeout(() => reject(new Error('timeout')), 2000)
-        )
-      ]);
+      console.log('[SUPPORT] START fetchAdvancePaymentTiers (using shared app_settings fetch)');
+      const value = await fetchAppSettingsShared(10000);
 
-      if (error) throw error;
-
-      if (data && data.value && Array.isArray(data.value.advancePaymentTiers)) {
-        console.log(`[SUPABASE LOAD] table=advance_payment_tiers status=success rows=${data.value.advancePaymentTiers.length}`);
-        return data.value.advancePaymentTiers.map((item: any) => ({
+      if (value && Array.isArray(value.advancePaymentTiers)) {
+        console.log(`[SUPABASE LOAD] table=advance_payment_tiers status=success rows=${value.advancePaymentTiers.length}`);
+        return value.advancePaymentTiers.map((item: any) => ({
           id: item.id,
           salary_threshold: Number(item.salary_threshold),
           amount: Number(item.amount)

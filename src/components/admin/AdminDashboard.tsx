@@ -1761,6 +1761,20 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {supabaseLoadStatus === 'loading' && (
+          <div className="mb-6 p-4 border border-amber-300 bg-amber-50 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 text-xs font-bold text-amber-900 border-dashed animate-pulse">
+            <div className="flex items-start gap-3">
+              <span className="text-xl shrink-0">⚠️</span>
+              <div className="space-y-1 text-right">
+                <p className="font-extrabold text-sm text-amber-800">الاتصال بقاعدة البيانات بطيء، سيتم إعادة المحاولة في الخلفية.</p>
+                <p className="text-amber-700 font-medium leading-relaxed">
+                  تم فتح لوحة التحكم بنجاح باستخدام كاش الإعدادات المحلي مؤقتاً لتجنب تعطيل العمل. يمكنك تصفح الإعدادات وتعديلها وسيقوم النظام بتحديثها في الخلفية حال استقرار شبكة الاتصال.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {supabaseLoadStatus === 'failed' && (
           <div className="mb-6 p-4 border border-red-350 bg-red-50 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 text-xs font-bold text-red-900 border-dashed">
             <div className="flex items-start gap-3">

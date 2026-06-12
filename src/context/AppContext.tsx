@@ -730,6 +730,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [tiersLoaded, setTiersLoaded] = useState(false);
   const [hasSynced, setHasSynced] = useState(false);
   const [forceReady, setForceReady] = useState(false);
+  const [supabaseValuesSynced, setSupabaseValuesSynced] = useState(false);
   
   const isSettingsLoading = !forceReady && (settingsLoading || !supabaseFetched || !tiersLoaded || !hasSynced) && supabaseLoadStatus !== 'failed';
 
@@ -781,7 +782,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   // Sync settings when loaded from the useSettings hook
   useEffect(() => {
-    if (settingsInitialized && supabaseFetched && tiersLoaded && !hasSynced) {
+    if (settingsInitialized && supabaseFetched && tiersLoaded && !supabaseValuesSynced) {
       const merged: AdminSettings = {
         banks: (settings.banks !== undefined && settings.banks !== null) ? settings.banks : initialData.banks,
         products: (settings.product_acceptance !== undefined && settings.product_acceptance !== null) ? settings.product_acceptance : initialData.products,
@@ -835,8 +836,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
       applySettingsState(merged);
       setHasSynced(true);
+      setSupabaseValuesSynced(true);
     }
-  }, [settingsInitialized, supabaseFetched, tiersLoaded, settings, hasSynced, housingSupportTiers, advancePaymentTiers]);
+  }, [settingsInitialized, supabaseFetched, tiersLoaded, settings, supabaseValuesSynced, housingSupportTiers, advancePaymentTiers, supabaseLoadStatus]);
 
   useEffect(() => {
     if (!isSettingsLoading) {

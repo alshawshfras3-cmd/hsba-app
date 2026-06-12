@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase, hasSupabaseKeys } from '../lib/supabase';
+import { supabase, hasSupabaseKeys, fetchAppSettingsShared, getCachedAppSettingsSync } from '../lib/supabase';
 import { DsrRule } from '../types';
 import { normalizeDsrRules } from '../lib/settings/normalizeDsrRules';
 
@@ -48,83 +48,82 @@ export function useSettings() {
     }
 
     setLoading(true);
+    let appSettingsObj: any = null;
+    let didTimeout = false;
+
     try {
-      console.log('[SUPABASE LOAD] Fetching app_settings');
-      // Fetch key = 'app_settings' with a 2-second timeout
-      const { data, error } = await Promise.race([
-        supabase
-          .from('system_settings')
-          .select('*')
-          .eq('key', 'app_settings')
-          .maybeSingle(),
-        new Promise<any>((_, reject) =>
-          setTimeout(() => reject(new Error('انتهت مهلة تحميل الإعدادات من قاعدة البيانات الرئيسية (2 ثانية)')), 2000)
-        )
-      ]);
-
-      if (error) {
-        throw error;
-      }
-
-      if (!data || !data.value) {
-        console.warn('[SETTINGS] Supabase settings empty');
-        setSettings({});
-        setSupabaseLoadStatus('empty_db');
-        setSupabaseFetched(true);
-        setLoading(false);
-        return;
-      }
-
-      const appSettingsObj = data.value;
-      console.log('[SETTINGS] key found in Supabase, using Supabase value: app_settings (source of truth)');
-
-      const loadedMargins = appSettingsObj.marginRules ?? appSettingsObj.margin_rules ?? [];
-      if (!Array.isArray(loadedMargins)) {
-        throw new Error('marginRules invalid');
-      }
-
+      console.log('[SUPABASE LOAD] Fetching app_settings (via shared cached loader with 10s timeout)');
+      
+      // Call with 10s timeout
+      appSettingsObj = await fetchAppSettingsShared(10000);
       setSupabaseLoadStatus('success');
-
-      // Convert appSettingsObj to settings mapping
-      // If we loaded successfully from Supabase, use database property or empty list.
-      // DONT fallback to seeds/DEFAULTS to avoid blending!
-      const settingsMap: Record<string, any> = {
-        banks: appSettingsObj.banks ?? [],
-        product_acceptance: appSettingsObj.products ?? appSettingsObj.product_acceptance ?? [],
-        military_ranks: appSettingsObj.militaryRanks ?? appSettingsObj.military_ranks ?? [],
-        salary_rules: appSettingsObj.salaryRules ?? appSettingsObj.salary_rules ?? [],
-        pension_rules: appSettingsObj.pensionRules ?? appSettingsObj.pension_rules ?? [],
-        term_rules: appSettingsObj.termRules ?? appSettingsObj.term_rules ?? [],
-        margin_rules: appSettingsObj.marginRules ?? appSettingsObj.margin_rules ?? [],
-        dsrRules: normalizeDsrRules(appSettingsObj.dsrRules ?? appSettingsObj.dsr_rules ?? []),
-        dsr_rules: normalizeDsrRules(appSettingsObj.dsrRules ?? appSettingsObj.dsr_rules ?? []),
-        support_settings: appSettingsObj.supportSettings ?? appSettingsObj.support_settings ?? {},
-        personal_finance_rules: appSettingsObj.personalRules ?? appSettingsObj.personal_finance_rules ?? [],
-        advanced_rules: appSettingsObj.advancedRules ?? appSettingsObj.advanced_rules ?? [],
-        hasba_custom_sectors: appSettingsObj.customSectors ?? appSettingsObj.hasba_custom_sectors ?? [],
-        bank_sector_pension_rules: appSettingsObj.bankSectorRules ?? appSettingsObj.bank_sector_pension_rules ?? [],
-        pension_rules_library: appSettingsObj.pensionRulesLibrary ?? appSettingsObj.pension_rules_library ?? [],
-        
-        housingSupportTiers: appSettingsObj.housingSupportTiers ?? appSettingsObj.housing_support_tiers ?? [],
-        advancePaymentTiers: appSettingsObj.advancePaymentTiers ?? appSettingsObj.advance_payment_tiers ?? [],
-        approvedSalaryRules: appSettingsObj.approvedSalaryRules ?? appSettingsObj.approvedSalaryDbRules ?? appSettingsObj.approved_salary_rules ?? appSettingsObj.approved_salary_db_rules ?? [],
-        pensionDbRules: appSettingsObj.pensionDbRules ?? appSettingsObj.pension_db_rules ?? [],
-        sectorMappings: appSettingsObj.sectorMappings ?? appSettingsObj.sector_mappings ?? [],
-      };
-
-      setSettings(settingsMap);
-      setSupabaseFetched(true);
-      setLoading(false);
-
     } catch (err: any) {
       const errMsg = err?.message || String(err);
-      console.error('[SUPABASE LOAD ERROR] table=system_settings status=failed message=', errMsg);
-      setSupabaseLoadStatus('failed');
-      setSupabaseLoadError(errMsg);
-      // Set to true so loading spinner can close, but AppContext details error state to prevent overriding!
-      setSupabaseFetched(true);
-      setLoading(false);
+      const isTimeout = err?.isTimeout || errMsg.includes('timeout') || errMsg.includes('مهلة');
+      
+      console.warn('[SUPABASE LOAD WARNING] Could not fetch settings directly:', errMsg);
+      
+      // Attempt to salvage from sync cache (sessionStorage/memory)
+      const cached = getCachedAppSettingsSync();
+      if (cached) {
+        console.log('[SUPABASE LOAD] Salvaged app_settings from local cache. Continuing cleanly.');
+        appSettingsObj = cached;
+        // Keep status as success (so save is NOT disabled, but we logged a warning)
+        setSupabaseLoadStatus('success');
+      } else {
+        // Absolutely no cache and no database response
+        if (isTimeout) {
+          didTimeout = true;
+          console.warn('[SUPABASE LOAD TIME-OUT] Slow database response. Keeping status as loading with background-retries.');
+          setSupabaseLoadStatus('loading'); // do NOT mark as failed so save is not permanently locked
+        } else {
+          // Real database query failure
+          setSupabaseLoadStatus('failed');
+          setSupabaseLoadError(errMsg);
+        }
+      }
     }
+
+    // If we have some appSettingsObj (either fetched or cached)
+    if (appSettingsObj) {
+      try {
+        const settingsMap: Record<string, any> = {
+          banks: appSettingsObj.banks ?? [],
+          product_acceptance: appSettingsObj.products ?? appSettingsObj.product_acceptance ?? [],
+          military_ranks: appSettingsObj.militaryRanks ?? appSettingsObj.military_ranks ?? [],
+          salary_rules: appSettingsObj.salaryRules ?? appSettingsObj.salary_rules ?? [],
+          pension_rules: appSettingsObj.pensionRules ?? appSettingsObj.pension_rules ?? [],
+          term_rules: appSettingsObj.termRules ?? appSettingsObj.term_rules ?? [],
+          margin_rules: appSettingsObj.marginRules ?? appSettingsObj.margin_rules ?? [],
+          dsrRules: normalizeDsrRules(appSettingsObj.dsrRules ?? appSettingsObj.dsr_rules ?? []),
+          dsr_rules: normalizeDsrRules(appSettingsObj.dsrRules ?? appSettingsObj.dsr_rules ?? []),
+          support_settings: appSettingsObj.supportSettings ?? appSettingsObj.support_settings ?? {},
+          personal_finance_rules: appSettingsObj.personalRules ?? appSettingsObj.personal_finance_rules ?? [],
+          advanced_rules: appSettingsObj.advancedRules ?? appSettingsObj.advanced_rules ?? [],
+          hasba_custom_sectors: appSettingsObj.customSectors ?? appSettingsObj.hasba_custom_sectors ?? [],
+          bank_sector_pension_rules: appSettingsObj.bankSectorRules ?? appSettingsObj.bank_sector_pension_rules ?? [],
+          pension_rules_library: appSettingsObj.pensionRulesLibrary ?? appSettingsObj.pension_rules_library ?? [],
+          
+          housingSupportTiers: appSettingsObj.housingSupportTiers ?? appSettingsObj.housing_support_tiers ?? [],
+          advancePaymentTiers: appSettingsObj.advancePaymentTiers ?? appSettingsObj.advance_payment_tiers ?? [],
+          approvedSalaryRules: appSettingsObj.approvedSalaryRules ?? appSettingsObj.approvedSalaryDbRules ?? appSettingsObj.approved_salary_rules ?? appSettingsObj.approved_salary_db_rules ?? [],
+          pensionDbRules: appSettingsObj.pensionDbRules ?? appSettingsObj.pension_db_rules ?? [],
+          sectorMappings: appSettingsObj.sectorMappings ?? appSettingsObj.sector_mappings ?? [],
+        };
+        setSettings(settingsMap);
+      } catch (err) {
+        console.error('[SETTINGS ERROR] Could not parse loaded appSettingsObj:', err);
+      }
+    } else if (didTimeout) {
+      // If we timed out and have no settings at all, start an asynchronous quiet retry loop in the background!
+      console.log('[SUPABASE LOAD RETRY] Starting silent background retries...');
+      setTimeout(() => {
+        fetchSettings();
+      }, 5000);
+    }
+
+    setSupabaseFetched(true);
+    setLoading(false);
   }, []);
 
   useEffect(() => {
