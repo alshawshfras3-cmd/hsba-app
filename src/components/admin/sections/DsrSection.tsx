@@ -30,7 +30,6 @@ export default function DsrSection({
   const formBanksList = banks.map(b => ({ id: b.id, nameAr: b.nameAr }));
 
   const [filterDsrBank, setFilterDsrBank] = useState<string>('rajhi');
-  const [filterDsrProduct, setFilterDsrProduct] = useState<string>('all');
   const [filterDsrSupport, setFilterDsrSupport] = useState<string>('all');
   const [filterDsrStage, setFilterDsrStage] = useState<string>('all');
   const [filterDsrStatus, setFilterDsrStatus] = useState<string>('all');
@@ -40,7 +39,6 @@ export default function DsrSection({
 
   // Form states for adding/editing a DSR Rule
   const [formDsrBankId, setFormDsrBankId] = useState<string>('rajhi');
-  const [formDsrProductType, setFormDsrProductType] = useState<'real_estate_only' | 'real_estate_with_new_personal' | 'real_estate_with_existing_personal'>('real_estate_only');
   const [formDsrSupportType, setFormDsrSupportType] = useState<'none' | 'monthly' | 'downpayment'>('none');
   const [formDsrCustomerStage, setFormDsrCustomerStage] = useState<'active_before_retirement' | 'retired_after_retirement'>('active_before_retirement');
   const [formDsrPercentStr, setFormDsrPercentStr] = useState<string>('');
@@ -61,19 +59,11 @@ export default function DsrSection({
     { id: 'retired_after_retirement', nameAr: 'متقاعد (بعد التقاعد)' }
   ];
 
-  const getProductTypeName = (type: string) => {
-    switch (type) {
-      case 'real_estate_only': return 'عقاري فقط';
-      case 'real_estate_with_new_personal': return 'عقاري + شخصي جديد';
-      case 'real_estate_with_existing_personal': return 'عقاري مع شخصي قائم';
-      default: return type;
-    }
-  };
+
 
   const handleOpenAddDsrModal = () => {
     setEditingDsrRule(null);
     setFormDsrBankId(filterDsrBank);
-    setFormDsrProductType('real_estate_only');
     setFormDsrSupportType('none');
     setFormDsrCustomerStage('active_before_retirement');
     setFormDsrPercentStr('');
@@ -86,7 +76,6 @@ export default function DsrSection({
   const handleOpenEditDsrModal = (rule: DsrRule) => {
     setEditingDsrRule(rule);
     setFormDsrBankId(rule.bankId);
-    setFormDsrProductType((rule.productType || 'real_estate_only') as any);
     setFormDsrSupportType((rule.supportType || 'none') as any);
     setFormDsrCustomerStage(rule.customerStage);
     setFormDsrPercentStr(String(rule.dsrPercent));
@@ -110,7 +99,7 @@ export default function DsrSection({
       const duplicateExists = dsrRules.some(
         r => r.id !== id &&
              r.bankId === targetRule.bankId &&
-             r.productType === targetRule.productType &&
+             (r.productType || 'real_estate_only') === (targetRule.productType || 'real_estate_only') &&
              r.supportType === targetRule.supportType &&
              r.customerStage === targetRule.customerStage &&
              r.active
@@ -131,7 +120,7 @@ export default function DsrSection({
       return;
     }
 
-    const finalProductType = formDsrProductType || 'real_estate_only';
+    const finalProductType = 'real_estate_only';
     const finalSupportType = formDsrSupportType || 'none';
     const ruleId = editingDsrRule ? editingDsrRule.id : `dsr_rule_${Date.now()}`;
 
@@ -140,7 +129,7 @@ export default function DsrSection({
       const duplicateExists = dsrRules.some(
         r => r.id !== ruleId &&
              r.bankId === formDsrBankId &&
-             r.productType === finalProductType &&
+             (r.productType || 'real_estate_only') === finalProductType &&
              r.supportType === finalSupportType &&
              r.customerStage === formDsrCustomerStage &&
              r.active
@@ -177,8 +166,8 @@ export default function DsrSection({
     <div className="space-y-6 text-right" dir="rtl">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-[#F1F5F9] pb-4 gap-4">
         <div>
-          <h2 className="text-xl font-extrabold text-[#111827]">حدود الاستقطاع ونسب DSR</h2>
-          <p className="text-xs text-[#6B7280] mt-1">ضبط الحد الأعلى للاستقطاع حسب البنك والمنتج والدعم ومرحلة العميل.</p>
+          <h2 className="text-xl font-extrabold text-[#111827]">حدود الاستقطاع العقاري</h2>
+          <p className="text-xs text-[#6B7280] mt-1">ضبط نسب الاستقطاع للتمويل العقاري حسب البنك ونوع الدعم ومرحلة العميل.</p>
         </div>
         <button
           type="button"
@@ -243,20 +232,7 @@ export default function DsrSection({
       </div>
 
       {/* Filters Bar */}
-      <div className="bg-white border border-[#E5E7EB] rounded-2xl p-5 shadow-xs grid grid-cols-2 lg:grid-cols-4 gap-3.5 text-xs font-bold font-sans text-gray-700">
-        <div>
-          <label className="block text-slate-500 mb-1.5 font-sans">المنتج والتمويل:</label>
-          <select
-            value={filterDsrProduct}
-            onChange={(e) => setFilterDsrProduct(e.target.value)}
-            className="w-full bg-white border border-gray-200 rounded-xl px-2.5 py-2 cursor-pointer focus:outline-none focus:ring-1 focus:ring-[#0057B8] text-right font-semibold text-gray-800 outline-none"
-          >
-            <option value="all">الكل (All Products)</option>
-            <option value="real_estate_only">عقاري فقط</option>
-            <option value="real_estate_with_new_personal">عقاري + شخصي جديد</option>
-            <option value="real_estate_with_existing_personal">عقاري مع شخصي قائم</option>
-          </select>
-        </div>
+      <div className="bg-white border border-[#E5E7EB] rounded-2xl p-5 shadow-xs grid grid-cols-1 md:grid-cols-3 gap-3.5 text-xs font-bold font-sans text-gray-700">
 
         <div>
           <label className="block text-slate-500 mb-1.5 font-sans">نوع الدعم:</label>
@@ -307,7 +283,6 @@ export default function DsrSection({
             <thead className="bg-[#F8FAFC] text-slate-500 font-bold text-xs font-sans">
               <tr>
                 <th scope="col" className="px-6 py-4 text-right font-sans">البنك</th>
-                <th scope="col" className="px-6 py-4 text-right font-sans">المنتج والتمويل</th>
                 <th scope="col" className="px-6 py-4 text-right font-sans">نوع الدعم</th>
                 <th scope="col" className="px-6 py-4 text-right font-sans">مرحلة العميل</th>
                 <th scope="col" className="px-6 py-4 text-center font-sans">نسبة الاستقطاع %</th>
@@ -319,8 +294,9 @@ export default function DsrSection({
             <tbody className="divide-y divide-gray-200 bg-white text-xs font-semibold text-gray-700">
               {dsrRules
                 .filter(rule => {
+                  // Show only real-estate rules in this section
+                  if (rule.productType === 'personal_only') return false;
                   if (filterDsrBank !== 'all' && rule.bankId !== filterDsrBank) return false;
-                  if (filterDsrProduct !== 'all' && rule.productType !== filterDsrProduct) return false;
                   if (filterDsrSupport !== 'all' && rule.supportType !== filterDsrSupport) return false;
                   if (filterDsrStage !== 'all' && rule.customerStage !== filterDsrStage) return false;
                   if (filterDsrStatus !== 'all') {
@@ -338,9 +314,6 @@ export default function DsrSection({
                     <tr key={rule.id} className="hover:bg-slate-50/50 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap font-bold text-slate-900 font-sans">
                         {matchedBank ? matchedBank.nameAr : rule.bankId}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-slate-800 font-sans">
-                        {getProductTypeName(rule.productType)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold font-sans ${
@@ -433,22 +406,6 @@ export default function DsrSection({
             </div>
 
             <div className="px-6 py-6 space-y-4 max-h-[70vh] overflow-y-auto">
-                {/* Product Type Select */}
-                <div className="space-y-1.5 text-right">
-                  <label className="block text-xs font-bold text-gray-600">المنتج والتمويل:</label>
-                  <select
-                    value={formDsrProductType}
-                    onChange={(e) => {
-                      const selectedProd = e.target.value as any;
-                      setFormDsrProductType(selectedProd);
-                    }}
-                    className="w-full bg-slate-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 focus:outline-none outline-none"
-                  >
-                    <option value="real_estate_only">عقاري فقط</option>
-                    <option value="real_estate_with_new_personal">عقاري + شخصي جديد</option>
-                    <option value="real_estate_with_existing_personal">عقاري مع شخصي قائم</option>
-                  </select>
-                </div>
 
                 {/* Support Type Select */}
                 <div className="space-y-1.5 text-right font-sans">

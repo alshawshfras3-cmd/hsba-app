@@ -274,6 +274,7 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
       maxSalary: maxSalaryNum,
       minAge: editingPfRule?.minAge ?? 18,
       maxAge: editingPfRule?.maxAge ?? 65,
+      // Ensure retireeDsrPercentage matches customerStatus (retiree gets dsrNum, active employee gets fallback 25)
       retireeDsrPercentage: formPfCustomerStatus === 'retired' ? dsrNum : 25,
       isActive: formPfActive,
       calculationMethod: formPfCalcMethod,
@@ -321,6 +322,12 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
         >
           + إضافة قاعدة تمويل شخصي
         </button>
+      </div>
+
+      <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 text-xs text-blue-800 font-sans">
+        <p className="font-bold mb-1">📌 ملاحظة: DSR التمويل الشخصي</p>
+        <p>نسبة الاستقطاع للتمويل الشخصي تُدار من هذه الصفحة فقط داخل كل قاعدة تمويل.
+        لا علاقة لها بصفحة الاستقطاعات العقارية.</p>
       </div>
 
       {/* Bank Navigation Tabs for Personal Finance */}
@@ -725,7 +732,7 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
                     <>
                       {/* 4. Dsr percentage */}
                       <div className="space-y-1.5 flex flex-col justify-end">
-                        <label className="block text-xs font-bold text-gray-700 mb-1">DSR التمويل الشخصي (%):</label>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">نسبة الاستقطاع الشخصي % (موظف نشط)</label>
                         <input
                           type="text"
                           inputMode="decimal"
