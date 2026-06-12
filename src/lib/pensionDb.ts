@@ -1,4 +1,4 @@
-import { supabase, hasSupabaseKeys } from './supabase';
+import { supabase, hasSupabaseKeys, fetchAppSettingsShared } from './supabase';
 import { 
   ApprovedSalarySourceRule, 
   PensionCalculationRule, 
@@ -205,16 +205,10 @@ export async function fetchApprovedSalaryRules(): Promise<ApprovedSalarySourceRu
   }
   try {
     console.log('[PENSION] START fetchApprovedSalaryRules');
-    const { data, error } = await supabase
-      .from('system_settings')
-      .select('value')
-      .eq('key', 'app_settings')
-      .maybeSingle();
+    const value = await fetchAppSettingsShared(10000);
 
-    if (error) throw error;
-    if (data && data.value) {
-      const val = data.value;
-      const rules = val.approvedSalaryRules || val.approvedSalaryDbRules || [];
+    if (value) {
+      const rules = value.approvedSalaryRules || value.approvedSalaryDbRules || [];
       console.log(`[SUPABASE LOAD] table=approved_salary_source_rules status=success rows=${rules.length}`);
       return rules;
     }
@@ -287,16 +281,10 @@ export async function fetchPensionCalculationRules(): Promise<PensionCalculation
   }
   try {
     console.log('[PENSION] START fetchPensionCalculationRules');
-    const { data, error } = await supabase
-      .from('system_settings')
-      .select('value')
-      .eq('key', 'app_settings')
-      .maybeSingle();
+    const value = await fetchAppSettingsShared(10000);
 
-    if (error) throw error;
-    if (data && data.value) {
-      const val = data.value;
-      const rules = val.pensionDbRules || val.pensionRules || [];
+    if (value) {
+      const rules = value.pensionDbRules || value.pensionRules || [];
       console.log(`[SUPABASE LOAD] table=pension_calculation_rules status=success rows=${rules.length}`);
       return rules;
     }
@@ -369,16 +357,10 @@ export async function fetchSectorClassificationMappings(): Promise<SectorClassif
   }
   try {
     console.log('[PENSION] START fetchSectorClassificationMappings');
-    const { data, error } = await supabase
-      .from('system_settings')
-      .select('value')
-      .eq('key', 'app_settings')
-      .maybeSingle();
+    const value = await fetchAppSettingsShared(10000);
 
-    if (error) throw error;
-    if (data && data.value) {
-      const val = data.value;
-      const mappings = val.sectorMappings || val.sectorClassificationMappings || [];
+    if (value) {
+      const mappings = value.sectorMappings || value.sectorClassificationMappings || [];
       console.log(`[SUPABASE LOAD] table=sector_classification_mapping status=success rows=${mappings.length}`);
       return mappings;
     }
