@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Bank, HousingSupportTier, AdvancePaymentTier } from '../../../types';
-import { Plus, Edit, Trash2 } from 'lucide-react';
+import { Bank, HousingSupportTier, AdvancePaymentTier, SupportSettings } from '../../../types';
+import { Plus, Edit, Trash2, Shield, AlertCircle } from 'lucide-react';
 import { getHousingSupport, getAdvancePayment } from '../../../lib/housingSupportService';
 import { normalizeNumberInput, parseNumberInput } from '../../../lib/number-input';
 
@@ -11,6 +11,8 @@ interface SupportSectionProps {
   advancePaymentTiers: AdvancePaymentTier[];
   setAdvancePaymentTiers: React.Dispatch<React.SetStateAction<AdvancePaymentTier[]>>;
   showToast: (msg: string, type: 'success' | 'refuse') => void;
+  supportSettings?: SupportSettings;
+  setSupportSettings?: React.Dispatch<React.SetStateAction<SupportSettings>>;
 }
 
 export default function SupportSection({
@@ -19,7 +21,9 @@ export default function SupportSection({
   setHousingSupportTiers,
   advancePaymentTiers,
   setAdvancePaymentTiers,
-  showToast
+  showToast,
+  supportSettings,
+  setSupportSettings
 }: SupportSectionProps) {
   const formBanksList = banks.map(b => ({ id: b.id, nameAr: b.nameAr }));
 
@@ -42,6 +46,37 @@ export default function SupportSection({
 
   const [aSalaryThreshold, setASalaryThreshold] = useState<string>('0');
   const [aAmount, setAAmount] = useState<string>('0');
+
+  // Etizaz support states
+  const etizaz = supportSettings?.etizaz || {
+    enabled: true,
+    amount: 160000,
+    isRefundable: false,
+    eligibleSectors: ['military'],
+    label: 'دعم اعتزاز للعسكريين',
+    notes: 'دعم غير مسترد خاص بالعسكريين المؤهلين'
+  };
+
+  const [localAmount, setLocalAmount] = useState<string>(String(etizaz.amount));
+  const [localNotes, setLocalNotes] = useState<string>(etizaz.notes || '');
+  const [localLabel, setLocalLabel] = useState<string>(etizaz.label || 'دعم اعتزاز للعسكريين');
+
+  React.useEffect(() => {
+    if (supportSettings?.etizaz) {
+      setLocalAmount(String(supportSettings.etizaz.amount));
+      setLocalNotes(supportSettings.etizaz.notes || '');
+      setLocalLabel(supportSettings.etizaz.label || 'دعم اعتزاز للعسكريين');
+    }
+  }, [supportSettings?.etizaz]);
+
+  const handleUpdateEtizazObj = (updatedEtizaz: any) => {
+    if (setSupportSettings && supportSettings) {
+      setSupportSettings({
+        ...supportSettings,
+        etizaz: updatedEtizaz
+      });
+    }
+  };
 
   return (
     <div className="space-y-6 text-right" dir="rtl">
@@ -528,6 +563,132 @@ export default function SupportSection({
               );
             })}
           </div>
+        </div>
+      </div>
+
+      {/* SECTION 3: ETIZAZ MILITARY SUPPORT */}
+      <div className="bg-white border border-[#E5E7EB] rounded-2xl p-6 shadow-xs leading-relaxed space-y-4">
+        <div className="flex items-center gap-3 border-b border-gray-100 pb-3">
+          <div className="p-2 bg-indigo-50 text-indigo-700 rounded-xl">
+            <Shield className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="font-bold text-sm text-[#111827]">دعم اعتزاز للعسكريين</h3>
+            <p className="text-xs text-[#6B7280]">
+              دعم غير مسترد خاص بالعسكريين المؤهلين، يظهر فقط عند اختيار القطاع العسكري في الحاسبة وبشرط التفعيل أدناه.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs font-semibold">
+          {/* 1. Toggle Switch */}
+          <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 flex flex-col justify-between space-y-3">
+            <div>
+              <span className="block font-bold text-gray-700 mb-0.5">تفعيل دعم اعتزاز</span>
+              <span className="text-[10px] text-gray-400 font-medium font-sans">تحديد ظهور السؤال والخصومات في الاستعلام</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  const nextVal = !etizaz.enabled;
+                  handleUpdateEtizazObj({ ...etizaz, enabled: nextVal });
+                }}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  etizaz.enabled ? 'bg-indigo-600' : 'bg-slate-200'
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                    etizaz.enabled ? '-translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+              <span className={`text-[11px] font-bold ${etizaz.enabled ? 'text-indigo-600' : 'text-gray-400'}`}>
+                {etizaz.enabled ? 'مفعّل' : 'معطّل'}
+              </span>
+            </div>
+          </div>
+
+          {/* 2. Amount Input */}
+          <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 flex flex-col justify-between space-y-3">
+            <div>
+              <label htmlFor="etizaz-amount-input" className="block font-bold text-gray-700 mb-1">مبلغ دعم اعتزاز:</label>
+              <span className="text-[10px] text-gray-400 font-medium font-sans block mb-1">مبلغ الدعم النقدي الممنوح للمُستحق</span>
+            </div>
+            <div className="relative">
+              <input
+                id="etizaz-amount-input"
+                type="text"
+                inputMode="decimal"
+                dir="ltr"
+                className="w-full bg-white border border-gray-200 rounded-xl px-3 py-1.5 focus:outline-none text-left font-mono font-bold text-xs"
+                value={localAmount}
+                onChange={(e) => {
+                  const rawVal = normalizeNumberInput(e.target.value);
+                  setLocalAmount(rawVal);
+                  const parsed = parseNumberInput(rawVal, 0);
+                  handleUpdateEtizazObj({ ...etizaz, amount: parsed });
+                }}
+              />
+              <span className="absolute left-3 top-2 text-[10px] text-gray-400 font-sans pointer-events-none font-bold">ريال</span>
+            </div>
+          </div>
+
+          {/* 3. Refundability & Sector Static info */}
+          <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 flex flex-col justify-between space-y-3">
+            <div>
+              <span className="block font-bold text-gray-750 mb-0.5">قابلية الاسترداد والقطاع</span>
+              <span className="text-[10px] text-gray-400 font-medium font-sans">طبيعة وقواعد هذا الدعم في النظام</span>
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1.5 text-[10px] text-indigo-700 bg-indigo-50 border border-indigo-150 rounded-lg px-2.5 py-1 font-bold">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>غير مسترد (isRefundable: false)</span>
+              </div>
+              <div className="text-[10px] text-gray-500 font-medium">
+                القطاع المؤهل: <strong className="text-gray-700 font-bold">العسكري فقط</strong>
+              </div>
+            </div>
+          </div>
+
+          {/* 4. Support label / Name */}
+          <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 flex flex-col justify-between space-y-3">
+            <div>
+              <label htmlFor="etizaz-label-input" className="block font-bold text-gray-700 mb-1">تسمية الدعم:</label>
+              <span className="text-[10px] text-gray-400 font-medium font-sans block mb-1">اسم الدعم كما يظهر للعميل في النتائج</span>
+            </div>
+            <div>
+              <input
+                id="etizaz-label-input"
+                type="text"
+                className="w-full bg-white border border-gray-200 rounded-xl px-3 py-1.5 focus:outline-none font-bold text-xs"
+                value={localLabel}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setLocalLabel(val);
+                  handleUpdateEtizazObj({ ...etizaz, label: val });
+                }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Notes Input Field row */}
+        <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 font-semibold text-xs space-y-2">
+          <label htmlFor="etizaz-notes-textarea" className="block text-gray-700 font-bold mb-1">ملاحظات توضيحية (Notes):</label>
+          <textarea
+            id="etizaz-notes-textarea"
+            rows={2}
+            className="w-full bg-white border border-gray-200 rounded-xl p-3 focus:outline-none font-semibold text-xs text-gray-750 resize-none"
+            placeholder="ملاحظات تظهر لمشرف الحسبة عند مراجعة إعدادات الدعم..."
+            value={localNotes}
+            onChange={(e) => {
+              const val = e.target.value;
+              setLocalNotes(val);
+              handleUpdateEtizazObj({ ...etizaz, notes: val });
+            }}
+          />
         </div>
       </div>
     </div>

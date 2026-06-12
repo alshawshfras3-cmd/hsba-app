@@ -490,7 +490,7 @@ export default function ResultsGrid({
                             )}
                             {offer.etizazAmount !== undefined && offer.etizazAmount > 0 && (
                               <div className="col-span-2 bg-indigo-50 border border-indigo-100 rounded-xl p-3 flex justify-between items-center text-xs">
-                                <span className="text-indigo-700 font-bold">دعم اعتزاز للعسكريين:</span>
+                                <span className="text-indigo-700 font-bold">دعم اعتزاز غير مسترد:</span>
                                 <span className="font-bold text-indigo-700">{Math.round(offer.etizazAmount).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال</span>
                               </div>
                             )}
@@ -848,7 +848,7 @@ export default function ResultsGrid({
                       </div>
                       {selectedOffer.etizazAmount !== undefined && selectedOffer.etizazAmount > 0 && (
                         <div>
-                          <span className="text-xs text-[#6B7280] block mb-1">دعم اعتزاز للعسكريين</span>
+                          <span className="text-xs text-[#6B7280] block mb-1">دعم اعتزاز غير مسترد</span>
                           <span className="font-bold text-indigo-700">{Math.round(selectedOffer.etizazAmount).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال</span>
                         </div>
                       )}

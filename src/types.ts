@@ -171,11 +171,21 @@ export interface SupportDownpaymentBracket {
   supportAmount: number;
 }
 
+export interface EtizazSettings {
+  enabled: boolean;
+  amount: number;
+  isRefundable: boolean;
+  eligibleSectors: string[];
+  label: string;
+  notes?: string;
+}
+
 export interface SupportSettings {
   addDownpaymentToLoan: boolean; // default: false
   addMonthlyToInstallment: boolean; // default: true
   monthlyBrackets: SupportMonthlyBracket[];
   downpaymentBrackets: SupportDownpaymentBracket[];
+  etizaz?: EtizazSettings;
 }
 
 export interface SalaryBracket {

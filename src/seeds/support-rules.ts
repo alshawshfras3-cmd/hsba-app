@@ -17,6 +17,14 @@ export const initialSupportSettings: SupportSettings = {
   downpaymentBrackets: [
     { fromSalary: 0, toSalary: 10000, supportAmount: 150000 },
     { fromSalary: 10001, toSalary: 999999, supportAmount: 100000 }
-  ]
+  ],
+  etizaz: {
+    enabled: true,
+    amount: 160000,
+    isRefundable: false,
+    eligibleSectors: ['military'],
+    label: 'دعم اعتزاز للعسكريين',
+    notes: 'دعم غير مسترد خاص بالعسكريين المؤهلين'
+  }
 };
 export const initialSupportRules = initialSupportSettings; // Aliasing for clarity

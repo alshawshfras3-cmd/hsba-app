@@ -809,7 +809,19 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
               ? settings.dsr_rules
               : initialData.dsrRules)
         ),
-        supportSettings: (settings.support_settings !== undefined && settings.support_settings !== null) ? settings.support_settings : initialData.supportSettings,
+        supportSettings: (() => {
+          const loadedSupport = settings.support_settings ?? settings.supportSettings ?? null;
+          if (loadedSupport === null || loadedSupport === undefined) {
+            return initialData.supportSettings;
+          }
+          if (!loadedSupport.etizaz) {
+            return {
+              ...loadedSupport,
+              etizaz: initialData.supportSettings.etizaz
+            };
+          }
+          return loadedSupport;
+        })(),
         housingSupportTiers: (housingSupportTiers !== undefined && housingSupportTiers !== null && housingSupportTiers.length > 0) ? housingSupportTiers : initialData.housingSupportTiers,
         advancePaymentTiers: (advancePaymentTiers !== undefined && advancePaymentTiers !== null && advancePaymentTiers.length > 0) ? advancePaymentTiers : initialData.advancePaymentTiers,
         personalRules: (settings.personal_finance_rules !== undefined && settings.personal_finance_rules !== null) ? settings.personal_finance_rules : initialData.personalRules,

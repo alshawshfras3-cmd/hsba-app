@@ -4204,6 +4204,8 @@ export default function AdminDashboard() {
             advancePaymentTiers={advancePaymentTiers}
             setAdvancePaymentTiers={setAdvancePaymentTiers}
             showToast={showToast}
+            supportSettings={supportSettings}
+            setSupportSettings={setSupportSettings}
           />
         )}
 
