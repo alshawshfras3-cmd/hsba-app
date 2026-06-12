@@ -690,15 +690,16 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     dstProduct: ProductId,
     dstSupport: SupportType
   ) => {
-    if (srcBank === dstBank && srcProduct === dstProduct && srcSupport === dstSupport) {
+    const normSrcSupport = (srcSupport as string) === 'down_payment' || srcSupport === 'downpayment' ? 'downpayment' : srcSupport;
+    const normDstSupport = (dstSupport as string) === 'down_payment' || dstSupport === 'downpayment' ? 'downpayment' : dstSupport;
+
+    if (srcBank === dstBank && srcProduct === dstProduct && normSrcSupport === normDstSupport) {
       showToast('لا يمكن النسخ لقرينة مطابِقة تماماً للمصدر.', 'refuse');
       return;
     }
 
-    const normSrcSupport = (srcSupport as string) === 'down_payment' || srcSupport === 'downpayment' ? 'downpayment' : srcSupport;
-    const normDstSupport = (dstSupport as string) === 'down_payment' || dstSupport === 'downpayment' ? 'downpayment' : dstSupport;
-
-    const relevantSrcRules = marginRules.map(r => {
+    // Normalize all rules to clean official product IDs and support types upon reading
+    const normalisedRules = marginRules.map(r => {
       let pId = r.productId as string;
       if (pId === 'real_estate') pId = 'real_estate_only';
       else if (pId === 'both') pId = 'real_estate_with_new_personal';
@@ -712,7 +713,9 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
         productId: pId as ProductId,
         supportType: sType as SupportType
       };
-    }).filter(r => 
+    });
+
+    const relevantSrcRules = normalisedRules.filter(r => 
       r.bankId === srcBank && 
       r.productId === srcProduct && 
       (r.supportType === normSrcSupport || r.supportType === 'all') &&
@@ -744,35 +747,39 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     if (shouldCopyTiers) {
       targetSalaryTiers.forEach(targetSalaryTier => {
         const matchingSrcTier = getSrcSalaryTierForTarget(targetSalaryTier);
-        const tierRules = relevantSrcRules.filter(r => 
-          (r.marginInputMode === 'duration_tiers' || getRuleInputMode(r) === 'duration_tiers') &&
-          (r.salaryTier === matchingSrcTier || (!r.salaryTier && matchingSrcTier === 'not_applicable') || r.salaryTier === 'not_applicable' || !r.salaryTier)
-        );
+        const tierRules = relevantSrcRules.filter(r => {
+          const rMode = r.marginInputMode || getRuleInputMode(r);
+          if (rMode !== 'duration_tiers') return false;
+          const rTier = r.salaryTier || 'not_applicable';
+          return rTier === matchingSrcTier;
+        });
 
         tierRules.forEach((srcRule, idx) => {
+          const rate = srcRule.marginRate ?? srcRule.annualMargin ?? srcRule.endMargin ?? 0;
           newRulesForDst.push({
             id: `copied_tier_${dstBank}_${dstProduct}_${normDstSupport}_${targetSalaryTier}_t${srcRule.fromMonth || srcRule.fromTermMonths || 0}_${srcRule.toMonth || srcRule.toTermMonths || 9999}_${idx}_${Date.now()}`,
             bankId: dstBank,
             productId: dstProduct,
             supportType: normDstSupport as any,
             sectorId: 'all',
-            fromTermMonths: (srcRule.fromMonth !== undefined ? srcRule.fromMonth : srcRule.fromTermMonths)!,
-            toTermMonths: (srcRule.toMonth !== undefined ? srcRule.toMonth : srcRule.toTermMonths)!,
-            startMargin: (srcRule.marginRate !== undefined ? srcRule.marginRate : srcRule.annualMargin)!,
-            endMargin: (srcRule.marginRate !== undefined ? srcRule.marginRate : srcRule.annualMargin)!,
+            fromTermMonths: (srcRule.fromMonth !== undefined ? srcRule.fromMonth : srcRule.fromTermMonths) ?? 0,
+            toTermMonths: (srcRule.toMonth !== undefined ? srcRule.toMonth : srcRule.toTermMonths) ?? 9999,
+            startMargin: rate,
+            endMargin: rate,
             calcType: 'fixed',
             isActive: srcRule.active !== false && srcRule.isActive !== false,
             salaryTier: targetSalaryTier,
             productType: dstProduct as any,
             marginInputMode: 'duration_tiers',
+            calculationMode: 'duration_tiers',
             calculationMethod: 'fixed',
-            termMonths: (srcRule.toMonth !== undefined ? srcRule.toMonth : srcRule.toTermMonths)!,
-            annualMargin: (srcRule.marginRate !== undefined ? srcRule.marginRate : srcRule.annualMargin)!,
+            termMonths: (srcRule.toMonth !== undefined ? srcRule.toMonth : srcRule.toTermMonths) ?? 9999,
+            annualMargin: rate,
             exceptionBps: 0,
-            baseMargin: Number((((srcRule.marginRate !== undefined ? srcRule.marginRate : srcRule.annualMargin) || 0) / 100).toFixed(6)),
-            fromMonth: (srcRule.fromMonth !== undefined ? srcRule.fromMonth : srcRule.fromTermMonths)!,
-            toMonth: (srcRule.toMonth !== undefined ? srcRule.toMonth : srcRule.toTermMonths)!,
-            marginRate: (srcRule.marginRate !== undefined ? srcRule.marginRate : srcRule.annualMargin)!,
+            baseMargin: Number((rate / 100).toFixed(6)),
+            fromMonth: (srcRule.fromMonth !== undefined ? srcRule.fromMonth : srcRule.fromTermMonths) ?? 0,
+            toMonth: (srcRule.toMonth !== undefined ? srcRule.toMonth : srcRule.toTermMonths) ?? 9999,
+            marginRate: rate,
             active: srcRule.active !== false && srcRule.isActive !== false,
             notes: srcRule.notes || ''
           });
@@ -784,10 +791,13 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     if (shouldCopyKeyPoints) {
       targetSalaryTiers.forEach(targetSalaryTier => {
         const matchingSrcTier = getSrcSalaryTierForTarget(targetSalaryTier);
-        const srcKeyPointRules = relevantSrcRules.filter(r => 
-          (r.marginInputMode === 'key_points' || getRuleInputMode(r) === 'key_points' || (!r.marginInputMode && [5, 10, 15, 20, 25, 30].includes(r.year || r.toTermMonths/12))) &&
-          (r.salaryTier === matchingSrcTier || (!r.salaryTier && matchingSrcTier === 'not_applicable') || r.salaryTier === 'not_applicable' || !r.salaryTier)
-        );
+        const srcKeyPointRules = relevantSrcRules.filter(r => {
+          const rMode = r.marginInputMode || getRuleInputMode(r);
+          const isKeyPoints = rMode === 'key_points' || (!r.marginInputMode && [5, 10, 15, 20, 25, 30].includes(r.year || (r.toTermMonths || 0)/12));
+          if (!isKeyPoints) return false;
+          const rTier = r.salaryTier || 'not_applicable';
+          return rTier === matchingSrcTier;
+        });
 
         const srcMarginsKeyPoints: Record<number, string> = {};
         [5, 10, 15, 20, 25, 30].forEach(year => {
@@ -876,6 +886,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
               salaryTier: targetSalaryTier,
               productType: dstProduct as any,
               marginInputMode: 'key_points',
+              calculationMode: 'key_points',
               calculationMethod: methodKey,
               year: def.yearPoint,
               termMonths: def.to === 9999 ? (def.yearPoint * 12) : def.to,
@@ -892,10 +903,13 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     if (shouldCopyYearly) {
       targetSalaryTiers.forEach(targetSalaryTier => {
         const matchingSrcTier = getSrcSalaryTierForTarget(targetSalaryTier);
-        const srcYearlyRules = relevantSrcRules.filter(r => 
-          (r.marginInputMode === 'yearly' || getRuleInputMode(r) === 'yearly' || (!r.marginInputMode && r.year && r.year >= 5 && r.year <= 30 && ![5, 10, 15, 20, 25, 30].includes(r.year))) &&
-          (r.salaryTier === matchingSrcTier || (!r.salaryTier && matchingSrcTier === 'not_applicable') || r.salaryTier === 'not_applicable' || !r.salaryTier)
-        );
+        const srcYearlyRules = relevantSrcRules.filter(r => {
+          const rMode = r.marginInputMode || getRuleInputMode(r);
+          const isYearly = rMode === 'yearly' || (!r.marginInputMode && r.year && r.year >= 5 && r.year <= 30 && ![5, 10, 15, 20, 25, 30].includes(r.year));
+          if (!isYearly) return false;
+          const rTier = r.salaryTier || 'not_applicable';
+          return rTier === matchingSrcTier;
+        });
 
         const srcMarginsYearly: Record<number, string> = {};
         const yearsListFullForYearly = Array.from({ length: 26 }, (_, i) => 5 + i);
@@ -985,6 +999,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
               salaryTier: targetSalaryTier,
               productType: dstProduct as any,
               marginInputMode: 'yearly',
+              calculationMode: 'yearly',
               calculationMethod: methodYearly,
               year: def.yearPoint,
               termMonths: def.to === 9999 ? (def.yearPoint * 12) : def.to,
@@ -997,25 +1012,20 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       });
     }
 
-    const remainingRules = marginRules.filter(r => {
-      const normalizedSupportType = (r.supportType === 'down_payment' || r.supportType === 'downpayment') ? 'downpayment' : r.supportType;
+    const remainingRules = normalisedRules.filter(r => {
       const isTargetBaseRule = 
          r.bankId === dstBank &&
          r.productId === dstProduct &&
-         normalizedSupportType === normDstSupport &&
-         targetSalaryTiers.includes(r.salaryTier || 'not_applicable' as any) &&
+         r.supportType === normDstSupport &&
+         targetSalaryTiers.includes((r.salaryTier || 'not_applicable') as any) &&
          !r.isExceptionOnly;
 
       if (!isTargetBaseRule) return true;
 
       const rMode = r.marginInputMode || getRuleInputMode(r);
-      const isKeyPointsRule = rMode === 'key_points';
-      const rIsTiers = rMode === 'duration_tiers';
-      const rIsYearly = rMode === 'yearly';
-
-      if (copyTableType === 'duration_tiers') return !rIsTiers;
-      if (copyTableType === 'key_points') return !isKeyPointsRule;
-      if (copyTableType === 'yearly') return !rIsYearly;
+      if (copyTableType === 'duration_tiers') return rMode !== 'duration_tiers';
+      if (copyTableType === 'key_points') return rMode !== 'key_points';
+      if (copyTableType === 'yearly') return rMode !== 'yearly';
       return false; // delete all of them for 'all'
     });
 
