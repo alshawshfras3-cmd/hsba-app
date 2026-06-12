@@ -79,78 +79,68 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function fetchProfile(userId: string, email?: string, userMetadata?: any) {
     if (!hasSupabaseKeys) return;
     try {
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Profile request timed out after 3 seconds')), 3000);
-      });
+      // Try app_users first, fallback to user_profiles
+      let profileData = null;
+      let foundInAppUsers = false;
+      try {
+        const { data, error } = await supabase
+          .from('app_users')
+          .select('*')
+          .eq('id', userId)
+          .maybeSingle();
+        if (!error && data) {
+          profileData = data;
+          foundInAppUsers = true;
+        }
+      } catch (e) {
+        console.warn("Could not load from app_users", e);
+      }
 
-      const fetchPromise = (async () => {
-        // Try app_users first, fallback to user_profiles
-        let profileData = null;
-        let foundInAppUsers = false;
+      if (!profileData) {
         try {
           const { data, error } = await supabase
-            .from('app_users')
+            .from('user_profiles')
             .select('*')
             .eq('id', userId)
             .maybeSingle();
           if (!error && data) {
             profileData = data;
-            foundInAppUsers = true;
           }
         } catch (e) {
-          console.warn("Could not load from app_users", e);
+          console.warn("Could not load from user_profiles fallback", e);
         }
+      }
 
-        if (!profileData) {
-          try {
-            const { data, error } = await supabase
-              .from('user_profiles')
-              .select('*')
-              .eq('id', userId)
-              .maybeSingle();
-            if (!error && data) {
-              profileData = data;
-            }
-          } catch (e) {
-            console.warn("Could not load from user_profiles fallback", e);
+      // If not found in app_users, perform a self-healing upsert instantly to synchronize
+      if (!foundInAppUsers) {
+        try {
+          const emailValue = email?.toLowerCase().trim() || profileData?.email?.toLowerCase().trim() || '';
+          const fullNameDesc = profileData?.full_name || profileData?.username || userMetadata?.full_name || userMetadata?.username || '';
+          const phoneValue = profileData?.phone || userMetadata?.phone || '';
+
+          const { data: upsertedData, error: upsertErr } = await supabase
+            .from('app_users')
+            .upsert({
+              id: userId,
+              email: emailValue,
+              full_name: fullNameDesc,
+              phone: phoneValue,
+              status: 'active',
+              last_login_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            }, {
+              onConflict: 'id'
+            })
+            .select()
+            .maybeSingle();
+
+          if (!upsertErr && upsertedData) {
+            profileData = upsertedData;
           }
+        } catch (createErr) {
+          console.error("Auto-creation of app_users failed inside fetchProfile:", createErr);
         }
-
-        // If not found in app_users, perform a self-healing upsert instantly to synchronize
-        if (!foundInAppUsers) {
-          try {
-            const emailValue = email?.toLowerCase().trim() || profileData?.email?.toLowerCase().trim() || '';
-            const fullNameDesc = profileData?.full_name || profileData?.username || userMetadata?.full_name || userMetadata?.username || '';
-            const phoneValue = profileData?.phone || userMetadata?.phone || '';
-
-            const { data: upsertedData, error: upsertErr } = await supabase
-              .from('app_users')
-              .upsert({
-                id: userId,
-                email: emailValue,
-                full_name: fullNameDesc,
-                phone: phoneValue,
-                status: 'active',
-                last_login_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-              }, {
-                onConflict: 'id'
-              })
-              .select()
-              .maybeSingle();
-
-            if (!upsertErr && upsertedData) {
-              profileData = upsertedData;
-            }
-          } catch (createErr) {
-            console.error("Auto-creation of app_users failed inside fetchProfile:", createErr);
-          }
-        }
-
-        return profileData;
-      })();
-
-      const profileData = await Promise.race([fetchPromise, timeoutPromise]);
+      }
 
       if (profileData) {
         const lowercaseEmail = (email || profileData.email || '').toLowerCase().trim();
@@ -249,17 +239,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let active = true;
 
-    // Safety timeout: If loading takes more than 2 seconds due to network, force-disable it to show UI with defaults immediately
-    const safetyTimer = setTimeout(() => {
-      if (active) {
-        console.warn("Auth initialization safety timer triggered (2 seconds). Forcing loading=false to display UI immediately with default permissions");
-        setLoading(false);
-      }
-    }, 2000);
-
     if (!hasSupabaseKeys) {
       setLoading(false);
-      clearTimeout(safetyTimer);
       const cachedUser = getCachedUser();
       if (cachedUser) {
         const isOwner = cachedUser.email?.toLowerCase().trim() === 'admin@hesba.com';
@@ -268,25 +249,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const sessionTimeout = new Promise<{ session: any }>((resolve) => {
-      setTimeout(() => {
-        console.warn('Session fetch timed out after 3 seconds, continuing with null session fallback');
-        resolve({ session: null });
-      }, 3000);
-    });
+    async function initializeAuth() {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) throw error;
 
-    const sessionFetch = (async () => {
-      const { data, error } = await supabase.auth.getSession();
-      if (error) throw error;
-      return data;
-    })();
-
-    Promise.race([sessionFetch, sessionTimeout])
-      .then(async (data: any) => {
-        const session = data?.session;
         if (!active) return;
         setSession(session ?? null);
         setUser(session?.user ?? null);
+
         if (session?.user) {
           try {
             sessionStorage.setItem('hesba_cached_user', JSON.stringify(session.user));
@@ -304,16 +275,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             try { sessionStorage.removeItem('hesba_is_admin'); } catch {}
           }
         }
+
         try {
           sessionStorage.setItem('hesba_permissions_checked', 'true');
           sessionStorage.setItem('hesba_calculator_permissions', 'true');
         } catch (e) {
           console.error(e);
         }
-        if (active) setLoading(false);
-      })
-      .catch(err => {
-        console.error("Error getting session on mount with timeout:", err);
+      } catch (err) {
+        console.error("Error getting session on mount:", err);
         const errMsg = String(err?.message || '').toLowerCase();
         if (errMsg.includes('refresh token') || errMsg.includes('refresh_token') || errMsg.includes('not found') || errMsg.includes('invalid')) {
           cleanStaleSupabaseSession();
@@ -333,8 +303,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.error(e);
           }
         }
-        if (active) setLoading(false);
-      });
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    initializeAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
@@ -382,7 +358,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       active = false;
-      clearTimeout(safetyTimer);
       subscription.unsubscribe();
     };
   }, []);
