@@ -398,58 +398,48 @@ export default function ResultsGrid({
                       <div className="grid grid-cols-2 gap-4">
                         {mainFinanceType === 'personal_only' ? (
                           <>
-                            <div className="border border-[#E5E7EB] rounded-xl p-3">
-                              <span className="text-xs text-[#6B7280] block mb-0.5">طريقة الحساب</span>
-                              <span className="font-bold text-indigo-700">
-                                {offer.personalCalculationMethod === 'pmt' 
-                                  ? 'معادلة القسط PMT' 
-                                  : offer.personalCalculationMethod === 'flat_rate' 
-                                  ? 'نسبة ربح مع معامل فعلي' 
-                                  : 'معامل تمويل يدوي'}
+                            {/* 2. قسط التمويل الشخصي */}
+                            <div className="border border-emerald-100 bg-emerald-50/30 rounded-xl p-3 col-span-2 flex justify-between items-center">
+                              <span className="text-xs font-semibold text-[#065F46]">قسط التمويل الشخصي:</span>
+                              <span className="font-bold text-emerald-600">
+                                {Math.round(offer.monthlyInstallmentBeforeRetirement).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال / شهر
                               </span>
                             </div>
-                            <div className="border border-[#E5E7EB] rounded-xl p-3">
-                              <span className="text-xs text-[#6B7280] block mb-0.5">نسبة الاستقطاع المعتمدة</span>
-                              <span className="font-bold text-[#111827]">{offer.dsrUsed}%</span>
-                            </div>
-                            {offer.personalCalculationMethod === 'multiplier' ? (
-                              <div className="border border-[#E5E7EB] rounded-xl p-3">
-                                <span className="text-xs text-[#6B7280] block mb-0.5">معامل التمويل اليدوي</span>
-                                <span className="font-bold text-[#111827]">{offer.personalCoefficient || '-'}</span>
-                              </div>
-                            ) : offer.personalCalculationMethod === 'flat_rate' ? (
-                              <>
-                                <div className="border border-[#E5E7EB] rounded-xl p-3">
-                                  <span className="text-xs text-[#6B7280] block mb-0.5">نسبة الربح السنوية</span>
-                                  <span className="font-bold text-[#0057B8]">{offer.annualMargin}%</span>
-                                </div>
-                                <div className="border border-[#E5E7EB] rounded-xl p-3">
-                                  <span className="text-xs text-[#6B7280] block mb-0.5">المعامل الفعلي</span>
-                                  <span className="font-bold text-[#0057B8]">{offer.personalCoefficient || '-'}</span>
-                                </div>
-                              </>
-                            ) : (
-                              <div className="border border-[#E5E7EB] rounded-xl p-3">
-                                <span className="text-xs text-[#6B7280] block mb-0.5">APR السنوي</span>
-                                <span className="font-bold text-[#0057B8]">{offer.annualMargin}%</span>
-                              </div>
-                            )}
-                            <div className="border border-[#E5E7EB] rounded-xl p-3 border-dashed">
-                              <span className="text-xs text-[#6B7280] block mb-0.5">مدة التمويل</span>
-                              <span className="font-bold text-[#111827]">{offer.termMonths} شهراً</span>
-                            </div>
-                            <div className="border border-[#E5E7EB] rounded-xl p-3 col-span-2 flex justify-between items-center bg-gray-50/50">
-                              <span className="text-xs font-semibold text-[#6B7280]">إجمالي السداد:</span>
-                              <span className="font-bold text-slate-800">
-                                {Math.round(offer.personalTotalRepayment !== undefined ? offer.personalTotalRepayment : (offer.personalAmount + (offer.personalAmount * (offer.annualMargin / 100) * (offer.termMonths / 12)))).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال
-                              </span>
-                            </div>
+
+                            {/* 3. إجمالي الأرباح */}
                             <div className="border border-[#E5E7EB] rounded-xl p-3 col-span-2 flex justify-between items-center bg-gray-50/50">
                               <span className="text-xs font-semibold text-[#6B7280]">إجمالي الأرباح:</span>
                               <span className="font-bold text-rose-600">
                                 {Math.round(offer.personalProfitAmount !== undefined ? offer.personalProfitAmount : (offer.personalAmount * (offer.annualMargin / 100) * (offer.termMonths / 12))).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال
                               </span>
                             </div>
+
+                            {/* 4. إجمالي السداد */}
+                            <div className="border border-[#E5E7EB] rounded-xl p-3 col-span-2 flex justify-between items-center bg-gray-50/50">
+                              <span className="text-xs font-semibold text-[#6B7280]">إجمالي السداد:</span>
+                              <span className="font-bold text-slate-800">
+                                {Math.round(offer.personalTotalRepayment !== undefined ? offer.personalTotalRepayment : (offer.personalAmount + (offer.personalAmount * (offer.annualMargin / 100) * (offer.termMonths / 12)))).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال
+                              </span>
+                            </div>
+
+                            {/* 5. نسبة الاستقطاع المعتمدة */}
+                            <div className="border border-[#E5E7EB] rounded-xl p-3">
+                              <span className="text-xs text-[#6B7280] block mb-0.5">نسبة الاستقطاع المعتمدة</span>
+                              <span className="font-bold text-[#111827]">{offer.dsrUsed}%</span>
+                            </div>
+
+                            {/* 6. نسبة الربح السنوية */}
+                            <div className="border border-[#E5E7EB] rounded-xl p-3">
+                              <span className="text-xs text-[#6B7280] block mb-0.5">نسبة الربح السنوية</span>
+                              <span className="font-bold text-[#0057B8]">{offer.annualMargin}%</span>
+                            </div>
+
+                            {/* 7. مدة التمويل */}
+                            <div className="border border-[#E5E7EB] rounded-xl p-3 border-dashed">
+                              <span className="text-xs text-[#6B7280] block mb-0.5">مدة التمويل</span>
+                              <span className="font-bold text-[#111827]">{offer.termMonths} شهراً</span>
+                            </div>
+
                             {offer.personalDiagnostics?.source === 'fallback' && (
                               <div className="col-span-2 bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2 text-xs text-amber-800">
                                 <span className="font-bold text-sm leading-none mt-0.5">⚠️</span>
@@ -566,12 +556,7 @@ export default function ResultsGrid({
                               </div>
                             )}
                           </div>
-                        ) : mainFinanceType === 'personal_only' ? (
-                          <div className="flex justify-between items-center">
-                            <span className="text-[#6B7280]">قسط التمويل الشخصي:</span>
-                            <span className="font-bold text-emerald-600">{Math.round(offer.monthlyInstallmentBeforeRetirement).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال</span>
-                          </div>
-                        ) : (
+                        ) : mainFinanceType === 'personal_only' ? null : (
                           <>
                             <div className="flex justify-between items-center">
                               <span className="text-[#6B7280]">قسط التمويل العقاري:</span>
@@ -750,7 +735,7 @@ export default function ResultsGrid({
               {/* Overall Summary Stat */}
               <div className="bg-white p-6 rounded-2xl border border-[#E5E7EB] shadow-xs">
                 <span className="text-xs font-bold text-[#6B7280] block mb-1">
-                  {mainFinanceType === 'personal_only' ? 'مبلغ التمويل الشخصي الممنوح' : 'التمويل العقاري الاستثماري'}
+                  {mainFinanceType === 'personal_only' ? 'مبلغ التمويل الشخصي المتاح' : 'التمويل العقاري الاستثماري'}
                 </span>
                 <div className="flex items-baseline gap-2 mb-4">
                   <span className="text-3xl font-extrabold text-[#0057B8]">
@@ -762,44 +747,19 @@ export default function ResultsGrid({
                 </div>
 
                 <div className="grid grid-cols-2 select-none md:grid-cols-3 gap-4 pt-4 border-t border-[#F1F5F9]">
-                   {mainFinanceType === 'personal_only' ? (
+                  {mainFinanceType === 'personal_only' ? (
                     <>
                       <div>
-                        <span className="text-xs text-[#6B7280] block mb-1">طريقة الحساب</span>
-                        <span className="font-bold text-indigo-700">
-                          {selectedOffer.personalCalculationMethod === 'pmt' 
-                            ? 'معادلة القسط PMT' 
-                            : selectedOffer.personalCalculationMethod === 'flat_rate' 
-                            ? 'نسبة ربح مع معامل فعلي' 
-                            : 'معامل تمويل يدوي'}
+                        <span className="text-xs text-[#6B7280] block mb-1">قسط التمويل الشخصي</span>
+                        <span className="font-bold text-emerald-600">
+                          {Math.round(selectedOffer.monthlyInstallmentBeforeRetirement).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال
                         </span>
                       </div>
                       <div>
-                        <span className="text-xs text-[#6B7280] block mb-1">نسبة الاستقطاع المعتمدة</span>
-                        <span className="font-bold text-[#111827]">{selectedOffer.dsrUsed}%</span>
-                      </div>
-                      {selectedOffer.personalCalculationMethod === 'multiplier' ? (
-                        <div>
-                          <span className="text-xs text-[#6B7280] block mb-1">معامل التمويل اليدوي</span>
-                          <span className="font-bold text-[#111827]">{selectedOffer.personalCoefficient || '-'}</span>
-                        </div>
-                      ) : (
-                        <>
-                          <div>
-                            <span className="text-xs text-[#6B7280] block mb-1">{selectedOffer.personalCalculationMethod === 'flat_rate' ? 'نسبة الربح السنوية' : 'APR السنوي'}</span>
-                            <span className="font-bold text-[#0057B8]">{selectedOffer.annualMargin}%</span>
-                          </div>
-                          {selectedOffer.personalCalculationMethod === 'flat_rate' && (
-                            <div>
-                              <span className="text-xs text-[#6B7280] block mb-1">المعامل الفعلي</span>
-                              <span className="font-bold text-[#0057B8]">{selectedOffer.personalCoefficient || '-'}</span>
-                            </div>
-                          )}
-                        </>
-                      )}
-                      <div>
-                        <span className="text-xs text-[#6B7280] block mb-1">مدة التمويل بالشهور</span>
-                        <span className="font-bold text-[#111827]">{selectedOffer.termMonths} شهراً</span>
+                        <span className="text-xs text-[#6B7280] block mb-1">إجمالي الأرباح</span>
+                        <span className="font-bold text-rose-600">
+                          {Math.round(selectedOffer.personalProfitAmount !== undefined ? selectedOffer.personalProfitAmount : (selectedOffer.personalAmount * (selectedOffer.annualMargin / 100) * (selectedOffer.termMonths / 12))).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال
+                        </span>
                       </div>
                       <div>
                         <span className="text-xs text-[#6B7280] block mb-1">إجمالي السداد</span>
@@ -808,10 +768,16 @@ export default function ResultsGrid({
                         </span>
                       </div>
                       <div>
-                        <span className="text-xs text-[#6B7280] block mb-1">إجمالي الأرباح</span>
-                        <span className="font-bold text-rose-600">
-                          {Math.round(selectedOffer.personalProfitAmount !== undefined ? selectedOffer.personalProfitAmount : (selectedOffer.personalAmount * (selectedOffer.annualMargin / 100) * (selectedOffer.termMonths / 12))).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال
-                        </span>
+                        <span className="text-xs text-[#6B7280] block mb-1">نسبة الاستقطاع المعتمدة</span>
+                        <span className="font-bold text-[#111827]">{selectedOffer.dsrUsed}%</span>
+                      </div>
+                      <div>
+                        <span className="text-xs text-[#6B7280] block mb-1">نسبة الربح السنوية</span>
+                        <span className="font-bold text-[#0057B8]">{selectedOffer.annualMargin}%</span>
+                      </div>
+                      <div>
+                        <span className="text-xs text-[#6B7280] block mb-1">مدة التمويل</span>
+                        <span className="font-bold text-[#111827]">{selectedOffer.termMonths} شهراً</span>
                       </div>
                       {selectedOffer.personalDiagnostics?.source === 'fallback' && (
                         <div className="col-span-2 md:col-span-3 bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2 text-xs text-amber-800">
