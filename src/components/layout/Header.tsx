@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAppState } from '../../context/AppContext';
-import { Calculator, ShieldAlert, Award, FileText, LogOut, Settings, X, ShieldCheck, User } from 'lucide-react';
+import { Calculator, ShieldAlert, Award, FileText, LogOut, Settings, X, ShieldCheck, User, BarChart3, HelpCircle } from 'lucide-react';
 import { useLocation } from '../../hooks/useLocation';
 
 export default function Header() {
@@ -59,13 +59,39 @@ export default function Header() {
             id="nav-calc-btn"
             onClick={() => handleNavChange('calculator')}
             className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-sans text-xs font-bold transition-all ${
-              location.pathname !== '/admin' && location.pathname !== '/account'
-                ? 'bg-white dark:bg-slate-900 text-[#0057B8] dark:text-white shadow-sm'
-                : 'text-gray-500 dark:text-slate-450 hover:text-[#111827] dark:hover:text-white'
+              location.pathname !== '/admin' && location.pathname !== '/account' && location.pathname !== '/results' && location.pathname !== '/about' && location.pathname !== '/about-us'
+                ? 'bg-white dark:bg-[#0F172A] text-[#0057B8] dark:text-white shadow-sm'
+                : 'text-gray-500 dark:text-slate-400 hover:text-[#111827] dark:hover:text-white'
             }`}
           >
             <Calculator className="w-4 h-4" />
             <span>حاسبة العميل</span>
+          </button>
+
+          <button
+            id="nav-results-btn"
+            onClick={() => location.navigate('/results')}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-sans text-xs font-bold transition-all ${
+              location.pathname === '/results'
+                ? 'bg-white dark:bg-[#0F172A] text-[#0057B8] dark:text-white shadow-sm'
+                : 'text-gray-500 dark:text-slate-400 hover:text-[#111827] dark:hover:text-white'
+            }`}
+          >
+            <BarChart3 className="w-4 h-4" />
+            <span>نتائجي</span>
+          </button>
+
+          <button
+            id="nav-about-btn"
+            onClick={() => location.navigate('/about')}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-sans text-xs font-bold transition-all ${
+              location.pathname === '/about' || location.pathname === '/about-us'
+                ? 'bg-white dark:bg-[#0F172A] text-[#0057B8] dark:text-white shadow-sm'
+                : 'text-gray-500 dark:text-slate-400 hover:text-[#111827] dark:hover:text-white'
+            }`}
+          >
+            <HelpCircle className="w-4 h-4" />
+            <span>من نحن</span>
           </button>
           
           {user && (
@@ -74,8 +100,8 @@ export default function Header() {
               onClick={() => location.navigate('/account')}
               className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-sans text-xs font-bold transition-all ${
                 location.pathname === '/account'
-                  ? 'bg-white dark:bg-slate-900 text-[#0057B8] dark:text-white shadow-sm'
-                  : 'text-gray-500 dark:text-slate-450 hover:text-[#111827] dark:hover:text-white'
+                  ? 'bg-white dark:bg-[#0F172A] text-[#0057B8] dark:text-white shadow-sm'
+                  : 'text-gray-500 dark:text-slate-400 hover:text-[#111827] dark:hover:text-white'
               }`}
             >
               <User className="w-4 h-4" />
