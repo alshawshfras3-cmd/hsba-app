@@ -1,4 +1,5 @@
 import { DsrOutput, DsrRule } from '../../types';
+import { initialDsrRules } from '../../seeds/dsr-rules';
 
 export function resolveDsrProductType(productId: string): 'real_estate_only' | 'real_estate_with_new_personal' | 'real_estate_with_existing_personal' | 'personal_only' {
   if (productId === 'personal_only' || productId === 'personal') return 'personal_only';
@@ -44,51 +45,16 @@ export function getDsrRule(params: {
 }): DsrRule {
   const { bankId, productType, supportType, customerStage, dsrRules, sectorId } = params;
 
-  // Development fallback ONLY if no rules are loaded in the entire app_settings
-  if (!dsrRules || dsrRules.length === 0) {
-    let fallbackPercent = 55;
-    if (productType === 'personal_only') {
-      fallbackPercent = customerStage === 'retired_after_retirement' ? 25 : 33.33;
-    } else {
-      fallbackPercent = supportType === 'monthly' ? 65 : 55;
-    }
-    return {
-      id: 'dev_fallback',
-      bankId: bankId,
-      productType,
-      supportType,
-      customerStage,
-      dsrPercent: fallbackPercent,
-      deductExistingObligations: true,
-      active: true
-    };
-  }
+  const isRealEstate = productType !== 'personal_only';
 
-  // 1. Check for duplicate active rules matching the selected bank by bankId + productType + supportType + customerStage
-  const bankMatches = dsrRules.filter(
-    r => r.bankId === bankId &&
-         r.productType === productType &&
-         r.supportType === supportType &&
-         r.customerStage === customerStage &&
-         r.active !== false &&
-         (!('employmentSector' in r) || !(r as any).employmentSector || (r as any).employmentSector === 'all' || (r as any).employmentSector === sectorId) &&
-         (!('sector' in r) || !(r as any).sector || (r as any).sector === 'all' || (r as any).sector === sectorId) &&
-         (!('sectorId' in r) || !(r as any).sectorId || (r as any).sectorId === 'all' || (r as any).sectorId === sectorId)
-  );
+  // Helper to query rules from a given muli-rule source
+  const lookupInSource = (rulesSource: DsrRule[]): DsrRule | null => {
+    if (!rulesSource || rulesSource.length === 0) return null;
 
-  if (bankMatches.length > 1) {
-    throw new Error(
-      `مفرط: هناك أكثر من قاعدة DSR نشطة للجهة التمويلية (${bankId}) لنفس التوليفة (${productType} — ${supportType} — ${customerStage}). يرجى تفعيل واحدة فقط.`
-    );
-  }
-
-  let rule = bankMatches[0];
-
-  // 1.5 Fallback matching for real-estate rules if specific combination isn't found
-  if (!rule && productType !== 'personal_only' && productType !== 'real_estate_only') {
-    const fallbackBankMatches = dsrRules.filter(
+    // 1. Check for specific combination
+    const bankMatches = rulesSource.filter(
       r => r.bankId === bankId &&
-           r.productType === 'real_estate_only' &&
+           r.productType === productType &&
            r.supportType === supportType &&
            r.customerStage === customerStage &&
            r.active !== false &&
@@ -96,14 +62,36 @@ export function getDsrRule(params: {
            (!('sector' in r) || !(r as any).sector || (r as any).sector === 'all' || (r as any).sector === sectorId) &&
            (!('sectorId' in r) || !(r as any).sectorId || (r as any).sectorId === 'all' || (r as any).sectorId === sectorId)
     );
-    if (fallbackBankMatches.length === 1) {
-      rule = fallbackBankMatches[0];
-    }
-  }
 
-  // 2. If specific rule not found, search the 'default' rule
-  if (!rule) {
-    const defaultMatches = dsrRules.filter(
+    if (bankMatches.length > 1) {
+      throw new Error(
+        `مفرط: هناك أكثر من قاعدة DSR نشطة للجهة التمويلية (${bankId}) لنفس التوليفة (${productType} — ${supportType} — ${customerStage}). يرجى تفعيل واحدة فقط.`
+      );
+    }
+
+    if (bankMatches.length === 1) {
+      return bankMatches[0];
+    }
+
+    // 1.5 Fallback matching for real-estate rules if specific combination isn't found
+    if (isRealEstate) {
+      const fallbackBankMatches = rulesSource.filter(
+        r => r.bankId === bankId &&
+             (r.productType === 'real_estate_only' || r.productType === 'real_estate_with_new_personal' || r.productType === 'real_estate_with_existing_personal') &&
+             r.supportType === supportType &&
+             r.customerStage === customerStage &&
+             r.active !== false &&
+             (!('employmentSector' in r) || !(r as any).employmentSector || (r as any).employmentSector === 'all' || (r as any).employmentSector === sectorId) &&
+             (!('sector' in r) || !(r as any).sector || (r as any).sector === 'all' || (r as any).sector === sectorId) &&
+             (!('sectorId' in r) || !(r as any).sectorId || (r as any).sectorId === 'all' || (r as any).sectorId === sectorId)
+      );
+      if (fallbackBankMatches.length > 0) {
+        return fallbackBankMatches[0];
+      }
+    }
+
+    // 2. Search default general bank rule
+    const defaultMatches = rulesSource.filter(
       r => r.bankId === 'default' &&
            r.productType === productType &&
            r.supportType === supportType &&
@@ -120,13 +108,15 @@ export function getDsrRule(params: {
       );
     }
 
-    rule = defaultMatches[0];
+    if (defaultMatches.length === 1) {
+      return defaultMatches[0];
+    }
 
     // Default fallback search for real_estate_only if specific defaulted combination fails
-    if (!rule && productType !== 'personal_only' && productType !== 'real_estate_only') {
-      const fallbackDefaultMatches = dsrRules.filter(
+    if (isRealEstate) {
+      const fallbackDefaultMatches = rulesSource.filter(
         r => r.bankId === 'default' &&
-             r.productType === 'real_estate_only' &&
+             (r.productType === 'real_estate_only' || r.productType === 'real_estate_with_new_personal' || r.productType === 'real_estate_with_existing_personal') &&
              r.supportType === supportType &&
              r.customerStage === customerStage &&
              r.active !== false &&
@@ -134,17 +124,40 @@ export function getDsrRule(params: {
              (!('sector' in r) || !(r as any).sector || (r as any).sector === 'all' || (r as any).sector === sectorId) &&
              (!('sectorId' in r) || !(r as any).sectorId || (r as any).sectorId === 'all' || (r as any).sectorId === sectorId)
       );
-      if (fallbackDefaultMatches.length === 1) {
-        rule = fallbackDefaultMatches[0];
+      if (fallbackDefaultMatches.length > 0) {
+        return fallbackDefaultMatches[0];
       }
     }
+
+    return null;
+  };
+
+  // Step 1: Look up in the custom db rules (app_settings.dsrRules)
+  let rule = lookupInSource(dsrRules);
+
+  // Step 2: Use seed fallback ONLY to complete the missing rules
+  if (!rule) {
+    rule = lookupInSource(initialDsrRules);
   }
 
-  // 3. If still not found, throw clean error
+  // Step 3: Programmatic absolute fallback according to business guidelines
   if (!rule) {
-    throw new Error(
-      `لا توجد قاعدة DSR مفعلة لهذا البنك/نوع التمويل في لوحة التحكم`
-    );
+    let fallbackPercent = 55;
+    if (productType === 'personal_only') {
+      fallbackPercent = customerStage === 'retired_after_retirement' ? 25 : 33.33;
+    } else {
+      fallbackPercent = supportType === 'monthly' ? 65 : 55;
+    }
+    rule = {
+      id: `dev_fallback_${bankId}_${productType}`,
+      bankId,
+      productType,
+      supportType,
+      customerStage,
+      dsrPercent: fallbackPercent,
+      deductExistingObligations: true,
+      active: true
+    };
   }
 
   return rule;
