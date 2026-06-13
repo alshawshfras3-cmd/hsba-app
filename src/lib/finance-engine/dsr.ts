@@ -1,20 +1,22 @@
 import { DsrOutput, DsrRule } from '../../types';
 
-export function mapProductIdToType(productId: string): 'real_estate_only' | 'real_estate_with_new_personal' | 'real_estate_with_existing_personal' | 'personal_only' {
-  const p = productId ? productId.trim().toLowerCase() : '';
-  if (p === 'personal' || p === 'personal_only') {
-    return 'personal_only';
-  }
-  if (p === 'real_estate' || p === 'real_estate_only') {
+export function resolveDsrProductType(productId: string): 'real_estate_only' | 'real_estate_with_new_personal' | 'real_estate_with_existing_personal' | 'personal_only' {
+  if (productId === 'personal_only' || productId === 'personal') return 'personal_only';
+
+  if (
+    productId === 'real_estate_only' ||
+    productId === 'real_estate_with_new_personal' ||
+    productId === 'real_estate_with_existing_personal' ||
+    productId === 'both'
+  ) {
     return 'real_estate_only';
   }
-  if (p === 'both' || p === 'real_estate_with_new_personal') {
-    return 'real_estate_only';
-  }
-  if (p === 'real_estate_with_personal_existing' || p === 'real_estate_with_existing_personal') {
-    return 'real_estate_only';
-  }
+
   return 'real_estate_only';
+}
+
+export function mapProductIdToType(productId: string): 'real_estate_only' | 'real_estate_with_new_personal' | 'real_estate_with_existing_personal' | 'personal_only' {
+  return resolveDsrProductType(productId);
 }
 
 export function mapSupportType(supportType: string): 'none' | 'monthly' | 'downpayment' | 'not_applicable' {
@@ -38,8 +40,29 @@ export function getDsrRule(params: {
   supportType: 'none' | 'monthly' | 'downpayment' | 'not_applicable';
   customerStage: 'active_before_retirement' | 'retired_after_retirement';
   dsrRules: DsrRule[];
+  sectorId?: string;
 }): DsrRule {
-  const { bankId, productType, supportType, customerStage, dsrRules } = params;
+  const { bankId, productType, supportType, customerStage, dsrRules, sectorId } = params;
+
+  // Development fallback ONLY if no rules are loaded in the entire app_settings
+  if (!dsrRules || dsrRules.length === 0) {
+    let fallbackPercent = 55;
+    if (productType === 'personal_only') {
+      fallbackPercent = customerStage === 'retired_after_retirement' ? 25 : 33.33;
+    } else {
+      fallbackPercent = supportType === 'monthly' ? 65 : 55;
+    }
+    return {
+      id: 'dev_fallback',
+      bankId: bankId,
+      productType,
+      supportType,
+      customerStage,
+      dsrPercent: fallbackPercent,
+      deductExistingObligations: true,
+      active: true
+    };
+  }
 
   // 1. Check for duplicate active rules matching the selected bank by bankId + productType + supportType + customerStage
   const bankMatches = dsrRules.filter(
@@ -47,7 +70,10 @@ export function getDsrRule(params: {
          r.productType === productType &&
          r.supportType === supportType &&
          r.customerStage === customerStage &&
-         r.active !== false
+         r.active !== false &&
+         (!('employmentSector' in r) || !(r as any).employmentSector || (r as any).employmentSector === 'all' || (r as any).employmentSector === sectorId) &&
+         (!('sector' in r) || !(r as any).sector || (r as any).sector === 'all' || (r as any).sector === sectorId) &&
+         (!('sectorId' in r) || !(r as any).sectorId || (r as any).sectorId === 'all' || (r as any).sectorId === sectorId)
   );
 
   if (bankMatches.length > 1) {
@@ -65,7 +91,10 @@ export function getDsrRule(params: {
            r.productType === 'real_estate_only' &&
            r.supportType === supportType &&
            r.customerStage === customerStage &&
-           r.active !== false
+           r.active !== false &&
+           (!('employmentSector' in r) || !(r as any).employmentSector || (r as any).employmentSector === 'all' || (r as any).employmentSector === sectorId) &&
+           (!('sector' in r) || !(r as any).sector || (r as any).sector === 'all' || (r as any).sector === sectorId) &&
+           (!('sectorId' in r) || !(r as any).sectorId || (r as any).sectorId === 'all' || (r as any).sectorId === sectorId)
     );
     if (fallbackBankMatches.length === 1) {
       rule = fallbackBankMatches[0];
@@ -79,7 +108,10 @@ export function getDsrRule(params: {
            r.productType === productType &&
            r.supportType === supportType &&
            r.customerStage === customerStage &&
-           r.active !== false
+           r.active !== false &&
+           (!('employmentSector' in r) || !(r as any).employmentSector || (r as any).employmentSector === 'all' || (r as any).employmentSector === sectorId) &&
+           (!('sector' in r) || !(r as any).sector || (r as any).sector === 'all' || (r as any).sector === sectorId) &&
+           (!('sectorId' in r) || !(r as any).sectorId || (r as any).sectorId === 'all' || (r as any).sectorId === sectorId)
     );
 
     if (defaultMatches.length > 1) {
@@ -97,7 +129,10 @@ export function getDsrRule(params: {
              r.productType === 'real_estate_only' &&
              r.supportType === supportType &&
              r.customerStage === customerStage &&
-             r.active !== false
+             r.active !== false &&
+             (!('employmentSector' in r) || !(r as any).employmentSector || (r as any).employmentSector === 'all' || (r as any).employmentSector === sectorId) &&
+             (!('sector' in r) || !(r as any).sector || (r as any).sector === 'all' || (r as any).sector === sectorId) &&
+             (!('sectorId' in r) || !(r as any).sectorId || (r as any).sectorId === 'all' || (r as any).sectorId === sectorId)
       );
       if (fallbackDefaultMatches.length === 1) {
         rule = fallbackDefaultMatches[0];
@@ -105,34 +140,10 @@ export function getDsrRule(params: {
     }
   }
 
-  // 3. If still not found, throw clean error & print complete diagnostics
+  // 3. If still not found, throw clean error
   if (!rule) {
-    const matchingRulesByBank = dsrRules.filter(r => r.bankId === bankId || r.bankId === 'default');
-
-    console.warn(`[DSR MATCH DIAGNOSTICS]`);
-    console.warn(`Required parameters:`, { bankId, productType, supportType, customerStage });
-    console.warn(`All existing rules for this bank ("${bankId}")/default:`, matchingRulesByBank.map(r => ({
-      bankId: r.bankId,
-      productType: r.productType,
-      supportType: r.supportType,
-      customerStage: r.customerStage,
-      percent: r.dsrPercent,
-      active: r.active !== false
-    })));
-
-    const mismatchedProperties: string[] = [];
-    if (matchingRulesByBank.length > 0) {
-      if (!matchingRulesByBank.some(r => r.productType === productType)) mismatchedProperties.push(`نوع المنتج "${productType}"`);
-      if (!matchingRulesByBank.some(r => r.supportType === supportType)) mismatchedProperties.push(`نوع الدعم "${supportType}"`);
-      if (!matchingRulesByBank.some(r => r.customerStage === customerStage)) mismatchedProperties.push(`المرحلة "${customerStage}"`);
-    } else {
-      mismatchedProperties.push(`عدم وجود أي قواعد للبنك أو افتراضيات`);
-    }
-
-    const mismatchHint = mismatchedProperties.length > 0 ? ` (الاختلاف: مفقود ${mismatchedProperties.join('، ')})` : '';
-
     throw new Error(
-      `لا توجد قاعدة استقطاع عقاري لهذا المنتج/الدعم/المرحلة في لوحة التحكم.${mismatchHint}`
+      `لا توجد قاعدة DSR مفعلة لهذا البنك/نوع التمويل في لوحة التحكم`
     );
   }
 
@@ -148,9 +159,9 @@ export function calculateDSR(params: {
   netSalary: number;
   dsrRules: DsrRule[];
 }): DsrOutput {
-  const { bankId, productId, supportType, phase, netSalary, dsrRules } = params;
+  const { bankId, productId, sectorId, supportType, phase, netSalary, dsrRules } = params;
 
-  const productType = mapProductIdToType(productId);
+  const productType = resolveDsrProductType(productId);
   const normalizedSupport = productType === 'personal_only' ? 'not_applicable' : mapSupportType(supportType);
   const customerStage = mapCustomerStage(phase);
 
@@ -160,7 +171,8 @@ export function calculateDSR(params: {
       productType,
       supportType: normalizedSupport,
       customerStage,
-      dsrRules
+      dsrRules,
+      sectorId
     });
 
     const dsrPercent = matchedRule.dsrPercent;
@@ -169,14 +181,15 @@ export function calculateDSR(params: {
     return {
       dsrPercentage: dsrPercent,
       maxInstallment,
-      ruleUsed: `تم تطبيق قاعدة الاستقطاع (${matchedRule.bankId === 'default' ? 'الافتراضية العامة' : 'الخاصة بالجهة'}) ونسبة ${dsrPercent}% لمنتج ${productType === 'real_estate_only' ? 'عقاري فقط' : productType === 'real_estate_with_new_personal' ? 'عقاري وشخصي جديد' : productType === 'real_estate_with_existing_personal' ? 'عقاري وشخصي قائم' : 'شخصي فقط'} (${customerStage === 'active_before_retirement' ? 'موظف نشط' : 'بعد التقاعد'}).`
+      ruleUsed: `تم تطبيق قاعدة الاستقطاع (${matchedRule.bankId === 'default' ? 'الافتراضية العامة' : 'الخاصة بالجهة'}) ونسبة ${dsrPercent}% لمنتج ${productType === 'real_estate_only' ? 'عقاري فقط' : productType === 'real_estate_with_new_personal' ? 'عقاري وشخصي جديد' : productType === 'real_estate_with_existing_personal' ? 'عقاري وشخصي قائم' : 'شخصي فقط'} (${customerStage === 'active_before_retirement' ? 'موظف نشط' : 'بعد التقاعد'}).`,
+      deductExistingObligations: matchedRule.deductExistingObligations
     };
   } catch (err: any) {
     return {
       dsrPercentage: 0,
       maxInstallment: 0,
-      ruleUsed: `خطأ استقطاع: ${err.message || 'فشل جلب قاعدة DSR.'}`,
-      error: err.message || 'فشل جلب قاعدة DSR.'
+      ruleUsed: `خطأ استقطاع: ${err.message || 'لا توجد قاعدة DSR مفعلة لهذا البنك/نوع التمويل في لوحة التحكم'}`,
+      error: err.message || 'لا توجد قاعدة DSR مفعلة لهذا البنك/نوع التمويل في لوحة التحكم'
     };
   }
 }

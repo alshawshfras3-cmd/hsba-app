@@ -297,6 +297,7 @@ export interface DsrOutput {
   dsrPercentage: number;
   maxInstallment: number;
   ruleUsed: string;
+  deductExistingObligations?: boolean;
   error?: string;
 }
 

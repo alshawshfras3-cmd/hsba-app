@@ -492,7 +492,9 @@ export function calculateBanksFinancing(params: {
         bankId: bank.id,
         pathType: 'personal_only',
         customerStatus: sectorId === 'retired' ? 'retired' : 'active_employee',
-        rules: personalRules
+        rules: personalRules,
+        sectorId,
+        netSalary: solvedNetSalary
       });
 
       let status: 'approved' | 'rejected' | 'warning' = 'approved';
@@ -510,8 +512,7 @@ export function calculateBanksFinancing(params: {
         messages.push('المنتج المطلوب (تمويل شخصي فقط) غير مفعّل لدى هذه الجهة.');
       } else if (!personalRule || !personalRule.isActive) {
         status = 'rejected';
-        messages.push('الهامش غير مهيأ لهذه الجهة التمويلية (البنك والمنتج ونوع الدعم والراتب) في لوحة التحكم.');
-        messages.unshift('لا يوجد عقد تمويل شخصي مفعّل في الإعدادات لهذا البنك وحالة العميل.');
+        messages.unshift('لا توجد قاعدة تمويل شخصي مفعلة لهذا البنك/القطاع في لوحة التحكم');
       } else {
         calculationSteps.push('الخطوة 2: فحص شروط الدخل والسن لعقد التمويل الشخصي ومطابقتها للمدخلات.');
         // If contract is active, check min salary
@@ -553,9 +554,20 @@ export function calculateBanksFinancing(params: {
         const remainingMonthsToMaxAge = Math.max(0, maxAgeAtEndMonths - currentAgeMonths);
         const monthsBeforeRetirement = Math.max(0, Math.round(retirementAge * 12) - currentAgeMonths);
 
+        const personDsr = calculateDSR({
+          bankId: bank.id,
+          productId: normalizedProductId,
+          sectorId,
+          supportType,
+          phase: sectorId === 'retired' ? 'retired' : 'before_retirement',
+          netSalary: solvedNetSalary,
+          dsrRules
+        });
+        const personalObligations = (personDsr?.deductExistingObligations !== false) ? obligations : 0;
+
         const personalCalc = calculatePersonalFinance({
           netSalary: solvedNetSalary,
-          obligations,
+          obligations: personalObligations,
           sectorId,
           bankId: bank.id,
           rules: personalRules,
@@ -806,7 +818,7 @@ export function calculateBanksFinancing(params: {
 
     if (normalizedProductId === 'both' || normalizedProductId === 'real_estate_with_new_personal') {
       if (bankSupportsPersonal) {
-        const personalObls = obligations;
+        const personalObls = (dsrBeforeResult?.deductExistingObligations !== false) ? obligations : 0;
         const personalCalc = calculatePersonalFinance({
           netSalary: solvedNetSalary,
           obligations: personalObls,
@@ -917,7 +929,8 @@ export function calculateBanksFinancing(params: {
         totalInstallmentStage2 = realEstateStage2;
         personalInstallmentDisplay = extObligations;
       } else {
-        const adjustedObligationsBeforeVal = (normalizedProductId === 'real_estate' || normalizedProductId === 'real_estate_only') ? 0 : (obligations + ((normalizedProductId === 'both' || normalizedProductId === 'real_estate_with_new_personal') ? personalInstallment : 0));
+        const effectiveObligationsBefore = (dsrBeforeResult?.deductExistingObligations !== false) ? obligations : 0;
+        const adjustedObligationsBeforeVal = (normalizedProductId === 'real_estate' || normalizedProductId === 'real_estate_only') ? 0 : (effectiveObligationsBefore + ((normalizedProductId === 'both' || normalizedProductId === 'real_estate_with_new_personal') ? personalInstallment : 0));
 
         const reCalc = calculateRealEstateFinance({
           netSalaryBefore: solvedNetSalary,
@@ -938,8 +951,8 @@ export function calculateBanksFinancing(params: {
           const monthsOutsidePersonal = Math.max(0, termResult.monthsBeforeRetirement - personalMonths);
 
           const effectiveSalaryBefore = solvedNetSalary + (supportType === 'monthly' ? supportResult.monthlySupport : 0);
-          const installmentWithPersonal = Math.max(0, (effectiveSalaryBefore * (dsrBeforeResult.dsrPercentage / 100)) - obligations - personalInstallment);
-          const installmentWithoutPersonal = Math.max(0, (effectiveSalaryBefore * (dsrBeforeResult.dsrPercentage / 100)) - obligations);
+          const installmentWithPersonal = Math.max(0, (effectiveSalaryBefore * (dsrBeforeResult.dsrPercentage / 100)) - effectiveObligationsBefore - personalInstallment);
+          const installmentWithoutPersonal = Math.max(0, (effectiveSalaryBefore * (dsrBeforeResult.dsrPercentage / 100)) - effectiveObligationsBefore);
 
           const effectiveSalaryAfter = correctedPensionSalary + (supportType === 'monthly' ? supportResult.monthlySupport : 0);
           let currentInstallmentAfter = 0;
@@ -1029,7 +1042,8 @@ export function calculateBanksFinancing(params: {
       diag.messages.unshift(marginResult.error);
     }
 
-    if (isPersonalOnly && personalCalcResult?.diagnostics?.error) {
+    const hasNewPersonal = normalizedProductId === 'both' || normalizedProductId === 'real_estate_with_new_personal';
+    if ((isPersonalOnly || hasNewPersonal) && personalCalcResult?.diagnostics?.error) {
       diag.status = 'rejected';
       diag.messages.unshift(personalCalcResult.diagnostics.error);
     }
@@ -1475,10 +1489,12 @@ export function calculateAll(params: {
 
   let personalInstallment = 0;
   let personalMonths = 0;
+  let personalErrorMsg: string | undefined = undefined;
   if (normalizedProductId === 'personal' || normalizedProductId === 'personal_only' || normalizedProductId === 'both' || normalizedProductId === 'real_estate_with_new_personal') {
+    const personalObls = (dsrBeforeResult?.deductExistingObligations !== false) ? obligations : 0;
     const personalCalc = calculatePersonalFinance({
       netSalary: solvedNetSalary,
-      obligations: obligations,
+      obligations: personalObls,
       sectorId,
       bankId,
       rules: personalRules,
@@ -1488,6 +1504,9 @@ export function calculateAll(params: {
     });
     personalInstallment = personalCalc.monthlyInstallment;
     personalMonths = personalCalc.termMonths || 60;
+    if (personalCalc.diagnostics?.error) {
+      personalErrorMsg = personalCalc.diagnostics.error;
+    }
   }
 
   // Calculate Stages
@@ -1501,12 +1520,14 @@ export function calculateAll(params: {
   let dsrPercentBefore = dsrBeforeResult.dsrPercentage;
   let dsrPercentAfter = dsrAfterResult.dsrPercentage;
 
+  const effectiveObligationsBefore = (dsrBeforeResult?.deductExistingObligations !== false) ? obligations : 0;
+
   if (normalizedProductId === 'both' || normalizedProductId === 'real_estate_with_new_personal') {
     stage1Months = Math.min(personalMonths, termResult.monthsBeforeRetirement);
-    installmentStage1 = Math.max(0, Math.round(((solvedNetSalary + monthlySupport) * (dsrPercentBefore / 100)) - obligations - personalInstallment));
+    installmentStage1 = Math.max(0, Math.round(((solvedNetSalary + monthlySupport) * (dsrPercentBefore / 100)) - effectiveObligationsBefore - personalInstallment));
     
     stage2Months = Math.max(0, termResult.monthsBeforeRetirement - personalMonths);
-    installmentStage2 = Math.max(0, Math.round(((solvedNetSalary + monthlySupport) * (dsrPercentBefore / 100)) - obligations));
+    installmentStage2 = Math.max(0, Math.round(((solvedNetSalary + monthlySupport) * (dsrPercentBefore / 100)) - effectiveObligationsBefore));
     
     stage3Months = termResult.monthsAfterRetirement;
     installmentStage3 = Math.max(0, Math.round(((expectedPensionSalary + monthlySupport) * (dsrPercentAfter / 100))));
@@ -1516,7 +1537,7 @@ export function calculateAll(params: {
   } else {
     // Real Estate Only
     stage1Months = termResult.monthsBeforeRetirement;
-    installmentStage1 = Math.max(0, Math.round(((solvedNetSalary + monthlySupport) * (dsrPercentBefore / 100)) - obligations));
+    installmentStage1 = Math.max(0, Math.round(((solvedNetSalary + monthlySupport) * (dsrPercentBefore / 100)) - effectiveObligationsBefore));
     
     stage2Months = 0;
     installmentStage2 = 0;
@@ -1668,6 +1689,9 @@ export function calculateAll(params: {
   const warningsList: string[] = [];
   if (manualDsrError) {
     warningsList.push(`❌ خطأ استقطاع DSR: ${manualDsrError}`);
+  }
+  if (personalErrorMsg) {
+    warningsList.push(`❌ خطأ في قاعدة التمويل الشخصي: ${personalErrorMsg}`);
   }
   if (marginResult.error) {
     warningsList.push(`❌ خطأ في هامش الربح: ${marginResult.error}`);

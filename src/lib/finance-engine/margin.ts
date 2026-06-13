@@ -362,7 +362,7 @@ export function calculateMargin(params: {
       r.exceptionBps !== undefined
   );
   const exceptionBps = isRealEstate && matchedExceptionRule ? (matchedExceptionRule.exceptionBps ?? 0) : 0;
-  const finalMarginPercent = Number((baseMarginPercent - (exceptionBps / 100)).toFixed(3));
+  const finalMarginPercent = Number(Math.max(0, baseMarginPercent + (exceptionBps / 100)).toFixed(3));
 
   let finalRuleUsed = ruleUsed;
   if (isRealEstate && exceptionBps !== 0) {

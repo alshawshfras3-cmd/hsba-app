@@ -255,6 +255,7 @@ export function LoginPage() {
                 onClick={async () => {
                   setLoadingAction(true);
                   try {
+                    // TODO: legacy admin fallback, do not remove until auth is unified
                     await signInWithEmail('admin@hesba.com', 'bypass');
                   } catch (e) {
                     console.error(e);

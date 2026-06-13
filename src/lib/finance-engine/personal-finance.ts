@@ -1,15 +1,22 @@
 import { PersonalFinanceOutput, PersonalFinanceRules, SectorId } from '../../types';
 
+export function hasLoadedPersonalRules(personalRules?: PersonalFinanceRules[]): boolean {
+  return Array.isArray(personalRules) && personalRules.length > 0;
+}
+
 export function getPersonalFinanceRule(params: {
   bankId: string;
   pathType: 'personal_only' | 'real_estate_with_new_personal' | 'real_estate_with_existing_personal';
   customerStatus: 'active' | 'retired' | 'active_employee';
   rules: PersonalFinanceRules[];
+  sectorId?: SectorId;
+  netSalary?: number;
+  termMonths?: number;
 }): PersonalFinanceRules | null {
-  const { bankId, pathType, customerStatus, rules } = params;
+  const { bankId, pathType, customerStatus, rules, sectorId, netSalary, termMonths } = params;
 
   // Standardize customerStatus
-  const isRetired = customerStatus === 'retired';
+  const isRetired = customerStatus === 'retired' || sectorId === 'retired';
   const targetStatus: 'active_employee' | 'retired' = isRetired ? 'retired' : 'active_employee';
 
   // Standardize pathType for searching
@@ -18,25 +25,86 @@ export function getPersonalFinanceRule(params: {
     targetPathType = 'real_estate_with_new_personal';
   }
 
-  // 1. Try to find precise bank match
-  let rule = rules.find(
-    r => r.bankId === bankId &&
-    r.pathType === targetPathType &&
-    r.customerStatus === targetStatus &&
-    r.isActive
-  );
-
-  // 2. Fall back to 'all' default bank match
-  if (!rule) {
-    rule = rules.find(
-      r => (r.bankId === 'all' || r.bankId === 'default') &&
-      r.pathType === targetPathType &&
-      r.customerStatus === targetStatus &&
-      r.isActive
-    );
+  // Development fallback ONLY if no rules are loaded in the entire app_settings
+  if (!hasLoadedPersonalRules(rules)) {
+    const isAlahli = bankId === 'alahli';
+    const isRajhi = bankId === 'rajhi';
+    return {
+      id: 'dev_fallback_personal',
+      bankId: bankId,
+      sectorId: 'all',
+      dsrPercentage: targetStatus === 'retired' ? 25 : 33.33,
+      termMonths: 60,
+      financeCoefficient: isRajhi || isAlahli ? 0 : 50.42,
+      annualMargin: isRajhi ? 4.59 : (isAlahli ? 5.00 : 4.80),
+      minSalary: 1000,
+      minAge: 18,
+      maxAge: targetStatus === 'retired' ? 75 : 65,
+      retireeDsrPercentage: 25,
+      isActive: true,
+      calculationMethod: (isRajhi || isAlahli) ? 'flat_rate' : 'multiplier',
+      pathType: targetPathType,
+      customerStatus: targetStatus
+    };
   }
 
-  return rule || null;
+  // Find rules matching the requirements
+  const findMatching = (targetBank: string) => {
+    return rules.filter(r => {
+      // 1. check isActive
+      if (!r.isActive) return false;
+
+      // 2. check bankId
+      if (r.bankId !== targetBank) return false;
+
+      // 3. check productType / pathType (if specified in rule)
+      if (r.pathType && r.pathType !== targetPathType) return false;
+
+      // 4. check customerStatus (if specified in rule)
+      if (r.customerStatus && r.customerStatus !== targetStatus) return false;
+
+      // 5. check sectorId / employmentSector (if specified in rule)
+      if (sectorId) {
+        const ruleSector = (r as any).sectorId || (r as any).employmentSector || (r as any).sector;
+        if (ruleSector && ruleSector !== 'all' && ruleSector !== sectorId) return false;
+      }
+
+      // 6. check salary range (if specified and netSalary is provided)
+      if (netSalary !== undefined) {
+        const minSal = Number(r.minSalary) || 0;
+        const maxSal = r.maxSalary !== undefined ? Number(r.maxSalary) : undefined;
+        if (netSalary < minSal) return false;
+        if (maxSal !== undefined && maxSal > 0 && netSalary > maxSal) return false;
+      }
+
+      // 7. check termMonths range (if specified and requested termMonths is provided)
+      if (termMonths !== undefined && r.termMonths && termMonths > r.termMonths) return false;
+
+      return true;
+    });
+  };
+
+  // Find candidates with precise bankId
+  let candidates = findMatching(bankId);
+  
+  // Try fallback to 'all' or 'default' bankId if none for precise bank
+  if (candidates.length === 0) {
+    candidates = findMatching('all').concat(findMatching('default'));
+  }
+
+  if (candidates.length > 0) {
+    // Return precise sectorId match if possible
+    if (sectorId) {
+      const best = candidates.find(r => {
+        const ruleSector = (r as any).sectorId || (r as any).employmentSector || (r as any).sector;
+        return ruleSector === sectorId;
+      });
+      if (best) return best;
+    }
+    return candidates[0];
+  }
+
+  return null;
 }
 
 export function calculatePersonalFinance(params: {
@@ -62,12 +130,18 @@ export function calculatePersonalFinance(params: {
     pathType = 'real_estate_with_existing_personal';
   }
 
+  if (!hasLoadedPersonalRules(rules)) {
+    console.warn("[HESBA FALLBACK] Using fallback personal finance rules because personalRules are unavailable");
+  }
+
   // Get matching rule
   const rule = getPersonalFinanceRule({
     bankId,
     pathType,
     customerStatus,
-    rules
+    rules,
+    sectorId,
+    netSalary
   });
 
   const targetStatus = customerStatus === 'retired' ? 'retired' : 'active_employee';
@@ -78,47 +152,23 @@ export function calculatePersonalFinance(params: {
   let finalRule = rule;
 
   if (rule) {
-    source = rule.bankId === bankId ? 'bank_specific' : 'default_bank';
+    source = rule.id === 'dev_fallback_personal' ? 'fallback' : (rule.bankId === bankId ? 'bank_specific' : 'default_bank');
   } else {
-    if (bankId === 'rajhi') {
-      source = 'fallback';
-      finalRule = {
-        bankId: 'rajhi',
-        sectorId: 'all',
-        dsrPercentage: customerStatus === 'retired' ? 25 : 33.33,
-        termMonths: 60,
-        financeCoefficient: 0,
-        annualMargin: 4.59,
-        minSalary: 2000,
-        minAge: 18,
-        maxAge: customerStatus === 'retired' ? 75 : 65,
-        retireeDsrPercentage: 25,
-        isActive: true,
-        calculationMethod: 'flat_rate',
-        pathType: pathType === 'real_estate_with_existing_personal' ? 'personal_only' : pathType,
-        customerStatus: targetStatus
-      };
-    } else if (customerStatus === 'retired') {
-      // If the customer is retired and no rule is found, we should NOT fall back to active employee
-      matchError = "لا توجد قاعدة تمويل شخصي للمتقاعد لهذا البنك";
+    if (hasLoadedPersonalRules(rules)) {
+      // Check if any rule for this bank exists in the configuration
+      const anyRuleForBank = rules.some(r => r.bankId === bankId);
+      if (anyRuleForBank) {
+        const activeRuleForBank = rules.some(r => r.bankId === bankId && r.isActive);
+        if (!activeRuleForBank) {
+          matchError = "قاعدة التمويل الشخصي لهذا البنك غير مفعلة في لوحة التحكم";
+        } else {
+          matchError = "لا توجد قاعدة تمويل شخصي مفعلة لهذا البنك/القطاع في لوحة التحكم";
+        }
+      } else {
+        matchError = "لا توجد قاعدة تمويل شخصي مفعلة لهذا البنك/القطاع في لوحة التحكم";
+      }
     } else {
-      source = 'fallback';
-      finalRule = {
-        bankId: bankId,
-        sectorId: 'all',
-        dsrPercentage: 33.33,
-        termMonths: 60,
-        financeCoefficient: 50.42,
-        annualMargin: 4.80,
-        minSalary: 4000,
-        minAge: 18,
-        maxAge: 65,
-        retireeDsrPercentage: 25,
-        isActive: true,
-        calculationMethod: 'multiplier',
-        pathType: pathType === 'real_estate_with_existing_personal' ? 'personal_only' : pathType,
-        customerStatus: 'active_employee'
-      };
+      matchError = "لا توجد قاعدة تمويل شخصي مفعلة لهذا البنك/القطاع في لوحة التحكم";
     }
   }
 
@@ -187,18 +237,20 @@ export function calculatePersonalFinance(params: {
     }
   }
 
-  // Only apply strict hardcoded defaults if it is a fallback rule from the calculator
-  if (source === 'fallback' && finalRule.bankId === 'alahli') {
-    annualMargin = 5.00;
-    ruleTermMonths = 60;
-    dsrPercent = customerStatus === 'retired' ? 25 : 33.33;
-    coeff = 0;
-  } else if (source === 'fallback' && finalRule.bankId === 'rajhi') {
-    annualMargin = 4.59;
-    ruleTermMonths = 60;
-    dsrPercent = customerStatus === 'retired' ? 25 : 33.33;
-    coeff = 0;
-    calculationMethod = 'flat_rate';
+  // Only apply strict hardcoded defaults if it is a fallback rule from the calculator in development environment
+  if (finalRule.id === 'dev_fallback_personal') {
+    if (finalRule.bankId === 'alahli') {
+      annualMargin = 5.00;
+      ruleTermMonths = 60;
+      dsrPercent = customerStatus === 'retired' ? 25 : 33.33;
+      coeff = 0;
+    } else if (finalRule.bankId === 'rajhi') {
+      annualMargin = 4.59;
+      ruleTermMonths = 60;
+      dsrPercent = customerStatus === 'retired' ? 25 : 33.33;
+      coeff = 0;
+      calculationMethod = 'flat_rate';
+    }
   }
 
   // تحديد مدة التمويل الشخصي الفعلية

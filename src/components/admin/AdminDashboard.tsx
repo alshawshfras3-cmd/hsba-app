@@ -59,6 +59,7 @@ import {
 import { getHousingSupport, getAdvancePayment } from '../../lib/housingSupportService';
 import { HousingSupportTier, AdvancePaymentTier } from '../../types';
 import { clearLegacyStorage } from '@/lib/utils';
+import { useAuth } from '../../contexts/AuthContext';
 
 const LOGO_COLOR_PRESETS = [
   { value: 'from-emerald-700 to-emerald-950', name: 'أخضر داكن (الأهلي)' },
@@ -89,6 +90,7 @@ const sectorsList = [
 ];
 
 export default function AdminDashboard() {
+  const { user } = useAuth();
   const {
     isSettingsLoading,
     banks, setBanks,
@@ -630,7 +632,7 @@ export default function AdminDashboard() {
         fromBankId: copySourceBank,
         toBankId: copyTargetBank,
         sections: copySections,
-        currentUserEmail: 'admin@hisba.sa',
+        currentUserEmail: user?.email || 'admin@hesba.com',
         marginRules,
         dsrRules,
         personalRules,
@@ -663,7 +665,7 @@ export default function AdminDashboard() {
         personalRules,
         approvedSalaryDbRules,
         pensionRules: pensionDbRules,
-        currentUserEmail: 'admin@hisba.sa',
+        currentUserEmail: user?.email || 'admin@hesba.com',
         bankNameAr
       });
 
@@ -694,7 +696,7 @@ export default function AdminDashboard() {
         personalRules,
         approvedSalaryDbRules,
         pensionDbRules,
-        currentUserEmail: 'admin@hisba.sa'
+        currentUserEmail: user?.email || 'admin@hesba.com'
       });
 
       // Update states
@@ -721,7 +723,7 @@ export default function AdminDashboard() {
         personalRules,
         approvedSalaryDbRules,
         pensionDbRules,
-        currentUserEmail: 'admin@hisba.sa'
+        currentUserEmail: user?.email || 'admin@hesba.com'
       });
 
       // Update states

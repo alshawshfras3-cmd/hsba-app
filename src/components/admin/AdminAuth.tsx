@@ -91,6 +91,7 @@ export default function AdminAuth() {
         setGoogleLoading(false);
         setUser({
           id: 'mock_google_id',
+          // TODO: legacy admin fallback, do not remove until auth is unified
           email: 'admin@hesba.com',
           user_metadata: {
             username: 'مدير النظام'
@@ -148,6 +149,7 @@ export default function AdminAuth() {
               onClick={() => {
                 setUser({
                   id: 'offline_admin',
+                  // TODO: legacy admin fallback, do not remove until auth is unified
                   email: 'admin@hesba.com',
                   user_metadata: {
                     username: 'مدير النظام'

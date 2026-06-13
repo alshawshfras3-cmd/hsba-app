@@ -626,7 +626,7 @@ export default function StepWizard() {
     const calcParams = {
       sectorId: effectiveSectorId,
       militarySubType: ((effectiveSectorId === 'military' || sectorId === 'military') ? ((militarySubtype === 'officer' || militaryType === 'officer') ? 'military_officer' : 'military_individual') : undefined) as 'military_officer' | 'military_individual' | undefined,
-      etizazAmount: ((effectiveSectorId === 'military' || sectorId === 'military') && isEtizazEligible === 'yes' && supportSettings.etizaz?.enabled !== false) ? (supportSettings.etizaz?.amount ?? 160000) : 0,
+      etizazAmount: (((supportSettings.etizaz?.eligibleSectors || ['military']).includes(effectiveSectorId)) && isEtizazEligible === 'yes' && supportSettings.etizaz?.enabled !== false) ? (supportSettings.etizaz?.amount ?? 160000) : 0,
       productId,
       birthYear: Number(birthYear) || 1990,
       birthMonth: Number(birthMonth) || 1,
@@ -1025,6 +1025,35 @@ export default function StepWizard() {
                   <div className="bg-white p-3 rounded-xl border border-gray-100 text-xs font-bold text-gray-600 text-center animate-fade-in max-w-xs mx-auto">
                     <span>سن التقاعد للرتبة: </span>
                     <strong className="text-[#0057B8]">{retirementAge} سنة</strong>
+                  </div>
+                </div>
+              )}
+
+              {/* Standalone Etizaz Selector for non-military eligible sectors */}
+              {sectorId !== 'military' && sectorId && (supportSettings.etizaz?.eligibleSectors || ['military']).includes(sectorId) && supportSettings.etizaz?.enabled !== false && (
+                <div id="etizaz-non-military-selector-wrapper" className="bg-gray-50 rounded-2xl p-6 border border-gray-200 animate-fade-in text-right space-y-4">
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-gray-700">هل العميل مؤهل لدعم اعتزاز؟</label>
+                    <div className="flex gap-3 max-w-xs">
+                      {[
+                        { id: 'no', label: 'لا' },
+                        { id: 'yes', label: 'نعم' }
+                      ].map((opt) => (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          id={`etizaz-opt-non-military-${opt.id}`}
+                          onClick={() => setIsEtizazEligible(opt.id as 'yes' | 'no')}
+                          className={`flex-1 py-2 px-4 rounded-xl text-xs font-bold transition-all border text-center cursor-pointer ${
+                            isEtizazEligible === opt.id
+                              ? 'bg-[#0057B8] text-white border-[#0057B8] shadow-xs'
+                              : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
               )}

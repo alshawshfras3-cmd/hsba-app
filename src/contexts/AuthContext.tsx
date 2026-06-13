@@ -163,6 +163,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (profileData) {
         const lowercaseEmail = (email || profileData.email || '').toLowerCase().trim();
+        // TODO: legacy admin fallback, do not remove until auth is unified
         const isOwnerEmail = lowercaseEmail === 'admin@hesba.com';
         
         // Block suspended/blocked users (except the protected super admin)
@@ -214,6 +215,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       console.warn("Could not fetch profile, falling back to basic details:", err);
       const lowercaseEmail = (email || '').toLowerCase().trim();
+      // TODO: legacy admin fallback, do not remove until auth is unified
       const isOwnerEmail = lowercaseEmail === 'admin@hesba.com';
       
       setIsSuspendedUser(false);
@@ -249,6 +251,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
       const cachedUser = getCachedUser();
       if (cachedUser) {
+        // TODO: legacy admin fallback, do not remove until auth is unified
         const isOwner = cachedUser.email?.toLowerCase().trim() === 'admin@hesba.com';
         setIsAdminInDb(isOwner);
       }
@@ -378,6 +381,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const isOwnerEmail = (email?: string) => {
     const e = email?.toLowerCase().trim();
+    // TODO: legacy admin fallback, do not remove until auth is unified
     return e === 'admin@hesba.com';
   };
 
@@ -395,6 +399,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function signInWithGoogle() {
     if (!hasSupabaseKeys) {
       // Mock OAuth Flow for Preview
+      // TODO: legacy admin fallback, do not remove until auth is unified
       const mockEmail = 'admin@hesba.com';
       setUser({
         id: 'mock_google_user',
