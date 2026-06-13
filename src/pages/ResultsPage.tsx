@@ -404,16 +404,6 @@ export function ResultsPage() {
               {/* Technical diagnostics and log messages */}
               <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-xs">
                 <h4 className="font-black text-slate-900 text-sm pb-2 border-b border-slate-100">المقاييس الفنية والتحقق الائتماني:</h4>
-                <div className="space-y-2 text-xs font-semibold text-slate-600">
-                  <div className="flex justify-between">
-                    <span>نسبة استهلاك عبء الدين (DSR):</span>
-                    <span className="font-black text-slate-800">{(selectedResult.payload.dsrUsed * 100).toFixed(1)}%</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>الراتب المعتمد للحسبة:</span>
-                    <span className="font-black text-slate-800" dir="ltr">{Math.round(selectedResult.payload.netSalary).toLocaleString('ar-SA')} ريال</span>
-                  </div>
-                </div>
 
                 {selectedResult.payload?.diagnosticMessages?.length > 0 && (
                   <div className="space-y-2 pt-2">
