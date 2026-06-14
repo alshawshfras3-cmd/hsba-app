@@ -1473,26 +1473,26 @@ export default function StepWizard() {
 
           {/* STEP: Combined Customer Data & Income (بيانات العميل والدخل) for Desktop/Laptop */}
           {activeStepId === 'personal_info_and_salary' && (
-            <div className="space-y-6 animate-fade-in text-right">
+            <div className="space-y-8 animate-fade-in text-right">
               <div className="text-center max-w-lg mx-auto mb-8">
                 <h3 className="text-xl font-bold text-[#111827]">أدخل بيانات العميل والدخل</h3>
                 <p className="text-sm text-[#6B7280] mt-1 font-sans">يرجى إدخال تفاصيل جهة العمل والدخل الشهري لتقرير نسب الملاءمة وتحديد العروض المناسبة بدقة.</p>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
-                {/* Column 1: Personal Info */}
-                <div className="space-y-6 bg-slate-50/20 p-6 rounded-2xl border border-gray-100">
-                  <h4 className="text-sm font-bold text-[#0057B8] flex items-center gap-2 border-b border-gray-150 pb-3 mb-4">
-                    <User className="w-4 h-4" />
-                    <span>القسم الأول: بيـانات العميل المهنية والشخصية</span>
+              <div className="space-y-8">
+                {/* Section 1: Personal Info */}
+                <div className="space-y-6 bg-slate-50/10 p-6 md:p-8 rounded-2xl border border-gray-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
+                  <h4 className="text-sm md:text-base font-bold text-[#0057B8] flex items-center gap-2 border-b border-gray-200/60 pb-3 mb-4">
+                    <User className="w-5 h-5" />
+                    <span>القسم الأول: بيانات العميل المهنية والشخصية</span>
                   </h4>
                   {renderPersonalInfoFields()}
                 </div>
 
-                {/* Column 2: Salary Info */}
-                <div className="space-y-6 bg-slate-50/20 p-6 rounded-2xl border border-gray-100">
-                  <h4 className="text-sm font-bold text-[#0057B8] flex items-center gap-2 border-b border-gray-150 pb-3 mb-4 font-sans">
-                    <Coins className="w-4 h-4 text-emerald-600" />
+                {/* Section 2: Salary Info */}
+                <div className="space-y-6 bg-slate-50/10 p-6 md:p-8 rounded-2xl border border-gray-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
+                  <h4 className="text-sm md:text-base font-bold text-[#0057B8] flex items-center gap-2 border-b border-gray-200/60 pb-3 mb-4 font-sans">
+                    <Coins className="w-5 h-5 text-emerald-600" />
                     <span>القسم الثاني: الرواتب والمستحقات والبدلات</span>
                   </h4>
                   {renderSalaryFields()}
