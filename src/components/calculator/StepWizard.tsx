@@ -216,6 +216,39 @@ export default function StepWizard() {
   // Compute live local calculated Net salary to aid real-time UI display
   const [localCalculatedNet, setLocalCalculatedNet] = useState(0);
 
+  // Desktop landscape/laptop breakpoint state (>= 1024px)
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => {
+    const handleResize = () => {
+      setIsDesktop(window.innerWidth >= 1024);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    // Synchronize currentStep when isDesktop flips
+    setCurrentStep((prev) => {
+      if (isDesktop) {
+        // transitioning to desktop
+        if (prev === 2 || prev === 3) return 2; // both personal_info and salary map to combined step 2
+        if (prev === 4) return 3; // finance_options maps to 3
+      } else {
+        // transitioning to mobile
+        if (prev === 2) return 2; // combined step 2 maps to personal_info
+        if (prev === 3) {
+          if (mainFinanceType === 'personal_only') {
+            return 3; // salary is index 3
+          } else {
+            return 4; // finance_options is index 4
+          }
+        }
+      }
+      return prev;
+    });
+  }, [isDesktop]);
+
   // Load draft values into AppContext's currentStep or results if they exist on mount
   useEffect(() => {
     try {
@@ -376,11 +409,16 @@ export default function StepWizard() {
     | 'main_type'
     | 'personal_info'
     | 'salary'
+    | 'personal_info_and_salary'
     | 'finance_options';
 
-  const flow: StepId[] = mainFinanceType === 'personal_only'
-    ? ['main_type', 'personal_info', 'salary']
-    : ['main_type', 'personal_info', 'salary', 'finance_options'];
+  const flow: StepId[] = isDesktop
+    ? (mainFinanceType === 'personal_only'
+        ? ['main_type', 'personal_info_and_salary']
+        : ['main_type', 'personal_info_and_salary', 'finance_options'])
+    : (mainFinanceType === 'personal_only'
+        ? ['main_type', 'personal_info', 'salary']
+        : ['main_type', 'personal_info', 'salary', 'finance_options']);
 
   const activeStepId = flow[currentStep - 1] || 'main_type';
 
@@ -395,6 +433,7 @@ export default function StepWizard() {
         if (stepId === 'main_type') stepLabel = 'نوع الحسبة';
         else if (stepId === 'personal_info') stepLabel = 'بيانات العميل';
         else if (stepId === 'salary') stepLabel = 'الراتب والدخل';
+        else if (stepId === 'personal_info_and_salary') stepLabel = 'بيانات العميل والدخل';
         else if (stepId === 'finance_options') stepLabel = 'خيارات الحسبة';
         else stepLabel = 'الحاسبة الذكية';
         setActiveStepLabel(stepLabel);
@@ -537,7 +576,7 @@ export default function StepWizard() {
       }
     }
 
-    if (stepId === 'personal_info') {
+    if (stepId === 'personal_info' || stepId === 'personal_info_and_salary') {
       if (!sectorId) {
         stepErrors.push('يرجى اختيار القطاع المهني لجهة العمل.');
       } else if (sectorId === 'military' && !militaryType) {
@@ -586,7 +625,7 @@ export default function StepWizard() {
       }
     }
 
-    if (stepId === 'salary') {
+    if (stepId === 'salary' || stepId === 'personal_info_and_salary') {
       if (salaryMode === 'direct' || effectiveSectorId === 'retired') {
         if (effectiveSectorId === 'retired' && directPensionSalary <= 0) {
           stepErrors.push('يرجى إدخال الراتب التقاعدي الصافي المستلم صحيح أكبر من الصفر.');
@@ -723,6 +762,584 @@ export default function StepWizard() {
     return arr;
   };
 
+  const renderPersonalInfoFields = () => {
+    return (
+      <div className="space-y-6">
+        {/* 1. Sector Picker */}
+        <div className="space-y-3">
+          <label className="block text-xs font-bold text-gray-700">ما هو القطاع المهني لجهة العمل؟</label>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            {[
+              { id: 'gov_civil', label: 'حكومي مدني', icon: Briefcase },
+              { id: 'military', label: 'عسكري', icon: User },
+              { id: 'semi_gov', label: 'شبه حكومي', icon: Scale },
+              { id: 'companies', label: 'موظف شركات', icon: Briefcase },
+              { id: 'retired', label: 'متقاعد حالي', icon: Coins }
+            ].map((sec) => (
+              <div
+                key={sec.id}
+                id={`sector-card-${sec.id}`}
+                onClick={() => {
+                  setSectorId(sec.id as SectorId);
+                  setSector(sec.id);
+                  
+                  if (sec.id === 'retired') {
+                    setSalaryMode('direct');
+                    setRetirementAge(getSectorRetirementAge('retired', 60, customSectors));
+                    setAhliGroup('');
+                    setMilitarySubtype('');
+                    setMilitaryRank('');
+                    setMilitaryType('');
+                  } else if (sec.id === 'gov_civil') {
+                    setRetirementAge(getSectorRetirementAge('gov_civil', 60, customSectors));
+                    setAhliGroup('A');
+                    setMilitarySubtype('');
+                    setMilitaryRank('');
+                    setMilitaryType('');
+                  } else if (sec.id === 'semi_gov') {
+                    setRetirementAge(getSectorRetirementAge('semi_gov', 60, customSectors));
+                    setAhliGroup('A');
+                    setMilitarySubtype('');
+                    setMilitaryRank('');
+                    setMilitaryType('');
+                  } else if (sec.id === 'companies') {
+                    setRetirementAge(getSectorRetirementAge('companies', 60, customSectors));
+                    setAhliGroup('A');
+                    setMilitarySubtype('');
+                    setMilitaryRank('');
+                    setMilitaryType('');
+                  } else if (sec.id === 'military') {
+                    setSalaryMode('details');
+                    setMilitarySubtype('enlisted');
+                    setMilitaryType('individual');
+                    const enlistedRanks = militaryRanks.filter(r => r.sectorScope === 'enlisted' && r.isActive);
+                    const sorted = [...enlistedRanks].sort((a,b) => a.displayOrder - b.displayOrder);
+                    const firstEnRank = sorted[0];
+                    if (firstEnRank) {
+                      setRankId(firstEnRank.id);
+                      setMilitaryRank(firstEnRank.nameAr);
+                      setRetirementAge(firstEnRank.retirementAge);
+                      setAhliGroup(firstEnRank.ahliGroup || 'B');
+                    } else {
+                      setRankId('jundi');
+                      setMilitaryRank('جندي / جندي أول');
+                      setRetirementAge(44);
+                      setAhliGroup('B');
+                    }
+                  }
+                }}
+                className={`flex flex-col items-center justify-center p-4 cursor-pointer transition-all border rounded-2xl text-center ${
+                  sectorId === sec.id
+                    ? 'border-[#0057B8] bg-[#0057B8]/5 ring-2 ring-[#0057B8]/15 font-bold'
+                    : 'border-slate-200 bg-white hover:bg-slate-50'
+                }`}
+              >
+                <sec.icon className={`w-5 h-5 mb-2 shrink-0 ${sectorId === sec.id ? 'text-[#0057B8]' : 'text-gray-500'}`} />
+                <span className="text-xs text-[#111827]">{sec.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 2. Military Selector details (only if Sector is Military) */}
+        {sectorId === 'military' && (
+          <div id="military-rank-selector-wrapper" className="bg-gray-50 rounded-2xl p-6 border border-gray-200 animate-fade-in text-right space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Category subclass selector */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-gray-700">تصنيف الخدمة العسكرية:</label>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { id: 'enlisted', type: 'individual', scope: 'enlisted', label: 'عسكري أفراد' },
+                    { id: 'officer', type: 'officer', scope: 'officer', label: 'عسكري ضباط' }
+                  ].map((sub) => {
+                    const isSelected = militarySubtype === sub.id;
+                    return (
+                      <button
+                        key={sub.id}
+                        type="button"
+                        onClick={() => {
+                          setMilitarySubtype(sub.id as 'enlisted' | 'officer');
+                          setMilitaryType(sub.type as 'officer' | 'individual');
+                          const targetScope = sub.scope;
+                          const filteredRanks = militaryRanks.filter(r => r.sectorScope === targetScope && r.isActive);
+                          const sorted = [...filteredRanks].sort((a, b) => a.displayOrder - b.displayOrder);
+                          const firstRank = sorted[0];
+                          if (firstRank) {
+                            setRankId(firstRank.id);
+                            setMilitaryRank(firstRank.nameAr);
+                            setRetirementAge(firstRank.retirementAge);
+                            setAhliGroup(firstRank.ahliGroup || (sub.id === 'officer' ? 'A' : 'B'));
+                          }
+                        }}
+                        className={`py-2 px-4 rounded-xl text-xs font-bold transition-all border text-center ${
+                          isSelected
+                            ? 'bg-[#0057B8] text-white border-[#0057B8] shadow-xs'
+                            : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                        }`}
+                      >
+                        {sub.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Rank dropdown */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-gray-700">الرتبة العسكرية للعميل:</label>
+                <select
+                  id="rank-select-step2"
+                  value={rankId}
+                  onChange={(e) => {
+                    const selectedId = e.target.value;
+                    setRankId(selectedId);
+                    
+                    const matched = militaryRanks.find(r => r.id === selectedId);
+                    if (matched) {
+                      setMilitaryRank(matched.nameAr);
+                      setRetirementAge(matched.retirementAge);
+                      setAhliGroup(matched.ahliGroup || (militarySubtype === 'officer' ? 'A' : 'B'));
+                    }
+                  }}
+                  className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] focus:border-transparent cursor-pointer"
+                >
+                  {militaryRanks
+                    .filter(rank => rank.sectorScope === (militarySubtype === 'officer' ? 'officer' : 'enlisted') && rank.isActive)
+                    .sort((a, b) => a.displayOrder - b.displayOrder)
+                    .map((rank) => (
+                      <option key={rank.id} value={rank.id}>
+                        {rank.nameAr}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            </div>
+
+            {/* هل العميل مؤهل لدعم اعتزاز؟ */}
+            {supportSettings.etizaz?.enabled !== false && (
+              <div className="border-t border-gray-150 pt-4 space-y-2">
+                <label className="block text-xs font-bold text-gray-700">هل العميل مؤهل لدعم اعتزاز؟</label>
+                <div className="flex gap-3 max-w-xs">
+                  {[
+                    { id: 'no', label: 'لا' },
+                    { id: 'yes', label: 'نعم' }
+                  ].map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      id={`etizaz-opt-${opt.id}`}
+                      onClick={() => setIsEtizazEligible(opt.id as 'yes' | 'no')}
+                      className={`flex-1 py-2 px-4 rounded-xl text-xs font-bold transition-all border text-center cursor-pointer ${
+                        isEtizazEligible === opt.id
+                          ? 'bg-[#0057B8] text-white border-[#0057B8] shadow-xs'
+                          : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="bg-white p-3 rounded-xl border border-gray-100 text-xs font-bold text-gray-600 text-center animate-fade-in max-w-xs mx-auto">
+              <span>سن التقاعد للرتبة: </span>
+              <strong className="text-[#0057B8]">{retirementAge} سنة</strong>
+            </div>
+          </div>
+        )}
+
+        {/* Standalone Etizaz Selector for non-military eligible sectors */}
+        {sectorId !== 'military' && sectorId && (supportSettings.etizaz?.eligibleSectors || ['military']).includes(sectorId) && supportSettings.etizaz?.enabled !== false && (
+          <div id="etizaz-non-military-selector-wrapper" className="bg-gray-50 rounded-2xl p-6 border border-gray-200 animate-fade-in text-right space-y-4">
+            <div className="space-y-2">
+              <label className="block text-xs font-bold text-gray-700">هل العميل مؤهل لدعم اعتزاز؟</label>
+              <div className="flex gap-3 max-w-xs">
+                {[
+                  { id: 'no', label: 'لا' },
+                  { id: 'yes', label: 'نعم' }
+                ].map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    id={`etizaz-opt-non-military-${opt.id}`}
+                    onClick={() => setIsEtizazEligible(opt.id as 'yes' | 'no')}
+                    className={`flex-1 py-2 px-4 rounded-xl text-xs font-bold transition-all border text-center cursor-pointer ${
+                      isEtizazEligible === opt.id
+                        ? 'bg-[#0057B8] text-white border-[#0057B8] shadow-xs'
+                        : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 3. Dates Selector Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* DOB Card */}
+          <div className="border border-gray-200 rounded-2xl p-6 bg-white space-y-4 font-sans">
+            <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+              <span className="text-xs font-bold text-[#111827] flex items-center gap-1.5">
+                <Calendar className="w-4 h-4 text-[#0057B8]" />
+                <span>تاريخ الميلاد:</span>
+              </span>
+              <div className="flex bg-gray-100 p-0.5 rounded-lg border border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => setBirthCalendar('gregorian')}
+                  className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all ${birthCalendar === 'gregorian' ? 'bg-white text-[#0057B8] shadow-xs' : 'text-gray-500 hover:text-gray-900'}`}
+                >
+                  ميلادي
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBirthCalendar('hijri')}
+                  className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all ${birthCalendar === 'hijri' ? 'bg-white text-[#0057B8] shadow-xs' : 'text-gray-500 hover:text-gray-900'}`}
+                >
+                  هجري
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">الشهر (1 - 12)</label>
+                <NumericInput
+                  id="birth-month-input-fields"
+                  min={1}
+                  max={12}
+                  allowDecimals={false}
+                  placeholder="05"
+                  value={birthMonth}
+                  onChange={setBirthMonth}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">السنة</label>
+                <NumericInput
+                  id="birth-year-input-fields"
+                  min={birthCalendar === 'gregorian' ? 1940 : 1360}
+                  max={birthCalendar === 'gregorian' ? 2008 : 1429}
+                  allowDecimals={false}
+                  placeholder={birthCalendar === 'gregorian' ? '1990' : '1410'}
+                  value={birthYear}
+                  onChange={setBirthYear}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Appointment date Card (only for Real Estate AND not retired!) */}
+          {mainFinanceType !== 'personal_only' && sectorId !== 'retired' ? (
+            <div className="border border-gray-200 rounded-2xl p-6 bg-white space-y-4 animate-fade-in shadow-xs font-sans">
+              <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+                <span className="text-xs font-bold text-[#111827] flex items-center gap-1.5">
+                  <Briefcase className="w-4 h-4 text-emerald-600" />
+                  <span>تاريخ المباشرة / التعيين:</span>
+                </span>
+                <div className="flex bg-gray-100 p-0.5 rounded-lg border border-gray-200">
+                  <button
+                    type="button"
+                    onClick={() => setAppointmentCalendar('gregorian')}
+                    className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all ${appointmentCalendar === 'gregorian' ? 'bg-white text-[#0057B8] shadow-xs' : 'text-gray-500 hover:text-gray-900'}`}
+                  >
+                    ميلادي
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAppointmentCalendar('hijri')}
+                    className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all ${appointmentCalendar === 'hijri' ? 'bg-white text-[#0057B8] shadow-xs' : 'text-gray-500 hover:text-gray-900'}`}
+                  >
+                    هجري
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">الشهر (1 - 12)</label>
+                  <NumericInput
+                    id="appointment-month-input-fields"
+                    min={1}
+                    max={12}
+                    allowDecimals={false}
+                    placeholder="09"
+                    value={appointmentMonth}
+                    onChange={setAppointmentMonth}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">السنة</label>
+                  <NumericInput
+                    id="appointment-year-input-fields"
+                    min={appointmentCalendar === 'gregorian' ? 1970 : 1390}
+                    max={appointmentCalendar === 'gregorian' ? 2026 : 1447}
+                    allowDecimals={false}
+                    placeholder={appointmentCalendar === 'gregorian' ? '2015' : '1436'}
+                    value={appointmentYear}
+                    onChange={setAppointmentYear}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                  />
+                </div>
+              </div>
+            </div>
+          ) : mainFinanceType !== 'personal_only' && sectorId === 'retired' ? (
+            <div className="bg-amber-50 rounded-2xl p-6 border border-amber-200 flex flex-col justify-center animate-fade-in shadow-xs">
+              <p className="text-xs text-amber-800 leading-relaxed font-sans font-medium">
+                بما أن القطاع المهني المختار هو <strong>"متقاعد حالي"</strong>، فلن نطلب تاريخ مباشرة العمل ويتم الاعتماد القياسي المطلق على السن لدورة الحياة التمويلية.
+              </p>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    );
+  };
+
+  const renderSalaryFields = () => {
+    return (
+      <div className="space-y-6">
+        {/* Sub tabs: manual net vs detailed (only if sector is NOT retired and NOT military) */}
+        {sectorId !== 'retired' && effectiveSectorId !== 'military' && (
+          <div className="flex bg-gray-100 p-1.5 rounded-xl border border-gray-200 gap-1 font-semibold font-sans">
+            <button
+              type="button"
+              id="salary-details-tab-field"
+              onClick={() => setSalaryMode('details')}
+              className={`flex-1 text-center py-2.5 rounded-lg font-bold text-xs transition-all cursor-pointer ${
+                salaryMode === 'details'
+                  ? 'bg-white text-[#0057B8] shadow-xs'
+                  : 'text-gray-500 hover:text-gray-900 hover:bg-white/50'
+              }`}
+            >
+              <span>إدخال تفاصيل الراتب (الأساسي والبدلات)</span>
+              <span className="text-[10px] font-normal text-[#0057B8]/80 block sm:inline-block sm:mr-1 mt-0.5 sm:mt-0 font-sans">(الخيار الموصى به والمساعد للحاسبة)</span>
+            </button>
+            <button
+              type="button"
+              id="salary-direct-tab-field"
+              onClick={() => setSalaryMode('direct')}
+              className={`flex-1 text-center py-2.5 rounded-lg font-bold text-xs transition-all cursor-pointer ${
+                salaryMode === 'direct'
+                  ? 'bg-white text-[#0057B8] shadow-xs'
+                  : 'text-gray-500 hover:text-gray-900 hover:bg-white/50'
+              }`}
+            >
+              أدخل الراتب الصافي مباشرة
+            </button>
+          </div>
+        )}
+
+        {/* Form elements */}
+        {effectiveSectorId === 'military' ? (
+          <div className="space-y-6 animate-fade-in text-right">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 font-sans">
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-gray-700">الراتب الأساسي <span className="text-rose-500">*</span>:</label>
+                <div className="relative">
+                  <NumericInput
+                    id="basic-salary-input-fields"
+                    min={0}
+                    allowDecimals={true}
+                    value={basicSalary}
+                    onChange={setBasicSalary}
+                    placeholder="مثال: 4555"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                  />
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">ريال</span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-gray-700">بدل النقل:</label>
+                <div className="relative">
+                  <NumericInput
+                    id="housing-salary-input-fields"
+                    min={0}
+                    allowDecimals={true}
+                    value={housingAllowance}
+                    onChange={setHousingAllowance}
+                    placeholder="مثال: 500"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                  />
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">ريال</span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-gray-700">البدلات / العلاوات الأخرى:</label>
+                <div className="relative">
+                  <NumericInput
+                    id="other-salary-input-fields"
+                    min={0}
+                    allowDecimals={true}
+                    value={otherAllowances}
+                    onChange={setOtherAllowances}
+                    placeholder="مثال: 4337.5"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                  />
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">ريال</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100 flex justify-between items-center text-xs">
+              <span className="text-emerald-800 font-bold">صافي الراتب المحسوب تلقائيًا:</span>
+              <span className="font-extrabold text-emerald-700 text-sm">{(localCalculatedNet).toLocaleString('ar-SA')} ريال سعودي</span>
+            </div>
+          </div>
+        ) : salaryMode === 'direct' || sectorId === 'retired' ? (
+          <div className="space-y-6 animate-fade-in text-right font-sans">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {sectorId === 'retired' ? (
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-gray-700 font-sans">الراتب التقاعدي الصافي المستلم شهريًا:</label>
+                  <div className="relative font-sans">
+                    <NumericInput
+                      id="retired-salary-input-fields"
+                      min={0}
+                      allowDecimals={true}
+                      value={directPensionSalary}
+                      onChange={setDirectPensionSalary}
+                      placeholder="مثال: 8000"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                    />
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">ريال سعودي</span>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-gray-700">مبلغ الراتب الصافي الكلي (المحول للبنك):</label>
+                    <div className="relative">
+                      <NumericInput
+                        id="direct-salary-input-fields"
+                        min={0}
+                        allowDecimals={true}
+                        value={directNetSalary}
+                        onChange={setDirectNetSalary}
+                        placeholder="مثال: 12500"
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                      />
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">ريال سعودي</span>
+                    </div>
+                  </div>
+
+                  {/* If chosen Direct Net Salary AND real_estate path, ask for Basic Salary (for pension selection) */}
+                  {mainFinanceType !== 'personal_only' && (
+                    <div className="space-y-2 animate-fade-in">
+                      <label className="block text-xs font-bold text-gray-700">الراتب الأساسي (لأغراض احتساب التقاعد فقط):</label>
+                      <div className="relative">
+                        <NumericInput
+                          id="basic-pension-salary-input-fields"
+                          min={0}
+                          allowDecimals={true}
+                          value={basicSalary}
+                          onChange={setBasicSalary}
+                          placeholder="مثال: 9000"
+                          className="w-full bg-slate-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                        />
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">ريال سعودي</span>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-6 animate-fade-in text-right font-sans">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-gray-700">الراتب الأساسي:</label>
+                <div className="relative">
+                  <NumericInput
+                    id="basic-salary-input-fields"
+                    min={0}
+                    allowDecimals={true}
+                    value={basicSalary}
+                    onChange={setBasicSalary}
+                    placeholder="مثال: 9000"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                  />
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">ريال</span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-gray-700">بدل السكن:</label>
+                <div className="relative">
+                  <NumericInput
+                    id="housing-salary-input-fields"
+                    min={0}
+                    allowDecimals={true}
+                    value={housingAllowance}
+                    onChange={setHousingAllowance}
+                    placeholder="مثال: 2250"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                  />
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">ريال</span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-gray-700">بدلات أخرى:</label>
+                <div className="relative">
+                  <NumericInput
+                    id="other-salary-input-fields"
+                    min={0}
+                    allowDecimals={true}
+                    value={otherAllowances}
+                    onChange={setOtherAllowances}
+                    placeholder="مثال: 1500"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                  />
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">ريال</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100 flex justify-between items-center text-xs">
+              <span className="text-emerald-800 font-bold">صافي الراتب المتوقع بعد خصم المعاشات:</span>
+              <span className="font-extrabold text-emerald-700 text-sm">{(localCalculatedNet).toLocaleString('ar-SA')} ريال سعودي</span>
+            </div>
+          </div>
+        )}
+
+        {mainFinanceType === 'personal_only' && (
+          <div className="mt-8 pt-6 border-t border-dashed border-gray-200 space-y-6 font-sans">
+            <div className="flex items-center gap-2 pb-2 text-slate-800">
+              <Coins className="w-5 h-5 text-amber-500" />
+              <h4 className="text-sm font-bold font-sans">خيارات الحسبة والجهات المفضلة</h4>
+            </div>
+            
+            <div className="border border-gray-200 bg-white rounded-2xl p-5 text-right space-y-3">
+              <label className="block text-xs font-bold text-gray-700">جهة التمويل المفضلة للتمويل الشخصي:</label>
+              <select
+                id="personal-bank-filter-select"
+                value={selectedBankId}
+                onChange={(e) => setSelectedBankId(e.target.value)}
+                className="w-full bg-slate-50 border border-gray-200 rounded-xl px-4 py-3.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-[#0057B8] focus:border-transparent cursor-pointer font-sans text-gray-800"
+              >
+                <option value="all">جميع جهات التمويل النشطة المتاحة (مقارنة العروض)</option>
+                {sortedActiveBanks.map(bank => (
+                  <option key={bank.id} value={bank.id}>{bank.nameAr}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="w-full bg-[#F5F7FA]">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -740,6 +1357,7 @@ export default function StepWizard() {
               if (stepId === 'main_type') stepLabel = 'نوع الحسبة';
               else if (stepId === 'personal_info') stepLabel = 'بيانات العميل';
               else if (stepId === 'salary') stepLabel = 'الراتب والدخل';
+              else if (stepId === 'personal_info_and_salary') stepLabel = 'بيانات العميل والدخل';
               else if (stepId === 'finance_options') stepLabel = 'خيارات الحسبة';
 
               return (
@@ -853,6 +1471,36 @@ export default function StepWizard() {
             </div>
           )}
 
+          {/* STEP: Combined Customer Data & Income (بيانات العميل والدخل) for Desktop/Laptop */}
+          {activeStepId === 'personal_info_and_salary' && (
+            <div className="space-y-6 animate-fade-in text-right">
+              <div className="text-center max-w-lg mx-auto mb-8">
+                <h3 className="text-xl font-bold text-[#111827]">أدخل بيانات العميل والدخل</h3>
+                <p className="text-sm text-[#6B7280] mt-1 font-sans">يرجى إدخال تفاصيل جهة العمل والدخل الشهري لتقرير نسب الملاءمة وتحديد العروض المناسبة بدقة.</p>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
+                {/* Column 1: Personal Info */}
+                <div className="space-y-6 bg-slate-50/20 p-6 rounded-2xl border border-gray-100">
+                  <h4 className="text-sm font-bold text-[#0057B8] flex items-center gap-2 border-b border-gray-150 pb-3 mb-4">
+                    <User className="w-4 h-4" />
+                    <span>القسم الأول: بيـانات العميل المهنية والشخصية</span>
+                  </h4>
+                  {renderPersonalInfoFields()}
+                </div>
+
+                {/* Column 2: Salary Info */}
+                <div className="space-y-6 bg-slate-50/20 p-6 rounded-2xl border border-gray-100">
+                  <h4 className="text-sm font-bold text-[#0057B8] flex items-center gap-2 border-b border-gray-150 pb-3 mb-4 font-sans">
+                    <Coins className="w-4 h-4 text-emerald-600" />
+                    <span>القسم الثاني: الرواتب والمستحقات والبدلات</span>
+                  </h4>
+                  {renderSalaryFields()}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* STEP 2: Customer Data (بيانات العميل) */}
           {activeStepId === 'personal_info' && (
             <div className="space-y-8 animate-fade-in text-right">
@@ -860,341 +1508,7 @@ export default function StepWizard() {
                 <h3 className="text-xl font-bold text-[#111827]">أدخل بيانات العميل المهنية والشخصية</h3>
                 <p className="text-sm text-[#6B7280] mt-1 font-sans">تساعد جهة العمل وتفاصيل السن والخدمة في ترجيح معايير الاستحقاق وهوامش التسعير.</p>
               </div>
-
-              {/* 1. Sector Picker */}
-              <div className="space-y-3">
-                <label className="block text-xs font-bold text-gray-700">ما هو القطاع المهني لجهة العمل؟</label>
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                  {[
-                    { id: 'gov_civil', label: 'حكومي مدني', icon: Briefcase },
-                    { id: 'military', label: 'عسكري', icon: User },
-                    { id: 'semi_gov', label: 'شبه حكومي', icon: Scale },
-                    { id: 'companies', label: 'موظف شركات', icon: Briefcase },
-                    { id: 'retired', label: 'متقاعد حالي', icon: Coins }
-                  ].map((sec) => (
-                    <div
-                      key={sec.id}
-                      id={`sector-card-${sec.id}`}
-                      onClick={() => {
-                        setSectorId(sec.id as SectorId);
-                        setSector(sec.id);
-                        
-                        if (sec.id === 'retired') {
-                          setSalaryMode('direct');
-                          setRetirementAge(getSectorRetirementAge('retired', 60, customSectors));
-                          setAhliGroup('');
-                          setMilitarySubtype('');
-                          setMilitaryRank('');
-                          setMilitaryType('');
-                        } else if (sec.id === 'gov_civil') {
-                          setRetirementAge(getSectorRetirementAge('gov_civil', 60, customSectors));
-                          setAhliGroup('A');
-                          setMilitarySubtype('');
-                          setMilitaryRank('');
-                          setMilitaryType('');
-                        } else if (sec.id === 'semi_gov') {
-                          setRetirementAge(getSectorRetirementAge('semi_gov', 60, customSectors));
-                          setAhliGroup('A');
-                          setMilitarySubtype('');
-                          setMilitaryRank('');
-                          setMilitaryType('');
-                        } else if (sec.id === 'companies') {
-                          setRetirementAge(getSectorRetirementAge('companies', 60, customSectors));
-                          setAhliGroup('A');
-                          setMilitarySubtype('');
-                          setMilitaryRank('');
-                          setMilitaryType('');
-                        } else if (sec.id === 'military') {
-                          setSalaryMode('details');
-                          setMilitarySubtype('enlisted');
-                          setMilitaryType('individual');
-                          const enlistedRanks = militaryRanks.filter(r => r.sectorScope === 'enlisted' && r.isActive);
-                          const sorted = [...enlistedRanks].sort((a,b) => a.displayOrder - b.displayOrder);
-                          const firstEnRank = sorted[0];
-                          if (firstEnRank) {
-                            setRankId(firstEnRank.id);
-                            setMilitaryRank(firstEnRank.nameAr);
-                            setRetirementAge(firstEnRank.retirementAge);
-                            setAhliGroup(firstEnRank.ahliGroup || 'B');
-                          } else {
-                            setRankId('jundi');
-                            setMilitaryRank('جندي / جندي أول');
-                            setRetirementAge(44);
-                            setAhliGroup('B');
-                          }
-                        }
-                      }}
-                      className={`flex flex-col items-center justify-center p-4 cursor-pointer transition-all border rounded-2xl text-center ${
-                        sectorId === sec.id
-                          ? 'border-[#0057B8] bg-[#0057B8]/5 ring-2 ring-[#0057B8]/15 font-bold'
-                          : 'border-slate-200 bg-white hover:bg-slate-50'
-                      }`}
-                    >
-                      <sec.icon className={`w-5 h-5 mb-2 shrink-0 ${sectorId === sec.id ? 'text-[#0057B8]' : 'text-gray-500'}`} />
-                      <span className="text-xs text-[#111827]">{sec.label}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* 2. Military Selector details (only if Sector is Military) */}
-              {sectorId === 'military' && (
-                <div id="military-rank-selector-wrapper" className="bg-gray-50 rounded-2xl p-6 border border-gray-200 animate-fade-in text-right space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Category subclass selector */}
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold text-gray-700">تصنيف الخدمة العسكرية:</label>
-                      <div className="grid grid-cols-2 gap-3">
-                        {[
-                          { id: 'enlisted', type: 'individual', scope: 'enlisted', label: 'عسكري أفراد' },
-                          { id: 'officer', type: 'officer', scope: 'officer', label: 'عسكري ضباط' }
-                        ].map((sub) => {
-                          const isSelected = militarySubtype === sub.id;
-                          return (
-                            <button
-                              key={sub.id}
-                              type="button"
-                              onClick={() => {
-                                setMilitarySubtype(sub.id as 'enlisted' | 'officer');
-                                setMilitaryType(sub.type as 'officer' | 'individual');
-                                const targetScope = sub.scope;
-                                const filteredRanks = militaryRanks.filter(r => r.sectorScope === targetScope && r.isActive);
-                                const sorted = [...filteredRanks].sort((a, b) => a.displayOrder - b.displayOrder);
-                                const firstRank = sorted[0];
-                                if (firstRank) {
-                                  setRankId(firstRank.id);
-                                  setMilitaryRank(firstRank.nameAr);
-                                  setRetirementAge(firstRank.retirementAge);
-                                  setAhliGroup(firstRank.ahliGroup || (sub.id === 'officer' ? 'A' : 'B'));
-                                }
-                              }}
-                              className={`py-2 px-4 rounded-xl text-xs font-bold transition-all border text-center ${
-                                isSelected
-                                  ? 'bg-[#0057B8] text-white border-[#0057B8] shadow-xs'
-                                  : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
-                              }`}
-                            >
-                              {sub.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Rank dropdown */}
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold text-gray-700">الرتبة العسكرية للعميل:</label>
-                      <select
-                        id="rank-select-step2"
-                        value={rankId}
-                        onChange={(e) => {
-                          const selectedId = e.target.value;
-                          setRankId(selectedId);
-                          
-                          const matched = militaryRanks.find(r => r.id === selectedId);
-                          if (matched) {
-                            setMilitaryRank(matched.nameAr);
-                            setRetirementAge(matched.retirementAge);
-                            setAhliGroup(matched.ahliGroup || (militarySubtype === 'officer' ? 'A' : 'B'));
-                          }
-                        }}
-                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] focus:border-transparent cursor-pointer"
-                      >
-                        {militaryRanks
-                          .filter(rank => rank.sectorScope === (militarySubtype === 'officer' ? 'officer' : 'enlisted') && rank.isActive)
-                          .sort((a, b) => a.displayOrder - b.displayOrder)
-                          .map((rank) => (
-                            <option key={rank.id} value={rank.id}>
-                              {rank.nameAr}
-                            </option>
-                          ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* هل العميل مؤهل لدعم اعتزاز؟ */}
-                  {supportSettings.etizaz?.enabled !== false && (
-                    <div className="border-t border-gray-150 pt-4 space-y-2">
-                      <label className="block text-xs font-bold text-gray-700">هل العميل مؤهل لدعم اعتزاز؟</label>
-                      <div className="flex gap-3 max-w-xs">
-                        {[
-                          { id: 'no', label: 'لا' },
-                          { id: 'yes', label: 'نعم' }
-                        ].map((opt) => (
-                          <button
-                            key={opt.id}
-                            type="button"
-                            id={`etizaz-opt-${opt.id}`}
-                            onClick={() => setIsEtizazEligible(opt.id as 'yes' | 'no')}
-                            className={`flex-1 py-2 px-4 rounded-xl text-xs font-bold transition-all border text-center cursor-pointer ${
-                              isEtizazEligible === opt.id
-                                ? 'bg-[#0057B8] text-white border-[#0057B8] shadow-xs'
-                                : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
-                            }`}
-                          >
-                            {opt.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="bg-white p-3 rounded-xl border border-gray-100 text-xs font-bold text-gray-600 text-center animate-fade-in max-w-xs mx-auto">
-                    <span>سن التقاعد للرتبة: </span>
-                    <strong className="text-[#0057B8]">{retirementAge} سنة</strong>
-                  </div>
-                </div>
-              )}
-
-              {/* Standalone Etizaz Selector for non-military eligible sectors */}
-              {sectorId !== 'military' && sectorId && (supportSettings.etizaz?.eligibleSectors || ['military']).includes(sectorId) && supportSettings.etizaz?.enabled !== false && (
-                <div id="etizaz-non-military-selector-wrapper" className="bg-gray-50 rounded-2xl p-6 border border-gray-200 animate-fade-in text-right space-y-4">
-                  <div className="space-y-2">
-                    <label className="block text-xs font-bold text-gray-700">هل العميل مؤهل لدعم اعتزاز؟</label>
-                    <div className="flex gap-3 max-w-xs">
-                      {[
-                        { id: 'no', label: 'لا' },
-                        { id: 'yes', label: 'نعم' }
-                      ].map((opt) => (
-                        <button
-                          key={opt.id}
-                          type="button"
-                          id={`etizaz-opt-non-military-${opt.id}`}
-                          onClick={() => setIsEtizazEligible(opt.id as 'yes' | 'no')}
-                          className={`flex-1 py-2 px-4 rounded-xl text-xs font-bold transition-all border text-center cursor-pointer ${
-                            isEtizazEligible === opt.id
-                              ? 'bg-[#0057B8] text-white border-[#0057B8] shadow-xs'
-                              : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
-                          }`}
-                        >
-                          {opt.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* 3. Dates Selector Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* DOB Card */}
-                <div className="border border-gray-200 rounded-2xl p-6 bg-white space-y-4">
-                  <div className="flex justify-between items-center border-b border-gray-100 pb-3">
-                    <span className="text-xs font-bold text-[#111827] flex items-center gap-1.5">
-                      <Calendar className="w-4 h-4 text-[#0057B8]" />
-                      <span>تاريخ الميلاد:</span>
-                    </span>
-                    <div className="flex bg-gray-100 p-0.5 rounded-lg border border-gray-200">
-                      <button
-                        type="button"
-                        onClick={() => setBirthCalendar('gregorian')}
-                        className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all ${birthCalendar === 'gregorian' ? 'bg-white text-[#0057B8] shadow-xs' : 'text-gray-500 hover:text-gray-900'}`}
-                      >
-                        ميلادي
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setBirthCalendar('hijri')}
-                        className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all ${birthCalendar === 'hijri' ? 'bg-white text-[#0057B8] shadow-xs' : 'text-gray-500 hover:text-gray-900'}`}
-                      >
-                        هجري
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-500 mb-1">الشهر (1 - 12)</label>
-                      <NumericInput
-                        id="birth-month-input"
-                        min={1}
-                        max={12}
-                        allowDecimals={false}
-                        placeholder="05"
-                        value={birthMonth}
-                        onChange={setBirthMonth}
-                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-500 mb-1">السنة</label>
-                      <NumericInput
-                        id="birth-year-input"
-                        min={birthCalendar === 'gregorian' ? 1940 : 1360}
-                        max={birthCalendar === 'gregorian' ? 2008 : 1429}
-                        allowDecimals={false}
-                        placeholder={birthCalendar === 'gregorian' ? '1990' : '1410'}
-                        value={birthYear}
-                        onChange={setBirthYear}
-                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Appointment date Card (only for Real Estate AND not retired!) */}
-                {mainFinanceType !== 'personal_only' && sectorId !== 'retired' ? (
-                  <div className="border border-gray-200 rounded-2xl p-6 bg-white space-y-4 animate-fade-in shadow-xs">
-                    <div className="flex justify-between items-center border-b border-gray-100 pb-3">
-                      <span className="text-xs font-bold text-[#111827] flex items-center gap-1.5">
-                        <Briefcase className="w-4 h-4 text-emerald-600" />
-                        <span>تاريخ المباشرة / التعيين:</span>
-                      </span>
-                      <div className="flex bg-gray-100 p-0.5 rounded-lg border border-gray-200">
-                        <button
-                          type="button"
-                          onClick={() => setAppointmentCalendar('gregorian')}
-                          className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all ${appointmentCalendar === 'gregorian' ? 'bg-white text-[#0057B8] shadow-xs' : 'text-gray-500 hover:text-gray-900'}`}
-                        >
-                          ميلادي
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setAppointmentCalendar('hijri')}
-                          className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all ${appointmentCalendar === 'hijri' ? 'bg-white text-[#0057B8] shadow-xs' : 'text-gray-500 hover:text-gray-900'}`}
-                        >
-                          هجري
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-500 mb-1">الشهر (1 - 12)</label>
-                        <NumericInput
-                          id="appointment-month-input"
-                          min={1}
-                          max={12}
-                          allowDecimals={false}
-                          placeholder="09"
-                          value={appointmentMonth}
-                          onChange={setAppointmentMonth}
-                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-500 mb-1">السنة</label>
-                        <NumericInput
-                          id="appointment-year-input"
-                          min={appointmentCalendar === 'gregorian' ? 1970 : 1390}
-                          max={appointmentCalendar === 'gregorian' ? 2026 : 1447}
-                          allowDecimals={false}
-                          placeholder={appointmentCalendar === 'gregorian' ? '2015' : '1436'}
-                          value={appointmentYear}
-                          onChange={setAppointmentYear}
-                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ) : mainFinanceType !== 'personal_only' && sectorId === 'retired' ? (
-                  <div className="bg-amber-50 rounded-2xl p-6 border border-amber-200 flex flex-col justify-center animate-fade-in shadow-xs">
-                    <p className="text-xs text-amber-800 leading-relaxed font-sans font-medium">
-                      بما أن القطاع المهني المختار هو <strong>"متقاعد حالي"</strong>، فلن نطلب تاريخ مباشرة العمل ويتم الاعتماد القياسي المطلق على السن لدورة الحياة التمويلية.
-                    </p>
-                  </div>
-                ) : null}
-              </div>
+              {renderPersonalInfoFields()}
             </div>
           )}
 
@@ -1205,237 +1519,7 @@ export default function StepWizard() {
                 <h3 className="text-xl font-bold text-[#111827]">الرواتب والمستحقات والبدلات</h3>
                 <p className="text-sm text-[#6B7280] mt-1 font-sans">يُشترط الإدخال الصحيح للراتب لتقرير عوامل الاستقطاع ونسب الملاءمة ائتمانياً لدى كافة البنوك.</p>
               </div>
-
-              {/* Sub tabs: manual net vs detailed (only if sector is NOT retired and NOT military) */}
-              {sectorId !== 'retired' && effectiveSectorId !== 'military' && (
-                <div className="flex bg-gray-100 p-1.5 rounded-xl mb-6 border border-gray-200 gap-1 font-semibold">
-                  <button
-                    type="button"
-                    id="salary-details-tab"
-                    onClick={() => setSalaryMode('details')}
-                    className={`flex-1 text-center py-2.5 rounded-lg font-bold text-xs transition-all cursor-pointer ${
-                      salaryMode === 'details'
-                        ? 'bg-white text-[#0057B8] shadow-xs'
-                        : 'text-gray-500 hover:text-gray-900 hover:bg-white/50'
-                    }`}
-                  >
-                    <span>إدخال تفاصيل الراتب (الأساسي والبدلات)</span>
-                    <span className="text-[10px] font-normal text-[#0057B8]/80 block sm:inline-block sm:mr-1 mt-0.5 sm:mt-0 font-sans">(الخيار الموصى به والمساعد للحاسبة)</span>
-                  </button>
-                  <button
-                    type="button"
-                    id="salary-direct-tab"
-                    onClick={() => setSalaryMode('direct')}
-                    className={`flex-1 text-center py-2.5 rounded-lg font-bold text-xs transition-all cursor-pointer ${
-                      salaryMode === 'direct'
-                        ? 'bg-white text-[#0057B8] shadow-xs'
-                        : 'text-gray-500 hover:text-gray-900 hover:bg-white/50'
-                    }`}
-                  >
-                    أدخل الراتب الصافي مباشرة
-                  </button>
-                </div>
-              )}
-
-              {/* Form elements */}
-              {effectiveSectorId === 'military' ? (
-                <div className="space-y-6 animate-fade-in text-right">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold text-gray-700">الراتب الأساسي <span className="text-rose-500">*</span>:</label>
-                      <div className="relative">
-                        <NumericInput
-                          id="basic-salary-input"
-                          min={0}
-                          allowDecimals={true}
-                          value={basicSalary}
-                          onChange={setBasicSalary}
-                          placeholder="مثال: 4555"
-                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
-                        />
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">ريال</span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold text-gray-700">بدل النقل:</label>
-                      <div className="relative">
-                        <NumericInput
-                          id="housing-salary-input"
-                          min={0}
-                          allowDecimals={true}
-                          value={housingAllowance}
-                          onChange={setHousingAllowance}
-                          placeholder="مثال: 500"
-                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
-                        />
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">ريال</span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold text-gray-700">البدلات / العلاوات الأخرى:</label>
-                      <div className="relative">
-                        <NumericInput
-                          id="other-salary-input"
-                          min={0}
-                          allowDecimals={true}
-                          value={otherAllowances}
-                          onChange={setOtherAllowances}
-                          placeholder="مثال: 4337.5"
-                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
-                        />
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">ريال</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="col-span-1 md:col-span-3 bg-emerald-50 rounded-2xl p-4 border border-emerald-100 flex justify-between items-center text-xs">
-                    <span className="text-emerald-800 font-bold">صافي الراتب المحسوب تلقائيًا:</span>
-                    <span className="font-extrabold text-emerald-700 text-sm">{(localCalculatedNet).toLocaleString('ar-SA')} ريال سعودي</span>
-                  </div>
-                </div>
-              ) : salaryMode === 'direct' || sectorId === 'retired' ? (
-                <div className="space-y-6 animate-fade-in">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {sectorId === 'retired' ? (
-                      <div className="space-y-2">
-                        <label className="block text-xs font-bold text-gray-700">الراتب التقاعدي الصافي المستلم شهريًا:</label>
-                        <div className="relative">
-                          <NumericInput
-                            id="retired-salary-input"
-                            min={0}
-                            allowDecimals={true}
-                            value={directPensionSalary}
-                            onChange={setDirectPensionSalary}
-                            placeholder="مثال: 8000"
-                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
-                          />
-                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">ريال سعودي</span>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="space-y-2">
-                          <label className="block text-xs font-bold text-gray-700">مبلغ الراتب الصافي الكلي (المحول للبنك):</label>
-                          <div className="relative">
-                            <NumericInput
-                              id="direct-salary-input"
-                              min={0}
-                              allowDecimals={true}
-                              value={directNetSalary}
-                              onChange={setDirectNetSalary}
-                              placeholder="مثال: 12500"
-                              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
-                            />
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">ريال سعودي</span>
-                          </div>
-                        </div>
-
-                        {/* If chosen Direct Net Salary AND real_estate path, ask for Basic Salary (for pension selection) */}
-                        {mainFinanceType !== 'personal_only' && (
-                          <div className="space-y-2 animate-fade-in">
-                            <label className="block text-xs font-bold text-gray-700">الراتب الأساسي (لأغراض احتساب التقاعد فقط):</label>
-                            <div className="relative">
-                              <NumericInput
-                                id="basic-pension-salary-input"
-                                min={0}
-                                allowDecimals={true}
-                                value={basicSalary}
-                                onChange={setBasicSalary}
-                                placeholder="مثال: 9000"
-                                className="w-full bg-slate-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
-                              />
-                              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">ريال سعودي</span>
-                            </div>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-6 animate-fade-in">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold text-gray-700">الراتب الأساسي:</label>
-                      <div className="relative">
-                        <NumericInput
-                          id="basic-salary-input"
-                          min={0}
-                          allowDecimals={true}
-                          value={basicSalary}
-                          onChange={setBasicSalary}
-                          placeholder="مثال: 9000"
-                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
-                        />
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">ريال</span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold text-gray-700">بدل السكن:</label>
-                      <div className="relative">
-                        <NumericInput
-                          id="housing-salary-input"
-                          min={0}
-                          allowDecimals={true}
-                          value={housingAllowance}
-                          onChange={setHousingAllowance}
-                          placeholder="مثال: 2250"
-                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
-                        />
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">ريال</span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold text-gray-700">بدلات أخرى:</label>
-                      <div className="relative">
-                        <NumericInput
-                          id="other-salary-input"
-                          min={0}
-                          allowDecimals={true}
-                          value={otherAllowances}
-                          onChange={setOtherAllowances}
-                          placeholder="مثال: 1500"
-                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
-                        />
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">ريال</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="col-span-1 md:col-span-3 bg-emerald-50 rounded-2xl p-4 border border-emerald-100 flex justify-between items-center text-xs">
-                    <span className="text-emerald-800 font-bold">صافي الراتب المتوقع بعد خصم المعاشات:</span>
-                    <span className="font-extrabold text-emerald-700 text-sm">{(localCalculatedNet).toLocaleString('ar-SA')} ريال سعودي</span>
-                  </div>
-                </div>
-              )}
-
-              {mainFinanceType === 'personal_only' && (
-                <div className="mt-8 pt-6 border-t border-dashed border-gray-200 space-y-6">
-                  <div className="flex items-center gap-2 pb-2 text-slate-800">
-                    <Coins className="w-5 h-5 text-amber-500" />
-                    <h4 className="text-sm font-bold">خيارات الحسبة والجهات المفضلة</h4>
-                  </div>
-                  
-                  <div className="border border-gray-200 bg-white rounded-2xl p-5 text-right space-y-3">
-                    <label className="block text-xs font-bold text-gray-700">جهة التمويل المفضلة للتمويل الشخصي:</label>
-                    <select
-                      id="personal-bank-filter-select"
-                      value={selectedBankId}
-                      onChange={(e) => setSelectedBankId(e.target.value)}
-                      className="w-full bg-slate-50 border border-gray-200 rounded-xl px-4 py-3.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-[#0057B8] focus:border-transparent cursor-pointer font-sans text-gray-800"
-                    >
-                      <option value="all">جميع جهات التمويل النشطة المتاحة (مقارنة العروض)</option>
-                      {sortedActiveBanks.map(bank => (
-                        <option key={bank.id} value={bank.id}>{bank.nameAr}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              )}
+              {renderSalaryFields()}
             </div>
           )}
                       {/* STEP 4: Finance Options & Obligations */}
