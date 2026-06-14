@@ -81,6 +81,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
   const [isLoaded, setIsLoaded] = useState(false);
   const lastUpdatedRulesRef = useRef<MarginRule[] | null>(null);
   const lastLoadedKeyRef = useRef<string>('');
+  const lastFilterKeyRef = useRef<string>('');
   const [isSavingToCloud, setIsSavingToCloud] = useState(false);
 
   // Hydration ref to block auto synchronization during table initialization or selection changes
@@ -153,6 +154,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
   useEffect(() => {
     if (!selectedBank) return;
 
+    const durationDistributionType = selectedYearsMode === 'duration_tiers' ? 'month_ranges' : 'years';
     const currentKey = [
       selectedBank,
       selectedProduct,
@@ -160,7 +162,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       selectedSector,
       selectedSalaryBand,
       selectedSalaryTransferStatus,
-      selectedYearsMode,
+      durationDistributionType,
       selectedCalcMethod
     ].join(':');
 
@@ -178,7 +180,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     let initialTiers: any[] = [];
     let initialExceptions: Record<string, string> = {};
     let method: 'linear' | 'fixed' = selectedCalcMethod || 'fixed';
-    let determinedMode: 'yearly' | 'key_points' | 'duration_tiers' | '' = selectedYearsMode;
+    let determinedMode: 'yearly' | 'key_points' | 'duration_tiers' | '' = '';
 
     const normSupportVal = normSupport(selectedSupport);
 
@@ -228,7 +230,16 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     );
 
     // Now detect or respect distribution mode
-    if (determinedMode === '') {
+    const filterKey = [
+      selectedBank,
+      selectedProduct,
+      selectedSupport,
+      selectedSector,
+      selectedSalaryBand,
+      selectedSalaryTransferStatus
+    ].join(':');
+
+    if (filterKey !== lastFilterKeyRef.current) {
       if (sectorRules.length > 0) {
         const withCalcMode = sectorRules.find(r => r.calculationMode);
         const withInputMode = sectorRules.find(r => r.marginInputMode);
@@ -241,8 +252,30 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
           determinedMode = getRuleInputMode(sectorRules[0]);
         }
       } else {
-        determinedMode = 'key_points';
+        // Look for any existing rule for this bank + product + support to use as default distribution mode
+        const bankRules = allNormalized.filter(r => 
+          r.bankId === targetBank &&
+          r.productId === targetProduct &&
+          normSupport(r.supportType) === normSupport(targetSupport) &&
+          !r.isExceptionOnly
+        );
+        if (bankRules.length > 0) {
+          const withCalcMode = bankRules.find(r => r.calculationMode);
+          const withInputMode = bankRules.find(r => r.marginInputMode);
+          if (withCalcMode && withCalcMode.calculationMode) {
+            determinedMode = withCalcMode.calculationMode as any;
+          } else if (withInputMode && withInputMode.marginInputMode) {
+            determinedMode = withInputMode.marginInputMode as any;
+          } else {
+            determinedMode = getRuleInputMode(bankRules[0]);
+          }
+        } else {
+          determinedMode = '';
+        }
       }
+      lastFilterKeyRef.current = filterKey;
+    } else {
+      determinedMode = selectedYearsMode;
     }
 
     // Load method from rules if defined and not set by user
@@ -354,13 +387,16 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       const rSB = r.salaryBand || (r.salaryTier === 'below_25000' ? 'below_25000' : r.salaryTier === 'above_or_equal_25000' ? 'from_25000' : 'all');
       const rMode = r.marginInputMode || getRuleInputMode(r);
 
+      const isRModeYears = (rMode === 'yearly' || rMode === 'key_points');
+      const isInputModeYears = (inputMode === 'yearly' || inputMode === 'key_points');
+
       const isBaseComboMatch = r.bankId === targetBank &&
                                r.productId === targetProduct &&
                                normSupport(r.supportType) === normSupportVal &&
                                normSector(r.sectorId) === normSector(targetSector) &&
                                rST === selectedSalaryTransferStatus &&
                                rSB === targetSalaryBand &&
-                               rMode === inputMode &&
+                               ((isInputModeYears && isRModeYears) || (inputMode === 'duration_tiers' && rMode === 'duration_tiers')) &&
                                !r.isExceptionOnly;
 
       if (isBaseComboMatch) {
@@ -527,6 +563,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     if (!isLoaded) return;
     if (isHydratingRef.current) return;
     
+    const durationDistributionType = selectedYearsMode === 'duration_tiers' ? 'month_ranges' : 'years';
     const currentKey = [
       selectedBank,
       selectedProduct,
@@ -534,7 +571,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       selectedSector,
       selectedSalaryBand,
       selectedSalaryTransferStatus,
-      selectedYearsMode,
+      durationDistributionType,
       selectedCalcMethod
     ].join(':');
 
@@ -565,6 +602,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     if (isHydratingRef.current) return;
     if (selectedYearsMode === '') return; // Guard: No mode selected/loaded, do not write empty state to global
 
+    const durationDistributionType = selectedYearsMode === 'duration_tiers' ? 'month_ranges' : 'years';
     const currentKey = [
       selectedBank,
       selectedProduct,
@@ -572,7 +610,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       selectedSector,
       selectedSalaryBand,
       selectedSalaryTransferStatus,
-      selectedYearsMode,
+      durationDistributionType,
       selectedCalcMethod
     ].join(':');
 
@@ -665,6 +703,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
         selectedYearsMode
       );
 
+      const durationDistributionType = selectedYearsMode === 'duration_tiers' ? 'month_ranges' : 'years';
       const currentKey = [
         selectedBank,
         selectedProduct,
@@ -672,7 +711,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
         selectedSector,
         selectedSalaryBand,
         selectedSalaryTransferStatus,
-        selectedYearsMode,
+        durationDistributionType,
         selectedCalcMethod
       ].join(':');
       const latestCombo = {
