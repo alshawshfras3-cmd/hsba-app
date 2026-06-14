@@ -122,6 +122,19 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     }
   }, [sectorsList, selectedSector]);
 
+  // Auto handle support and salary band dependencies
+  useEffect(() => {
+    if (selectedSupport === 'none') {
+      if (selectedSalaryBand !== 'all') {
+        setSelectedSalaryBand('all');
+      }
+    } else {
+      if (selectedSalaryBand === 'all' || !selectedSalaryBand) {
+        setSelectedSalaryBand('below_25000');
+      }
+    }
+  }, [selectedSupport, selectedSalaryBand]);
+
   // Normalization helper definitions
   const normSector = (s?: string) => (!s || s === 'all') ? 'all' : s;
   const normSupport = (s?: string) => {
@@ -829,7 +842,8 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
             toMonth: (srcRule.toMonth !== undefined ? srcRule.toMonth : srcRule.toTermMonths) ?? 9999,
             marginRate: rate,
             active: srcRule.active !== false && srcRule.isActive !== false,
-            notes: srcRule.notes || ''
+            notes: srcRule.notes || '',
+            salaryBand: targetSalaryTier === 'below_25000' ? 'below_25000' : targetSalaryTier === 'above_or_equal_25000' ? 'from_25000' : 'all'
           });
         });
       });
@@ -940,7 +954,8 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
               termMonths: def.to === 9999 ? (def.yearPoint * 12) : def.to,
               annualMargin: def.end,
               exceptionBps: 0,
-              baseMargin: Number((def.end / 100).toFixed(6))
+              baseMargin: Number((def.end / 100).toFixed(6)),
+              salaryBand: targetSalaryTier === 'below_25000' ? 'below_25000' : targetSalaryTier === 'above_or_equal_25000' ? 'from_25000' : 'all'
             });
           });
         }
@@ -1053,7 +1068,8 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
               termMonths: def.to === 9999 ? (def.yearPoint * 12) : def.to,
               annualMargin: def.end,
               exceptionBps: 0,
-              baseMargin: Number((def.end / 100).toFixed(6))
+              baseMargin: Number((def.end / 100).toFixed(6)),
+              salaryBand: targetSalaryTier === 'below_25000' ? 'below_25000' : targetSalaryTier === 'above_or_equal_25000' ? 'from_25000' : 'all'
             });
           });
         }
@@ -1319,32 +1335,33 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
             </div>
 
             {/* Salary Band Select (فئة الراتب الشهري) - Segmented Buttons */}
-            <div className="space-y-1.5">
-              <label className="block text-[11px] font-bold text-gray-500">فئة الراتب الشهري:</label>
-              <div className="grid grid-cols-3 gap-1">
-                {[
-                  { id: 'all', label: 'الكل' },
-                  { id: 'below_25000', label: 'أقل من ٢٥ ألف' },
-                  { id: 'from_25000', label: '٢٥ ألف فأكثر' }
-                ].map(t => {
-                  const isSelected = selectedSalaryBand === t.id;
-                  return (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => setSelectedSalaryBand(t.id as any)}
-                      className={`px-1 py-1.5 rounded-lg border text-[10px] font-bold text-center transition-all cursor-pointer white-space-nowrap ${
-                        isSelected
-                          ? 'bg-[#0057B8]/10 border-[#0057B8] text-[#0057B8] shadow-xs'
-                          : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
-                      }`}
-                    >
-                      {t.label}
-                    </button>
-                  );
-                })}
+            {selectedSupport !== 'none' && (
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-bold text-gray-500">فئة الراتب الشهري:</label>
+                <div className="grid grid-cols-2 gap-1">
+                  {[
+                    { id: 'below_25000', label: 'أقل من ٢٥ ألف' },
+                    { id: 'from_25000', label: '٢٥ ألف فأكثر' }
+                  ].map(t => {
+                    const isSelected = selectedSalaryBand === t.id;
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => setSelectedSalaryBand(t.id as any)}
+                        className={`px-1 py-1.5 rounded-lg border text-[10px] font-bold text-center transition-all cursor-pointer white-space-nowrap ${
+                          isSelected
+                            ? 'bg-[#0057B8]/10 border-[#0057B8] text-[#0057B8] shadow-xs'
+                            : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
+                        }`}
+                      >
+                        {t.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Salary Transfer Status Select */}
             <div className="space-y-1.5">
@@ -1513,9 +1530,11 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                 💼 {sectorsList.find(s => s.id === selectedSector)?.nameAr || 'عام'}
               </span>
 
-              <span className="col-span-1 bg-indigo-50 border border-indigo-100 text-indigo-700 text-[11px] px-2.5 py-1 rounded-lg font-bold">
-                💵 {selectedSalaryBand === 'all' ? 'فئة الراتب: الكل' : selectedSalaryBand === 'below_25000' ? 'فئة الراتب: أقل من 25,000' : 'فئة الراتب: 25,000 فأكثر'}
-              </span>
+              {selectedSupport !== 'none' && (
+                <span className="col-span-1 bg-indigo-50 border border-indigo-100 text-indigo-700 text-[11px] px-2.5 py-1 rounded-lg font-bold">
+                  💵 {selectedSalaryBand === 'below_25000' ? 'فئة الراتب: أقل من 25,000' : 'فئة الراتب: 25,000 فأكثر'}
+                </span>
+              )}
 
               <span className="bg-slate-100 border border-slate-200 text-slate-700 text-[11px] px-2.5 py-1 rounded-lg font-bold">
                 ⏱️ {selectedYearsMode === 'key_points' ? 'نقاط رئيسية' : selectedYearsMode === 'yearly' ? 'كل سنة مستقلة' : selectedYearsMode === 'duration_tiers' ? 'شرائح مدة' : 'طريقة التوزيع غير محددة بعد'}
