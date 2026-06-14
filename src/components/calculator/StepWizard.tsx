@@ -166,6 +166,7 @@ export default function StepWizard() {
 
   // New prompt requirements states
   const [sector, setSector] = useState<string>(() => getDraftValue('sector', ''));
+  const [salaryBankId, setSalaryBankId] = useState<string>(() => getDraftValue('salaryBankId', ''));
   const [militarySubtype, setMilitarySubtype] = useState<'officer' | 'enlisted' | ''>(() => getDraftValue('militarySubtype', ''));
   const [militaryRank, setMilitaryRank] = useState<string>(() => getDraftValue('militaryRank', ''));
   const [retirementAge, setRetirementAge] = useState<number | ''>(() => getDraftValue<number | ''>('retirementAge', ''));
@@ -280,6 +281,7 @@ export default function StepWizard() {
       militaryType,
       rankId,
       sector,
+      salaryBankId,
       militarySubtype,
       militaryRank,
       retirementAge,
@@ -322,6 +324,7 @@ export default function StepWizard() {
     militaryType,
     rankId,
     sector,
+    salaryBankId,
     militarySubtype,
     militaryRank,
     retirementAge,
@@ -385,6 +388,7 @@ export default function StepWizard() {
     
     setSupportType('');
     setSelectedBankId('');
+    setSalaryBankId('');
     setTermMode('max');
     setManualTermYears(25);
     setIsEtizazEligible('no');
@@ -583,6 +587,10 @@ export default function StepWizard() {
         stepErrors.push('حدد نوع العسكري لأن بعض البنوك تختلف بين الضباط والأفراد.');
       }
 
+      if (!salaryBankId) {
+        stepErrors.push('يرجى تحديد البنك المحول عليه راتبك للمتابعة.');
+      }
+
       const today = new Date();
       const currentYear = today.getFullYear();
 
@@ -703,6 +711,7 @@ export default function StepWizard() {
       obligationRemainingMonths: Number(obligationRemainingMonths) || 0,
       supportType,
       selectedBankId,
+      salaryBankId,
       termMode,
       manualTermMonths: (termMode === 'manual' && manualTermYears) ? (Number(manualTermYears) * 12) : undefined,
 
@@ -839,6 +848,27 @@ export default function StepWizard() {
               </div>
             ))}
           </div>
+        </div>
+
+        {/* Salary Bank Input */}
+        <div id="salary-bank-selector-wrapper" className="space-y-2 animate-fade-in">
+          <label className="block text-xs font-bold text-gray-700">راتبك على أي بنك؟ <span className="text-rose-500">*</span></label>
+          <select
+            id="salary-bank-select"
+            value={salaryBankId}
+            onChange={(e) => setSalaryBankId(e.target.value)}
+            className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] focus:border-transparent cursor-pointer"
+          >
+            <option value="">-- اختر البنك المحول عليه راتبك --</option>
+            <option id="opt-alahli" value="alahli">البنك الأهلي</option>
+            <option id="opt-rajhi" value="rajhi">بنك الراجحي</option>
+            <option id="opt-albilad" value="albilad">بنك البلاد</option>
+            <option id="opt-alinma" value="alinma">بنك الإنماء</option>
+            <option id="opt-fransi" value="fransi">البنك السعودي الفرنسي</option>
+            <option id="opt-alarabi" value="alarabi">البنك العربي</option>
+            <option id="opt-bidaya" value="bidaya">بداية</option>
+            <option id="opt-other_bank" value="other_bank">بنك آخر</option>
+          </select>
         </div>
 
         {/* 2. Military Selector details (only if Sector is Military) */}

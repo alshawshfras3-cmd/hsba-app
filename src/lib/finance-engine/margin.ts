@@ -14,15 +14,30 @@ export const getRuleInputMode = (r: MarginRule): 'yearly' | 'key_points' | 'dura
   return 'key_points';
 };
 
-export function resolveConfiguredMarginMode(params: {
+export function resolveSalaryTransferStatus(
+  targetBankId: string,
+  salaryBankId?: string | null
+): 'salary_transfer' | 'no_salary_transfer' {
+  if (salaryBankId && salaryBankId === targetBankId) {
+    return 'salary_transfer';
+  }
+  return 'no_salary_transfer';
+}
+
+export function resolveMatchingRules(params: {
   bankId: string;
   productId: ProductId;
   supportType: SupportType;
   sectorId: SectorId;
   marginRules: MarginRule[];
   netSalary?: number;
-}): 'duration_tiers' | 'yearly' | 'key_points' {
-  let normProduct = params.productId;
+  salaryBankId?: string | null;
+  installmentType?: 'fixed_or_step_down' | 'increasing' | 'all';
+}): MarginRule[] {
+  const { bankId, productId, supportType, sectorId, marginRules, netSalary, salaryBankId, installmentType = 'fixed_or_step_down' } = params;
+
+  // Normalize Product ID
+  let normProduct = productId;
   if (normProduct === 'real_estate' || normProduct === 'real_estate_only') {
     normProduct = 'real_estate_only';
   } else if (normProduct === 'both' || normProduct === 'real_estate_with_new_personal') {
@@ -31,58 +46,125 @@ export function resolveConfiguredMarginMode(params: {
     normProduct = 'real_estate_with_existing_personal';
   }
 
+  // Normalize Support Type
   const normSup = (s?: string) => {
     if (!s || s === 'none') return 'none';
     if (s === 'down_payment' || s === 'downpayment') return 'downpayment';
     return s;
   };
-  const normSec = (s?: string) => (!s || s === 'all') ? 'all' : s;
-  const normSal = (t?: string) => (!t || t === 'not_applicable') ? 'not_applicable' : t;
+  const targetSupportNorm = normSup(supportType);
 
-  let salaryTier: 'below_25000' | 'above_or_equal_25000' | 'not_applicable' = 'not_applicable';
-  if (normSup(params.supportType) !== 'none' && params.netSalary !== undefined) {
-    salaryTier = params.netSalary < 25000 ? 'below_25000' : 'above_or_equal_25000';
+  // Determine Salary Band
+  let salaryBand: 'below_25000' | 'from_25000' | 'all' = 'all';
+  if (netSalary !== undefined) {
+    salaryBand = netSalary < 25000 ? 'below_25000' : 'from_25000';
   }
 
-  const targetSupportNorm = normSup(params.supportType);
-  const targetSalaryTierNorm = normSal(salaryTier);
-  const targetSectorNorm = normSec(params.sectorId);
+  // Determine Salary Transfer Status
+  const salaryTransferStatus = resolveSalaryTransferStatus(bankId, salaryBankId);
 
-  let matchingRules = params.marginRules.filter(
-    r => r.bankId === params.bankId &&
+  // Normalization value extractors for robust old/new rules support
+  const getRuleInstallmentType = (r: MarginRule): 'fixed_or_step_down' | 'increasing' | 'all' => {
+    return r.installmentType || 'all';
+  };
+
+  const getRuleSalaryTransferStatus = (r: MarginRule): 'all' | 'salary_transfer' | 'no_salary_transfer' => {
+    return r.salaryTransferStatus || 'all';
+  };
+
+  const getRuleSalaryBand = (r: MarginRule): 'all' | 'below_25000' | 'from_25000' => {
+    if (r.salaryBand) return r.salaryBand;
+    if (r.salaryTier === 'below_25000') return 'below_25000';
+    if (r.salaryTier === 'above_or_equal_25000') return 'from_25000';
+    return 'all';
+  };
+
+  const getRuleSupportType = (r: MarginRule): 'all' | 'none' | 'monthly' | 'downpayment' => {
+    const s = r.supportType;
+    if (!s || s === 'all') return 'all';
+    if (s === 'none') return 'none';
+    if (s === 'monthly') return 'monthly';
+    if (s === 'downpayment' || s === 'down_payment') return 'downpayment';
+    return 'all';
+  };
+
+  const activeRules = marginRules.filter(r => r.isActive && !r.isExceptionOnly);
+
+  // Sequence matching:
+  // 1. Full Match: matching bankId, productId, installmentType, salaryTransferStatus, salaryBand, supportType
+  const match1 = activeRules.filter(
+    r => r.bankId === bankId &&
          r.productId === normProduct &&
-         (normSup(r.supportType) === 'all' || normSup(r.supportType) === targetSupportNorm) &&
-         (normSec(r.sectorId) === targetSectorNorm) &&
-         r.isActive &&
-         (normSal(r.salaryTier) === 'not_applicable' || normSal(r.salaryTier) === targetSalaryTierNorm) &&
-         !r.isExceptionOnly
+         (getRuleInstallmentType(r) === 'all' || getRuleInstallmentType(r) === installmentType) &&
+         (getRuleSalaryTransferStatus(r) === salaryTransferStatus) &&
+         (getRuleSalaryBand(r) === salaryBand) &&
+         (getRuleSupportType(r) === 'all' || getRuleSupportType(r) === targetSupportNorm)
   );
+  if (match1.length > 0) return match1;
 
-  if (matchingRules.length === 0) {
-    matchingRules = params.marginRules.filter(
-      r => r.bankId === params.bankId &&
-           r.productId === normProduct &&
-           (normSup(r.supportType) === 'all' || normSup(r.supportType) === targetSupportNorm) &&
-           (normSec(r.sectorId) === 'all') &&
-           r.isActive &&
-           (normSal(r.salaryTier) === 'not_applicable' || normSal(r.salaryTier) === targetSalaryTierNorm) &&
-           !r.isExceptionOnly
-    );
-  }
+  // 2. Fallback salaryTransferStatus = all
+  const match2 = activeRules.filter(
+    r => r.bankId === bankId &&
+         r.productId === normProduct &&
+         (getRuleInstallmentType(r) === 'all' || getRuleInstallmentType(r) === installmentType) &&
+         (getRuleSalaryTransferStatus(r) === 'all') &&
+         (getRuleSalaryBand(r) === salaryBand) &&
+         (getRuleSupportType(r) === 'all' || getRuleSupportType(r) === targetSupportNorm)
+  );
+  if (match2.length > 0) return match2;
 
-  const specificRules = matchingRules.filter(r => normSal(r.salaryTier) === targetSalaryTierNorm);
-  if (specificRules.length > 0) {
-    matchingRules = specificRules;
-  }
+  // 3. Fallback salaryBand = all
+  const match3 = activeRules.filter(
+    r => r.bankId === bankId &&
+         r.productId === normProduct &&
+         (getRuleInstallmentType(r) === 'all' || getRuleInstallmentType(r) === installmentType) &&
+         (getRuleSalaryTransferStatus(r) === salaryTransferStatus || getRuleSalaryTransferStatus(r) === 'all') &&
+         (getRuleSalaryBand(r) === 'all') &&
+         (getRuleSupportType(r) === 'all' || getRuleSupportType(r) === targetSupportNorm)
+  );
+  if (match3.length > 0) return match3;
 
-  if (matchingRules.length === 0) {
-    matchingRules = params.marginRules.filter(
-      r => r.bankId === 'all' &&
-           r.productId === normProduct &&
-           r.isActive &&
-           !r.isExceptionOnly
-    );
-  }
+  // 4. Fallback supportType = all
+  const match4 = activeRules.filter(
+    r => r.bankId === bankId &&
+         r.productId === normProduct &&
+         (getRuleInstallmentType(r) === 'all' || getRuleInstallmentType(r) === installmentType) &&
+         (getRuleSalaryTransferStatus(r) === salaryTransferStatus || getRuleSalaryTransferStatus(r) === 'all') &&
+         (getRuleSalaryBand(r) === salaryBand || getRuleSalaryBand(r) === 'all') &&
+         (getRuleSupportType(r) === 'all')
+  );
+  if (match4.length > 0) return match4;
+
+  // 5. Fallback both salaryBand and supportType = all
+  const match5 = activeRules.filter(
+    r => r.bankId === bankId &&
+         r.productId === normProduct &&
+         (getRuleInstallmentType(r) === 'all' || getRuleInstallmentType(r) === installmentType) &&
+         (getRuleSalaryTransferStatus(r) === 'all') &&
+         (getRuleSalaryBand(r) === 'all') &&
+         (getRuleSupportType(r) === 'all')
+  );
+  if (match5.length > 0) return match5;
+
+  // 6. Global fallback rule matching bankId === 'all'
+  const matchGlobal = activeRules.filter(
+    r => r.bankId === 'all' &&
+         r.productId === normProduct
+  );
+  return matchGlobal;
+}
+
+export function resolveConfiguredMarginMode(params: {
+  bankId: string;
+  productId: ProductId;
+  supportType: SupportType;
+  sectorId: SectorId;
+  marginRules: MarginRule[];
+  netSalary?: number;
+  salaryBankId?: string | null;
+  installmentType?: 'fixed_or_step_down' | 'increasing' | 'all';
+}): 'duration_tiers' | 'yearly' | 'key_points' {
+  const matchingRules = resolveMatchingRules(params);
 
   const withInputMode = matchingRules.find(r => r.marginInputMode);
   if (withInputMode && withInputMode.marginInputMode) {
@@ -100,9 +182,11 @@ export function calculateMargin(params: {
   termMonths: number;
   marginRules: MarginRule[];
   netSalary?: number;
+  salaryBankId?: string | null;
+  installmentType?: 'fixed_or_step_down' | 'increasing' | 'all';
   calculationMode: 'duration_tiers' | 'yearly' | 'key_points';
 }): MarginOutput {
-  const { bankId, productId, supportType, sectorId, termMonths, marginRules, netSalary, calculationMode } = params;
+  const { bankId, productId, supportType, sectorId, termMonths, marginRules, netSalary, salaryBankId, installmentType, calculationMode } = params;
 
   // 1. Normalize productId to the values defined inside margin settings
   let normProduct: ProductId = productId;
@@ -130,63 +214,21 @@ export function calculateMargin(params: {
   let selectedMarginYear = Math.round(termMonths / 12);
   selectedMarginYear = Math.min(Math.max(selectedMarginYear, 5), 30);
 
-  // Normalization helpers inside calculator
-  const normSec = (s?: string) => (!s || s === 'all') ? 'all' : s;
-  const normSup = (s?: string) => {
-    if (!s || s === 'none') return 'none';
-    if (s === 'down_payment' || s === 'downpayment') return 'downpayment';
-    return s;
-  };
-  const normSal = (t?: string) => (!t || t === 'not_applicable') ? 'not_applicable' : t;
-
-  const targetSupportNorm = normSup(normSupport);
-  const targetSalaryTierNorm = normSal(salaryTier);
-  const targetSectorNorm = normSec(sectorId);
-
-  // Filter base rules (which are our margin rules across years)
-  // Try matching exact sectorId first
-  let rules = marginRules.filter(
-    r => r.bankId === bankId &&
-         r.productId === normProduct &&
-         (normSup(r.supportType) === 'all' || normSup(r.supportType) === targetSupportNorm) &&
-         (normSec(r.sectorId) === targetSectorNorm) &&
-         r.isActive &&
-         (normSal(r.salaryTier) === 'not_applicable' || normSal(r.salaryTier) === targetSalaryTierNorm) &&
-         !r.isExceptionOnly
-  );
-
-  // If no sector-specific rules exist, fallback to general/all sector rules
-  if (rules.length === 0) {
-    rules = marginRules.filter(
-      r => r.bankId === bankId &&
-           r.productId === normProduct &&
-           (normSup(r.supportType) === 'all' || normSup(r.supportType) === targetSupportNorm) &&
-           (normSec(r.sectorId) === 'all') &&
-           r.isActive &&
-           (normSal(r.salaryTier) === 'not_applicable' || normSal(r.salaryTier) === targetSalaryTierNorm) &&
-           !r.isExceptionOnly
-    );
-  }
-
-  // If we have rules that explicitly specify our target salaryTier, prioritize them
-  const specificRules = rules.filter(r => normSal(r.salaryTier) === targetSalaryTierNorm);
-  if (specificRules.length > 0) {
-    rules = specificRules;
-  }
-
-  // If no bank-specific rule, look for general rules
-  if (rules.length === 0) {
-    rules = marginRules.filter(
-      r => r.bankId === 'all' &&
-           r.productId === normProduct &&
-           r.isActive &&
-           !r.isExceptionOnly
-    );
-  }
+  // Retrieve sequenced matching rules
+  const rules = resolveMatchingRules({
+    bankId,
+    productId,
+    supportType,
+    sectorId,
+    marginRules,
+    netSalary,
+    salaryBankId,
+    installmentType
+  });
 
   const bankNameAr = bankId === 'rajhi' ? 'مصرف الراجحي' : bankId === 'alahli' ? 'البنك الأهلي السعودي' : bankId === 'alinma' ? 'مصرف الإنماء' : bankId;
   const productNameAr = normProduct === 'real_estate_only' ? 'عقاري فقط' : normProduct === 'real_estate_with_new_personal' ? 'عقاري + شخصي جديد' : 'عقاري مع شخصي قائم';
-  const supportNameAr = normSupport === 'none' ? 'غير مدعوم' : normSupport === 'monthly' ? 'دعم شهري' : 'دعم دفعة';
+  const supportNameAr = normSupport === 'none' ? 'بدون دعم' : normSupport === 'monthly' ? 'دعم شهري' : 'دعم دفعة';
 
   if (rules.length === 0) {
     return {

@@ -64,6 +64,9 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
   const [selectedSector, setSelectedSector] = useState<string>('');
   const [selectedYearsMode, setSelectedYearsMode] = useState<'yearly' | 'key_points' | 'duration_tiers' | ''>('');
   const [selectedCalcMethod, setSelectedCalcMethod] = useState<'linear' | 'fixed'>('fixed');
+  const [selectedSalaryTransferStatus, setSelectedSalaryTransferStatus] = useState<'all' | 'salary_transfer' | 'no_salary_transfer'>('all');
+  const [selectedInstallmentType, setSelectedInstallmentType] = useState<'all' | 'fixed_or_step_down' | 'increasing'>('all');
+  const [selectedSalaryBand, setSelectedSalaryBand] = useState<'all' | 'below_25000' | 'from_25000'>('all');
 
   // 2. Local inputs for Edit Grid
   const [localTiers, setLocalTiers] = useState<Array<{
@@ -148,7 +151,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
   useEffect(() => {
     if (!selectedBank) return;
 
-    const currentKey = `${selectedBank}_${selectedProduct}_${selectedSupport}_${selectedSalaryTier}_${selectedSector}`;
+    const currentKey = `${selectedBank}_${selectedProduct}_${selectedSupport}_${selectedSalaryTier}_${selectedSector}_${selectedSalaryTransferStatus}_${selectedInstallmentType}_${selectedSalaryBand}`;
 
     // Bypass loader if we are just reflecting our own user edits within the same active combo
     if (currentKey === lastLoadedKeyRef.current && lastUpdatedRulesRef.current === marginRules) {
@@ -198,6 +201,17 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       if (r.productId !== targetProduct) return false;
       if (normSupport(r.supportType) !== normSupport(targetSupport)) return false;
       if (normSalaryTier(r.salaryTier) !== normSalaryTier(targetSalaryTier)) return false;
+
+      // Filter by new attributes
+      const rST = r.salaryTransferStatus || 'all';
+      if (rST !== selectedSalaryTransferStatus) return false;
+
+      const rIT = r.installmentType || 'all';
+      if (rIT !== selectedInstallmentType) return false;
+
+      const rSB = r.salaryBand || 'all';
+      if (rSB !== selectedSalaryBand) return false;
+
       return true;
     });
 
@@ -306,7 +320,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       isHydratingRef.current = false;
     }, 0);
 
-  }, [selectedBank, selectedProduct, selectedSupport, selectedSalaryTier, selectedSector, marginRules]);
+  }, [selectedBank, selectedProduct, selectedSupport, selectedSalaryTier, selectedSector, selectedSalaryTransferStatus, selectedInstallmentType, selectedSalaryBand, marginRules]);
 
   // Database updater to match exact core rules compatibility
   const updateGlobalRulesForCombo = (
@@ -326,11 +340,18 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     const normSupportVal = normSupport(targetSupport);
 
     const remainingRules = marginRules.filter(r => {
+      const rST = r.salaryTransferStatus || 'all';
+      const rIT = r.installmentType || 'all';
+      const rSB = r.salaryBand || 'all';
+
       const isBaseComboMatch = r.bankId === targetBank &&
                                r.productId === targetProduct &&
                                normSupport(r.supportType) === normSupportVal &&
                                normSector(r.sectorId) === normSector(targetSector) &&
                                normSalaryTier(r.salaryTier) === normSalaryTier(targetSalaryTier) &&
+                               rST === selectedSalaryTransferStatus &&
+                               rIT === selectedInstallmentType &&
+                               rSB === selectedSalaryBand &&
                                !r.isExceptionOnly;
 
       // COMPLETELY DELETE ALL EXISTING MARGIN RULES (both duration tiers and years)
@@ -354,7 +375,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
         const numRate = Number(tier.marginRate) || 0;
         
         newRulesForThisCombo.push({
-          id: tier.id || `tier_margin_${targetBank}_${targetProduct}_${normSupportVal}_${targetSector}_${targetSalaryTier}_t${numFrom}_${numTo}_${index}`,
+          id: tier.id || `tier_margin_${targetBank}_${targetProduct}_${normSupportVal}_${targetSector}_${targetSalaryTier}_t${numFrom}_${numTo}_${index}_${selectedSalaryTransferStatus}_${selectedInstallmentType}_${selectedSalaryBand}`,
           bankId: targetBank,
           productId: targetProduct,
           supportType: normSupportVal as any,
@@ -378,7 +399,10 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
           toMonth: numTo,
           marginRate: numRate,
           active: tier.active !== false,
-          notes: tier.notes || ''
+          notes: tier.notes || '',
+          salaryTransferStatus: selectedSalaryTransferStatus,
+          installmentType: selectedInstallmentType,
+          salaryBand: selectedSalaryBand
         });
       });
     } else {
@@ -444,7 +468,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
 
         definitions.forEach((def, index) => {
           newRulesForThisCombo.push({
-            id: `gen_margin_${targetBank}_${targetProduct}_${normSupportVal}_${targetSector}_${targetSalaryTier}_t${def.from}_${def.to}_${index}`,
+            id: `gen_margin_${targetBank}_${targetProduct}_${normSupportVal}_${targetSector}_${targetSalaryTier}_t${def.from}_${def.to}_${index}_${selectedSalaryTransferStatus}_${selectedInstallmentType}_${selectedSalaryBand}`,
             bankId: targetBank,
             productId: targetProduct,
             supportType: normSupportVal as any,
@@ -464,7 +488,10 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
             termMonths: def.to === 9999 ? (def.yearPoint * 12) : def.to,
             annualMargin: def.end,
             exceptionBps: 0,
-            baseMargin: Number((def.end / 100).toFixed(6))
+            baseMargin: Number((def.end / 100).toFixed(6)),
+            salaryTransferStatus: selectedSalaryTransferStatus,
+            installmentType: selectedInstallmentType,
+            salaryBand: selectedSalaryBand
           });
         });
       }
@@ -494,7 +521,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
   useEffect(() => {
     if (!isLoaded) return;
     if (isHydratingRef.current) return;
-    const currentKey = `${selectedBank}_${selectedProduct}_${selectedSupport}_${selectedSalaryTier}_${selectedSector}`;
+    const currentKey = `${selectedBank}_${selectedProduct}_${selectedSupport}_${selectedSalaryTier}_${selectedSector}_${selectedSalaryTransferStatus}_${selectedInstallmentType}_${selectedSalaryBand}`;
 
     const activeComboData = {
       key: currentKey,
@@ -515,7 +542,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       }
       return [...prev, activeComboData];
     });
-  }, [localMargins, localTiers, localSectorExceptions, selectedCalcMethod, selectedYearsMode, isLoaded, selectedBank, selectedProduct, selectedSupport, selectedSalaryTier, selectedSector]);
+  }, [localMargins, localTiers, localSectorExceptions, selectedCalcMethod, selectedYearsMode, isLoaded, selectedBank, selectedProduct, selectedSupport, selectedSalaryTier, selectedSector, selectedSalaryTransferStatus, selectedInstallmentType, selectedSalaryBand]);
 
   // Auto-synchronize local changes directly to parent to trigger global "hasUnsavedChanges" banner only when dirty
   useEffect(() => {
@@ -523,7 +550,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     if (isHydratingRef.current) return;
     if (selectedYearsMode === '') return; // Guard: No mode selected/loaded, do not write empty state to global
 
-    const currentKey = `${selectedBank}_${selectedProduct}_${selectedSupport}_${selectedSalaryTier}_${selectedSector}`;
+    const currentKey = `${selectedBank}_${selectedProduct}_${selectedSupport}_${selectedSalaryTier}_${selectedSector}_${selectedSalaryTransferStatus}_${selectedInstallmentType}_${selectedSalaryBand}`;
     const activeCombo = {
       key: currentKey,
       localMargins,
@@ -553,7 +580,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       selectedCalcMethod,
       selectedYearsMode
     );
-  }, [localMargins, localTiers, localSectorExceptions, selectedCalcMethod, selectedYearsMode, isLoaded, initialMarginData, selectedBank, selectedProduct, selectedSupport, selectedSector, selectedSalaryTier]);
+  }, [localMargins, localTiers, localSectorExceptions, selectedCalcMethod, selectedYearsMode, isLoaded, initialMarginData, selectedBank, selectedProduct, selectedSupport, selectedSector, selectedSalaryTier, selectedSalaryTransferStatus, selectedInstallmentType, selectedSalaryBand]);
 
   // Main save action for basic margins + exceptions
   const handleSaveConfig = async () => {
@@ -1302,6 +1329,51 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                   })}
                 </div>
               )}
+            </div>
+
+            {/* Salary Transfer Status Select */}
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-bold text-gray-500">حالة تحويل الراتب:</label>
+              <select
+                id="filter-transfer-status"
+                value={selectedSalaryTransferStatus}
+                onChange={(e) => setSelectedSalaryTransferStatus(e.target.value as any)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 text-xs font-bold text-slate-800 outline-none focus:ring-1 focus:ring-[#0057B8] cursor-pointer"
+              >
+                <option value="all">الكل (بدون تحويل ومع تحويل)</option>
+                <option value="salary_transfer">بتحويل راتب</option>
+                <option value="no_salary_transfer">بدون تحويل راتب</option>
+              </select>
+            </div>
+
+            {/* Installment Type Select */}
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-bold text-gray-500">نوع القسط:</label>
+              <select
+                id="filter-installment-type"
+                value={selectedInstallmentType}
+                onChange={(e) => setSelectedInstallmentType(e.target.value as any)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 text-xs font-bold text-slate-800 outline-none focus:ring-1 focus:ring-[#0057B8] cursor-pointer"
+              >
+                <option value="all">الكل (ثابت، متنازل، متزايد)</option>
+                <option value="fixed_or_step_down">ثابت أو متناقص</option>
+                <option value="increasing">متزايد</option>
+              </select>
+            </div>
+
+            {/* Salary Band Select */}
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-bold text-gray-500">نطاق راتب العميل (للهامش):</label>
+              <select
+                id="filter-salary-band"
+                value={selectedSalaryBand}
+                onChange={(e) => setSelectedSalaryBand(e.target.value as any)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 text-xs font-bold text-slate-800 outline-none focus:ring-1 focus:ring-[#0057B8] cursor-pointer"
+              >
+                <option value="all">الكل (شامل لكل الفئات)</option>
+                <option value="below_25000">أقل من 25,000</option>
+                <option value="from_25000">25,000 فأكثر</option>
+              </select>
             </div>
 
             {/* Show Mode Selector - Segmented Buttons */}

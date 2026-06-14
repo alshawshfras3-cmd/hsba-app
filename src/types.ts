@@ -146,6 +146,10 @@ export interface MarginRule {
   marginRate?: number;
   active?: boolean;
   notes?: string;
+
+  installmentType?: 'fixed_or_step_down' | 'increasing' | 'all';
+  salaryTransferStatus?: 'all' | 'salary_transfer' | 'no_salary_transfer';
+  salaryBand?: 'all' | 'below_25000' | 'from_25000';
 }
 
 export interface DsrRule {

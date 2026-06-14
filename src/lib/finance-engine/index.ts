@@ -287,6 +287,7 @@ export function calculateBanksFinancing(params: {
   obligationRemainingMonths?: number;
   supportType: SupportType;
   selectedBankId: 'all' | string;
+  salaryBankId?: string | null;
   termMode: TermMode;
   manualTermMonths?: number;
 
@@ -337,6 +338,7 @@ export function calculateBanksFinancing(params: {
     obligationRemainingMonths = 0,
     supportType,
     selectedBankId,
+    salaryBankId,
     termMode,
     manualTermMonths = 300,
 
@@ -777,7 +779,8 @@ export function calculateBanksFinancing(params: {
         supportType,
         sectorId,
         marginRules,
-        netSalary: solvedNetSalary
+        netSalary: solvedNetSalary,
+        salaryBankId
       });
 
       marginResult = calculateMargin({
@@ -788,6 +791,7 @@ export function calculateBanksFinancing(params: {
         termMonths: termResult.totalMonths,
         marginRules,
         netSalary: solvedNetSalary,
+        salaryBankId,
         calculationMode: marginMode
       });
     } else {
@@ -1203,6 +1207,7 @@ export function calculateAll(params: {
   obligations: number;
   monthlySupport: number;
   productId: ProductId;
+  salaryBankId?: string | null;
   termYears: number;
 
   banks: Bank[];
@@ -1244,6 +1249,7 @@ export function calculateAll(params: {
     obligations,
     monthlySupport,
     productId,
+    salaryBankId,
     termYears,
 
     banks,
@@ -1458,7 +1464,8 @@ export function calculateAll(params: {
       supportType: 'none',
       sectorId,
       marginRules,
-      netSalary: solvedNetSalary
+      netSalary: solvedNetSalary,
+      salaryBankId
     });
   }
 
@@ -1471,6 +1478,7 @@ export function calculateAll(params: {
         termMonths: termResult.totalMonths,
         marginRules,
         netSalary: solvedNetSalary,
+        salaryBankId,
         calculationMode: secondMarginMode
       })
     : {
