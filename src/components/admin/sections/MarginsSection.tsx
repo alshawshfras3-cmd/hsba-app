@@ -60,12 +60,10 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
   const [selectedBank, setSelectedBank] = useState<string>(banks[0]?.id || 'alahli');
   const [selectedProduct, setSelectedProduct] = useState<ProductId>('real_estate_only');
   const [selectedSupport, setSelectedSupport] = useState<SupportType>('none');
-  const [selectedSalaryTier, setSelectedSalaryTier] = useState<'below_25000' | 'above_or_equal_25000' | 'not_applicable'>('not_applicable');
   const [selectedSector, setSelectedSector] = useState<string>('');
   const [selectedYearsMode, setSelectedYearsMode] = useState<'yearly' | 'key_points' | 'duration_tiers' | ''>('');
   const [selectedCalcMethod, setSelectedCalcMethod] = useState<'linear' | 'fixed'>('fixed');
   const [selectedSalaryTransferStatus, setSelectedSalaryTransferStatus] = useState<'all' | 'salary_transfer' | 'no_salary_transfer'>('all');
-  const [selectedInstallmentType, setSelectedInstallmentType] = useState<'all' | 'fixed_or_step_down' | 'increasing'>('all');
   const [selectedSalaryBand, setSelectedSalaryBand] = useState<'all' | 'below_25000' | 'from_25000'>('all');
 
   // 2. Local inputs for Edit Grid
@@ -117,15 +115,6 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
   const [copyDstProduct, setCopyDstProduct] = useState<ProductId>('real_estate_only');
   const [copyDstSupport, setCopyDstSupport] = useState<SupportType>('none');
 
-  // Auto handle support and salary tier dependencies
-  useEffect(() => {
-    if (selectedSupport === 'none') {
-      setSelectedSalaryTier('not_applicable');
-    } else if (selectedSalaryTier === 'not_applicable') {
-      setSelectedSalaryTier('below_25000');
-    }
-  }, [selectedSupport]);
-
   // Handle default selected sector initialization
   useEffect(() => {
     if (sectorsList.length > 0 && !selectedSector) {
@@ -151,7 +140,16 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
   useEffect(() => {
     if (!selectedBank) return;
 
-    const currentKey = `${selectedBank}_${selectedProduct}_${selectedSupport}_${selectedSalaryTier}_${selectedSector}_${selectedSalaryTransferStatus}_${selectedInstallmentType}_${selectedSalaryBand}`;
+    const currentKey = [
+      selectedBank,
+      selectedProduct,
+      selectedSupport,
+      selectedSector,
+      selectedSalaryBand,
+      selectedSalaryTransferStatus,
+      selectedYearsMode,
+      selectedCalcMethod
+    ].join(':');
 
     // Bypass loader if we are just reflecting our own user edits within the same active combo
     if (currentKey === lastLoadedKeyRef.current && lastUpdatedRulesRef.current === marginRules) {
@@ -166,8 +164,8 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     let initialMargins: Record<number, string> = {};
     let initialTiers: any[] = [];
     let initialExceptions: Record<string, string> = {};
-    let method: 'linear' | 'fixed' = 'fixed';
-    let determinedMode: 'yearly' | 'key_points' | 'duration_tiers' | '' = '';
+    let method: 'linear' | 'fixed' = selectedCalcMethod || 'fixed';
+    let determinedMode: 'yearly' | 'key_points' | 'duration_tiers' | '' = selectedYearsMode;
 
     const normSupportVal = normSupport(selectedSupport);
 
@@ -191,61 +189,66 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     const targetBank = selectedBank;
     const targetProduct = selectedProduct;
     const targetSupport = normSupportVal;
-    const targetSalaryTier = selectedSalaryTier;
     const targetSector = selectedSector;
 
-    // Filter rules matching core values: bank, product, support, and salary tier with clean normalization
+    // Filter rules matching core values: bank, product, support, and salary band with clean normalization
     const matchingRules = allNormalized.filter(r => {
       if (r.isExceptionOnly) return false;
       if (r.bankId !== targetBank) return false;
       if (r.productId !== targetProduct) return false;
       if (normSupport(r.supportType) !== normSupport(targetSupport)) return false;
-      if (normSalaryTier(r.salaryTier) !== normSalaryTier(targetSalaryTier)) return false;
 
-      // Filter by new attributes
+      // Filter by salary band (unified field)
+      const rSB = r.salaryBand || (r.salaryTier === 'below_25000' ? 'below_25000' : r.salaryTier === 'above_or_equal_25000' ? 'from_25000' : 'all');
+      if (rSB !== selectedSalaryBand) return false;
+
+      // Filter by transfer status
       const rST = r.salaryTransferStatus || 'all';
       if (rST !== selectedSalaryTransferStatus) return false;
-
-      const rIT = r.installmentType || 'all';
-      if (rIT !== selectedInstallmentType) return false;
-
-      const rSB = r.salaryBand || 'all';
-      if (rSB !== selectedSalaryBand) return false;
 
       return true;
     });
 
-    // أولاً: فلترة القطاع
-    let sectorRules = matchingRules.filter(
+    // 1. Filter by sector (Strict single table matching - no fallback to all sectors)
+    const sectorRules = matchingRules.filter(
       r => normSector(r.sectorId) === normSector(targetSector)
     );
 
-    // fallback فقط إذا ما فيه قطاع
-    if (sectorRules.length === 0 && normSector(targetSector) !== 'all') {
-      sectorRules = matchingRules.filter(
-        r => normSector(r.sectorId) === 'all'
-      );
-    }
+    // Now detect or respect distribution mode
+    if (determinedMode === '') {
+      if (sectorRules.length > 0) {
+        const withCalcMode = sectorRules.find(r => r.calculationMode);
+        const withInputMode = sectorRules.find(r => r.marginInputMode);
 
-    // الآن فقط نحدد mode
-    if (sectorRules.length > 0) {
-      const withCalcMode = sectorRules.find(r => r.calculationMode);
-      const withInputMode = sectorRules.find(r => r.marginInputMode);
-
-      if (withCalcMode && withCalcMode.calculationMode) {
-        determinedMode = withCalcMode.calculationMode as any;
-      } else if (withInputMode && withInputMode.marginInputMode) {
-        determinedMode = withInputMode.marginInputMode as any;
+        if (withCalcMode && withCalcMode.calculationMode) {
+          determinedMode = withCalcMode.calculationMode as any;
+        } else if (withInputMode && withInputMode.marginInputMode) {
+          determinedMode = withInputMode.marginInputMode as any;
+        } else {
+          determinedMode = getRuleInputMode(sectorRules[0]);
+        }
       } else {
-        determinedMode = getRuleInputMode(sectorRules[0]);
+        determinedMode = 'key_points';
       }
-    } else {
-      determinedMode = '';
     }
+
+    // Load method from rules if defined and not set by user
+    if (sectorRules.length > 0) {
+      const foundMethodRule = sectorRules.find(r => r.calculationMethod || r.calcType);
+      if (foundMethodRule) {
+        method = (foundMethodRule.calculationMethod || foundMethodRule.calcType) as any;
+      }
+    }
+
+    // Filter sector rules strictly matching the current determinedMode
+    const currentModeRules = sectorRules.filter(r => {
+      const rMode = r.marginInputMode || getRuleInputMode(r);
+      return rMode === determinedMode;
+    });
 
     if (determinedMode !== '') {
-      // 1. Load years margins (for yearly / key_points) independently of selected mode to avoid wiping
-      const yearsRules = sectorRules.filter(r => !isTiersRule(r));
+      // 1. Load years margins (for yearly / key_points)
+      const yearsRules = currentModeRules.filter(r => !isTiersRule(r));
       const yearsListFull = Array.from({ length: 26 }, (_, i) => 5 + i);
 
       yearsListFull.forEach(year => {
@@ -257,8 +260,8 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
         }
       });
 
-      // 2. Load duration tiers independently of selected mode to avoid wiping
-      const tierRules = sectorRules.filter(r => isTiersRule(r));
+      // 2. Load duration tiers
+      const tierRules = currentModeRules.filter(r => isTiersRule(r));
       initialTiers = tierRules.map((r, idx) => ({
         id: r.id || `tier_${idx}_${Date.now()}`,
         fromMonth: r.fromMonth ?? r.fromTermMonths ?? 0,
@@ -268,15 +271,9 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
         active: r.active !== false && r.isActive !== false
       }));
       initialTiers.sort((a, b) => a.fromMonth - b.fromMonth);
-
-      // 3. Load calculation method
-      const foundMethodRule = sectorRules.find(r => r.calculationMethod || r.calcType);
-      if (foundMethodRule) {
-        method = (foundMethodRule.calculationMethod || foundMethodRule.calcType) as any;
-      }
     }
 
-    // 5. Synchronize sector exceptions (bank level exception list) independently of config presence
+    // 5. Synchronize sector exceptions (bank level exception list)
     sectorsList.forEach(sec => {
       const exRule = marginRules.find(r =>
         r.bankId === selectedBank &&
@@ -320,7 +317,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       isHydratingRef.current = false;
     }, 0);
 
-  }, [selectedBank, selectedProduct, selectedSupport, selectedSalaryTier, selectedSector, selectedSalaryTransferStatus, selectedInstallmentType, selectedSalaryBand, marginRules]);
+  }, [selectedBank, selectedProduct, selectedSupport, selectedSector, selectedSalaryTransferStatus, selectedSalaryBand, selectedYearsMode, selectedCalcMethod, marginRules]);
 
   // Database updater to match exact core rules compatibility
   const updateGlobalRulesForCombo = (
@@ -328,7 +325,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     targetProduct: ProductId,
     targetSupport: SupportType,
     targetSector: string,
-    targetSalaryTier: 'below_25000' | 'above_or_equal_25000' | 'not_applicable',
+    targetSalaryBand: 'all' | 'below_25000' | 'from_25000',
     marginsRecord: Record<number, string>,
     sectorExceptionsRecord: Record<string, string>,
     method: 'linear' | 'fixed' = 'fixed',
@@ -341,21 +338,18 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
 
     const remainingRules = marginRules.filter(r => {
       const rST = r.salaryTransferStatus || 'all';
-      const rIT = r.installmentType || 'all';
-      const rSB = r.salaryBand || 'all';
+      const rSB = r.salaryBand || (r.salaryTier === 'below_25000' ? 'below_25000' : r.salaryTier === 'above_or_equal_25000' ? 'from_25000' : 'all');
+      const rMode = r.marginInputMode || getRuleInputMode(r);
 
       const isBaseComboMatch = r.bankId === targetBank &&
                                r.productId === targetProduct &&
                                normSupport(r.supportType) === normSupportVal &&
                                normSector(r.sectorId) === normSector(targetSector) &&
-                               normSalaryTier(r.salaryTier) === normSalaryTier(targetSalaryTier) &&
                                rST === selectedSalaryTransferStatus &&
-                               rIT === selectedInstallmentType &&
-                               rSB === selectedSalaryBand &&
+                               rSB === targetSalaryBand &&
+                               rMode === inputMode &&
                                !r.isExceptionOnly;
 
-      // COMPLETELY DELETE ALL EXISTING MARGIN RULES (both duration tiers and years)
-      // for this exact combo so we don't leak stale leftovers when we switch modes!
       if (isBaseComboMatch) {
         return false;
       }
@@ -375,7 +369,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
         const numRate = Number(tier.marginRate) || 0;
         
         newRulesForThisCombo.push({
-          id: tier.id || `tier_margin_${targetBank}_${targetProduct}_${normSupportVal}_${targetSector}_${targetSalaryTier}_t${numFrom}_${numTo}_${index}_${selectedSalaryTransferStatus}_${selectedInstallmentType}_${selectedSalaryBand}`,
+          id: tier.id || `tier_margin_${targetBank}_${targetProduct}_${normSupportVal}_${targetSector}_${targetSalaryBand}_t${numFrom}_${numTo}_${index}_${selectedSalaryTransferStatus}_${inputMode}`,
           bankId: targetBank,
           productId: targetProduct,
           supportType: normSupportVal as any,
@@ -386,7 +380,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
           endMargin: numRate,
           calcType: 'fixed',
           isActive: tier.active !== false,
-          salaryTier: targetSalaryTier,
+          salaryTier: targetSalaryBand as any,
           productType: targetProduct as any,
           marginInputMode: 'duration_tiers',
           calculationMode: 'duration_tiers',
@@ -401,8 +395,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
           active: tier.active !== false,
           notes: tier.notes || '',
           salaryTransferStatus: selectedSalaryTransferStatus,
-          installmentType: selectedInstallmentType,
-          salaryBand: selectedSalaryBand
+          salaryBand: targetSalaryBand
         });
       });
     } else {
@@ -468,7 +461,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
 
         definitions.forEach((def, index) => {
           newRulesForThisCombo.push({
-            id: `gen_margin_${targetBank}_${targetProduct}_${normSupportVal}_${targetSector}_${targetSalaryTier}_t${def.from}_${def.to}_${index}_${selectedSalaryTransferStatus}_${selectedInstallmentType}_${selectedSalaryBand}`,
+            id: `gen_margin_${targetBank}_${targetProduct}_${normSupportVal}_${targetSector}_${targetSalaryBand}_t${def.from}_${def.to}_${index}_${selectedSalaryTransferStatus}_${inputMode}`,
             bankId: targetBank,
             productId: targetProduct,
             supportType: normSupportVal as any,
@@ -479,7 +472,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
             endMargin: def.end,
             calcType: def.calcType,
             isActive: true,
-            salaryTier: targetSalaryTier,
+            salaryTier: targetSalaryBand as any,
             productType: targetProduct as any,
             marginInputMode: inputMode as any,
             calculationMode: inputMode as any,
@@ -490,8 +483,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
             exceptionBps: 0,
             baseMargin: Number((def.end / 100).toFixed(6)),
             salaryTransferStatus: selectedSalaryTransferStatus,
-            installmentType: selectedInstallmentType,
-            salaryBand: selectedSalaryBand
+            salaryBand: targetSalaryBand
           });
         });
       }
@@ -521,7 +513,17 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
   useEffect(() => {
     if (!isLoaded) return;
     if (isHydratingRef.current) return;
-    const currentKey = `${selectedBank}_${selectedProduct}_${selectedSupport}_${selectedSalaryTier}_${selectedSector}_${selectedSalaryTransferStatus}_${selectedInstallmentType}_${selectedSalaryBand}`;
+    
+    const currentKey = [
+      selectedBank,
+      selectedProduct,
+      selectedSupport,
+      selectedSector,
+      selectedSalaryBand,
+      selectedSalaryTransferStatus,
+      selectedYearsMode,
+      selectedCalcMethod
+    ].join(':');
 
     const activeComboData = {
       key: currentKey,
@@ -542,7 +544,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       }
       return [...prev, activeComboData];
     });
-  }, [localMargins, localTiers, localSectorExceptions, selectedCalcMethod, selectedYearsMode, isLoaded, selectedBank, selectedProduct, selectedSupport, selectedSalaryTier, selectedSector, selectedSalaryTransferStatus, selectedInstallmentType, selectedSalaryBand]);
+  }, [localMargins, localTiers, localSectorExceptions, selectedCalcMethod, selectedYearsMode, isLoaded, selectedBank, selectedProduct, selectedSupport, selectedSector, selectedSalaryTransferStatus, selectedSalaryBand]);
 
   // Auto-synchronize local changes directly to parent to trigger global "hasUnsavedChanges" banner only when dirty
   useEffect(() => {
@@ -550,7 +552,17 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     if (isHydratingRef.current) return;
     if (selectedYearsMode === '') return; // Guard: No mode selected/loaded, do not write empty state to global
 
-    const currentKey = `${selectedBank}_${selectedProduct}_${selectedSupport}_${selectedSalaryTier}_${selectedSector}_${selectedSalaryTransferStatus}_${selectedInstallmentType}_${selectedSalaryBand}`;
+    const currentKey = [
+      selectedBank,
+      selectedProduct,
+      selectedSupport,
+      selectedSector,
+      selectedSalaryBand,
+      selectedSalaryTransferStatus,
+      selectedYearsMode,
+      selectedCalcMethod
+    ].join(':');
+
     const activeCombo = {
       key: currentKey,
       localMargins,
@@ -574,13 +586,13 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       selectedProduct,
       selectedSupport,
       selectedSector,
-      selectedSalaryTier,
+      selectedSalaryBand,
       localMargins,
       localSectorExceptions,
       selectedCalcMethod,
       selectedYearsMode
     );
-  }, [localMargins, localTiers, localSectorExceptions, selectedCalcMethod, selectedYearsMode, isLoaded, initialMarginData, selectedBank, selectedProduct, selectedSupport, selectedSector, selectedSalaryTier, selectedSalaryTransferStatus, selectedInstallmentType, selectedSalaryBand]);
+  }, [localMargins, localTiers, localSectorExceptions, selectedCalcMethod, selectedYearsMode, isLoaded, initialMarginData, selectedBank, selectedProduct, selectedSupport, selectedSector, selectedSalaryTransferStatus, selectedSalaryBand]);
 
   // Main save action for basic margins + exceptions
   const handleSaveConfig = async () => {
@@ -633,14 +645,23 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
         selectedProduct,
         selectedSupport,
         selectedSector,
-        selectedSalaryTier,
+        selectedSalaryBand,
         localMargins,
         localSectorExceptions,
         selectedCalcMethod,
         selectedYearsMode
       );
 
-      const currentKey = `${selectedBank}_${selectedProduct}_${selectedSupport}_${selectedSalaryTier}_${selectedSector}`;
+      const currentKey = [
+        selectedBank,
+        selectedProduct,
+        selectedSupport,
+        selectedSector,
+        selectedSalaryBand,
+        selectedSalaryTransferStatus,
+        selectedYearsMode,
+        selectedCalcMethod
+      ].join(':');
       const latestCombo = {
         key: currentKey,
         localMargins,
@@ -1063,9 +1084,9 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     setSelectedProduct(dstProduct);
     setSelectedSupport(dstSupport);
     if (normDstSupport === 'none') {
-      setSelectedSalaryTier('not_applicable');
+      setSelectedSalaryBand('all');
     } else {
-      setSelectedSalaryTier('below_25000');
+      setSelectedSalaryBand('below_25000');
     }
 
     // Beautifully construct localized strings for copy toaster
@@ -1110,12 +1131,10 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
         supports.forEach(sId => {
           if (selectedSupport && sId !== selectedSupport) return;
 
-          const tiers: Array<'not_applicable' | 'below_25000' | 'above_or_equal_25000'> = sId === 'none'
-            ? ['not_applicable']
-            : ['below_25000', 'above_or_equal_25000'];
+          const bands: Array<'all' | 'below_25000' | 'from_25000'> = ['all', 'below_25000', 'from_25000'];
 
-          tiers.forEach(tier => {
-            if (sId !== 'none' && selectedSalaryTier !== tier) return;
+          bands.forEach(band => {
+            if (selectedSalaryBand && selectedSalaryBand !== 'all' && selectedSalaryBand !== band) return;
 
             const relevantRules = marginRules.map(r => {
               let prodInput = r.productId as string;
@@ -1135,7 +1154,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
               r.bankId === bId &&
               r.productId === pId &&
               (r.supportType === sId || r.supportType === 'all') &&
-              (r.salaryTier === tier || (!r.salaryTier && tier === 'not_applicable'))
+              ((r.salaryBand || (r.salaryTier === 'below_25000' ? 'below_25000' : r.salaryTier === 'above_or_equal_25000' ? 'from_25000' : 'all')) === band)
             );
 
             if (relevantRules.length === 0) return;
@@ -1150,7 +1169,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                   sectorId: sec.id as SectorId,
                   termMonths: year * 12,
                   marginRules,
-                  netSalary: tier === 'below_25000' ? 20000 : tier === 'above_or_equal_25000' ? 30000 : undefined,
+                  netSalary: band === 'below_25000' ? 20000 : band === 'from_25000' ? 30000 : undefined,
                   calculationMode: (selectedYearsMode === 'yearly' || selectedYearsMode === 'key_points') ? selectedYearsMode : 'key_points'
                 });
 
@@ -1169,11 +1188,12 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                 const isActive = matchedBaseRule ? matchedBaseRule.isActive !== false : true;
 
                 list.push({
-                  id: `combo_${bId}_${pId}_${sId}_${tier}_${sec.id}_${year}`,
+                  id: `combo_${bId}_${pId}_${sId}_${band}_${sec.id}_${year}`,
                   bankId: bId,
                   productId: pId,
                   supportType: sId,
-                  salaryTier: tier,
+                  salaryTier: band === 'below_25000' ? 'below_25000' : band === 'from_25000' ? 'above_or_equal_25000' : 'not_applicable',
+                  salaryBand: band,
                   sectorId: sec.id as SectorId,
                   sectorNameAr: sec.nameAr,
                   year: year,
@@ -1298,37 +1318,32 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
               </select>
             </div>
 
-            {/* Salary Tier Select - Segmented Buttons */}
+            {/* Salary Band Select (فئة الراتب الشهري) - Segmented Buttons */}
             <div className="space-y-1.5">
               <label className="block text-[11px] font-bold text-gray-500">فئة الراتب الشهري:</label>
-              {selectedSupport === 'none' ? (
-                <div className="bg-slate-50 border border-slate-100 text-slate-400 rounded-lg p-2.5 text-[11px] font-bold leading-normal text-center">
-                  🔒 الجدول العام لغير المدعوم (لا ينطبق)
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-1">
-                  {[
-                    { id: 'below_25000', label: '💵 أقل من ٢٥ ألف' },
-                    { id: 'above_or_equal_25000', label: '💰 ٢٥ ألف فأكثر' }
-                  ].map(t => {
-                    const isSelected = selectedSalaryTier === t.id;
-                    return (
-                      <button
-                        key={t.id}
-                        type="button"
-                        onClick={() => setSelectedSalaryTier(t.id as any)}
-                        className={`px-1 py-1.5 rounded-lg border text-[10px] font-bold text-center transition-all cursor-pointer white-space-nowrap ${
-                          isSelected
-                            ? 'bg-[#0057B8]/10 border-[#0057B8] text-[#0057B8] shadow-xs'
-                            : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
-                        }`}
-                      >
-                        {t.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+              <div className="grid grid-cols-3 gap-1">
+                {[
+                  { id: 'all', label: 'الكل' },
+                  { id: 'below_25000', label: 'أقل من ٢٥ ألف' },
+                  { id: 'from_25000', label: '٢٥ ألف فأكثر' }
+                ].map(t => {
+                  const isSelected = selectedSalaryBand === t.id;
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => setSelectedSalaryBand(t.id as any)}
+                      className={`px-1 py-1.5 rounded-lg border text-[10px] font-bold text-center transition-all cursor-pointer white-space-nowrap ${
+                        isSelected
+                          ? 'bg-[#0057B8]/10 border-[#0057B8] text-[#0057B8] shadow-xs'
+                          : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
+                      }`}
+                    >
+                      {t.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Salary Transfer Status Select */}
@@ -1343,36 +1358,6 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                 <option value="all">الكل (بدون تحويل ومع تحويل)</option>
                 <option value="salary_transfer">بتحويل راتب</option>
                 <option value="no_salary_transfer">بدون تحويل راتب</option>
-              </select>
-            </div>
-
-            {/* Installment Type Select */}
-            <div className="space-y-1.5">
-              <label className="block text-[11px] font-bold text-gray-500">نوع القسط:</label>
-              <select
-                id="filter-installment-type"
-                value={selectedInstallmentType}
-                onChange={(e) => setSelectedInstallmentType(e.target.value as any)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 text-xs font-bold text-slate-800 outline-none focus:ring-1 focus:ring-[#0057B8] cursor-pointer"
-              >
-                <option value="all">الكل (ثابت، متنازل، متزايد)</option>
-                <option value="fixed_or_step_down">ثابت أو متناقص</option>
-                <option value="increasing">متزايد</option>
-              </select>
-            </div>
-
-            {/* Salary Band Select */}
-            <div className="space-y-1.5">
-              <label className="block text-[11px] font-bold text-gray-500">نطاق راتب العميل (للهامش):</label>
-              <select
-                id="filter-salary-band"
-                value={selectedSalaryBand}
-                onChange={(e) => setSelectedSalaryBand(e.target.value as any)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 text-xs font-bold text-slate-800 outline-none focus:ring-1 focus:ring-[#0057B8] cursor-pointer"
-              >
-                <option value="all">الكل (شامل لكل الفئات)</option>
-                <option value="below_25000">أقل من 25,000</option>
-                <option value="from_25000">25,000 فأكثر</option>
               </select>
             </div>
 
@@ -1529,7 +1514,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
               </span>
 
               <span className="col-span-1 bg-indigo-50 border border-indigo-100 text-indigo-700 text-[11px] px-2.5 py-1 rounded-lg font-bold">
-                💵 {selectedSupport === 'none' ? 'الجدول العام لغير المدعوم' : selectedSalaryTier === 'below_25000' ? 'راتب أقل من 25,000' : 'راتب 25,000 فأكثر'}
+                💵 {selectedSalaryBand === 'all' ? 'فئة الراتب: الكل' : selectedSalaryBand === 'below_25000' ? 'فئة الراتب: أقل من 25,000' : 'فئة الراتب: 25,000 فأكثر'}
               </span>
 
               <span className="bg-slate-100 border border-slate-200 text-slate-700 text-[11px] px-2.5 py-1 rounded-lg font-bold">

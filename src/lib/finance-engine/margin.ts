@@ -32,9 +32,8 @@ export function resolveMatchingRules(params: {
   marginRules: MarginRule[];
   netSalary?: number;
   salaryBankId?: string | null;
-  installmentType?: 'fixed_or_step_down' | 'increasing' | 'all';
 }): MarginRule[] {
-  const { bankId, productId, supportType, sectorId, marginRules, netSalary, salaryBankId, installmentType = 'fixed_or_step_down' } = params;
+  const { bankId, productId, supportType, sectorId, marginRules, netSalary, salaryBankId } = params;
 
   // Normalize Product ID
   let normProduct = productId;
@@ -64,10 +63,6 @@ export function resolveMatchingRules(params: {
   const salaryTransferStatus = resolveSalaryTransferStatus(bankId, salaryBankId);
 
   // Normalization value extractors for robust old/new rules support
-  const getRuleInstallmentType = (r: MarginRule): 'fixed_or_step_down' | 'increasing' | 'all' => {
-    return r.installmentType || 'all';
-  };
-
   const getRuleSalaryTransferStatus = (r: MarginRule): 'all' | 'salary_transfer' | 'no_salary_transfer' => {
     return r.salaryTransferStatus || 'all';
   };
@@ -91,11 +86,10 @@ export function resolveMatchingRules(params: {
   const activeRules = marginRules.filter(r => r.isActive && !r.isExceptionOnly);
 
   // Sequence matching:
-  // 1. Full Match: matching bankId, productId, installmentType, salaryTransferStatus, salaryBand, supportType
+  // 1. Full Match: matching bankId, productId, salaryTransferStatus, salaryBand, supportType
   const match1 = activeRules.filter(
     r => r.bankId === bankId &&
          r.productId === normProduct &&
-         (getRuleInstallmentType(r) === 'all' || getRuleInstallmentType(r) === installmentType) &&
          (getRuleSalaryTransferStatus(r) === salaryTransferStatus) &&
          (getRuleSalaryBand(r) === salaryBand) &&
          (getRuleSupportType(r) === 'all' || getRuleSupportType(r) === targetSupportNorm)
@@ -106,7 +100,6 @@ export function resolveMatchingRules(params: {
   const match2 = activeRules.filter(
     r => r.bankId === bankId &&
          r.productId === normProduct &&
-         (getRuleInstallmentType(r) === 'all' || getRuleInstallmentType(r) === installmentType) &&
          (getRuleSalaryTransferStatus(r) === 'all') &&
          (getRuleSalaryBand(r) === salaryBand) &&
          (getRuleSupportType(r) === 'all' || getRuleSupportType(r) === targetSupportNorm)
@@ -117,7 +110,6 @@ export function resolveMatchingRules(params: {
   const match3 = activeRules.filter(
     r => r.bankId === bankId &&
          r.productId === normProduct &&
-         (getRuleInstallmentType(r) === 'all' || getRuleInstallmentType(r) === installmentType) &&
          (getRuleSalaryTransferStatus(r) === salaryTransferStatus || getRuleSalaryTransferStatus(r) === 'all') &&
          (getRuleSalaryBand(r) === 'all') &&
          (getRuleSupportType(r) === 'all' || getRuleSupportType(r) === targetSupportNorm)
@@ -128,7 +120,6 @@ export function resolveMatchingRules(params: {
   const match4 = activeRules.filter(
     r => r.bankId === bankId &&
          r.productId === normProduct &&
-         (getRuleInstallmentType(r) === 'all' || getRuleInstallmentType(r) === installmentType) &&
          (getRuleSalaryTransferStatus(r) === salaryTransferStatus || getRuleSalaryTransferStatus(r) === 'all') &&
          (getRuleSalaryBand(r) === salaryBand || getRuleSalaryBand(r) === 'all') &&
          (getRuleSupportType(r) === 'all')
@@ -139,7 +130,6 @@ export function resolveMatchingRules(params: {
   const match5 = activeRules.filter(
     r => r.bankId === bankId &&
          r.productId === normProduct &&
-         (getRuleInstallmentType(r) === 'all' || getRuleInstallmentType(r) === installmentType) &&
          (getRuleSalaryTransferStatus(r) === 'all') &&
          (getRuleSalaryBand(r) === 'all') &&
          (getRuleSupportType(r) === 'all')
@@ -162,7 +152,6 @@ export function resolveConfiguredMarginMode(params: {
   marginRules: MarginRule[];
   netSalary?: number;
   salaryBankId?: string | null;
-  installmentType?: 'fixed_or_step_down' | 'increasing' | 'all';
 }): 'duration_tiers' | 'yearly' | 'key_points' {
   const matchingRules = resolveMatchingRules(params);
 
@@ -183,10 +172,9 @@ export function calculateMargin(params: {
   marginRules: MarginRule[];
   netSalary?: number;
   salaryBankId?: string | null;
-  installmentType?: 'fixed_or_step_down' | 'increasing' | 'all';
   calculationMode: 'duration_tiers' | 'yearly' | 'key_points';
 }): MarginOutput {
-  const { bankId, productId, supportType, sectorId, termMonths, marginRules, netSalary, salaryBankId, installmentType, calculationMode } = params;
+  const { bankId, productId, supportType, sectorId, termMonths, marginRules, netSalary, salaryBankId, calculationMode } = params;
 
   // 1. Normalize productId to the values defined inside margin settings
   let normProduct: ProductId = productId;
@@ -222,8 +210,7 @@ export function calculateMargin(params: {
     sectorId,
     marginRules,
     netSalary,
-    salaryBankId,
-    installmentType
+    salaryBankId
   });
 
   const bankNameAr = bankId === 'rajhi' ? 'مصرف الراجحي' : bankId === 'alahli' ? 'البنك الأهلي السعودي' : bankId === 'alinma' ? 'مصرف الإنماء' : bankId;
