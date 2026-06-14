@@ -29,6 +29,32 @@ export function calculateNetSalary(params: {
     };
   }
 
+  if (sectorId === 'military') {
+    const numBasic = Number(basicSalary ?? 0);
+    const numTrans = Number(housingAllowance ?? 0);
+    const numOther = Number(otherAllowances ?? 0);
+    
+    const deductionPct = 9.0;
+    const pensionDeduction = numBasic * 0.09;
+    const gross = numBasic + numTrans + numOther;
+    let netSalary = gross - pensionDeduction;
+    if (netSalary < 0) netSalary = 0;
+    
+    return {
+      grossSalary: gross,
+      deductionAmount: pensionDeduction,
+      netSalary: netSalary, // Preserve full precision (decimals)
+      calculationMethod: 'details',
+      breakdown: {
+        basicSalary: numBasic,
+        housingAllowance: numTrans,
+        otherAllowances: numOther,
+        deductionRate: deductionPct,
+        deductionBase: numBasic
+      }
+    };
+  }
+
   if (method === 'direct') {
     return {
       grossSalary: directNetSalary,

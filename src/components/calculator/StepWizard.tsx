@@ -485,22 +485,38 @@ export default function StepWizard() {
     if (salaryMode === 'direct') {
       setLocalCalculatedNet(Number(directNetSalary || 0));
     } else {
-      const rule = salaryRules.find(r => r.sectorId === effectiveSectorId && r.isActive) || {
-        deductionPercentage: 9.0,
-        deductionBase: 'basic_housing' as const
-      };
-      const numBasic = Number(basicSalary || 0);
-      const numHousing = Number(housingAllowance || 0);
-      const numOther = Number(otherAllowances || 0);
-      const gross = numBasic + numHousing + numOther;
-      let dBase = numBasic + numHousing;
-      if (rule.deductionBase === 'basic_only') dBase = numBasic;
-      else if (rule.deductionBase === 'total') dBase = gross;
+      if (effectiveSectorId === 'military') {
+        const numBasic = Number(basicSalary || 0);
+        const numTrans = Number(housingAllowance || 0);
+        const numOther = Number(otherAllowances || 0);
+        const pensionDeduction = numBasic * 0.09;
+        const gross = numBasic + numTrans + numOther;
+        const netSalary = gross - pensionDeduction;
+        setLocalCalculatedNet(netSalary < 0 ? 0 : Number(netSalary.toFixed(2)));
+      } else {
+        const rule = salaryRules.find(r => r.sectorId === effectiveSectorId && r.isActive) || {
+          deductionPercentage: 9.0,
+          deductionBase: 'basic_housing' as const
+        };
+        const numBasic = Number(basicSalary || 0);
+        const numHousing = Number(housingAllowance || 0);
+        const numOther = Number(otherAllowances || 0);
+        const gross = numBasic + numHousing + numOther;
+        let dBase = numBasic + numHousing;
+        if (rule.deductionBase === 'basic_only') dBase = numBasic;
+        else if (rule.deductionBase === 'total') dBase = gross;
 
-      const deduction = (dBase * rule.deductionPercentage) / 100;
-      setLocalCalculatedNet(Math.round(gross - deduction));
+        const deduction = (dBase * rule.deductionPercentage) / 100;
+        setLocalCalculatedNet(Math.round(gross - deduction));
+      }
     }
   }, [salaryMode, directNetSalary, basicSalary, housingAllowance, otherAllowances, effectiveSectorId, salaryRules, directPensionSalary]);
+
+  useEffect(() => {
+    if (effectiveSectorId === 'military' && salaryMode !== 'details') {
+      setSalaryMode('details');
+    }
+  }, [effectiveSectorId, salaryMode]);
 
   const hijriToGreg = (year: number, calendar: 'gregorian' | 'hijri'): number => {
     if (calendar === 'hijri') {
@@ -889,6 +905,7 @@ export default function StepWizard() {
                           setMilitaryRank('');
                           setMilitaryType('');
                         } else if (sec.id === 'military') {
+                          setSalaryMode('details');
                           setMilitarySubtype('enlisted');
                           setMilitaryType('individual');
                           const enlistedRanks = militaryRanks.filter(r => r.sectorScope === 'enlisted' && r.isActive);
@@ -1189,8 +1206,8 @@ export default function StepWizard() {
                 <p className="text-sm text-[#6B7280] mt-1 font-sans">يُشترط الإدخال الصحيح للراتب لتقرير عوامل الاستقطاع ونسب الملاءمة ائتمانياً لدى كافة البنوك.</p>
               </div>
 
-              {/* Sub tabs: manual net vs detailed (only if sector is NOT retired) */}
-              {sectorId !== 'retired' && (
+              {/* Sub tabs: manual net vs detailed (only if sector is NOT retired and NOT military) */}
+              {sectorId !== 'retired' && effectiveSectorId !== 'military' && (
                 <div className="flex bg-gray-100 p-1.5 rounded-xl mb-6 border border-gray-200 gap-1 font-semibold">
                   <button
                     type="button"
@@ -1221,7 +1238,64 @@ export default function StepWizard() {
               )}
 
               {/* Form elements */}
-              {salaryMode === 'direct' || sectorId === 'retired' ? (
+              {effectiveSectorId === 'military' ? (
+                <div className="space-y-6 animate-fade-in text-right">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-gray-700">الراتب الأساسي <span className="text-rose-500">*</span>:</label>
+                      <div className="relative">
+                        <NumericInput
+                          id="basic-salary-input"
+                          min={0}
+                          allowDecimals={true}
+                          value={basicSalary}
+                          onChange={setBasicSalary}
+                          placeholder="مثال: 4555"
+                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                        />
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">ريال</span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-gray-700">بدل النقل:</label>
+                      <div className="relative">
+                        <NumericInput
+                          id="housing-salary-input"
+                          min={0}
+                          allowDecimals={true}
+                          value={housingAllowance}
+                          onChange={setHousingAllowance}
+                          placeholder="مثال: 500"
+                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                        />
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">ريال</span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-gray-700">البدلات / العلاوات الأخرى:</label>
+                      <div className="relative">
+                        <NumericInput
+                          id="other-salary-input"
+                          min={0}
+                          allowDecimals={true}
+                          value={otherAllowances}
+                          onChange={setOtherAllowances}
+                          placeholder="مثال: 4337.5"
+                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                        />
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">ريال</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="col-span-1 md:col-span-3 bg-emerald-50 rounded-2xl p-4 border border-emerald-100 flex justify-between items-center text-xs">
+                    <span className="text-emerald-800 font-bold">صافي الراتب المحسوب تلقائيًا:</span>
+                    <span className="font-extrabold text-emerald-700 text-sm">{(localCalculatedNet).toLocaleString('ar-SA')} ريال سعودي</span>
+                  </div>
+                </div>
+              ) : salaryMode === 'direct' || sectorId === 'retired' ? (
                 <div className="space-y-6 animate-fade-in">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {sectorId === 'retired' ? (
