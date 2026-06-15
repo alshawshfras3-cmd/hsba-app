@@ -88,6 +88,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
 
   // Hydration ref to block auto synchronization during table initialization or selection changes
   const isHydratingRef = useRef(false);
+  const userChangedTableConfigRef = useRef<boolean>(false);
 
   // 1. Isolated states to track edited margins and check dirty status independently of settings
   const [marginData, setMarginData] = useState<any[]>([]);
@@ -268,19 +269,24 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     }
 
     // Now, let's see if we switched tables (changed the table key identity)
-    const newIdentityKey = [
-      selectedBank,
-      selectedProduct,
-      selectedSupport,
-      selectedSector,
-      selectedSalaryBand,
-      determinedSalaryTransferStatus
-    ].join(':');
+    const resolvedDurationDistributionType = determinedYearsMode === 'duration_tiers' ? 'month_ranges' : 'years';
+    const newIdentityKey = buildActiveMarginTableKey({
+      bankId: selectedBank,
+      productId: selectedProduct,
+      supportType: selectedSupport,
+      sectorId: selectedSector,
+      salaryBand: selectedSalaryBand,
+      salaryTransferStatus: determinedSalaryTransferStatus,
+      durationDistributionType: resolvedDurationDistributionType,
+      calculationMethod: determinedCalcMethod
+    });
 
     // Only update these states if we switched the physical table identity!
     if (newIdentityKey !== lastIdentityKeyRef.current) {
       lastIdentityKeyRef.current = newIdentityKey;
+      lastLoadedKeyRef.current = newIdentityKey;
       isHydratingRef.current = true;
+      userChangedTableConfigRef.current = false;
 
       setTransferMode(determinedTransferMode);
       setSelectedSalaryTransferStatus(determinedSalaryTransferStatus);
@@ -367,6 +373,9 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       // we only load margins/exceptions if marginRules changed globally by an external action (like save)
       // and we are NOT in hydration / editing.
       if (!isHydratingRef.current && lastUpdatedRulesRef.current !== marginRules) {
+        isHydratingRef.current = true;
+        userChangedTableConfigRef.current = false;
+
         // Load up-to-date data for the current table
         let initialMargins: Record<number, string> = {};
         let initialTiers: any[] = [];
@@ -434,6 +443,10 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
           const filtered = prevArray.filter((item: any) => item.key !== newIdentityKey);
           return JSON.stringify([...filtered, loadedCombo]);
         });
+
+        setTimeout(() => {
+          isHydratingRef.current = false;
+        }, 0);
       }
     }
   }, [
@@ -681,18 +694,23 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
   useEffect(() => {
     if (!isLoaded) return;
     if (isHydratingRef.current) return;
+    if (!lastLoadedKeyRef.current) return;
     
     const durationDistributionType = selectedYearsMode === 'duration_tiers' ? 'month_ranges' : 'years';
-    const currentKey = [
-      selectedBank,
-      selectedProduct,
-      selectedSupport,
-      selectedSector,
-      selectedSalaryBand,
-      selectedSalaryTransferStatus,
+    const currentKey = buildActiveMarginTableKey({
+      bankId: selectedBank,
+      productId: selectedProduct,
+      supportType: selectedSupport,
+      sectorId: selectedSector,
+      salaryBand: selectedSalaryBand,
+      salaryTransferStatus: selectedSalaryTransferStatus,
       durationDistributionType,
-      selectedCalcMethod
-    ].join(':');
+      calculationMethod: selectedCalcMethod
+    });
+
+    if (currentKey !== lastLoadedKeyRef.current && !userChangedTableConfigRef.current) {
+      return;
+    }
 
     const activeComboData = {
       key: currentKey,
@@ -719,19 +737,24 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
   useEffect(() => {
     if (!isLoaded) return;
     if (isHydratingRef.current) return;
+    if (!lastLoadedKeyRef.current) return;
     if (selectedYearsMode === '') return; // Guard: No mode selected/loaded, do not write empty state to global
 
     const durationDistributionType = selectedYearsMode === 'duration_tiers' ? 'month_ranges' : 'years';
-    const currentKey = [
-      selectedBank,
-      selectedProduct,
-      selectedSupport,
-      selectedSector,
-      selectedSalaryBand,
-      selectedSalaryTransferStatus,
+    const currentKey = buildActiveMarginTableKey({
+      bankId: selectedBank,
+      productId: selectedProduct,
+      supportType: selectedSupport,
+      sectorId: selectedSector,
+      salaryBand: selectedSalaryBand,
+      salaryTransferStatus: selectedSalaryTransferStatus,
       durationDistributionType,
-      selectedCalcMethod
-    ].join(':');
+      calculationMethod: selectedCalcMethod
+    });
+
+    if (currentKey !== lastLoadedKeyRef.current && !userChangedTableConfigRef.current) {
+      return;
+    }
 
     const activeCombo = {
       key: currentKey,
@@ -823,16 +846,19 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       );
 
       const durationDistributionType = selectedYearsMode === 'duration_tiers' ? 'month_ranges' : 'years';
-      const currentKey = [
-        selectedBank,
-        selectedProduct,
-        selectedSupport,
-        selectedSector,
-        selectedSalaryBand,
-        selectedSalaryTransferStatus,
+      const currentKey = buildActiveMarginTableKey({
+        bankId: selectedBank,
+        productId: selectedProduct,
+        supportType: selectedSupport,
+        sectorId: selectedSector,
+        salaryBand: selectedSalaryBand,
+        salaryTransferStatus: selectedSalaryTransferStatus,
         durationDistributionType,
-        selectedCalcMethod
-      ].join(':');
+        calculationMethod: selectedCalcMethod
+      });
+      lastLoadedKeyRef.current = currentKey;
+      userChangedTableConfigRef.current = false;
+
       const latestCombo = {
         key: currentKey,
         localMargins,
@@ -1709,6 +1735,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                 <button
                   type="button"
                   onClick={() => {
+                    userChangedTableConfigRef.current = true;
                     if (selectedYearsMode === 'duration_tiers' || selectedYearsMode === '') {
                       setSelectedYearsMode('key_points');
                     }
@@ -1724,7 +1751,10 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                 <button
                   type="button"
                   id="tab-duration-tiers"
-                  onClick={() => setSelectedYearsMode('duration_tiers')}
+                  onClick={() => {
+                    userChangedTableConfigRef.current = true;
+                    setSelectedYearsMode('duration_tiers');
+                  }}
                   className={`px-3 py-2.5 rounded-xl border text-xs font-bold text-center transition-all cursor-pointer ${
                     selectedYearsMode === 'duration_tiers'
                       ? 'bg-[#0057B8]/10 border-[#0057B8] text-[#0057B8] shadow-xs font-extrabold'
@@ -1740,7 +1770,10 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                   <span className="text-[10px] text-gray-400 shrink-0 select-none">عرض الجدول:</span>
                   <button
                     type="button"
-                    onClick={() => setSelectedYearsMode('key_points')}
+                    onClick={() => {
+                      userChangedTableConfigRef.current = true;
+                      setSelectedYearsMode('key_points');
+                    }}
                     className={`px-2 py-0.5 text-[10px] font-bold rounded ${
                       selectedYearsMode === 'key_points'
                         ? 'bg-white text-[#0057B8] shadow-xs border border-gray-200'
@@ -1751,7 +1784,10 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setSelectedYearsMode('yearly')}
+                    onClick={() => {
+                      userChangedTableConfigRef.current = true;
+                      setSelectedYearsMode('yearly');
+                    }}
                     className={`px-2 py-0.5 text-[10px] font-bold rounded ${
                       selectedYearsMode === 'yearly'
                         ? 'bg-white text-[#0057B8] shadow-xs border border-gray-200'
@@ -1777,7 +1813,10 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                     <button
                       key={c.id}
                       type="button"
-                      onClick={() => setSelectedCalcMethod(c.id as any)}
+                      onClick={() => {
+                        userChangedTableConfigRef.current = true;
+                        setSelectedCalcMethod(c.id as any);
+                      }}
                       className={`px-1 py-1.5 rounded-lg border text-[10px] font-bold text-center transition-all cursor-pointer ${
                         isSelected
                           ? 'bg-[#0057B8]/10 border-[#0057B8] text-[#0057B8] shadow-xs'
