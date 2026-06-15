@@ -64,6 +64,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
   const [selectedYearsMode, setSelectedYearsMode] = useState<'yearly' | 'key_points' | 'duration_tiers' | ''>('');
   const [selectedCalcMethod, setSelectedCalcMethod] = useState<'linear' | 'fixed'>('fixed');
   const [selectedSalaryTransferStatus, setSelectedSalaryTransferStatus] = useState<'all' | 'salary_transfer' | 'no_salary_transfer'>('all');
+  const [transferMode, setTransferMode] = useState<'all_only' | 'split_transfer'>('all_only');
   const [selectedSalaryBand, setSelectedSalaryBand] = useState<'all' | 'below_25000' | 'from_25000'>('all');
 
   // 2. Local inputs for Edit Grid
@@ -150,6 +151,93 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     return mode === 'duration_tiers';
   };
 
+  // Auto-detection of transferMode and selectedYearsMode on Bank/Product/Support change
+  const lastFilterTriggerRef = useRef<string>('');
+
+  useEffect(() => {
+    if (!selectedBank) return;
+    const filterTriggerKey = [selectedBank, selectedProduct, selectedSupport].join(':');
+    if (filterTriggerKey === lastFilterTriggerRef.current) return;
+
+    lastFilterTriggerRef.current = filterTriggerKey;
+
+    const normSupportVal = normSupport(selectedSupport);
+
+    // Normalize and filter context rules for this bank + product + support
+    const matchingContextRules = marginRules.filter(r => {
+      let pId = r.productId as string;
+      if (pId === 'real_estate') pId = 'real_estate_only';
+      else if (pId === 'both') pId = 'real_estate_with_new_personal';
+      else if (pId === 'real_estate_with_personal_existing') pId = 'real_estate_with_existing_personal';
+
+      let sType = r.supportType as string;
+      if (sType === 'down_payment') sType = 'downpayment';
+
+      return (
+        !r.isExceptionOnly &&
+        r.bankId === selectedBank &&
+        pId === selectedProduct &&
+        normSupport(sType) === normSupportVal
+      );
+    });
+
+    // 1. Detect transferMode
+    const hasSplitRules = matchingContextRules.some(r => 
+      r.salaryTransferStatus === 'salary_transfer' || 
+      r.salaryTransferStatus === 'no_salary_transfer'
+    );
+
+    let nextTransferMode: 'all_only' | 'split_transfer' = 'all_only';
+    let nextTransferStatus: 'all' | 'salary_transfer' | 'no_salary_transfer' = 'all';
+
+    if (hasSplitRules) {
+      nextTransferMode = 'split_transfer';
+      // Seek what we actually have, default to 'salary_transfer'
+      const hasOnlyNoTransfer = matchingContextRules.every(r => r.salaryTransferStatus !== 'salary_transfer');
+      nextTransferStatus = hasOnlyNoTransfer ? 'no_salary_transfer' : 'salary_transfer';
+    } else {
+      nextTransferMode = 'all_only';
+      nextTransferStatus = 'all';
+    }
+
+    // 2. Detect yearsMode
+    let nextYearsMode: 'yearly' | 'key_points' | 'duration_tiers' | '' = '';
+    // Let's filter the ones that match our detected transfer status
+    const statusMatchingRules = matchingContextRules.filter(r => 
+      (r.salaryTransferStatus || 'all') === nextTransferStatus
+    );
+
+    if (statusMatchingRules.length > 0) {
+      const withCalcMode = statusMatchingRules.find(r => r.calculationMode);
+      const withInputMode = statusMatchingRules.find(r => r.marginInputMode);
+      if (withCalcMode && withCalcMode.calculationMode) {
+        nextYearsMode = withCalcMode.calculationMode as any;
+      } else if (withInputMode && withInputMode.marginInputMode) {
+        nextYearsMode = withInputMode.marginInputMode as any;
+      } else {
+        nextYearsMode = getRuleInputMode(statusMatchingRules[0]);
+      }
+    } else if (matchingContextRules.length > 0) {
+      // Fallback to any rule in context
+      const withCalcMode = matchingContextRules.find(r => r.calculationMode);
+      const withInputMode = matchingContextRules.find(r => r.marginInputMode);
+      if (withCalcMode && withCalcMode.calculationMode) {
+        nextYearsMode = withCalcMode.calculationMode as any;
+      } else if (withInputMode && withInputMode.marginInputMode) {
+        nextYearsMode = withInputMode.marginInputMode as any;
+      } else {
+        nextYearsMode = getRuleInputMode(matchingContextRules[0]);
+      }
+    } else {
+      nextYearsMode = 'key_points';
+    }
+
+    setTransferMode(nextTransferMode);
+    setSelectedSalaryTransferStatus(nextTransferStatus);
+    setSelectedYearsMode(nextYearsMode);
+
+  }, [selectedBank, selectedProduct, selectedSupport, marginRules]);
+
   // Synchronize local states when selection changes or marginRules are updated
   useEffect(() => {
     if (!selectedBank) return;
@@ -229,54 +317,8 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       r => normSector(r.sectorId) === normSector(targetSector)
     );
 
-    // Now detect or respect distribution mode
-    const filterKey = [
-      selectedBank,
-      selectedProduct,
-      selectedSupport,
-      selectedSector,
-      selectedSalaryBand,
-      selectedSalaryTransferStatus
-    ].join(':');
-
-    if (filterKey !== lastFilterKeyRef.current) {
-      if (sectorRules.length > 0) {
-        const withCalcMode = sectorRules.find(r => r.calculationMode);
-        const withInputMode = sectorRules.find(r => r.marginInputMode);
-
-        if (withCalcMode && withCalcMode.calculationMode) {
-          determinedMode = withCalcMode.calculationMode as any;
-        } else if (withInputMode && withInputMode.marginInputMode) {
-          determinedMode = withInputMode.marginInputMode as any;
-        } else {
-          determinedMode = getRuleInputMode(sectorRules[0]);
-        }
-      } else {
-        // Look for any existing rule for this bank + product + support to use as default distribution mode
-        const bankRules = allNormalized.filter(r => 
-          r.bankId === targetBank &&
-          r.productId === targetProduct &&
-          normSupport(r.supportType) === normSupport(targetSupport) &&
-          !r.isExceptionOnly
-        );
-        if (bankRules.length > 0) {
-          const withCalcMode = bankRules.find(r => r.calculationMode);
-          const withInputMode = bankRules.find(r => r.marginInputMode);
-          if (withCalcMode && withCalcMode.calculationMode) {
-            determinedMode = withCalcMode.calculationMode as any;
-          } else if (withInputMode && withInputMode.marginInputMode) {
-            determinedMode = withInputMode.marginInputMode as any;
-          } else {
-            determinedMode = getRuleInputMode(bankRules[0]);
-          }
-        } else {
-          determinedMode = '';
-        }
-      }
-      lastFilterKeyRef.current = filterKey;
-    } else {
-      determinedMode = selectedYearsMode;
-    }
+    // Respect distribution mode defined by selectedYearsMode
+    determinedMode = selectedYearsMode || 'key_points';
 
     // Load method from rules if defined and not set by user
     if (sectorRules.length > 0) {
@@ -363,7 +405,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       isHydratingRef.current = false;
     }, 0);
 
-  }, [selectedBank, selectedProduct, selectedSupport, selectedSector, selectedSalaryTransferStatus, selectedSalaryBand, selectedYearsMode, selectedCalcMethod, marginRules]);
+  }, [selectedBank, selectedProduct, selectedSupport, selectedSector, selectedSalaryTransferStatus, selectedSalaryBand, selectedYearsMode, selectedCalcMethod, marginRules, transferMode]);
 
   // Database updater to match exact core rules compatibility
   const updateGlobalRulesForCombo = (
@@ -594,7 +636,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       }
       return [...prev, activeComboData];
     });
-  }, [localMargins, localTiers, localSectorExceptions, selectedCalcMethod, selectedYearsMode, isLoaded, selectedBank, selectedProduct, selectedSupport, selectedSector, selectedSalaryTransferStatus, selectedSalaryBand]);
+  }, [localMargins, localTiers, localSectorExceptions, selectedCalcMethod, selectedYearsMode, isLoaded, selectedBank, selectedProduct, selectedSupport, selectedSector, selectedSalaryTransferStatus, selectedSalaryBand, transferMode]);
 
   // Auto-synchronize local changes directly to parent to trigger global "hasUnsavedChanges" banner only when dirty
   useEffect(() => {
@@ -643,7 +685,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       selectedCalcMethod,
       selectedYearsMode
     );
-  }, [localMargins, localTiers, localSectorExceptions, selectedCalcMethod, selectedYearsMode, isLoaded, initialMarginData, selectedBank, selectedProduct, selectedSupport, selectedSector, selectedSalaryTransferStatus, selectedSalaryBand]);
+  }, [localMargins, localTiers, localSectorExceptions, selectedCalcMethod, selectedYearsMode, isLoaded, initialMarginData, selectedBank, selectedProduct, selectedSupport, selectedSector, selectedSalaryTransferStatus, selectedSalaryBand, transferMode]);
 
   // Main save action for basic margins + exceptions
   const handleSaveConfig = async () => {
@@ -1402,20 +1444,70 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
               </div>
             )}
 
-            {/* Salary Transfer Status Select */}
+            {/* نظام هوامش تحويل الراتب */}
             <div className="space-y-1.5">
-              <label className="block text-[11px] font-bold text-gray-500">حالة تحويل الراتب:</label>
-              <select
-                id="filter-transfer-status"
-                value={selectedSalaryTransferStatus}
-                onChange={(e) => setSelectedSalaryTransferStatus(e.target.value as any)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 text-xs font-bold text-slate-800 outline-none focus:ring-1 focus:ring-[#0057B8] cursor-pointer"
-              >
-                <option value="all">الكل (بدون تحويل ومع تحويل)</option>
-                <option value="salary_transfer">بتحويل راتب</option>
-                <option value="no_salary_transfer">بدون تحويل راتب</option>
-              </select>
+              <label className="block text-[11px] font-bold text-gray-500">نظام هوامش تحويل الراتب:</label>
+              <div className="grid grid-cols-2 gap-1">
+                {[
+                  { id: 'all_only', label: 'جدول موحد للجميع' },
+                  { id: 'split_transfer', label: 'جدولان منفصلان' }
+                ].map(m => {
+                  const isSelected = transferMode === m.id;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => {
+                        setTransferMode(m.id as any);
+                        if (m.id === 'all_only') {
+                          setSelectedSalaryTransferStatus('all');
+                        } else {
+                          if (selectedSalaryTransferStatus === 'all') {
+                            setSelectedSalaryTransferStatus('salary_transfer');
+                          }
+                        }
+                      }}
+                      className={`px-1 py-1.5 rounded-lg border text-[10px] font-bold text-center transition-all cursor-pointer whitespace-nowrap ${
+                        isSelected
+                          ? 'bg-[#0057B8]/10 border-[#0057B8] text-[#0057B8] shadow-xs'
+                          : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
+                      }`}
+                    >
+                      {m.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
+
+            {/* الجدول المعروض - Show only when split_transfer */}
+            {transferMode === 'split_transfer' && (
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-bold text-gray-500 font-bold">الجدول المعروض:</label>
+                <div className="grid grid-cols-2 gap-1">
+                  {[
+                    { id: 'salary_transfer', label: 'بتحويل راتب' },
+                    { id: 'no_salary_transfer', label: 'بدون تحويل راتب' }
+                  ].map(status => {
+                    const isSelected = selectedSalaryTransferStatus === status.id;
+                    return (
+                      <button
+                        key={status.id}
+                        type="button"
+                        onClick={() => setSelectedSalaryTransferStatus(status.id as any)}
+                        className={`px-1 py-1.5 rounded-lg border text-[10px] font-bold text-center transition-all cursor-pointer whitespace-nowrap ${
+                          isSelected
+                            ? 'bg-[#0057B8]/10 border-[#0057B8] text-[#0057B8] shadow-xs'
+                            : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
+                        }`}
+                      >
+                        {status.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Show Mode Selector - Segmented Buttons */}
             <div className="space-y-1.5">
@@ -1574,6 +1666,10 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                   💵 {selectedSalaryBand === 'below_25000' ? 'فئة الراتب: أقل من 25,000' : 'فئة الراتب: 25,000 فأكثر'}
                 </span>
               )}
+
+              <span className="bg-rose-50 border border-rose-100 text-rose-700 text-[11px] px-2.5 py-1 rounded-lg font-bold">
+                💳 {transferMode === 'all_only' ? 'تحويل الراتب: جدول موحد' : selectedSalaryTransferStatus === 'salary_transfer' ? 'تحويل الراتب: بتحويل راتب' : 'تحويل الراتب: بدون تحويل راتب'}
+              </span>
 
               <span className="bg-slate-100 border border-slate-200 text-slate-700 text-[11px] px-2.5 py-1 rounded-lg font-bold">
                 ⏱️ {selectedYearsMode === 'key_points' ? 'نقاط رئيسية' : selectedYearsMode === 'yearly' ? 'كل سنة مستقلة' : selectedYearsMode === 'duration_tiers' ? 'شرائح مدة' : 'طريقة التوزيع غير محددة بعد'}
