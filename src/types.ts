@@ -224,6 +224,8 @@ export interface PersonalFinanceRules {
   customerStatus?: 'active_employee' | 'retired';
   rateApplicationType?: 'fixed' | 'bracket';
   salaryBrackets?: SalaryBracket[];
+  capPersonalTenorByRetirement?: boolean;
+  allowPersonalAfterRetirementForActive?: boolean;
 }
 
 export interface AdvancedRule {
@@ -342,6 +344,10 @@ export interface PersonalFinanceOutput {
     flatRate?: number;
     source: 'bank_specific' | 'default_bank' | 'fallback';
     error?: string;
+    personalMaxTenorMonths?: number;
+    monthsUntilRetirement?: number;
+    effectivePersonalTenorMonths?: number;
+    reductionReason?: string;
   };
 }
 

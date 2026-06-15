@@ -824,6 +824,28 @@ export default function ResultsGrid({
                       </div>
                     </>
                   )}
+
+                  {/* Retirement-based Personal Loan diagnostics */}
+                  {selectedOffer.personalDiagnostics?.reductionReason && (
+                    <div className="col-span-2 md:col-span-3 bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-start gap-2 text-xs text-[#1E40AF]">
+                      <span className="font-bold text-sm leading-none mt-0.5">ℹ️</span>
+                      <div>
+                        <span className="font-bold block mb-0.5 text-[#1E3A8A]">معالجة مدة التمويل الشخصي:</span>
+                        <span className="font-semibold text-[#1E40AF]">{selectedOffer.personalDiagnostics.reductionReason}</span>
+                        <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[10px] font-sans font-extrabold text-blue-800">
+                          {selectedOffer.personalDiagnostics.personalMaxTenorMonths !== undefined && (
+                            <span>الحد الأقصى للجهة: {selectedOffer.personalDiagnostics.personalMaxTenorMonths} شهر</span>
+                          )}
+                          {selectedOffer.personalDiagnostics.monthsUntilRetirement !== undefined && (
+                            <span>المتبقي للتقاعد: {selectedOffer.personalDiagnostics.monthsUntilRetirement} شهر</span>
+                          )}
+                          {selectedOffer.personalDiagnostics.effectivePersonalTenorMonths !== undefined && (
+                            <span>المدة الفعلية الاحتسابية: {selectedOffer.personalDiagnostics.effectivePersonalTenorMonths} شهر</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 

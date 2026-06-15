@@ -211,6 +211,10 @@ export default function StepWizard() {
   const [existingMonthlyObligations, setExistingMonthlyObligations] = useState<number | ''>(() => getDraftValue<number | ''>('existingMonthlyObligations', ''));
   const [obligationRemainingMonths, setObligationRemainingMonths] = useState<number | ''>(() => getDraftValue<number | ''>('obligationRemainingMonths', ''));
 
+  // Personal finance manual custom selection states
+  const [personalTenorSelectionMode, setPersonalTenorSelectionMode] = useState<'auto' | 'custom'>(() => getDraftValue<'auto' | 'custom'>('personalTenorSelectionMode', 'auto'));
+  const [requestedPersonalTenorMonths, setRequestedPersonalTenorMonths] = useState<number | ''>(() => getDraftValue<number | ''>('requestedPersonalTenorMonths', ''));
+
   // Validation errors
   const [errors, setErrors] = useState<string[]>([]);
 
@@ -307,6 +311,8 @@ export default function StepWizard() {
       isEtizazEligible,
       existingMonthlyObligations,
       obligationRemainingMonths,
+      personalTenorSelectionMode,
+      requestedPersonalTenorMonths,
       currentStep,
       results
     };
@@ -350,6 +356,8 @@ export default function StepWizard() {
     isEtizazEligible,
     existingMonthlyObligations,
     obligationRemainingMonths,
+    personalTenorSelectionMode,
+    requestedPersonalTenorMonths,
     currentStep,
     results
   ]);
@@ -395,6 +403,8 @@ export default function StepWizard() {
     
     setExistingMonthlyObligations(0);
     setObligationRemainingMonths(0);
+    setPersonalTenorSelectionMode('auto');
+    setRequestedPersonalTenorMonths('');
     
     setErrors([]);
     setResults(null);
@@ -587,7 +597,7 @@ export default function StepWizard() {
         stepErrors.push('حدد نوع العسكري لأن بعض البنوك تختلف بين الضباط والأفراد.');
       }
 
-      if (!salaryBankId) {
+      if (sectorId && sectorId !== 'retired' && !salaryBankId) {
         stepErrors.push('يرجى تحديد البنك المحول عليه راتبك للمتابعة.');
       }
 
@@ -650,6 +660,25 @@ export default function StepWizard() {
     if (stepId === 'finance_options') {
       if (!selectedBankId) {
         stepErrors.push('يرجى اختيار جهة التمويل المفضلة أو مقارنة جميع الجهات.');
+      }
+      if (mainFinanceType === 'personal_only') {
+        if (personalTenorSelectionMode === 'custom') {
+          if (!requestedPersonalTenorMonths || Number(requestedPersonalTenorMonths) < 1) {
+            stepErrors.push('يرجى إدخال عدد أشهر التمويل الشخصي المطلوبة (صحيح أكبر من الصفر).');
+          } else {
+            const requestedVal = Number(requestedPersonalTenorMonths);
+            let absoluteMax = 60; // default standard personal tenor limit
+            if (selectedBankId !== 'all') {
+              const ruleForBank = personalRules?.find(r => r.bankId === selectedBankId && r.isActive);
+              if (ruleForBank && ruleForBank.termMonths) {
+                absoluteMax = ruleForBank.termMonths;
+              }
+            }
+            if (requestedVal > absoluteMax) {
+              stepErrors.push(`المدة المطلوبة للتمويل الشخصي (${requestedVal} شهرًا) تتجاوز الحد الأقصى المسموح به لهذه الجهة البالغ ${absoluteMax} شهرًا.`);
+            }
+          }
+        }
       }
       if (mainFinanceType !== 'personal_only') {
         if (!productId) {
@@ -714,6 +743,8 @@ export default function StepWizard() {
       salaryBankId,
       termMode,
       manualTermMonths: (termMode === 'manual' && manualTermYears) ? (Number(manualTermYears) * 12) : undefined,
+      personalTenorSelectionMode: mainFinanceType === 'personal_only' ? personalTenorSelectionMode : 'auto',
+      requestedPersonalTenorMonths: (mainFinanceType === 'personal_only' && personalTenorSelectionMode === 'custom' && requestedPersonalTenorMonths) ? Number(requestedPersonalTenorMonths) : undefined,
 
       banks,
       products,
@@ -851,25 +882,27 @@ export default function StepWizard() {
         </div>
 
         {/* Salary Bank Input */}
-        <div id="salary-bank-selector-wrapper" className="space-y-2 animate-fade-in">
-          <label className="block text-xs font-bold text-gray-700">راتبك على أي بنك؟ <span className="text-rose-500">*</span></label>
-          <select
-            id="salary-bank-select"
-            value={salaryBankId}
-            onChange={(e) => setSalaryBankId(e.target.value)}
-            className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] focus:border-transparent cursor-pointer"
-          >
-            <option value="">-- اختر البنك المحول عليه راتبك --</option>
-            <option id="opt-alahli" value="alahli">البنك الأهلي</option>
-            <option id="opt-rajhi" value="rajhi">بنك الراجحي</option>
-            <option id="opt-albilad" value="albilad">بنك البلاد</option>
-            <option id="opt-alinma" value="alinma">بنك الإنماء</option>
-            <option id="opt-fransi" value="fransi">البنك السعودي الفرنسي</option>
-            <option id="opt-alarabi" value="alarabi">البنك العربي</option>
-            <option id="opt-bidaya" value="bidaya">بداية</option>
-            <option id="opt-other_bank" value="other_bank">بنك آخر</option>
-          </select>
-        </div>
+        {sectorId && sectorId !== 'retired' && (
+          <div id="salary-bank-selector-wrapper" className="space-y-2 animate-fade-in">
+            <label className="block text-xs font-bold text-gray-700">راتبك على أي بنك؟ <span className="text-rose-500">*</span></label>
+            <select
+              id="salary-bank-select"
+              value={salaryBankId}
+              onChange={(e) => setSalaryBankId(e.target.value)}
+              className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] focus:border-transparent cursor-pointer"
+            >
+              <option value="">-- اختر البنك المحول عليه راتبك --</option>
+              <option id="opt-alahli" value="alahli">البنك الأهلي</option>
+              <option id="opt-rajhi" value="rajhi">بنك الراجحي</option>
+              <option id="opt-albilad" value="albilad">بنك البلاد</option>
+              <option id="opt-alinma" value="alinma">بنك الإنماء</option>
+              <option id="opt-fransi" value="fransi">البنك السعودي الفرنسي</option>
+              <option id="opt-alarabi" value="alarabi">البنك العربي</option>
+              <option id="opt-bidaya" value="bidaya">بداية</option>
+              <option id="opt-other_bank" value="other_bank">بنك آخر</option>
+            </select>
+          </div>
+        )}
 
         {/* 2. Military Selector details (only if Sector is Military) */}
         {sectorId === 'military' && (
@@ -1717,6 +1750,59 @@ export default function StepWizard() {
                             className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
                           />
                           <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-500">سنة</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Personal Tenor Option Mode - ONLY FOR PERSONAL ONLY PATH */}
+                {mainFinanceType === 'personal_only' && (
+                  <div className="border border-gray-200 bg-white rounded-2xl p-5 text-right space-y-3 col-span-1 md:col-span-2">
+                    <label className="block text-xs font-bold text-gray-700 flex items-center gap-1.5 pb-1">
+                      <Coins className="w-4 h-4 text-amber-500" />
+                      <span>مدة التمويل الشخصي المطلوبة:</span>
+                    </label>
+                    <div className="grid grid-cols-2 gap-3 max-w-md">
+                      {[
+                        { id: 'auto', label: 'تلقائي حسب قاعدة البنك والتقاعد' },
+                        { id: 'custom', label: 'مدة مخصصة (بالأشهر)' }
+                      ].map((tm) => (
+                        <button
+                          key={tm.id}
+                          type="button"
+                          onClick={() => {
+                            setPersonalTenorSelectionMode(tm.id as 'auto' | 'custom');
+                            if (tm.id === 'auto') {
+                              setRequestedPersonalTenorMonths('');
+                            }
+                          }}
+                          className={`py-3 px-2 text-xs font-bold rounded-xl border text-center transition-all cursor-pointer font-sans ${
+                            personalTenorSelectionMode === tm.id
+                              ? 'border-[#0057B8] bg-[#0057B8]/5 text-[#0057B8]'
+                              : 'border-gray-200 text-gray-500 hover:bg-gray-50 hover:border-gray-300'
+                          }`}
+                        >
+                          {tm.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {personalTenorSelectionMode === 'custom' && (
+                      <div className="mt-4 space-y-2 animate-fade-in font-sans max-w-md">
+                        <label className="block text-[10px] font-bold text-gray-400">عدد أشهر التمويل الشخصي (مثال: 12، 24، 36، 48، 60 شهراً):</label>
+                        <div className="relative">
+                          <NumericInput
+                            id="custom-personal-term-months-input"
+                            min={1}
+                            max={60}
+                            allowDecimals={false}
+                            placeholder="مثال: 60"
+                            value={requestedPersonalTenorMonths}
+                            onChange={setRequestedPersonalTenorMonths}
+                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                          />
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-500">شهر</span>
                         </div>
                       </div>
                     )}

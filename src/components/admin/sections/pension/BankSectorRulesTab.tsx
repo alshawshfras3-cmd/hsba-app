@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Edit, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { Bank } from '../../../../types';
 import { BankSectorPensionRule } from '../../../../types/pension-rules';
+import NumericInput from '../../../calculator/NumericInput';
 
 interface BankSectorRulesTabProps {
   banks: Bank[];
@@ -351,27 +352,26 @@ export default function BankSectorRulesTab({
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-slate-500 mb-1">قاسم حساب التقاعد (سنة):</label>
-                      <input
-                        type="number"
+                      <NumericInput
                         value={editingBankSectorRule.divisorYears ?? 40}
-                        onChange={(e) => setEditingBankSectorRule({
+                        onChange={(val) => setEditingBankSectorRule({
                           ...editingBankSectorRule,
-                          divisorYears: parseInt(e.target.value) || 40
+                          divisorYears: val === '' ? 40 : val
                         })}
-                        className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-mono font-bold"
+                        allowDecimals={false}
+                        className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-right"
                       />
                     </div>
                     <div>
                       <label className="block text-slate-500 mb-1">معدل النمو السنوي %:</label>
-                      <input
-                        type="number"
-                        step="0.01"
+                      <NumericInput
                         value={editingBankSectorRule.growthRate ?? 2.5}
-                        onChange={(e) => setEditingBankSectorRule({
+                        onChange={(val) => setEditingBankSectorRule({
                           ...editingBankSectorRule,
-                          growthRate: parseFloat(e.target.value) || 0
+                          growthRate: val === '' ? 0 : val
                         })}
-                        className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-mono font-bold"
+                        allowDecimals={true}
+                        className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-right"
                       />
                     </div>
                   </div>
@@ -379,38 +379,38 @@ export default function BankSectorRulesTab({
                   <div className="grid grid-cols-3 gap-2">
                     <div>
                       <label className="block text-[10px] text-slate-400 mb-1">أدنى سنوات للنمو:</label>
-                      <input
-                        type="number"
+                      <NumericInput
                         value={editingBankSectorRule.growthMinYears ?? 5}
-                        onChange={(e) => setEditingBankSectorRule({
+                        onChange={(val) => setEditingBankSectorRule({
                           ...editingBankSectorRule,
-                          growthMinYears: parseInt(e.target.value) || 0
+                          growthMinYears: val === '' ? 0 : val
                         })}
-                        className="w-full bg-white border border-gray-200 rounded-xl px-2 py-1.5 text-xs"
+                        allowDecimals={false}
+                        className="w-full bg-white border border-gray-200 rounded-xl px-2 py-1.5 text-xs text-right"
                       />
                     </div>
                     <div>
                       <label className="block text-[10px] text-slate-400 mb-1">أقصى سن للنمو:</label>
-                      <input
-                        type="number"
+                      <NumericInput
                         value={editingBankSectorRule.growthMaxYears ?? 12}
-                        onChange={(e) => setEditingBankSectorRule({
+                        onChange={(val) => setEditingBankSectorRule({
                           ...editingBankSectorRule,
-                          growthMaxYears: parseInt(e.target.value) || 0
+                          growthMaxYears: val === '' ? 0 : val
                         })}
-                        className="w-full bg-white border border-gray-200 rounded-xl px-2 py-1.5 text-xs"
+                        allowDecimals={false}
+                        className="w-full bg-white border border-gray-200 rounded-xl px-2 py-1.5 text-xs text-right"
                       />
                     </div>
                     <div>
                       <label className="block text-[10px] text-slate-400 mb-1">مانع الخدمة (سنة):</label>
-                      <input
-                        type="number"
+                      <NumericInput
                         value={editingBankSectorRule.noGrowthAboveYears ?? 25}
-                        onChange={(e) => setEditingBankSectorRule({
+                        onChange={(val) => setEditingBankSectorRule({
                           ...editingBankSectorRule,
-                          noGrowthAboveYears: parseInt(e.target.value) || 0
+                          noGrowthAboveYears: val === '' ? 0 : val
                         })}
-                        className="w-full bg-white border border-gray-200 rounded-xl px-2 py-1.5 text-xs"
+                        allowDecimals={false}
+                        className="w-full bg-white border border-gray-200 rounded-xl px-2 py-1.5 text-xs text-right"
                       />
                     </div>
                   </div>
@@ -439,38 +439,38 @@ export default function BankSectorRulesTab({
                   <div className="grid grid-cols-3 gap-2 text-right">
                     <div>
                       <label className="block text-slate-500 text-[10px] mb-1">عتبة السنوات المتبقية:</label>
-                      <input
-                        type="number"
+                      <NumericInput
                         value={editingBankSectorRule.thresholdYears ?? 5}
-                        onChange={(e) => setEditingBankSectorRule({
+                        onChange={(val) => setEditingBankSectorRule({
                           ...editingBankSectorRule,
-                          thresholdYears: parseInt(e.target.value) || 5
+                          thresholdYears: val === '' ? 5 : val
                         })}
-                        className="w-full bg-white border border-gray-200 rounded-xl px-2 py-2 text-xs text-center"
+                        allowDecimals={false}
+                        className="w-full bg-white border border-gray-200 rounded-xl px-2 py-2 text-xs text-center font-bold"
                       />
                     </div>
                     <div>
                       <label className="block text-slate-500 text-[10px] mb-1">النسبة % (≤ العتبة):</label>
-                      <input
-                        type="number"
+                      <NumericInput
                         value={editingBankSectorRule.rateBelow ?? 70}
-                        onChange={(e) => setEditingBankSectorRule({
+                        onChange={(val) => setEditingBankSectorRule({
                           ...editingBankSectorRule,
-                          rateBelow: parseInt(e.target.value) || 70
+                          rateBelow: val === '' ? 70 : val
                         })}
-                        className="w-full bg-white border border-gray-200 rounded-xl px-2 py-2 text-xs text-center"
+                        allowDecimals={true}
+                        className="w-full bg-white border border-gray-200 rounded-xl px-2 py-2 text-xs text-center font-bold"
                       />
                     </div>
                     <div>
                       <label className="block text-slate-500 text-[10px] mb-1">النسبة % (&gt; العتبة):</label>
-                      <input
-                        type="number"
+                      <NumericInput
                         value={editingBankSectorRule.rateAbove ?? 80}
-                        onChange={(e) => setEditingBankSectorRule({
+                        onChange={(val) => setEditingBankSectorRule({
                           ...editingBankSectorRule,
-                          rateAbove: parseInt(e.target.value) || 80
+                          rateAbove: val === '' ? 80 : val
                         })}
-                        className="w-full bg-white border border-gray-200 rounded-xl px-2 py-2 text-xs text-center"
+                        allowDecimals={true}
+                        className="w-full bg-white border border-gray-200 rounded-xl px-2 py-2 text-xs text-center font-bold"
                       />
                     </div>
                   </div>

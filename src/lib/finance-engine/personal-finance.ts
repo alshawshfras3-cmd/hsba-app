@@ -116,8 +116,10 @@ export function calculatePersonalFinance(params: {
   productId?: string;
   monthsBeforeRetirement?: number;
   remainingMonthsToMaxAge?: number;
+  personalTenorSelectionMode?: 'auto' | 'custom';
+  requestedPersonalTenorMonths?: number;
 }): PersonalFinanceOutput {
-  const { netSalary, obligations, sectorId, bankId, rules, productId, monthsBeforeRetirement, remainingMonthsToMaxAge } = params;
+  const { netSalary, obligations, sectorId, bankId, rules, productId, monthsBeforeRetirement, remainingMonthsToMaxAge, personalTenorSelectionMode, requestedPersonalTenorMonths } = params;
 
   // Map sectorId to customerStatus
   const customerStatus: 'active' | 'retired' = sectorId === 'retired' ? 'retired' : 'active';
@@ -254,15 +256,44 @@ export function calculatePersonalFinance(params: {
   }
 
   // تحديد مدة التمويل الشخصي الفعلية
-  let termMonths = ruleTermMonths;
-  if (customerStatus === 'retired') {
-    termMonths = remainingMonthsToMaxAge
+  let maxAllowedPersonalTenor = ruleTermMonths;
+  const capPersonalTenorByRetirement = finalRule.capPersonalTenorByRetirement !== false;
+  const allowPersonalAfterRetirementForActive = finalRule.allowPersonalAfterRetirementForActive === true;
+
+  if (customerStatus === 'retired' || sectorId === 'retired') {
+    maxAllowedPersonalTenor = remainingMonthsToMaxAge
       ? Math.min(ruleTermMonths, remainingMonthsToMaxAge)
       : ruleTermMonths;
   } else {
-    termMonths = monthsBeforeRetirement
-      ? Math.min(ruleTermMonths, monthsBeforeRetirement)
-      : ruleTermMonths;
+    // Active employee
+    const monthsUntilRetirement = monthsBeforeRetirement !== undefined ? monthsBeforeRetirement : 0;
+    if (capPersonalTenorByRetirement || !allowPersonalAfterRetirementForActive) {
+      maxAllowedPersonalTenor = Math.min(ruleTermMonths, monthsUntilRetirement);
+    } else {
+      maxAllowedPersonalTenor = ruleTermMonths;
+    }
+  }
+  if (maxAllowedPersonalTenor < 1) maxAllowedPersonalTenor = 1;
+
+  let termMonths = maxAllowedPersonalTenor;
+  let reductionReason = '';
+
+  if (pathType === 'personal_only' && personalTenorSelectionMode === 'custom' && requestedPersonalTenorMonths !== undefined) {
+    if (requestedPersonalTenorMonths > maxAllowedPersonalTenor) {
+      termMonths = maxAllowedPersonalTenor;
+      reductionReason = `تم تقليل مدة التمويل الشخصي المطلوبة (${requestedPersonalTenorMonths} شهرًا) وتحديدها بـ ${termMonths} شهرًا لتتوافق مع الحد الأقصى المسموح به لظروف التقاعد أو اللائحة لدى البنك البالغ ${maxAllowedPersonalTenor} شهرًا.`;
+    } else {
+      termMonths = requestedPersonalTenorMonths;
+    }
+  } else {
+    // auto or other paths
+    termMonths = maxAllowedPersonalTenor;
+    if (customerStatus !== 'retired' && sectorId !== 'retired') {
+      const monthsUntilRetirement = monthsBeforeRetirement !== undefined ? monthsBeforeRetirement : 0;
+      if (termMonths < ruleTermMonths) {
+        reductionReason = `تم اعتماد مدة الشخصي ${termMonths} شهرًا لأنها الأقل بين مدة البنك القصوى ${ruleTermMonths} شهرًا والأشهر المتبقية قبل التقاعد ${monthsUntilRetirement} شهرًا.`;
+      }
+    }
   }
   if (termMonths < 1) termMonths = 1;
 
@@ -333,7 +364,11 @@ export function calculatePersonalFinance(params: {
       calculationMethod,
       multiplier: calculationMethod === 'flat_rate' ? Number((termMonths / (1 + (annualMargin / 100) * (termMonths / 12))).toFixed(2)) : coeff,
       flatRate: calculationMethod === 'flat_rate' ? annualMargin : (annualMarginApprox !== undefined ? Number(annualMarginApprox.toFixed(2)) : finalRule.annualMargin),
-      source
+      source,
+      personalMaxTenorMonths: ruleTermMonths,
+      monthsUntilRetirement: monthsBeforeRetirement,
+      effectivePersonalTenorMonths: termMonths,
+      reductionReason: reductionReason || undefined,
     }
   };
 }

@@ -84,6 +84,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
   const lastLoadedKeyRef = useRef<string>('');
   const lastFilterKeyRef = useRef<string>('');
   const lastIdentityKeyRef = useRef<string>('');
+  const lastBaseSelectionKeyRef = useRef<string>('');
   const [isSavingToCloud, setIsSavingToCloud] = useState(false);
 
   // Hydration ref to block auto synchronization during table initialization or selection changes
@@ -191,7 +192,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       let pId = r.productId as string;
       if (pId === 'real_estate') pId = 'real_estate_only';
       else if (pId === 'both') pId = 'real_estate_with_new_personal';
-      else if (pId === 'real_estate_with_personal_existing') pId = 'real_estate_with_existing_personal';
+      else if (pId === 'real_estate_with_personal_existing' || r.productId === 'real_estate_with_personal_existing') pId = 'real_estate_with_existing_personal';
 
       let sType = r.supportType as string;
       if (sType === 'down_payment') sType = 'downpayment';
@@ -213,7 +214,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       let pId = r.productId as string;
       if (pId === 'real_estate') pId = 'real_estate_only';
       else if (pId === 'both') pId = 'real_estate_with_new_personal';
-      else if (pId === 'real_estate_with_personal_existing') pId = 'real_estate_with_existing_personal';
+      else if (pId === 'real_estate_with_personal_existing' || r.productId === 'real_estate_with_personal_existing') pId = 'real_estate_with_existing_personal';
 
       let sType = r.supportType as string;
       if (sType === 'down_payment') sType = 'downpayment';
@@ -225,23 +226,41 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       );
     });
 
-    let determinedTransferMode: 'all_only' | 'split_transfer' = 'all_only';
-    const hasSplitInRelated = relatedRules.some(r => r.salaryTransferStatus === 'salary_transfer' || r.salaryTransferStatus === 'no_salary_transfer');
-    const hasSplitInBroader = broaderRules.some(r => r.salaryTransferStatus === 'salary_transfer' || r.salaryTransferStatus === 'no_salary_transfer');
+    const currentBaseSelectionKey = [
+      selectedBank,
+      selectedProduct,
+      selectedSupport,
+      selectedSector,
+      selectedSalaryBand
+    ].join(':');
 
-    if (hasSplitInRelated || hasSplitInBroader) {
-      determinedTransferMode = 'split_transfer';
-    } else {
-      determinedTransferMode = 'all_only';
-    }
-
+    let determinedTransferMode: 'all_only' | 'split_transfer' = transferMode;
     let determinedSalaryTransferStatus = selectedSalaryTransferStatus;
-    if (determinedTransferMode === 'split_transfer') {
-      if (determinedSalaryTransferStatus === 'all') {
+
+    if (currentBaseSelectionKey !== lastBaseSelectionKeyRef.current) {
+      lastBaseSelectionKeyRef.current = currentBaseSelectionKey;
+      // Base filters changed! Query database to determine initial transfer mode and status
+      const hasSplitInRelated = relatedRules.some(r => r.salaryTransferStatus === 'salary_transfer' || r.salaryTransferStatus === 'no_salary_transfer');
+      const hasSplitInBroader = broaderRules.some(r => r.salaryTransferStatus === 'salary_transfer' || r.salaryTransferStatus === 'no_salary_transfer');
+
+      if (hasSplitInRelated || hasSplitInBroader) {
+        determinedTransferMode = 'split_transfer';
         determinedSalaryTransferStatus = 'salary_transfer';
+      } else {
+        determinedTransferMode = 'all_only';
+        determinedSalaryTransferStatus = 'all';
       }
     } else {
-      determinedSalaryTransferStatus = 'all';
+      // Manual user clicks or direct edits. Respect current local choice.
+      determinedTransferMode = transferMode;
+      determinedSalaryTransferStatus = selectedSalaryTransferStatus;
+      if (determinedTransferMode === 'all_only') {
+        determinedSalaryTransferStatus = 'all';
+      } else {
+        if (determinedSalaryTransferStatus === 'all') {
+          determinedSalaryTransferStatus = 'salary_transfer';
+        }
+      }
     }
 
     const exactRules = relatedRules.filter(r => (r.salaryTransferStatus || 'all') === determinedSalaryTransferStatus);
@@ -456,6 +475,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     selectedSector,
     selectedSalaryBand,
     selectedSalaryTransferStatus,
+    transferMode,
     marginRules
   ]);
 

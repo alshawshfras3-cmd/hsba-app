@@ -8,6 +8,7 @@ import {
   calculateApprovedBase, 
   calculatePensionByBankRule 
 } from '../../../../lib/finance-engine/pension';
+import { convertArabicToEnglishDigits } from '../../../../lib/number-input';
 
 interface RuleTestTabProps {
   banks: Bank[];
@@ -259,7 +260,7 @@ export default function RuleTestTab({
                 inputMode="decimal"
                 dir="ltr"
                 value={sandboxBasic || ''}
-                onChange={(e) => setSandboxBasic(parseFloat(e.target.value.replace(/[^0-9.]/g, '')) || 0)}
+                onChange={(e) => setSandboxBasic(parseFloat(convertArabicToEnglishDigits(e.target.value).replace(/[^0-9.]/g, '')) || 0)}
                 className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-blue-200 font-bold"
               />
             </div>
@@ -270,7 +271,7 @@ export default function RuleTestTab({
                 inputMode="decimal"
                 dir="ltr"
                 value={sandboxHousing || ''}
-                onChange={(e) => setSandboxHousing(parseFloat(e.target.value.replace(/[^0-9.]/g, '')) || 0)}
+                onChange={(e) => setSandboxHousing(parseFloat(convertArabicToEnglishDigits(e.target.value).replace(/[^0-9.]/g, '')) || 0)}
                 className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-blue-200 font-bold"
               />
             </div>
@@ -281,7 +282,7 @@ export default function RuleTestTab({
                 inputMode="decimal"
                 dir="ltr"
                 value={sandboxOther || ''}
-                onChange={(e) => setSandboxOther(parseFloat(e.target.value.replace(/[^0-9.]/g, '')) || 0)}
+                onChange={(e) => setSandboxOther(parseFloat(convertArabicToEnglishDigits(e.target.value).replace(/[^0-9.]/g, '')) || 0)}
                 className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-blue-200 font-bold"
               />
             </div>
@@ -295,7 +296,7 @@ export default function RuleTestTab({
                 inputMode="decimal"
                 dir="ltr"
                 value={sandboxDirectNet || ''}
-                onChange={(e) => setSandboxDirectNet(parseFloat(e.target.value.replace(/[^0-9.]/g, '')) || 0)}
+                onChange={(e) => setSandboxDirectNet(parseFloat(convertArabicToEnglishDigits(e.target.value).replace(/[^0-9.]/g, '')) || 0)}
                 className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-blue-200 font-bold"
               />
             </div>
@@ -307,7 +308,7 @@ export default function RuleTestTab({
                   inputMode="decimal"
                   dir="ltr"
                   value={sandboxDirectPension || ''}
-                  onChange={(e) => setSandboxDirectPension(parseFloat(e.target.value.replace(/[^0-9.]/g, '')) || 0)}
+                  onChange={(e) => setSandboxDirectPension(parseFloat(convertArabicToEnglishDigits(e.target.value).replace(/[^0-9.]/g, '')) || 0)}
                   className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-blue-200 font-bold"
                 />
               </div>
@@ -348,7 +349,7 @@ export default function RuleTestTab({
                     inputMode="decimal"
                     dir="ltr"
                     value={sandboxServiceMonths || ''}
-                    onChange={(e) => setSandboxServiceMonths(parseFloat(e.target.value.replace(/[^0-9.]/g, '')) || 0)}
+                    onChange={(e) => setSandboxServiceMonths(parseFloat(convertArabicToEnglishDigits(e.target.value).replace(/[^0-9.]/g, '')) || 0)}
                     className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold outline-none"
                   />
                   <span className="bg-slate-200 px-3 py-2 rounded-xl text-[10px] font-bold text-slate-600 self-center whitespace-nowrap">
@@ -363,7 +364,7 @@ export default function RuleTestTab({
                   inputMode="decimal"
                   dir="ltr"
                   value={sandboxYearsToRetire || ''}
-                  onChange={(e) => setSandboxYearsToRetire(parseFloat(e.target.value.replace(/[^0-9.]/g, '')) || 0)}
+                  onChange={(e) => setSandboxYearsToRetire(parseFloat(convertArabicToEnglishDigits(e.target.value).replace(/[^0-9.]/g, '')) || 0)}
                   className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold outline-none"
                 />
               </div>

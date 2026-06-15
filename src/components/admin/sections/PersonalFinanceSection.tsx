@@ -42,6 +42,8 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
   const [formPfMaxSalary, setFormPfMaxSalary] = useState('');
   const [formPfCalcMethod, setFormPfCalcMethod] = useState<'multiplier' | 'pmt' | 'flat_rate'>('flat_rate');
   const [formPfActive, setFormPfActive] = useState(true);
+  const [formPfCapPersonalTenorByRetirement, setFormPfCapPersonalTenorByRetirement] = useState(true);
+  const [formPfAllowPersonalAfterRetirementForActive, setFormPfAllowPersonalAfterRetirementForActive] = useState(false);
   const [formPfRateAppType, setFormPfRateAppType] = useState<'fixed' | 'bracket'>('fixed');
   const [formPfSalaryBrackets, setFormPfSalaryBrackets] = useState<any[]>([]);
   const [pfError, setPfError] = useState('');
@@ -153,6 +155,8 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
     setFormPfMaxSalary('');
     setFormPfCalcMethod('flat_rate');
     setFormPfActive(true);
+    setFormPfCapPersonalTenorByRetirement(true);
+    setFormPfAllowPersonalAfterRetirementForActive(false);
     setFormPfRateAppType('fixed');
     setFormPfSalaryBrackets([]);
     setPfError('');
@@ -175,6 +179,8 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
     setFormPfMaxSalary(rule.maxSalary !== undefined ? String(rule.maxSalary) : '');
     setFormPfCalcMethod(rule.calculationMethod || 'multiplier');
     setFormPfActive(rule.isActive !== false);
+    setFormPfCapPersonalTenorByRetirement(rule.capPersonalTenorByRetirement !== false);
+    setFormPfAllowPersonalAfterRetirementForActive(rule.allowPersonalAfterRetirementForActive === true);
     setFormPfRateAppType(rule.rateApplicationType || 'fixed');
     const bEdits = (rule.salaryBrackets || []).map(b => ({
       fromSalary: String(b.fromSalary),
@@ -281,7 +287,9 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
       pathType: formPfPathType,
       customerStatus: formPfCustomerStatus,
       rateApplicationType: formPfRateAppType,
-      salaryBrackets: finalBrackets
+      salaryBrackets: finalBrackets,
+      capPersonalTenorByRetirement: formPfCapPersonalTenorByRetirement,
+      allowPersonalAfterRetirementForActive: formPfAllowPersonalAfterRetirementForActive
     };
 
     if (editingPfRule) {
@@ -463,6 +471,8 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
                 <th className="p-4 font-bold text-center">النسبة / المعامل</th>
                 <th className="p-4 font-bold text-center">أقل راتب</th>
                 <th className="p-4 font-bold text-center">أعلى راتب</th>
+                <th className="p-4 font-bold text-center">تقليل قبل التقاعد</th>
+                <th className="p-4 font-bold text-center">يسمح بعد التقاعد</th>
                 <th className="p-4 font-bold text-center">الحالة</th>
                 <th className="p-4 font-bold text-center">الإجراءات</th>
               </tr>
@@ -539,6 +549,16 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
                         </td>
                         <td className="p-4 text-center font-sans">{(rule.minSalary ?? 0).toLocaleString('ar-SA')} ريال</td>
                         <td className="p-4 text-center font-sans">{rule.maxSalary ? `${rule.maxSalary.toLocaleString('ar-SA')} ريال` : 'غير محدد'}</td>
+                        <td className="p-4 text-center text-xs">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${rule.capPersonalTenorByRetirement !== false ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
+                            {rule.capPersonalTenorByRetirement !== false ? 'نعم' : 'لا'}
+                          </span>
+                        </td>
+                        <td className="p-4 text-center text-xs">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${rule.allowPersonalAfterRetirementForActive === true ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
+                            {rule.allowPersonalAfterRetirementForActive === true ? 'نعم' : 'لا'}
+                          </span>
+                        </td>
                         <td className="p-4 text-center">
                           <button
                             onClick={() => setPersonalRules(prev => prev.map(r => r.id === rule.id ? { ...r, isActive: !r.isActive } : r))}
@@ -1148,6 +1168,42 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
                       <span
                         className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
                           formPfActive ? '-translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {/* 12. Cap Personal Tenor By Retirement */}
+                  <div className="flex items-center gap-3 pt-6">
+                    <span className="text-xs font-bold text-gray-600">تقليل مدة الشخصي عند قرب التقاعد:</span>
+                    <button
+                      type="button"
+                      onClick={() => setFormPfCapPersonalTenorByRetirement(!formPfCapPersonalTenorByRetirement)}
+                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        formPfCapPersonalTenorByRetirement ? 'bg-[#0057B8]' : 'bg-slate-200'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                          formPfCapPersonalTenorByRetirement ? '-translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {/* 13. Allow Personal After Retirement for Active */}
+                  <div className="flex items-center gap-3 pt-6">
+                    <span className="text-xs font-bold text-gray-600">السماح للشخصي بعد التقاعد:</span>
+                    <button
+                      type="button"
+                      onClick={() => setFormPfAllowPersonalAfterRetirementForActive(!formPfAllowPersonalAfterRetirementForActive)}
+                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        formPfAllowPersonalAfterRetirementForActive ? 'bg-[#0057B8]' : 'bg-slate-200'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                          formPfAllowPersonalAfterRetirementForActive ? '-translate-x-5' : 'translate-x-0'
                         }`}
                       />
                     </button>

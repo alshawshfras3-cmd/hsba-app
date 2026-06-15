@@ -106,25 +106,45 @@ export function resolveMatchingRules(params: {
   );
   if (match2.length > 0) return match2;
 
-  // 3. Fallback salaryBand = all
-  const match3 = activeRules.filter(
+  // 3a. Fallback salaryBand = all with exact salaryTransferStatus
+  const match3_exact = activeRules.filter(
     r => r.bankId === bankId &&
          r.productId === normProduct &&
-         (getRuleSalaryTransferStatus(r) === salaryTransferStatus || getRuleSalaryTransferStatus(r) === 'all') &&
+         (getRuleSalaryTransferStatus(r) === salaryTransferStatus) &&
          (getRuleSalaryBand(r) === 'all') &&
          (getRuleSupportType(r) === 'all' || getRuleSupportType(r) === targetSupportNorm)
   );
-  if (match3.length > 0) return match3;
+  if (match3_exact.length > 0) return match3_exact;
 
-  // 4. Fallback supportType = all
-  const match4 = activeRules.filter(
+  // 3b. Fallback salaryBand = all with fallback status = all
+  const match3_fallback = activeRules.filter(
     r => r.bankId === bankId &&
          r.productId === normProduct &&
-         (getRuleSalaryTransferStatus(r) === salaryTransferStatus || getRuleSalaryTransferStatus(r) === 'all') &&
+         (getRuleSalaryTransferStatus(r) === 'all') &&
+         (getRuleSalaryBand(r) === 'all') &&
+         (getRuleSupportType(r) === 'all' || getRuleSupportType(r) === targetSupportNorm)
+  );
+  if (match3_fallback.length > 0) return match3_fallback;
+
+  // 4a. Fallback supportType = all with exact salaryTransferStatus
+  const match4_exact = activeRules.filter(
+    r => r.bankId === bankId &&
+         r.productId === normProduct &&
+         (getRuleSalaryTransferStatus(r) === salaryTransferStatus) &&
          (getRuleSalaryBand(r) === salaryBand || getRuleSalaryBand(r) === 'all') &&
          (getRuleSupportType(r) === 'all')
   );
-  if (match4.length > 0) return match4;
+  if (match4_exact.length > 0) return match4_exact;
+
+  // 4b. Fallback supportType = all with fallback status = all
+  const match4_fallback = activeRules.filter(
+    r => r.bankId === bankId &&
+         r.productId === normProduct &&
+         (getRuleSalaryTransferStatus(r) === 'all') &&
+         (getRuleSalaryBand(r) === salaryBand || getRuleSalaryBand(r) === 'all') &&
+         (getRuleSupportType(r) === 'all')
+  );
+  if (match4_fallback.length > 0) return match4_fallback;
 
   // 5. Fallback both salaryBand and supportType = all
   const match5 = activeRules.filter(

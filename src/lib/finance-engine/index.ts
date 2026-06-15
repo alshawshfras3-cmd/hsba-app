@@ -290,6 +290,8 @@ export function calculateBanksFinancing(params: {
   salaryBankId?: string | null;
   termMode: TermMode;
   manualTermMonths?: number;
+  personalTenorSelectionMode?: 'auto' | 'custom';
+  requestedPersonalTenorMonths?: number;
 
   // Active configurations state
   banks: Bank[];
@@ -341,6 +343,8 @@ export function calculateBanksFinancing(params: {
     salaryBankId,
     termMode,
     manualTermMonths = 300,
+    personalTenorSelectionMode,
+    requestedPersonalTenorMonths,
 
     banks,
     products,
@@ -575,7 +579,9 @@ export function calculateBanksFinancing(params: {
           rules: personalRules,
           productId: normalizedProductId,
           monthsBeforeRetirement,
-          remainingMonthsToMaxAge
+          remainingMonthsToMaxAge,
+          personalTenorSelectionMode,
+          requestedPersonalTenorMonths
         });
 
         personalCalcResult = personalCalc;
@@ -831,7 +837,9 @@ export function calculateBanksFinancing(params: {
           rules: personalRules,
           productId: normalizedProductId,
           monthsBeforeRetirement: Math.max(0, Math.round(retirementAge * 12) - termResult.currentAgeMonths),
-          remainingMonthsToMaxAge: termResult.remainingMonthsToMaxAge
+          remainingMonthsToMaxAge: termResult.remainingMonthsToMaxAge,
+          personalTenorSelectionMode,
+          requestedPersonalTenorMonths
         });
         personalCalcResult = personalCalc;
         personalLoanAmount = personalCalc.personalFinanceAmount;
@@ -951,8 +959,9 @@ export function calculateBanksFinancing(params: {
         });
 
         if (normalizedProductId === 'both' || normalizedProductId === 'real_estate_with_new_personal') {
-          const monthsInPersonal = Math.min(termResult.monthsBeforeRetirement, personalMonths);
+          const monthsInPersonal = personalMonths;
           const monthsOutsidePersonal = Math.max(0, termResult.monthsBeforeRetirement - personalMonths);
+          const monthsAfterRetirementAdjusted = Math.max(0, termResult.totalMonths - Math.max(termResult.monthsBeforeRetirement, personalMonths));
 
           const effectiveSalaryBefore = solvedNetSalary + (supportType === 'monthly' ? supportResult.monthlySupport : 0);
           const installmentWithPersonal = Math.max(0, (effectiveSalaryBefore * (dsrBeforeResult.dsrPercentage / 100)) - effectiveObligationsBefore - personalInstallment);
@@ -964,7 +973,7 @@ export function calculateBanksFinancing(params: {
             currentInstallmentAfter = Math.max(0, effectiveSalaryAfter * (dsrAfterResult.dsrPercentage / 100));
           }
 
-          const totalDualCashflow = (installmentWithPersonal * monthsInPersonal) + (installmentWithoutPersonal * monthsOutsidePersonal) + (currentInstallmentAfter * termResult.monthsAfterRetirement);
+          const totalDualCashflow = (installmentWithPersonal * monthsInPersonal) + (installmentWithoutPersonal * monthsOutsidePersonal) + (currentInstallmentAfter * monthsAfterRetirementAdjusted);
           const denominator = 1 + (marginResult.annualMargin / 100) * (termResult.totalMonths / 12);
           
           reLoanAmount = Math.round(totalDualCashflow / denominator);
@@ -975,6 +984,15 @@ export function calculateBanksFinancing(params: {
           totalInstallmentStage1 = installmentWithPersonal + personalInstallment;
           totalInstallmentStage2 = installmentWithoutPersonal;
           personalInstallmentDisplay = personalInstallment;
+
+          // Store for output stage tracking
+          realEstateStage1 = installmentWithPersonal;
+          realEstateStage2 = installmentWithoutPersonal;
+          realEstateStage3 = currentInstallmentAfter;
+          stage1Months = monthsInPersonal;
+          stage2Months = monthsOutsidePersonal;
+          stage3Months = monthsAfterRetirementAdjusted;
+          totalCustomerStage1 = installmentWithPersonal + personalInstallment;
         } else {
           reLoanAmount = reCalc.realEstateFinanceAmount;
           installmentBefore = reCalc.monthlyInstallmentBeforeRetirement;
@@ -1209,6 +1227,8 @@ export function calculateAll(params: {
   productId: ProductId;
   salaryBankId?: string | null;
   termYears: number;
+  personalTenorSelectionMode?: 'auto' | 'custom';
+  requestedPersonalTenorMonths?: number;
 
   banks: Bank[];
   products: ProductAcceptance[];
@@ -1251,6 +1271,8 @@ export function calculateAll(params: {
     productId,
     salaryBankId,
     termYears,
+    personalTenorSelectionMode,
+    requestedPersonalTenorMonths,
 
     banks,
     products,
@@ -1508,7 +1530,9 @@ export function calculateAll(params: {
       rules: personalRules,
       productId: normalizedProductId,
       monthsBeforeRetirement: termResult.monthsBeforeRetirement,
-      remainingMonthsToMaxAge: termResult.remainingMonthsToMaxAge
+      remainingMonthsToMaxAge: termResult.remainingMonthsToMaxAge,
+      personalTenorSelectionMode,
+      requestedPersonalTenorMonths
     });
     personalInstallment = personalCalc.monthlyInstallment;
     personalMonths = personalCalc.termMonths || 60;
@@ -1531,13 +1555,13 @@ export function calculateAll(params: {
   const effectiveObligationsBefore = (dsrBeforeResult?.deductExistingObligations !== false) ? obligations : 0;
 
   if (normalizedProductId === 'both' || normalizedProductId === 'real_estate_with_new_personal') {
-    stage1Months = Math.min(personalMonths, termResult.monthsBeforeRetirement);
+    stage1Months = personalMonths;
     installmentStage1 = Math.max(0, Math.round(((solvedNetSalary + monthlySupport) * (dsrPercentBefore / 100)) - effectiveObligationsBefore - personalInstallment));
     
     stage2Months = Math.max(0, termResult.monthsBeforeRetirement - personalMonths);
     installmentStage2 = Math.max(0, Math.round(((solvedNetSalary + monthlySupport) * (dsrPercentBefore / 100)) - effectiveObligationsBefore));
     
-    stage3Months = termResult.monthsAfterRetirement;
+    stage3Months = Math.max(0, termResult.totalMonths - Math.max(termResult.monthsBeforeRetirement, personalMonths));
     installmentStage3 = Math.max(0, Math.round(((expectedPensionSalary + monthlySupport) * (dsrPercentAfter / 100))));
   } else if (normalizedProductId === 'personal' || normalizedProductId === 'personal_only') {
     stage1Months = personalMonths;

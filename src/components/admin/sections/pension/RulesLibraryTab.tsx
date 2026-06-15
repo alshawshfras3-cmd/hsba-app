@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Plus, Trash2, Edit, CheckCircle2 } from 'lucide-react';
 import { PensionLibraryRule } from '../../../../types/pension-rules';
+import NumericInput from '../../../calculator/NumericInput';
 
 interface RulesLibraryTabProps {
   libraryRules: PensionLibraryRule[];
@@ -300,13 +301,15 @@ export default function RulesLibraryTab({
                   <div className="grid grid-cols-2 gap-4 text-right">
                     <div className="space-y-1">
                       <label className="block text-slate-500">معامل الخدمة بالسنوات:</label>
-                      <input
-                        type="number"
-                        required
+                      <NumericInput
                         value={editingLibraryRule.divisorYears ?? 40}
-                        onChange={(e) => setEditingLibraryRule({ ...editingLibraryRule, divisorYears: parseInt(e.target.value) || 40 })}
+                        onChange={(val) => setEditingLibraryRule({
+                          ...editingLibraryRule,
+                          divisorYears: val === '' ? 40 : val
+                        })}
+                        allowDecimals={false}
                         placeholder="مثال: 40 لـ 480 شهر"
-                        className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:border-[#0057B8]"
+                        className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:border-[#0057B8] text-right font-bold"
                       />
                       <span className="block text-[10px] text-gray-400 font-sans mt-1">
                         عادة 40 سنة للمدني و 35 سنة للعسكري.
@@ -315,14 +318,15 @@ export default function RulesLibraryTab({
 
                     <div className="space-y-1">
                       <label className="block text-slate-500">معدل النمو السنوي (%):</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        required
+                      <NumericInput
                         value={editingLibraryRule.growthRate !== undefined ? editingLibraryRule.growthRate : 2.5}
-                        onChange={(e) => setEditingLibraryRule({ ...editingLibraryRule, growthRate: parseFloat(e.target.value) || 0 })}
+                        onChange={(val) => setEditingLibraryRule({
+                          ...editingLibraryRule,
+                          growthRate: val === '' ? 0 : val
+                        })}
+                        allowDecimals={true}
                         placeholder="مثال: 2.5 للـ 2.5%"
-                        className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:border-[#0057B8]"
+                        className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:border-[#0057B8] text-right font-bold"
                       />
                       <span className="block text-[10px] text-gray-400 font-sans mt-1">
                         إذا تم إعفاء القاعدة من نمو الراتب، ضعه بـ 0.
@@ -333,32 +337,38 @@ export default function RulesLibraryTab({
                   <div className="grid grid-cols-3 gap-3 text-right">
                     <div className="space-y-1">
                       <label className="block text-slate-500 text-[10px]">الحد الأدنى للنمو (سنة):</label>
-                      <input
-                        type="number"
-                        required
+                      <NumericInput
                         value={editingLibraryRule.growthMinYears ?? 0}
-                        onChange={(e) => setEditingLibraryRule({ ...editingLibraryRule, growthMinYears: parseInt(e.target.value) || 0 })}
-                        className="w-full bg-white border border-gray-200 rounded-xl px-2 py-2 text-xs text-slate-800 outline-none"
+                        onChange={(val) => setEditingLibraryRule({
+                          ...editingLibraryRule,
+                          growthMinYears: val === '' ? 0 : val
+                        })}
+                        allowDecimals={false}
+                        className="w-full bg-white border border-gray-200 rounded-xl px-2 py-2 text-xs text-slate-800 outline-none text-right font-bold"
                       />
                     </div>
                     <div className="space-y-1">
                       <label className="block text-slate-500 text-[10px]">سقف سنوات النمو:</label>
-                      <input
-                        type="number"
-                        required
+                      <NumericInput
                         value={editingLibraryRule.growthMaxYears ?? 0}
-                        onChange={(e) => setEditingLibraryRule({ ...editingLibraryRule, growthMaxYears: parseInt(e.target.value) || 0 })}
-                        className="w-full bg-white border border-gray-200 rounded-xl px-2 py-2 text-xs text-slate-800 outline-none"
+                        onChange={(val) => setEditingLibraryRule({
+                          ...editingLibraryRule,
+                          growthMaxYears: val === '' ? 0 : val
+                        })}
+                        allowDecimals={false}
+                        className="w-full bg-white border border-gray-200 rounded-xl px-2 py-2 text-xs text-slate-800 outline-none text-right font-bold"
                       />
                     </div>
                     <div className="space-y-1">
                       <label className="block text-slate-500 text-[10px]">الحد المانع (سنة متبقية):</label>
-                      <input
-                        type="number"
-                        required
+                      <NumericInput
                         value={editingLibraryRule.noGrowthAboveYears ?? 0}
-                        onChange={(e) => setEditingLibraryRule({ ...editingLibraryRule, noGrowthAboveYears: parseInt(e.target.value) || 0 })}
-                        className="w-full bg-white border border-gray-200 rounded-xl px-2 py-2 text-xs text-slate-800 outline-none"
+                        onChange={(val) => setEditingLibraryRule({
+                          ...editingLibraryRule,
+                          noGrowthAboveYears: val === '' ? 0 : val
+                        })}
+                        allowDecimals={false}
+                        className="w-full bg-white border border-gray-200 rounded-xl px-2 py-2 text-xs text-slate-800 outline-none text-right font-bold"
                       />
                     </div>
                   </div>
@@ -387,34 +397,40 @@ export default function RulesLibraryTab({
                   <div className="grid grid-cols-3 gap-2 text-right">
                     <div className="space-y-1">
                       <label className="block text-slate-500 text-[10px]">عتبة السنوات (سنة متبقية):</label>
-                      <input
-                        type="number"
-                        required
+                      <NumericInput
                         value={editingLibraryRule.thresholdYears ?? 5}
-                        onChange={(e) => setEditingLibraryRule({ ...editingLibraryRule, thresholdYears: parseInt(e.target.value) || 5 })}
-                        className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:border-[#0057B8]"
+                        onChange={(val) => setEditingLibraryRule({
+                          ...editingLibraryRule,
+                          thresholdYears: val === '' ? 5 : val
+                        })}
+                        allowDecimals={false}
+                        className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:border-[#0057B8] text-right font-bold"
                       />
                     </div>
 
                     <div className="space-y-1">
                       <label className="block text-slate-500 text-[10px]">النسبة إذا أقل أو يساوي (%):</label>
-                      <input
-                        type="number"
-                        required
+                      <NumericInput
                         value={editingLibraryRule.rateBelow ?? 70}
-                        onChange={(e) => setEditingLibraryRule({ ...editingLibraryRule, rateBelow: parseInt(e.target.value) || 0 })}
-                        className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:border-[#0057B8]"
+                        onChange={(val) => setEditingLibraryRule({
+                          ...editingLibraryRule,
+                          rateBelow: val === '' ? 70 : val
+                        })}
+                        allowDecimals={true}
+                        className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:border-[#0057B8] text-right font-bold"
                       />
                     </div>
 
                     <div className="space-y-1">
                       <label className="block text-slate-500 text-[10px]">النسبة إذا أكبر (%):</label>
-                      <input
-                        type="number"
-                        required
+                      <NumericInput
                         value={editingLibraryRule.rateAbove ?? 80}
-                        onChange={(e) => setEditingLibraryRule({ ...editingLibraryRule, rateAbove: parseInt(e.target.value) || 0 })}
-                        className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:border-[#0057B8]"
+                        onChange={(val) => setEditingLibraryRule({
+                          ...editingLibraryRule,
+                          rateAbove: val === '' ? 80 : val
+                        })}
+                        allowDecimals={true}
+                        className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:border-[#0057B8] text-right font-bold"
                       />
                     </div>
                   </div>
