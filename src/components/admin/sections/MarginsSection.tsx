@@ -116,6 +116,9 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
   const [copyDstBank, setCopyDstBank] = useState<string>(banks[1]?.id || 'rajhi');
   const [copyDstProduct, setCopyDstProduct] = useState<ProductId>('real_estate_only');
   const [copyDstSupport, setCopyDstSupport] = useState<SupportType>('none');
+  const [copySrcTransferStatus, setCopySrcTransferStatus] = useState<'all' | 'salary_transfer' | 'no_salary_transfer'>('all');
+  const [copyDstTransferStatus, setCopyDstTransferStatus] = useState<'all' | 'salary_transfer' | 'no_salary_transfer'>('all');
+  const [copyBothTransferTables, setCopyBothTransferTables] = useState<boolean>(false);
 
   // Handle default selected sector initialization
   useEffect(() => {
@@ -824,18 +827,38 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     }
   };
 
-  const handleCopyMargins = (
-    srcBank: string,
-    srcProduct: ProductId,
-    srcSupport: SupportType,
-    dstBank: string,
-    dstProduct: ProductId,
-    dstSupport: SupportType
-  ) => {
+  const handleCopyMargins = (params: {
+    srcBank: string;
+    srcProduct: ProductId;
+    srcSupport: SupportType;
+    srcSalaryTransferStatus: 'all' | 'salary_transfer' | 'no_salary_transfer';
+    dstBank: string;
+    dstProduct: ProductId;
+    dstSupport: SupportType;
+    dstSalaryTransferStatus: 'all' | 'salary_transfer' | 'no_salary_transfer';
+    copyBothTransferTables?: boolean;
+  }) => {
+    const {
+      srcBank,
+      srcProduct,
+      srcSupport,
+      dstBank,
+      dstProduct,
+      dstSupport,
+      srcSalaryTransferStatus,
+      dstSalaryTransferStatus,
+      copyBothTransferTables
+    } = params;
+
     const normSrcSupport = (srcSupport as string) === 'down_payment' || srcSupport === 'downpayment' ? 'downpayment' : srcSupport;
     const normDstSupport = (dstSupport as string) === 'down_payment' || dstSupport === 'downpayment' ? 'downpayment' : dstSupport;
 
-    if (srcBank === dstBank && srcProduct === dstProduct && normSrcSupport === normDstSupport) {
+    if (
+      srcBank === dstBank &&
+      srcProduct === dstProduct &&
+      normSrcSupport === normDstSupport &&
+      (copyBothTransferTables ? true : srcSalaryTransferStatus === dstSalaryTransferStatus)
+    ) {
       showToast('لا يمكن النسخ لقرينة مطابِقة تماماً للمصدر.', 'refuse');
       return;
     }
@@ -857,17 +880,80 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       };
     });
 
-    const relevantSrcRules = normalisedRules.filter(r => 
-      r.bankId === srcBank && 
-      r.productId === srcProduct && 
-      (r.supportType === normSrcSupport || r.supportType === 'all') &&
-      (!r.isExceptionOnly)
-    );
+    const getRuleSalaryTransferStatus = (rule: any) => rule.salaryTransferStatus || 'all';
+
+    const getTransferStatusLabel = (status: 'all' | 'salary_transfer' | 'no_salary_transfer') => {
+      if (status === 'all') return 'جدول موحد للجميع';
+      if (status === 'salary_transfer') return 'بتحويل راتب';
+      return 'بدون تحويل راتب';
+    };
+
+    const srcBankName = banks.find(b => b.id === srcBank)?.nameAr || srcBank;
+    const dstBankName = banks.find(b => b.id === dstBank)?.nameAr || dstBank;
+
+    // Show Confirmation Message
+    let confirmMsg = '';
+    if (copyBothTransferTables) {
+      confirmMsg = `سيتم نسخ جدولي تحويل الراتب وبدون تحويل الراتب معًا، ولن يتم تعديل الجدول الموحد. من [${srcBankName}] إلى [${dstBankName}].`;
+    } else {
+      confirmMsg = `سيتم نسخ هوامش [${getTransferStatusLabel(srcSalaryTransferStatus)}] من [${srcBankName}] إلى [${getTransferStatusLabel(dstSalaryTransferStatus)}] في [${dstBankName}].`;
+    }
+
+    if (!window.confirm(`${confirmMsg}\n\nهل تريد المتابعة وتطبيق قيم النسخ بالذاكرة المؤقتة؟`)) {
+      return;
+    }
+
+    // Define runs to execute
+    let runs: Array<{ srcStatus: 'all' | 'salary_transfer' | 'no_salary_transfer'; dstStatus: 'all' | 'salary_transfer' | 'no_salary_transfer' }> = [];
+
+    if (copyBothTransferTables) {
+      const srcTransRules = normalisedRules.filter(r => 
+        r.bankId === srcBank && 
+        r.productId === srcProduct && 
+        (r.supportType === normSrcSupport || r.supportType === 'all') &&
+        !r.isExceptionOnly &&
+        getRuleSalaryTransferStatus(r) === 'salary_transfer'
+      );
+      const srcNoTransRules = normalisedRules.filter(r => 
+        r.bankId === srcBank && 
+        r.productId === srcProduct && 
+        (r.supportType === normSrcSupport || r.supportType === 'all') &&
+        !r.isExceptionOnly &&
+        getRuleSalaryTransferStatus(r) === 'no_salary_transfer'
+      );
+
+      if (srcTransRules.length === 0 && srcNoTransRules.length === 0) {
+        showToast('لا توجد هوامش محفوظة في جدول المصدر المحدد.', 'refuse');
+        return;
+      }
+
+      if (srcTransRules.length > 0) {
+        runs.push({ srcStatus: 'salary_transfer', dstStatus: 'salary_transfer' });
+      }
+      if (srcNoTransRules.length > 0) {
+        runs.push({ srcStatus: 'no_salary_transfer', dstStatus: 'no_salary_transfer' });
+      }
+    } else {
+      const srcRules = normalisedRules.filter(r => 
+        r.bankId === srcBank && 
+        r.productId === srcProduct && 
+        (r.supportType === normSrcSupport || r.supportType === 'all') &&
+        !r.isExceptionOnly &&
+        getRuleSalaryTransferStatus(r) === srcSalaryTransferStatus
+      );
+
+      if (srcRules.length === 0) {
+        showToast('لا توجد هوامش محفوظة في جدول المصدر المحدد.', 'refuse');
+        return;
+      }
+      runs.push({ srcStatus: srcSalaryTransferStatus, dstStatus: dstSalaryTransferStatus });
+    }
 
     // Resolve target parameters
     const targetSalaryTiers: Array<'below_25000' | 'above_or_equal_25000' | 'not_applicable'> = 
       normDstSupport === 'none' ? ['not_applicable'] : ['below_25000', 'above_or_equal_25000'];
 
+    let currentRules = [...normalisedRules];
     const newRulesForDst: MarginRule[] = [];
 
     const shouldCopyTiers = copyTableType === 'duration_tiers' || copyTableType === 'all';
@@ -885,296 +971,311 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       return 'below_25000';
     };
 
-    // 1. Process Duration Tiers
-    if (shouldCopyTiers) {
-      targetSalaryTiers.forEach(targetSalaryTier => {
-        const matchingSrcTier = getSrcSalaryTierForTarget(targetSalaryTier);
-        const tierRules = relevantSrcRules.filter(r => {
-          const rMode = r.marginInputMode || getRuleInputMode(r);
-          if (rMode !== 'duration_tiers') return false;
-          const rTier = r.salaryTier || 'not_applicable';
-          return rTier === matchingSrcTier;
-        });
+    runs.forEach(({ srcStatus, dstStatus }) => {
+      const relevantSrcRules = normalisedRules.filter(r => 
+        r.bankId === srcBank && 
+        r.productId === srcProduct && 
+        (r.supportType === normSrcSupport || r.supportType === 'all') &&
+        (!r.isExceptionOnly) &&
+        getRuleSalaryTransferStatus(r) === srcStatus
+      );
 
-        tierRules.forEach((srcRule, idx) => {
-          const rate = srcRule.marginRate ?? srcRule.annualMargin ?? srcRule.endMargin ?? 0;
-          newRulesForDst.push({
-            id: `copied_tier_${dstBank}_${dstProduct}_${normDstSupport}_${targetSalaryTier}_t${srcRule.fromMonth || srcRule.fromTermMonths || 0}_${srcRule.toMonth || srcRule.toTermMonths || 9999}_${idx}_${Date.now()}`,
-            bankId: dstBank,
-            productId: dstProduct,
-            supportType: normDstSupport as any,
-            sectorId: 'all',
-            fromTermMonths: (srcRule.fromMonth !== undefined ? srcRule.fromMonth : srcRule.fromTermMonths) ?? 0,
-            toTermMonths: (srcRule.toMonth !== undefined ? srcRule.toMonth : srcRule.toTermMonths) ?? 9999,
-            startMargin: rate,
-            endMargin: rate,
-            calcType: 'fixed',
-            isActive: srcRule.active !== false && srcRule.isActive !== false,
-            salaryTier: targetSalaryTier,
-            productType: dstProduct as any,
-            marginInputMode: 'duration_tiers',
-            calculationMode: 'duration_tiers',
-            calculationMethod: 'fixed',
-            termMonths: (srcRule.toMonth !== undefined ? srcRule.toMonth : srcRule.toTermMonths) ?? 9999,
-            annualMargin: rate,
-            exceptionBps: 0,
-            baseMargin: Number((rate / 100).toFixed(6)),
-            fromMonth: (srcRule.fromMonth !== undefined ? srcRule.fromMonth : srcRule.fromTermMonths) ?? 0,
-            toMonth: (srcRule.toMonth !== undefined ? srcRule.toMonth : srcRule.toTermMonths) ?? 9999,
-            marginRate: rate,
-            active: srcRule.active !== false && srcRule.isActive !== false,
-            notes: srcRule.notes || '',
-            salaryBand: targetSalaryTier === 'below_25000' ? 'below_25000' : targetSalaryTier === 'above_or_equal_25000' ? 'from_25000' : 'all'
-          });
-        });
+      // Deletion of matching target rules
+      currentRules = currentRules.filter(r => {
+        const isTargetBaseRule = 
+           r.bankId === dstBank &&
+           r.productId === dstProduct &&
+           r.supportType === normDstSupport &&
+           getRuleSalaryTransferStatus(r) === dstStatus &&
+           targetSalaryTiers.includes((r.salaryTier || 'not_applicable') as any) &&
+           !r.isExceptionOnly;
+
+        if (!isTargetBaseRule) return true;
+
+        const rMode = r.marginInputMode || getRuleInputMode(r);
+        if (copyTableType === 'duration_tiers') return rMode !== 'duration_tiers';
+        if (copyTableType === 'key_points') return rMode !== 'key_points';
+        if (copyTableType === 'yearly') return rMode !== 'yearly';
+        return false; // delete all of them for 'all'
       });
-    }
 
-    // 2. Process Key Points
-    if (shouldCopyKeyPoints) {
-      targetSalaryTiers.forEach(targetSalaryTier => {
-        const matchingSrcTier = getSrcSalaryTierForTarget(targetSalaryTier);
-        const srcKeyPointRules = relevantSrcRules.filter(r => {
-          const rMode = r.marginInputMode || getRuleInputMode(r);
-          const isKeyPoints = rMode === 'key_points' || (!r.marginInputMode && [5, 10, 15, 20, 25, 30].includes(r.year || (r.toTermMonths || 0)/12));
-          if (!isKeyPoints) return false;
-          const rTier = r.salaryTier || 'not_applicable';
-          return rTier === matchingSrcTier;
-        });
-
-        const srcMarginsKeyPoints: Record<number, string> = {};
-        [5, 10, 15, 20, 25, 30].forEach(year => {
-          const rY = srcKeyPointRules.find(r => r.year === year || r.toTermMonths === year * 12);
-          if (rY) {
-            srcMarginsKeyPoints[year] = (rY.annualMargin !== undefined ? rY.annualMargin : (rY.baseMargin !== undefined ? Number((rY.baseMargin * 100).toFixed(3)) : rY.endMargin)).toLocaleString('en-US', {useGrouping: false});
-          } else {
-            srcMarginsKeyPoints[year] = '';
-          }
-        });
-
-        let methodKey: 'linear' | 'fixed' = 'fixed';
-        const foundMethodRule = srcKeyPointRules.find(r => r.calculationMethod || r.calcType);
-        if (foundMethodRule) {
-          methodKey = (foundMethodRule.calculationMethod || foundMethodRule.calcType) as any;
-        }
-
-        const filledYears = [5, 10, 15, 20, 25, 30].filter(year => {
-          const val = srcMarginsKeyPoints[year];
-          return val !== undefined && val !== '' && !isNaN(parseFloat(val)) && parseFloat(val) > 0;
-        });
-        filledYears.sort((a, b) => a - b);
-
-        if (filledYears.length > 0) {
-          const definitions: Array<{ from: number, to: number, start: number, end: number, calcType: 'fixed' | 'linear', yearPoint: number }> = [];
-
-          for (let i = 0; i < filledYears.length; i++) {
-            const currentYear = filledYears[i];
-            const currentMarginStr = srcMarginsKeyPoints[currentYear];
-            const currentMarginVal = parseFloat(currentMarginStr) || 0;
-
-            if (i === 0) {
-              definitions.push({
-                from: 0,
-                to: currentYear * 12,
-                start: currentMarginVal,
-                end: currentMarginVal,
-                calcType: 'fixed' as const,
-                yearPoint: currentYear
-              });
-            } else {
-              const prevYear = filledYears[i - 1];
-              const prevMarginStr = srcMarginsKeyPoints[prevYear];
-              const prevMarginVal = parseFloat(prevMarginStr) || 0;
-
-              const fromMonths = prevYear * 12 + 1;
-              const toMonths = currentYear * 12;
-
-              definitions.push({
-                from: fromMonths,
-                to: toMonths,
-                start: methodKey === 'fixed' ? currentMarginVal : prevMarginVal,
-                end: currentMarginVal,
-                calcType: methodKey,
-                yearPoint: currentYear
-              });
-            }
-          }
-
-          const lastYear = filledYears[filledYears.length - 1];
-          const lastMarginStr = srcMarginsKeyPoints[lastYear];
-          const lastMarginVal = parseFloat(lastMarginStr) || 0;
-
-          definitions.push({
-            from: lastYear * 12 + 1,
-            to: 9999,
-            start: lastMarginVal,
-            end: lastMarginVal,
-            calcType: 'fixed' as const,
-            yearPoint: lastYear
+      // 1. Process Duration Tiers
+      if (shouldCopyTiers) {
+        targetSalaryTiers.forEach(targetSalaryTier => {
+          const matchingSrcTier = getSrcSalaryTierForTarget(targetSalaryTier);
+          const tierRules = relevantSrcRules.filter(r => {
+            const rMode = r.marginInputMode || getRuleInputMode(r);
+            if (rMode !== 'duration_tiers') return false;
+            const rTier = r.salaryTier || 'not_applicable';
+            return rTier === matchingSrcTier;
           });
 
-          definitions.forEach((def, index) => {
+          tierRules.forEach((srcRule, idx) => {
+            const rate = srcRule.marginRate ?? srcRule.annualMargin ?? srcRule.endMargin ?? 0;
             newRulesForDst.push({
-              id: `copied_margin_${dstBank}_${dstProduct}_${normDstSupport}_${targetSalaryTier}_t${def.from}_${def.to}_${index}_${Date.now()}`,
+              id: `copied_tier_${dstBank}_${dstProduct}_${normDstSupport}_${targetSalaryTier}_t${srcRule.fromMonth || srcRule.fromTermMonths || 0}_${srcRule.toMonth || srcRule.toTermMonths || 9999}_${idx}_${dstStatus}_${Date.now()}`,
               bankId: dstBank,
               productId: dstProduct,
               supportType: normDstSupport as any,
               sectorId: 'all',
-              fromTermMonths: def.from,
-              toTermMonths: def.to,
-              startMargin: def.start,
-              endMargin: def.end,
-              calcType: def.calcType,
-              isActive: true,
+              fromTermMonths: (srcRule.fromMonth !== undefined ? srcRule.fromMonth : srcRule.fromTermMonths) ?? 0,
+              toTermMonths: (srcRule.toMonth !== undefined ? srcRule.toMonth : srcRule.toTermMonths) ?? 9999,
+              startMargin: rate,
+              endMargin: rate,
+              calcType: 'fixed',
+              isActive: srcRule.active !== false && srcRule.isActive !== false,
               salaryTier: targetSalaryTier,
               productType: dstProduct as any,
-              marginInputMode: 'key_points',
-              calculationMode: 'key_points',
-              calculationMethod: methodKey,
-              year: def.yearPoint,
-              termMonths: def.to === 9999 ? (def.yearPoint * 12) : def.to,
-              annualMargin: def.end,
+              marginInputMode: 'duration_tiers',
+              calculationMode: 'duration_tiers',
+              calculationMethod: 'fixed',
+              termMonths: (srcRule.toMonth !== undefined ? srcRule.toMonth : srcRule.toTermMonths) ?? 9999,
+              annualMargin: rate,
               exceptionBps: 0,
-              baseMargin: Number((def.end / 100).toFixed(6)),
-              salaryBand: targetSalaryTier === 'below_25000' ? 'below_25000' : targetSalaryTier === 'above_or_equal_25000' ? 'from_25000' : 'all'
+              baseMargin: Number((rate / 100).toFixed(6)),
+              fromMonth: (srcRule.fromMonth !== undefined ? srcRule.fromMonth : srcRule.fromTermMonths) ?? 0,
+              toMonth: (srcRule.toMonth !== undefined ? srcRule.toMonth : srcRule.toTermMonths) ?? 9999,
+              marginRate: rate,
+              active: srcRule.active !== false && srcRule.isActive !== false,
+              notes: srcRule.notes || '',
+              salaryBand: targetSalaryTier === 'below_25000' ? 'below_25000' : targetSalaryTier === 'above_or_equal_25000' ? 'from_25000' : 'all',
+              salaryTransferStatus: dstStatus, // Explicit salaryTransferStatus
             });
           });
-        }
-      });
-    }
-
-    // 3. Process Yearly Independent
-    if (shouldCopyYearly) {
-      targetSalaryTiers.forEach(targetSalaryTier => {
-        const matchingSrcTier = getSrcSalaryTierForTarget(targetSalaryTier);
-        const srcYearlyRules = relevantSrcRules.filter(r => {
-          const rMode = r.marginInputMode || getRuleInputMode(r);
-          const isYearly = rMode === 'yearly' || (!r.marginInputMode && r.year && r.year >= 5 && r.year <= 30 && ![5, 10, 15, 20, 25, 30].includes(r.year));
-          if (!isYearly) return false;
-          const rTier = r.salaryTier || 'not_applicable';
-          return rTier === matchingSrcTier;
         });
+      }
 
-        const srcMarginsYearly: Record<number, string> = {};
-        const yearsListFullForYearly = Array.from({ length: 26 }, (_, i) => 5 + i);
-        yearsListFullForYearly.forEach(year => {
-          const rY = srcYearlyRules.find(r => r.year === year || r.toTermMonths === year * 12);
-          if (rY) {
-            srcMarginsYearly[year] = (rY.annualMargin !== undefined ? rY.annualMargin : (rY.baseMargin !== undefined ? Number((rY.baseMargin * 100).toFixed(3)) : rY.endMargin)).toLocaleString('en-US', {useGrouping: false});
-          } else {
-            srcMarginsYearly[year] = '';
-          }
-        });
+      // 2. Process Key Points
+      if (shouldCopyKeyPoints) {
+        targetSalaryTiers.forEach(targetSalaryTier => {
+          const matchingSrcTier = getSrcSalaryTierForTarget(targetSalaryTier);
+          const srcKeyPointRules = relevantSrcRules.filter(r => {
+            const rMode = r.marginInputMode || getRuleInputMode(r);
+            const isKeyPoints = rMode === 'key_points' || (!r.marginInputMode && [5, 10, 15, 20, 25, 30].includes(r.year || (r.toTermMonths || 0)/12));
+            if (!isKeyPoints) return false;
+            const rTier = r.salaryTier || 'not_applicable';
+            return rTier === matchingSrcTier;
+          });
 
-        let methodYearly: 'linear' | 'fixed' = 'fixed';
-        const foundMethodRule = srcYearlyRules.find(r => r.calculationMethod || r.calcType);
-        if (foundMethodRule) {
-          methodYearly = (foundMethodRule.calculationMethod || foundMethodRule.calcType) as any;
-        }
-
-        const filledYears = yearsListFullForYearly.filter(year => {
-          const val = srcMarginsYearly[year];
-          return val !== undefined && val !== '' && !isNaN(parseFloat(val)) && parseFloat(val) > 0;
-        });
-        filledYears.sort((a, b) => a - b);
-
-        if (filledYears.length > 0) {
-          const definitions: Array<{ from: number, to: number, start: number, end: number, calcType: 'fixed' | 'linear', yearPoint: number }> = [];
-
-          for (let i = 0; i < filledYears.length; i++) {
-            const currentYear = filledYears[i];
-            const currentMarginStr = srcMarginsYearly[currentYear];
-            const currentMarginVal = parseFloat(currentMarginStr) || 0;
-
-            if (i === 0) {
-              definitions.push({
-                from: 0,
-                to: currentYear * 12,
-                start: currentMarginVal,
-                end: currentMarginVal,
-                calcType: 'fixed' as const,
-                yearPoint: currentYear
-              });
+          const srcMarginsKeyPoints: Record<number, string> = {};
+          [5, 10, 15, 20, 25, 30].forEach(year => {
+            const rY = srcKeyPointRules.find(r => r.year === year || r.toTermMonths === year * 12);
+            if (rY) {
+              srcMarginsKeyPoints[year] = (rY.annualMargin !== undefined ? rY.annualMargin : (rY.baseMargin !== undefined ? Number((rY.baseMargin * 100).toFixed(3)) : rY.endMargin)).toLocaleString('en-US', {useGrouping: false});
             } else {
-              const prevYear = filledYears[i - 1];
-              const prevMarginStr = srcMarginsYearly[prevYear];
-              const prevMarginVal = parseFloat(prevMarginStr) || 0;
-
-              const fromMonths = prevYear * 12 + 1;
-              const toMonths = currentYear * 12;
-
-              definitions.push({
-                from: fromMonths,
-                to: toMonths,
-                start: methodYearly === 'fixed' ? currentMarginVal : prevMarginVal,
-                end: currentMarginVal,
-                calcType: methodYearly,
-                yearPoint: currentYear
-              });
+              srcMarginsKeyPoints[year] = '';
             }
+          });
+
+          let methodKey: 'linear' | 'fixed' = 'fixed';
+          const foundMethodRule = srcKeyPointRules.find(r => r.calculationMethod || r.calcType);
+          if (foundMethodRule) {
+            methodKey = (foundMethodRule.calculationMethod || foundMethodRule.calcType) as any;
           }
 
-          const lastYear = filledYears[filledYears.length - 1];
-          const lastMarginStr = srcMarginsYearly[lastYear];
-          const lastMarginVal = parseFloat(lastMarginStr) || 0;
-
-          definitions.push({
-            from: lastYear * 12 + 1,
-            to: 9999,
-            start: lastMarginVal,
-            end: lastMarginVal,
-            calcType: 'fixed' as const,
-            yearPoint: lastYear
+          const filledYears = [5, 10, 15, 20, 25, 30].filter(year => {
+            const val = srcMarginsKeyPoints[year];
+            return val !== undefined && val !== '' && !isNaN(parseFloat(val)) && parseFloat(val) > 0;
           });
+          filledYears.sort((a, b) => a - b);
 
-          definitions.forEach((def, index) => {
-            newRulesForDst.push({
-              id: `copied_margin_${dstBank}_${dstProduct}_${normDstSupport}_${targetSalaryTier}_t${def.from}_${def.to}_${index}_${Date.now()}`,
-              bankId: dstBank,
-              productId: dstProduct,
-              supportType: normDstSupport as any,
-              sectorId: 'all',
-              fromTermMonths: def.from,
-              toTermMonths: def.to,
-              startMargin: def.start,
-              endMargin: def.end,
-              calcType: def.calcType,
-              isActive: true,
-              salaryTier: targetSalaryTier,
-              productType: dstProduct as any,
-              marginInputMode: 'yearly',
-              calculationMode: 'yearly',
-              calculationMethod: methodYearly,
-              year: def.yearPoint,
-              termMonths: def.to === 9999 ? (def.yearPoint * 12) : def.to,
-              annualMargin: def.end,
-              exceptionBps: 0,
-              baseMargin: Number((def.end / 100).toFixed(6)),
-              salaryBand: targetSalaryTier === 'below_25000' ? 'below_25000' : targetSalaryTier === 'above_or_equal_25000' ? 'from_25000' : 'all'
+          if (filledYears.length > 0) {
+            const definitions: Array<{ from: number, to: number, start: number, end: number, calcType: 'fixed' | 'linear', yearPoint: number }> = [];
+
+            for (let i = 0; i < filledYears.length; i++) {
+              const currentYear = filledYears[i];
+              const currentMarginStr = srcMarginsKeyPoints[currentYear];
+              const currentMarginVal = parseFloat(currentMarginStr) || 0;
+
+              if (i === 0) {
+                definitions.push({
+                  from: 0,
+                  to: currentYear * 12,
+                  start: currentMarginVal,
+                  end: currentMarginVal,
+                  calcType: 'fixed' as const,
+                  yearPoint: currentYear
+                });
+              } else {
+                const prevYear = filledYears[i - 1];
+                const prevMarginStr = srcMarginsKeyPoints[prevYear];
+                const prevMarginVal = parseFloat(prevMarginStr) || 0;
+
+                const fromMonths = prevYear * 12 + 1;
+                const toMonths = currentYear * 12;
+
+                definitions.push({
+                  from: fromMonths,
+                  to: toMonths,
+                  start: methodKey === 'fixed' ? currentMarginVal : prevMarginVal,
+                  end: currentMarginVal,
+                  calcType: methodKey,
+                  yearPoint: currentYear
+                });
+              }
+            }
+
+            const lastYear = filledYears[filledYears.length - 1];
+            const lastMarginStr = srcMarginsKeyPoints[lastYear];
+            const lastMarginVal = parseFloat(lastMarginStr) || 0;
+
+            definitions.push({
+              from: lastYear * 12 + 1,
+              to: 9999,
+              start: lastMarginVal,
+              end: lastMarginVal,
+              calcType: 'fixed' as const,
+              yearPoint: lastYear
             });
+
+            definitions.forEach((def, index) => {
+              newRulesForDst.push({
+                id: `copied_margin_${dstBank}_${dstProduct}_${normDstSupport}_${targetSalaryTier}_t${def.from}_${def.to}_${index}_${dstStatus}_${Date.now()}`,
+                bankId: dstBank,
+                productId: dstProduct,
+                supportType: normDstSupport as any,
+                sectorId: 'all',
+                fromTermMonths: def.from,
+                toTermMonths: def.to,
+                startMargin: def.start,
+                endMargin: def.end,
+                calcType: def.calcType,
+                isActive: true,
+                salaryTier: targetSalaryTier,
+                productType: dstProduct as any,
+                marginInputMode: 'key_points',
+                calculationMode: 'key_points',
+                calculationMethod: methodKey,
+                year: def.yearPoint,
+                termMonths: def.to === 9999 ? (def.yearPoint * 12) : def.to,
+                annualMargin: def.end,
+                exceptionBps: 0,
+                baseMargin: Number((def.end / 100).toFixed(6)),
+                salaryBand: targetSalaryTier === 'below_25000' ? 'below_25000' : targetSalaryTier === 'above_or_equal_25000' ? 'from_25000' : 'all',
+                salaryTransferStatus: dstStatus, // Explicit salaryTransferStatus
+              });
+            });
+          }
+        });
+      }
+
+      // 3. Process Yearly Independent
+      if (shouldCopyYearly) {
+        targetSalaryTiers.forEach(targetSalaryTier => {
+          const matchingSrcTier = getSrcSalaryTierForTarget(targetSalaryTier);
+          const srcYearlyRules = relevantSrcRules.filter(r => {
+            const rMode = r.marginInputMode || getRuleInputMode(r);
+            const isYearly = rMode === 'yearly' || (!r.marginInputMode && r.year && r.year >= 5 && r.year <= 30 && ![5, 10, 15, 20, 25, 30].includes(r.year));
+            if (!isYearly) return false;
+            const rTier = r.salaryTier || 'not_applicable';
+            return rTier === matchingSrcTier;
           });
-        }
-      });
-    }
 
-    const remainingRules = normalisedRules.filter(r => {
-      const isTargetBaseRule = 
-         r.bankId === dstBank &&
-         r.productId === dstProduct &&
-         r.supportType === normDstSupport &&
-         targetSalaryTiers.includes((r.salaryTier || 'not_applicable') as any) &&
-         !r.isExceptionOnly;
+          const srcMarginsYearly: Record<number, string> = {};
+          const yearsListFullForYearly = Array.from({ length: 26 }, (_, i) => 5 + i);
+          yearsListFullForYearly.forEach(year => {
+            const rY = srcYearlyRules.find(r => r.year === year || r.toTermMonths === year * 12);
+            if (rY) {
+              srcMarginsYearly[year] = (rY.annualMargin !== undefined ? rY.annualMargin : (rY.baseMargin !== undefined ? Number((rY.baseMargin * 100).toFixed(3)) : rY.endMargin)).toLocaleString('en-US', {useGrouping: false});
+            } else {
+              srcMarginsYearly[year] = '';
+            }
+          });
 
-      if (!isTargetBaseRule) return true;
+          let methodYearly: 'linear' | 'fixed' = 'fixed';
+          const foundMethodRule = srcYearlyRules.find(r => r.calculationMethod || r.calcType);
+          if (foundMethodRule) {
+            methodYearly = (foundMethodRule.calculationMethod || foundMethodRule.calcType) as any;
+          }
 
-      const rMode = r.marginInputMode || getRuleInputMode(r);
-      if (copyTableType === 'duration_tiers') return rMode !== 'duration_tiers';
-      if (copyTableType === 'key_points') return rMode !== 'key_points';
-      if (copyTableType === 'yearly') return rMode !== 'yearly';
-      return false; // delete all of them for 'all'
+          const filledYears = yearsListFullForYearly.filter(year => {
+            const val = srcMarginsYearly[year];
+            return val !== undefined && val !== '' && !isNaN(parseFloat(val)) && parseFloat(val) > 0;
+          });
+          filledYears.sort((a, b) => a - b);
+
+          if (filledYears.length > 0) {
+            const definitions: Array<{ from: number, to: number, start: number, end: number, calcType: 'fixed' | 'linear', yearPoint: number }> = [];
+
+            for (let i = 0; i < filledYears.length; i++) {
+              const currentYear = filledYears[i];
+              const currentMarginStr = srcMarginsYearly[currentYear];
+              const currentMarginVal = parseFloat(currentMarginStr) || 0;
+
+              if (i === 0) {
+                definitions.push({
+                  from: 0,
+                  to: currentYear * 12,
+                  start: currentMarginVal,
+                  end: currentMarginVal,
+                  calcType: 'fixed' as const,
+                  yearPoint: currentYear
+                });
+              } else {
+                const prevYear = filledYears[i - 1];
+                const prevMarginStr = srcMarginsYearly[prevYear];
+                const prevMarginVal = parseFloat(prevMarginStr) || 0;
+
+                const fromMonths = prevYear * 12 + 1;
+                const toMonths = currentYear * 12;
+
+                definitions.push({
+                  from: fromMonths,
+                  to: toMonths,
+                  start: methodYearly === 'fixed' ? currentMarginVal : prevMarginVal,
+                  end: currentMarginVal,
+                  calcType: methodYearly,
+                  yearPoint: currentYear
+                });
+              }
+            }
+
+            const lastYear = filledYears[filledYears.length - 1];
+            const lastMarginStr = srcMarginsYearly[lastYear];
+            const lastMarginVal = parseFloat(lastMarginStr) || 0;
+
+            definitions.push({
+              from: lastYear * 12 + 1,
+              to: 9999,
+              start: lastMarginVal,
+              end: lastMarginVal,
+              calcType: 'fixed' as const,
+              yearPoint: lastYear
+            });
+
+            definitions.forEach((def, index) => {
+              newRulesForDst.push({
+                id: `copied_margin_${dstBank}_${dstProduct}_${normDstSupport}_${targetSalaryTier}_t${def.from}_${def.to}_${index}_${dstStatus}_${Date.now()}`,
+                bankId: dstBank,
+                productId: dstProduct,
+                supportType: normDstSupport as any,
+                sectorId: 'all',
+                fromTermMonths: def.from,
+                toTermMonths: def.to,
+                startMargin: def.start,
+                endMargin: def.end,
+                calcType: def.calcType,
+                isActive: true,
+                salaryTier: targetSalaryTier,
+                productType: dstProduct as any,
+                marginInputMode: 'yearly',
+                calculationMode: 'yearly',
+                calculationMethod: methodYearly,
+                year: def.yearPoint,
+                termMonths: def.to === 9999 ? (def.yearPoint * 12) : def.to,
+                annualMargin: def.end,
+                exceptionBps: 0,
+                baseMargin: Number((def.end / 100).toFixed(6)),
+                salaryBand: targetSalaryTier === 'below_25000' ? 'below_25000' : targetSalaryTier === 'above_or_equal_25000' ? 'from_25000' : 'all',
+                salaryTransferStatus: dstStatus, // Explicit salaryTransferStatus
+              });
+            });
+          }
+        });
+      }
     });
 
-    setMarginRules([...remainingRules, ...newRulesForDst]);
+    setMarginRules([...currentRules, ...newRulesForDst]);
 
     // Force context selections to change to the target combo automatically
     setSelectedBank(dstBank);
@@ -1186,7 +1287,20 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       setSelectedSalaryBand('below_25000');
     }
 
-    // Beautifully construct localized strings for copy toaster
+    // Sync showing system modes
+    if (copyBothTransferTables) {
+      setTransferMode('split_transfer');
+      setSelectedSalaryTransferStatus('salary_transfer');
+    } else {
+      if (dstSalaryTransferStatus === 'all') {
+        setTransferMode('all_only');
+        setSelectedSalaryTransferStatus('all');
+      } else {
+        setTransferMode('split_transfer');
+        setSelectedSalaryTransferStatus(dstSalaryTransferStatus);
+      }
+    }
+
     const getSupportName = (s: SupportType) => {
       if (s === 'monthly') return 'دعم شهري';
       if (s === 'downpayment') return 'دعم دفعة';
@@ -1199,17 +1313,22 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       return 'جميع الهوامش';
     };
 
-    const srcBankName = banks.find(b => b.id === srcBank)?.nameAr || srcBank;
-    const dstBankName = banks.find(b => b.id === dstBank)?.nameAr || dstBank;
     const srcProductName = productTypesList.find(p => p.id === srcProduct)?.nameAr || srcProduct;
     const dstProductName = productTypesList.find(p => p.id === dstProduct)?.nameAr || dstProduct;
     const srcSupportName = getSupportName(srcSupport);
     const dstSupportName = getSupportName(dstSupport);
 
-    showToast(
-      `تم نسخ: (${getTypeName(copyTableType)}) من: [${srcBankName} - ${srcProductName} - ${srcSupportName}] إلى: [${dstBankName} - ${dstProductName} - ${dstSupportName}] وتطبيقها بنجاح! تم تحويل شاشة العرض تلقائياً للبنك الهدف لمراجعة وتثبيت التعديلات.`,
-      'success'
-    );
+    if (copyBothTransferTables) {
+      showToast(
+        `تم نسخ: (${getTypeName(copyTableType)}) لجدولي تحويل الراتب معاً من: [${srcBankName} - ${srcProductName} - ${srcSupportName}] إلى: [${dstBankName} - ${dstProductName} - ${dstSupportName}] وتطبيقها بنجاح! تم تحويل شاشة العرض تلقائياً للبنك الهدف لمراجعة وتثبيت التعديلات.`,
+        'success'
+      );
+    } else {
+      showToast(
+        `تم نسخ: (${getTypeName(copyTableType)}) للمجموعة المستهدفة [${getTransferStatusLabel(dstSalaryTransferStatus)}] من: [${srcBankName} - ${srcProductName} - ${srcSupportName}] إلى: [${dstBankName} - ${dstProductName} - ${dstSupportName}] وتطبيقها بنجاح! تم تحويل شاشة العرض تلقائياً للبنك الهدف لمراجعة وتثبيت التعديلات.`,
+        'success'
+      );
+    }
   };
 
   // Compile combined flat row configs for general log reviewing
@@ -1956,9 +2075,9 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               
               {/* Source (المنسوخ منه) */}
-              <div className="bg-blue-50/20 p-4 rounded-xl border border-blue-105 space-y-3">
+              <div className="bg-blue-50/20 p-4 rounded-xl border border-blue-100 space-y-3">
                 <span className="block text-xs font-bold text-[#0057B8]">👈 المصدر التمويلي (المنسخ منه):</span>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
                   <div className="space-y-1">
                     <label className="block text-[10px] font-bold text-gray-400">البنك:</label>
                     <select
@@ -1997,13 +2116,27 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                       <option value="downpayment">دعم دفعة</option>
                     </select>
                   </div>
+
+                  <div className="space-y-1">
+                    <label className={`block text-[10px] font-bold ${copyBothTransferTables ? 'text-gray-300' : 'text-gray-400'}`}>من تحويل الراتب:</label>
+                    <select
+                      value={copySrcTransferStatus}
+                      onChange={(e) => setCopySrcTransferStatus(e.target.value as any)}
+                      disabled={copyBothTransferTables}
+                      className={`w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold text-gray-800 outline-none focus:ring-1 focus:ring-[#0057B8] ${copyBothTransferTables ? 'opacity-50 cursor-not-allowed bg-gray-100' : ''}`}
+                    >
+                      <option value="all">جدول موحد للجميع</option>
+                      <option value="salary_transfer">بتحويل راتب</option>
+                      <option value="no_salary_transfer">بدون تحويل راتب</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
               {/* Destination (الهدف) */}
-              <div className="bg-emerald-50/10 p-4 rounded-xl border border-emerald-110 space-y-3">
+              <div className="bg-emerald-50/10 p-4 rounded-xl border border-emerald-100 space-y-3">
                 <span className="block text-xs font-bold text-emerald-700">👉 الهدف التمويلي (الذي سيتم استبدال قيمه):</span>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
                   <div className="space-y-1">
                     <label className="block text-[10px] font-bold text-gray-400">البنك:</label>
                     <select
@@ -2042,9 +2175,37 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                       <option value="downpayment">دعم دفعة</option>
                     </select>
                   </div>
+
+                  <div className="space-y-1">
+                    <label className={`block text-[10px] font-bold ${copyBothTransferTables ? 'text-gray-300' : 'text-gray-400'}`}>إلى تحويل الراتب:</label>
+                    <select
+                      value={copyDstTransferStatus}
+                      onChange={(e) => setCopyDstTransferStatus(e.target.value as any)}
+                      disabled={copyBothTransferTables}
+                      className={`w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold text-gray-800 outline-none focus:ring-1 focus:ring-[#0057B8] ${copyBothTransferTables ? 'opacity-50 cursor-not-allowed bg-gray-100' : ''}`}
+                    >
+                      <option value="all">جدول موحد للجميع</option>
+                      <option value="salary_transfer">بتحويل راتب</option>
+                      <option value="no_salary_transfer">بدون تحويل راتب</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
+            </div>
+
+            {/* Checkbox section for copying both tables together */}
+            <div className="bg-white p-3.5 rounded-xl border border-gray-200 flex items-center gap-3 text-right">
+              <input
+                id="copy-both-transfer-tables"
+                type="checkbox"
+                checked={copyBothTransferTables}
+                onChange={(e) => setCopyBothTransferTables(e.target.checked)}
+                className="w-4 h-4 text-[#0057B8] border-gray-300 rounded focus:ring-[#0057B8] cursor-pointer"
+              />
+              <label htmlFor="copy-both-transfer-tables" className="text-xs font-bold text-gray-700 cursor-pointer select-none leading-normal">
+                🔄 نسخ جدولي تحويل الراتب معًا (salary_transfer ➔ salary_transfer و no_salary_transfer ➔ no_salary_transfer دفعة واحدة بدون لمس الجداول الموحدة)
+              </label>
             </div>
 
             <div className="flex flex-col sm:flex-row justify-between items-center gap-3 bg-amber-50 rounded-xl p-3.5 border border-amber-100">
@@ -2055,14 +2216,17 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    handleCopyMargins(
-                      copySrcBank,
-                      copySrcProduct,
-                      copySrcSupport,
-                      copyDstBank,
-                      copyDstProduct,
-                      copyDstSupport
-                    );
+                    handleCopyMargins({
+                      srcBank: copySrcBank,
+                      srcProduct: copySrcProduct,
+                      srcSupport: copySrcSupport,
+                      srcSalaryTransferStatus: copySrcTransferStatus,
+                      dstBank: copyDstBank,
+                      dstProduct: copyDstProduct,
+                      dstSupport: copyDstSupport,
+                      dstSalaryTransferStatus: copyDstTransferStatus,
+                      copyBothTransferTables: copyBothTransferTables
+                    });
                   }}
                   className="px-5 py-2 bg-[#0057B8] hover:bg-[#004bb0] text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
                 >
