@@ -155,6 +155,28 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     return mode === 'duration_tiers';
   };
 
+  const buildActiveMarginTableKey = (params: {
+    bankId: string;
+    productId: string;
+    supportType: string;
+    sectorId: string;
+    salaryBand: string;
+    salaryTransferStatus: string;
+    durationDistributionType: string;
+    calculationMethod: string;
+  }) => {
+    return [
+      params.bankId,
+      params.productId,
+      normSupport(params.supportType),
+      normSector(params.sectorId),
+      params.salaryBand,
+      params.salaryTransferStatus,
+      params.durationDistributionType,
+      params.calculationMethod
+    ].join(':');
+  };
+
   // Synchronize local states when selection, settings, or marginRules change
   useEffect(() => {
     if (!selectedBank) return;
