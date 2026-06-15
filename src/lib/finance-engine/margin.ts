@@ -83,7 +83,7 @@ export function resolveMatchingRules(params: {
     return 'all';
   };
 
-  const activeRules = marginRules.filter(r => r.isActive && !r.isExceptionOnly);
+  const activeRules = marginRules.filter(r => r.isActive && !r.isExceptionOnly && !r.isConfigOnly);
 
   // Sequence matching:
   // 1. Full Match: matching bankId, productId, salaryTransferStatus, salaryBand, supportType

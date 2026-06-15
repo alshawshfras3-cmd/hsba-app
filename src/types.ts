@@ -150,6 +150,7 @@ export interface MarginRule {
   installmentType?: 'fixed_or_step_down' | 'increasing' | 'all';
   salaryTransferStatus?: 'all' | 'salary_transfer' | 'no_salary_transfer';
   salaryBand?: 'all' | 'below_25000' | 'from_25000';
+  isConfigOnly?: boolean;
 }
 
 export interface DsrRule {
