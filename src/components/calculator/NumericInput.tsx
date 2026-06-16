@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { normalizeNumberInput } from '../../lib/number-input';
 
 interface NumericInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'value'> {
   value: number | '';
@@ -20,65 +19,68 @@ export default function NumericInput({
   id,
   ...props
 }: NumericInputProps) {
-  // We keep a local string state to allow natural typing (including trailing dots, e.g. "12.")
   const [localVal, setLocalVal] = useState<string>('');
 
-  // Sync with parent value if it changes externally
   useEffect(() => {
-    if (value === '') {
+    if (value === '' || value === undefined || value === null) {
       if (localVal !== '') setLocalVal('');
     } else {
       const parsedLocal = parseFloat(localVal.replace(/,/g, ''));
-      // If the parent number is different from parsed local representation, sync them
       if (isNaN(parsedLocal) || parsedLocal !== value) {
         setLocalVal(value.toString());
       }
     }
   }, [value]);
 
-  const convertArabicToEnglish = (input: string): string => {
+  const convertToEnglish = (input: string): string => {
     if (!input) return '';
     let result = input;
 
-    // Convert Arabic-Indic numerals (٠١٢٣٤٥٦٧٨٩)
+    // Arabic-Indic numerals ٠١٢٣٤٥٦٧٨٩
     const arabicIndic = [/٠/g, /١/g, /٢/g, /٣/g, /٤/g, /٥/g, /٦/g, /٧/g, /٨/g, /٩/g];
     for (let i = 0; i < 10; i++) {
       result = result.replace(arabicIndic[i], i.toString());
     }
 
-    // Convert Persian numerals (۰۱۲۳۴۵۶۷۸۹)
-    const persian = [/۰/g, /۱/g, /۲/g, /۳/g, /۴/g, /۵/g, /۶/g, /۷/g, /۸/g, /۹/g];
+    // Persian numerals ۰۱۲۳۴۵۶۷۸۹
+    const persian = [/۰/g, /۱/g, /۲/g, /۳/g, /۴/g, /۵/g, /۶/g, /۷/g, /٨/g, /٩/g];
     for (let i = 0; i < 10; i++) {
       result = result.replace(persian[i], i.toString());
     }
 
-    // Convert Arabic comma (،) to decimal dot (.)
+    // Arabic comma → dot
     result = result.replace(/،/g, '.');
+    // Arabic decimal separator
+    result = result.replace(/٫/g, '.');
 
     return result;
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
-    const translated = convertArabicToEnglish(raw);
+    const translated = convertToEnglish(raw);
 
-    // Apply normalizeNumberInput to handle digits/dot/comma safely
-    let sanitized = normalizeNumberInput(translated);
+    // Keep only digits, dots, and minus
+    let sanitized = translated
+      .replace(/[^\d.\-]/g, '')
+      .replace(/(\..*)\./g, '$1'); // Only one dot allowed
 
     if (!allowDecimals) {
       sanitized = sanitized.replace(/\./g, '');
     }
 
+    // Remove minus if not at start
+    if (sanitized.indexOf('-') > 0) {
+      sanitized = sanitized.replace(/-/g, '');
+    }
+
     setLocalVal(sanitized);
 
-    if (sanitized === '' || sanitized === '.') {
+    if (sanitized === '' || sanitized === '.' || sanitized === '-') {
       onChange('');
     } else {
       let parsed = allowDecimals ? parseFloat(sanitized) : parseInt(sanitized, 10);
       if (!isNaN(parsed)) {
-        if (min !== undefined && parsed < min) {
-          // Keep local state
-        }
         if (max !== undefined && parsed > max) {
           parsed = max;
           setLocalVal(max.toString());
@@ -89,8 +91,7 @@ export default function NumericInput({
   };
 
   const handleBlur = () => {
-    // On loss of focus, enforce min limit if specified
-    if (localVal === '' || localVal === '.') {
+    if (localVal === '' || localVal === '.' || localVal === '-') {
       if (min !== undefined) {
         setLocalVal(min.toString());
         onChange(min);
@@ -101,14 +102,13 @@ export default function NumericInput({
       return;
     }
 
-    let parsed = allowDecimals ? parseFloat(localVal.replace(/,/g, '')) : parseInt(localVal.replace(/,/g, ''), 10);
+    let parsed = allowDecimals
+      ? parseFloat(localVal.replace(/,/g, ''))
+      : parseInt(localVal.replace(/,/g, ''), 10);
+
     if (!isNaN(parsed)) {
-      if (min !== undefined && parsed < min) {
-        parsed = min;
-      }
-      if (max !== undefined && parsed > max) {
-        parsed = max;
-      }
+      if (min !== undefined && parsed < min) parsed = min;
+      if (max !== undefined && parsed > max) parsed = max;
       setLocalVal(parsed.toString());
       onChange(parsed);
     }
@@ -119,12 +119,15 @@ export default function NumericInput({
       {...props}
       type="text"
       inputMode={allowDecimals ? 'decimal' : 'numeric'}
+      dir="ltr"
+      style={{ textAlign: 'right', ...(props.style || {}) }}
       id={id}
       value={localVal}
       onChange={handleChange}
       onBlur={handleBlur}
-      placeholder={placeholder}
+      placeholder={placeholder || (allowDecimals ? '0.00' : '0')}
       className={className}
+      autoComplete="off"
     />
   );
 }
