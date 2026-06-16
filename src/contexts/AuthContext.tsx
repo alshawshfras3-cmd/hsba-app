@@ -419,10 +419,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsAdminInDb(true);
       return;
     }
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: window.location.origin }
-    });
+    try {
+      const redirectUrl = `${window.location.origin}/auth/callback`;
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUrl,
+        },
+      });
+      if (error) {
+        console.error('Google OAuth error:', error);
+        throw error;
+      }
+    } catch (error) {
+      console.error('Failed to sign in with Google:', error);
+    }
   }
 
   async function signInWithEmail(email: string, password: string) {

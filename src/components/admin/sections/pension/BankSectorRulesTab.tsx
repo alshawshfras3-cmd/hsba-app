@@ -22,6 +22,7 @@ export default function BankSectorRulesTab({
   const [bankSectorRulesSelectedBankId, setBankSectorRulesSelectedBankId] = useState<string>(banks[0]?.id || 'rajhi');
   const [isBankSectorModalOpen, setIsBankSectorModalOpen] = useState(false);
   const [editingBankSectorRule, setEditingBankSectorRule] = useState<BankSectorPensionRule | null>(null);
+  const [pensionModalError, setPensionModalError] = useState<string>('');
 
   // Copy bank rules modals states
   const [isCopyBankModalOpen, setIsCopyBankModalOpen] = useState(false);
@@ -251,6 +252,7 @@ export default function BankSectorRulesTab({
                             rateAbove: ruleObj.rateAbove ?? 80,
                             capAtApprovedSalary: ruleObj.capAtApprovedSalary !== false
                           });
+                          setPensionModalError('');
                           setIsBankSectorModalOpen(true);
                         }}
                         className="text-blue-600 hover:text-white bg-blue-50 hover:bg-[#0057B8] px-3.5 py-2 rounded-xl border border-blue-150 font-extrabold font-sans text-xs flex items-center gap-1 transition-all cursor-pointer"
@@ -286,6 +288,11 @@ export default function BankSectorRulesTab({
             </div>
 
             <div className="p-6 space-y-4 text-xs font-bold text-gray-750 overflow-y-auto flex-1 text-right">
+              {pensionModalError && (
+                <div className="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-2xl flex items-center gap-2 text-xs font-extrabold mb-4">
+                  ⚠️ {pensionModalError}
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3 text-right">
                 <div>
                   <label className="block text-gray-500 mb-1">الجهة التمويلية المستهدفة:</label>
@@ -482,15 +489,135 @@ export default function BankSectorRulesTab({
               <button
                 type="button"
                 onClick={() => {
-                  const updated = bankSectorRules.map(r => r.id === editingBankSectorRule.id ? editingBankSectorRule : r);
+                  // 1. Validate & Parse fields based on calcMethod
+                  const calcMethod = editingBankSectorRule.calcMethod || 'service_growth';
+                  const salarySource = editingBankSectorRule.salarySource || 'basic_only';
+                  
+                  let divY = editingBankSectorRule.divisorYears;
+                  let grR = editingBankSectorRule.growthRate;
+                  let grMin = editingBankSectorRule.growthMinYears;
+                  let grMax = editingBankSectorRule.growthMaxYears;
+                  let noGr = editingBankSectorRule.noGrowthAboveYears;
+                  let thY = editingBankSectorRule.thresholdYears;
+                  let rBelow = editingBankSectorRule.rateBelow;
+                  let rAbove = editingBankSectorRule.rateAbove;
+
+                  if (calcMethod === 'service_growth') {
+                    const valDiv = divY ?? 40;
+                    if (isNaN(Number(valDiv)) || Number(valDiv) <= 0) {
+                      setPensionModalError('معامل أو قاسم التقاعد يجب أن يكون رقماً أكبر من 0');
+                      return;
+                    }
+                    divY = Number(valDiv);
+
+                    const valGrowth = grR ?? 0;
+                    if (isNaN(Number(valGrowth)) || Number(valGrowth) < 0 || Number(valGrowth) > 100) {
+                      setPensionModalError('نسبة النمو السنوية يجب أن تكون بين 0 و 100');
+                      return;
+                    }
+                    grR = Number(valGrowth);
+
+                    const valMin = grMin ?? 0;
+                    if (isNaN(Number(valMin)) || Number(valMin) < 0) {
+                      setPensionModalError('أقل سنوات متبقية للنمو يجب أن تكون 0 أو أكبر');
+                      return;
+                    }
+                    grMin = Number(valMin);
+
+                    const valMax = grMax ?? 0;
+                    if (isNaN(Number(valMax)) || Number(valMax) < 0) {
+                      setPensionModalError('أقصى سنوات متبقية للنمو يجب أن تكون 0 أو أكبر');
+                      return;
+                    }
+                    grMax = Number(valMax);
+
+                    const valNoGr = noGr ?? 0;
+                    if (isNaN(Number(valNoGr)) || Number(valNoGr) < 0) {
+                      setPensionModalError('توقف النمو إذا تخطى سنوات يجب أن يكون 0 أو أكبر');
+                      return;
+                    }
+                    noGr = Number(valNoGr);
+
+                    thY = undefined;
+                    rBelow = undefined;
+                    rAbove = undefined;
+                  } else if (calcMethod === 'fixed_percentage') {
+                    const valTh = thY ?? 5;
+                    if (isNaN(Number(valTh)) || Number(valTh) <= 0) {
+                      setPensionModalError('حد السنوات المتبقية الفارق يجب أن يكون أكبر من 0');
+                      return;
+                    }
+                    thY = Number(valTh);
+
+                    const valBelow = rBelow ?? 70;
+                    if (isNaN(Number(valBelow)) || Number(valBelow) < 0 || Number(valBelow) > 100) {
+                      setPensionModalError('النسبة إذا كان السنوات ≤ الحد يجب أن تكون بين 0 و 100');
+                      return;
+                    }
+                    rBelow = Number(valBelow);
+
+                    const valAbove = rAbove ?? 80;
+                    if (isNaN(Number(valAbove)) || Number(valAbove) < 0 || Number(valAbove) > 100) {
+                      setPensionModalError('النسبة إذا كان السنوات > الحد يجب أن تكون بين 0 و 100');
+                      return;
+                    }
+                    rAbove = Number(valAbove);
+
+                    divY = undefined;
+                    grR = undefined;
+                    grMin = undefined;
+                    grMax = undefined;
+                    noGr = undefined;
+                  } else {
+                    divY = undefined;
+                    grR = undefined;
+                    grMin = undefined;
+                    grMax = undefined;
+                    noGr = undefined;
+                    thY = undefined;
+                    rBelow = undefined;
+                    rAbove = undefined;
+                  }
+
+                  // Clean error
+                  setPensionModalError('');
+
+                  const finalRule: BankSectorPensionRule = {
+                    ...editingBankSectorRule,
+                    id: `${editingBankSectorRule.bankId}_${editingBankSectorRule.sectorId}`,
+                    calcMethod,
+                    salarySource,
+                    divisorYears: divY,
+                    growthRate: grR,
+                    growthMinYears: grMin,
+                    growthMaxYears: grMax,
+                    noGrowthAboveYears: noGr,
+                    thresholdYears: thY,
+                    rateBelow: rBelow,
+                    rateAbove: rAbove
+                  };
+
+                  const existingIndex = bankSectorRules.findIndex(
+                    rule =>
+                      rule.bankId === finalRule.bankId &&
+                      rule.sectorId === finalRule.sectorId
+                  );
+
+                  const updated =
+                    existingIndex >= 0
+                      ? bankSectorRules.map((rule, index) =>
+                          index === existingIndex ? finalRule : rule
+                        )
+                      : [...bankSectorRules, finalRule];
+
                   setBankSectorRules(updated);
                   setIsBankSectorModalOpen(false);
                   setEditingBankSectorRule(null);
-                  showToast("تم تحديث إعدادات الربط محليًا بنجاح! اضغط على حفظ تغييرات الربط لتأكيدها بـ Supabase.", "success");
+                  showToast("تم تطبيق التعديل محلياً. اضغط حفظ التغييرات لتثبيته في قاعدة البيانات.", "success");
                 }}
                 className="bg-[#0057B8] hover:bg-blue-755 text-white px-5 py-2.5 rounded-xl text-xs transition-all cursor-pointer shadow-sm"
               >
-                تطبيق الربط المؤقت
+                تطبيق التعديلات
               </button>
               <button
                 type="button"

@@ -275,6 +275,7 @@ export default function AdminDashboard() {
   const [bankSectorRulesSelectedBankId, setBankSectorRulesSelectedBankId] = useState<string>('');
   const [isBankSectorModalOpen, setIsBankSectorModalOpen] = useState(false);
   const [editingBankSectorRule, setEditingBankSectorRule] = useState<BankSectorPensionRule | null>(null);
+  const [pensionModalError, setPensionModalError] = useState<string>('');
   const [copySourceBankId, setCopySourceBankId] = useState<string>('');
   const [isCopyBankModalOpen, setIsCopyBankModalOpen] = useState(false);
 
@@ -3106,6 +3107,7 @@ export default function AdminDashboard() {
                                     rateAbove: ruleObj.rateAbove ?? 80,
                                     capAtApprovedSalary: ruleObj.capAtApprovedSalary !== false
                                   });
+                                  setPensionModalError('');
                                   setIsBankSectorModalOpen(true);
                                 }}
                                 className="text-blue-600 hover:text-white bg-blue-50 hover:bg-[#0057B8] px-3.5 py-2 rounded-xl border border-blue-150 font-extrabold font-sans text-xs flex items-center gap-1 transition-all cursor-pointer"
@@ -4326,6 +4328,11 @@ export default function AdminDashboard() {
 
               {/* Content */}
               <div className="p-6 space-y-5 text-xs font-bold text-gray-750 text-right overflow-y-auto flex-1">
+                {pensionModalError && (
+                  <div className="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-2xl flex items-center gap-2 text-xs font-extrabold">
+                    ⚠️ {pensionModalError}
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
                   <div className="space-y-1">
                     <span className="block text-gray-500">🏦 شركة التمويل / البنك:</span>
@@ -4397,16 +4404,17 @@ export default function AdminDashboard() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <label className="block text-[10px] text-gray-500">معامل القسمة (سنوات):</label>
-                        <input
-                          type="number"
-                          value={editingBankSectorRule.divisorYears ?? 40}
-                          onChange={(e) => {
+                        <NumericInput
+                          value={editingBankSectorRule.divisorYears ?? ''}
+                          onChange={(val) => {
                             setEditingBankSectorRule({
                               ...editingBankSectorRule,
-                              divisorYears: parseInt(e.target.value) || 40
+                              divisorYears: val === '' ? undefined : val
                             });
                           }}
-                          className="w-full bg-white border border-[#E2E8F0] focus:border-[#0057B8] rounded-xl px-3 py-2 text-xs font-bold text-gray-700 outline-none"
+                          allowDecimals={false}
+                          min={1}
+                          className="w-full bg-white border border-[#E2E8F0] focus:border-[#0057B8] rounded-xl px-3 py-2 text-xs font-bold text-gray-750 outline-none"
                         />
                         <div className="text-[9px] text-[#0057B8] font-semibold mt-0.5 leading-tight">
                           الراتب التقاعدي = الراتب المعتمد × سنوات الخدمة ÷ {editingBankSectorRule.divisorYears ?? 40}
@@ -4414,17 +4422,18 @@ export default function AdminDashboard() {
                       </div>
                       <div className="space-y-1">
                         <label className="block text-[10px] text-gray-500">نسبة النمو السنوية (%):</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={editingBankSectorRule.growthRate ?? 0}
-                          onChange={(e) => {
+                        <NumericInput
+                          value={editingBankSectorRule.growthRate ?? ''}
+                          onChange={(val) => {
                             setEditingBankSectorRule({
                               ...editingBankSectorRule,
-                              growthRate: parseFloat(e.target.value) || 0
+                              growthRate: val === '' ? undefined : val
                             });
                           }}
-                          className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-700 outline-none"
+                          allowDecimals={true}
+                          min={0}
+                          max={100}
+                          className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-750 outline-none"
                         />
                       </div>
                     </div>
@@ -4432,44 +4441,47 @@ export default function AdminDashboard() {
                     <div className="grid grid-cols-3 gap-3">
                       <div className="space-y-1">
                         <label className="block text-[9px] text-gray-500">أقل سنوات متبقية للنمو:</label>
-                        <input
-                          type="number"
-                          value={editingBankSectorRule.growthMinYears ?? 5}
-                          onChange={(e) => {
+                        <NumericInput
+                          value={editingBankSectorRule.growthMinYears ?? ''}
+                          onChange={(val) => {
                             setEditingBankSectorRule({
                               ...editingBankSectorRule,
-                              growthMinYears: parseInt(e.target.value) || 0
+                              growthMinYears: val === '' ? undefined : val
                             });
                           }}
-                          className="w-full bg-white border border-gray-200 rounded-xl px-2 py-1.5 text-xs font-bold text-gray-700"
+                          allowDecimals={false}
+                          min={0}
+                          className="w-full bg-white border border-gray-200 rounded-xl px-2 py-1.5 text-xs text-right font-bold text-gray-750"
                         />
                       </div>
                       <div className="space-y-1">
                         <label className="block text-[9px] text-gray-500">أقصى سنوات متبقية للنمو:</label>
-                        <input
-                          type="number"
-                          value={editingBankSectorRule.growthMaxYears ?? 12}
-                          onChange={(e) => {
+                        <NumericInput
+                          value={editingBankSectorRule.growthMaxYears ?? ''}
+                          onChange={(val) => {
                             setEditingBankSectorRule({
                               ...editingBankSectorRule,
-                              growthMaxYears: parseInt(e.target.value) || 0
+                              growthMaxYears: val === '' ? undefined : val
                             });
                           }}
-                          className="w-full bg-white border border-gray-200 rounded-xl px-2 py-1.5 text-xs font-bold text-gray-700"
+                          allowDecimals={false}
+                          min={0}
+                          className="w-full bg-white border border-gray-200 rounded-xl px-2 py-1.5 text-xs text-right font-bold text-gray-750"
                         />
                       </div>
                       <div className="space-y-1">
                         <label className="block text-[9px] text-gray-500">توقف النمو إذا تخطى سنوات:</label>
-                        <input
-                          type="number"
-                          value={editingBankSectorRule.noGrowthAboveYears ?? 25}
-                          onChange={(e) => {
+                        <NumericInput
+                          value={editingBankSectorRule.noGrowthAboveYears ?? ''}
+                          onChange={(val) => {
                             setEditingBankSectorRule({
                               ...editingBankSectorRule,
-                              noGrowthAboveYears: parseInt(e.target.value) || 0
+                              noGrowthAboveYears: val === '' ? undefined : val
                             });
                           }}
-                          className="w-full bg-white border border-gray-200 rounded-xl px-2 py-1.5 text-xs font-bold text-gray-700"
+                          allowDecimals={false}
+                          min={0}
+                          className="w-full bg-white border border-gray-200 rounded-xl px-2 py-1.5 text-xs text-right font-bold text-gray-750"
                         />
                       </div>
                     </div>
@@ -4501,44 +4513,49 @@ export default function AdminDashboard() {
                     <div className="grid grid-cols-3 gap-3">
                       <div className="space-y-1">
                         <label className="block text-[9px] text-gray-500">حد السنوات المتبقية الفارق:</label>
-                        <input
-                          type="number"
-                          value={editingBankSectorRule.thresholdYears ?? 5}
-                          onChange={(e) => {
+                        <NumericInput
+                          value={editingBankSectorRule.thresholdYears ?? ''}
+                          onChange={(val) => {
                             setEditingBankSectorRule({
                               ...editingBankSectorRule,
-                              thresholdYears: parseInt(e.target.value) || 5
+                              thresholdYears: val === '' ? undefined : val
                             });
                           }}
-                          className="w-full bg-white border border-gray-200 rounded-xl px-2 py-1.5 text-xs font-bold text-gray-700"
+                          allowDecimals={false}
+                          min={1}
+                          className="w-full bg-white border border-gray-200 rounded-xl px-2 py-1.5 text-xs text-right font-bold text-gray-750 outline-none"
                         />
                       </div>
                       <div className="space-y-1">
                         <label className="block text-[9px] text-gray-500">النسبة (%) إذا السنوات ≤ الحد:</label>
-                        <input
-                          type="number"
-                          value={editingBankSectorRule.rateBelow ?? 70}
-                          onChange={(e) => {
+                        <NumericInput
+                          value={editingBankSectorRule.rateBelow ?? ''}
+                          onChange={(val) => {
                             setEditingBankSectorRule({
                               ...editingBankSectorRule,
-                              rateBelow: parseInt(e.target.value) || 70
+                              rateBelow: val === '' ? undefined : val
                             });
                           }}
-                          className="w-full bg-white border border-gray-200 rounded-xl px-2 py-1.5 text-xs font-bold text-gray-700"
+                          allowDecimals={true}
+                          min={0}
+                          max={100}
+                          className="w-full bg-white border border-gray-200 rounded-xl px-2 py-1.5 text-xs text-right font-bold text-gray-750 outline-none"
                         />
                       </div>
                       <div className="space-y-1">
                         <label className="block text-[9px] text-gray-500">النسبة (%) إذا السنوات &gt; الحد:</label>
-                        <input
-                          type="number"
-                          value={editingBankSectorRule.rateAbove ?? 80}
-                          onChange={(e) => {
+                        <NumericInput
+                          value={editingBankSectorRule.rateAbove ?? ''}
+                          onChange={(val) => {
                             setEditingBankSectorRule({
                               ...editingBankSectorRule,
-                              rateAbove: parseInt(e.target.value) || 80
+                              rateAbove: val === '' ? undefined : val
                             });
                           }}
-                          className="w-full bg-white border border-gray-200 rounded-xl px-2 py-1.5 text-xs font-bold text-gray-700"
+                          allowDecimals={true}
+                          min={0}
+                          max={100}
+                          className="w-full bg-white border border-gray-200 rounded-xl px-2 py-1.5 text-xs text-right font-bold text-gray-750 outline-none"
                         />
                       </div>
                     </div>
@@ -4576,16 +4593,131 @@ export default function AdminDashboard() {
                 <button
                   type="button"
                   onClick={() => {
+                    // 1. Validate & Parse fields based on calcMethod
+                    const calcMethod = editingBankSectorRule.calcMethod || 'service_growth';
+                    const salarySource = editingBankSectorRule.salarySource || 'basic_only';
+                    
+                    let divY = editingBankSectorRule.divisorYears;
+                    let grR = editingBankSectorRule.growthRate;
+                    let grMin = editingBankSectorRule.growthMinYears;
+                    let grMax = editingBankSectorRule.growthMaxYears;
+                    let noGr = editingBankSectorRule.noGrowthAboveYears;
+                    let thY = editingBankSectorRule.thresholdYears;
+                    let rBelow = editingBankSectorRule.rateBelow;
+                    let rAbove = editingBankSectorRule.rateAbove;
+
+                    if (calcMethod === 'service_growth') {
+                      const valDiv = divY ?? 40;
+                      if (isNaN(Number(valDiv)) || Number(valDiv) <= 0) {
+                        setPensionModalError('معامل أو قاسم التقاعد يجب أن يكون رقماً أكبر من 0');
+                        return;
+                      }
+                      divY = Number(valDiv);
+
+                      const valGrowth = grR ?? 0;
+                      if (isNaN(Number(valGrowth)) || Number(valGrowth) < 0 || Number(valGrowth) > 100) {
+                        setPensionModalError('نسبة النمو السنوية يجب أن تكون بين 0 و 100');
+                        return;
+                      }
+                      grR = Number(valGrowth);
+
+                      const valMin = grMin ?? 0;
+                      if (isNaN(Number(valMin)) || Number(valMin) < 0) {
+                        setPensionModalError('أقل سنوات متبقية للنمو يجب أن تكون 0 أو أكبر');
+                        return;
+                      }
+                      grMin = Number(valMin);
+
+                      const valMax = grMax ?? 0;
+                      if (isNaN(Number(valMax)) || Number(valMax) < 0) {
+                        setPensionModalError('أقصى سنوات متبقية للنمو يجب أن تكون 0 أو أكبر');
+                        return;
+                      }
+                      grMax = Number(valMax);
+
+                      const valNoGr = noGr ?? 0;
+                      if (isNaN(Number(valNoGr)) || Number(valNoGr) < 0) {
+                        setPensionModalError('توقف النمو إذا تخطى سنوات يجب أن يكون 0 أو أكبر');
+                        return;
+                      }
+                      noGr = Number(valNoGr);
+
+                      thY = undefined;
+                      rBelow = undefined;
+                      rAbove = undefined;
+                    } else if (calcMethod === 'fixed_percentage') {
+                      const valTh = thY ?? 5;
+                      if (isNaN(Number(valTh)) || Number(valTh) <= 0) {
+                        setPensionModalError('حد السنوات المتبقية الفارق يجب أن يكون أكبر من 0');
+                        return;
+                      }
+                      thY = Number(valTh);
+
+                      const valBelow = rBelow ?? 70;
+                      if (isNaN(Number(valBelow)) || Number(valBelow) < 0 || Number(valBelow) > 100) {
+                        setPensionModalError('النسبة إذا كان السنوات ≤ الحد يجب أن تكون بين 0 و 100');
+                        return;
+                      }
+                      rBelow = Number(valBelow);
+
+                      const valAbove = rAbove ?? 80;
+                      if (isNaN(Number(valAbove)) || Number(valAbove) < 0 || Number(valAbove) > 100) {
+                        setPensionModalError('النسبة إذا كان السنوات > الحد يجب أن تكون بين 0 و 100');
+                        return;
+                      }
+                      rAbove = Number(valAbove);
+
+                      divY = undefined;
+                      grR = undefined;
+                      grMin = undefined;
+                      grMax = undefined;
+                      noGr = undefined;
+                    } else {
+                      divY = undefined;
+                      grR = undefined;
+                      grMin = undefined;
+                      grMax = undefined;
+                      noGr = undefined;
+                      thY = undefined;
+                      rBelow = undefined;
+                      rAbove = undefined;
+                    }
+
+                    // Clean error
+                    setPensionModalError('');
+
                     const finalRule: BankSectorPensionRule = {
                       ...editingBankSectorRule,
-                      calcMethod: editingBankSectorRule.calcMethod || 'service_growth',
-                      salarySource: editingBankSectorRule.salarySource || 'basic_only'
+                      id: `${editingBankSectorRule.bankId}_${editingBankSectorRule.sectorId}`,
+                      calcMethod,
+                      salarySource,
+                      divisorYears: divY,
+                      growthRate: grR,
+                      growthMinYears: grMin,
+                      growthMaxYears: grMax,
+                      noGrowthAboveYears: noGr,
+                      thresholdYears: thY,
+                      rateBelow: rBelow,
+                      rateAbove: rAbove
                     };
-                    const updated = bankSectorRules.map(r => r.id === finalRule.id ? finalRule : r);
+
+                    const existingIndex = bankSectorRules.findIndex(
+                      rule =>
+                        rule.bankId === finalRule.bankId &&
+                        rule.sectorId === finalRule.sectorId
+                    );
+
+                    const updated =
+                      existingIndex >= 0
+                        ? bankSectorRules.map((rule, index) =>
+                            index === existingIndex ? finalRule : rule
+                          )
+                        : [...bankSectorRules, finalRule];
+
                     setBankSectorRules(updated);
                     setIsBankSectorModalOpen(false);
                     setEditingBankSectorRule(null);
-                    showToast("تم تحديث قواعد البنك والقطاع بنجاح محلياً! للتثبيت السحابي، اضغط على زر حفظ التغييرات من الشريط الأسافلي.", "success");
+                    showToast("تم تطبيق التعديل محلياً. اضغط حفظ التغييرات لتثبيته في قاعدة البيانات.", "success");
                   }}
                   className="bg-[#0057B8] hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer"
                 >

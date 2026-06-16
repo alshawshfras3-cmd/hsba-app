@@ -14,6 +14,7 @@ import AdminDashboard from './components/admin/AdminDashboard';
 import { AdminLoginPage } from './pages/AdminLoginPage';
 import { AdminDashboardGuard } from './components/admin/AdminDashboardGuard';
 import ResetPasswordPage from './pages/ResetPasswordPage';
+import AuthCallbackPage from './pages/AuthCallbackPage';
 import { Calculator, ShieldCheck, Mail, Phone, ExternalLink, ShieldAlert, Loader2 } from 'lucide-react';
 import { supabase, hasSupabaseKeys, cleanStaleSupabaseSession } from './lib/supabase';
 
@@ -143,6 +144,11 @@ function AppContent() {
         <span className="text-xs text-gray-400 dark:text-slate-400 font-bold select-none">جاري الاستعلام عن صلاحيات حسبة...</span>
       </div>
     );
+  }
+
+  // Google OAuth Auth Callback Pathway (unprotected, public)
+  if (location.pathname === '/auth/callback' || location.pathname === '/auth/callback/') {
+    return <AuthCallbackPage />;
   }
 
   // Admin Login Section Pathway

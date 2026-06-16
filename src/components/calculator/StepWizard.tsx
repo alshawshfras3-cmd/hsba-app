@@ -571,6 +571,27 @@ export default function StepWizard() {
     }
   }, [effectiveSectorId, salaryMode]);
 
+  const getSelectedBankPersonalMaxTenor = () => {
+    let absoluteMax = 60;
+    if (selectedBankId && selectedBankId !== 'all') {
+      const matchingRules = (personalRules || []).filter(r => r.bankId === selectedBankId && r.isActive);
+      if (matchingRules.length > 0) {
+        const terms = matchingRules.map(r => r.termMonths || 60);
+        absoluteMax = Math.max(...terms);
+      }
+    }
+    return absoluteMax;
+  };
+
+  useEffect(() => {
+    if (mainFinanceType === 'personal_only' && personalTenorSelectionMode === 'custom' && requestedPersonalTenorMonths !== '') {
+      const maxTenor = getSelectedBankPersonalMaxTenor();
+      if (Number(requestedPersonalTenorMonths) > maxTenor) {
+        setRequestedPersonalTenorMonths(maxTenor);
+      }
+    }
+  }, [selectedBankId, personalTenorSelectionMode, personalRules]);
+
   const hijriToGreg = (year: number, calendar: 'gregorian' | 'hijri'): number => {
     if (calendar === 'hijri') {
       const greg = convertHijriToGregorian(year, 1, 1);
@@ -655,30 +676,28 @@ export default function StepWizard() {
           stepErrors.push('يرجى إدخال الراتب الأساسي الخاص بك بدقة.');
         }
       }
-    }
 
-    if (stepId === 'finance_options') {
-      if (!selectedBankId) {
-        stepErrors.push('يرجى اختيار جهة التمويل المفضلة أو مقارنة جميع الجهات.');
-      }
       if (mainFinanceType === 'personal_only') {
+        if (!selectedBankId) {
+          stepErrors.push('يرجى اختيار جهة التمويل المفضلة أو مقارنة جميع الجهات.');
+        }
         if (personalTenorSelectionMode === 'custom') {
           if (!requestedPersonalTenorMonths || Number(requestedPersonalTenorMonths) < 1) {
             stepErrors.push('يرجى إدخال عدد أشهر التمويل الشخصي المطلوبة (صحيح أكبر من الصفر).');
           } else {
             const requestedVal = Number(requestedPersonalTenorMonths);
-            let absoluteMax = 60; // default standard personal tenor limit
-            if (selectedBankId !== 'all') {
-              const ruleForBank = personalRules?.find(r => r.bankId === selectedBankId && r.isActive);
-              if (ruleForBank && ruleForBank.termMonths) {
-                absoluteMax = ruleForBank.termMonths;
-              }
-            }
+            const absoluteMax = getSelectedBankPersonalMaxTenor();
             if (requestedVal > absoluteMax) {
-              stepErrors.push(`المدة المطلوبة للتمويل الشخصي (${requestedVal} شهرًا) تتجاوز الحد الأقصى المسموح به لهذه الجهة البالغ ${absoluteMax} شهرًا.`);
+              stepErrors.push(`المدة المطلوبة للتمويل الشخصي (${requestedVal} شهرًا) تتجاوز الحد الأقصى المسموح به للجهة المختارة البالغ ${absoluteMax} شهرًا.`);
             }
           }
         }
+      }
+    }
+
+    if (stepId === 'finance_options') {
+      if (!selectedBankId) {
+        stepErrors.push('يرجى اختيار جهة التمويل المفضلة أو مقارنة جميع الجهات.');
       }
       if (mainFinanceType !== 'personal_only') {
         if (!productId) {
@@ -1383,6 +1402,94 @@ export default function StepWizard() {
               <h4 className="text-sm font-bold font-sans">خيارات الحسبة والجهات المفضلة</h4>
             </div>
             
+            {/* 1. مدة التمويل الشخصي */}
+            <div className="border border-gray-200 bg-white rounded-2xl p-5 text-right space-y-4">
+              <label className="block text-xs font-bold text-gray-700 flex items-center gap-1.5 pb-1">
+                <Calendar className="w-4 h-4 text-[#0057B8]" />
+                <span>مدة التمويل الشخصي:</span>
+              </label>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* تلقائي */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPersonalTenorSelectionMode('auto');
+                    setRequestedPersonalTenorMonths('');
+                  }}
+                  className={`p-4 rounded-xl border text-right transition-all cursor-pointer font-sans duration-200 flex flex-col gap-1.5 ${
+                    personalTenorSelectionMode === 'auto'
+                      ? 'border-[#0057B8] bg-[#0057B8]/5 text-[#0057B8]'
+                      : 'border-gray-200 text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <span className="text-xs font-extrabold">تلقائي</span>
+                  <span className={`text-[10px] leading-relaxed ${
+                    personalTenorSelectionMode === 'auto' ? 'text-blue-700/80' : 'text-gray-400'
+                  }`}>
+                    يحدد النظام المدة المناسبة حسب قاعدة البنك والمدة المتبقية قبل التقاعد.
+                  </span>
+                </button>
+
+                {/* اختيار يدوي */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPersonalTenorSelectionMode('custom');
+                    const maxT = selectedBankId === 'all' ? 60 : getSelectedBankPersonalMaxTenor();
+                    setRequestedPersonalTenorMonths(maxT);
+                  }}
+                  className={`p-4 rounded-xl border text-right transition-all cursor-pointer font-sans duration-200 flex flex-col gap-1.5 ${
+                    personalTenorSelectionMode === 'custom'
+                      ? 'border-[#0057B8] bg-[#0057B8]/5 text-[#0057B8]'
+                      : 'border-gray-200 text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <span className="text-xs font-extrabold font-sans">اختيار يدوي</span>
+                  <span className={`text-[10px] leading-relaxed ${
+                    personalTenorSelectionMode === 'custom' ? 'text-blue-700/80' : 'text-gray-400'
+                  }`}>
+                    تحديد مدة مخصصة للتمويل الشخصي (بالأشهر) تناسب رغبتك.
+                  </span>
+                </button>
+              </div>
+
+              {personalTenorSelectionMode === 'custom' && (
+                <div className="mt-4 pt-4 border-t border-gray-100 space-y-3 animate-fade-in font-sans">
+                  <span className="block text-[11px] font-bold text-gray-500">اختر مدة التمويل الشخصي المفضلة (بالأشهر):</span>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                    {(() => {
+                      const activeMax = selectedBankId === 'all' ? 60 : getSelectedBankPersonalMaxTenor();
+                      const personalTenorOptions = [
+                        { value: 12, label: 'سنة واحدة — 12 شهرًا' },
+                        { value: 24, label: 'سنتان — 24 شهرًا' },
+                        { value: 36, label: '3 سنوات — 36 شهرًا' },
+                        { value: 48, label: '4 سنوات — 48 شهرًا' },
+                        { value: 60, label: '5 سنوات — 60 شهرًا' }
+                      ];
+                      const filtered = personalTenorOptions.filter(opt => opt.value <= activeMax);
+                      
+                      return filtered.map((opt) => (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setRequestedPersonalTenorMonths(opt.value)}
+                          className={`py-3 px-2 text-xs font-bold rounded-xl border text-center transition-all cursor-pointer ${
+                            requestedPersonalTenorMonths === opt.value
+                              ? 'border-[#0057B8] bg-[#0057B8] text-white font-extrabold'
+                              : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ));
+                    })()}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 2. جهة التمويل المفضلة للتمويل الشخصي */}
             <div className="border border-gray-200 bg-white rounded-2xl p-5 text-right space-y-3">
               <label className="block text-xs font-bold text-gray-700">جهة التمويل المفضلة للتمويل الشخصي:</label>
               <select
@@ -1756,58 +1863,7 @@ export default function StepWizard() {
                   </div>
                 )}
 
-                {/* Personal Tenor Option Mode - ONLY FOR PERSONAL ONLY PATH */}
-                {mainFinanceType === 'personal_only' && (
-                  <div className="border border-gray-200 bg-white rounded-2xl p-5 text-right space-y-3 col-span-1 md:col-span-2">
-                    <label className="block text-xs font-bold text-gray-700 flex items-center gap-1.5 pb-1">
-                      <Coins className="w-4 h-4 text-amber-500" />
-                      <span>مدة التمويل الشخصي المطلوبة:</span>
-                    </label>
-                    <div className="grid grid-cols-2 gap-3 max-w-md">
-                      {[
-                        { id: 'auto', label: 'تلقائي حسب قاعدة البنك والتقاعد' },
-                        { id: 'custom', label: 'مدة مخصصة (بالأشهر)' }
-                      ].map((tm) => (
-                        <button
-                          key={tm.id}
-                          type="button"
-                          onClick={() => {
-                            setPersonalTenorSelectionMode(tm.id as 'auto' | 'custom');
-                            if (tm.id === 'auto') {
-                              setRequestedPersonalTenorMonths('');
-                            }
-                          }}
-                          className={`py-3 px-2 text-xs font-bold rounded-xl border text-center transition-all cursor-pointer font-sans ${
-                            personalTenorSelectionMode === tm.id
-                              ? 'border-[#0057B8] bg-[#0057B8]/5 text-[#0057B8]'
-                              : 'border-gray-200 text-gray-500 hover:bg-gray-50 hover:border-gray-300'
-                          }`}
-                        >
-                          {tm.label}
-                        </button>
-                      ))}
-                    </div>
 
-                    {personalTenorSelectionMode === 'custom' && (
-                      <div className="mt-4 space-y-2 animate-fade-in font-sans max-w-md">
-                        <label className="block text-[10px] font-bold text-gray-400">عدد أشهر التمويل الشخصي (مثال: 12، 24، 36، 48، 60 شهراً):</label>
-                        <div className="relative">
-                          <NumericInput
-                            id="custom-personal-term-months-input"
-                            min={1}
-                            max={60}
-                            allowDecimals={false}
-                            placeholder="مثال: 60"
-                            value={requestedPersonalTenorMonths}
-                            onChange={setRequestedPersonalTenorMonths}
-                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
-                          />
-                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-500">شهر</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
 
                 {/* Preferred Bank Filter - FOR BOTH PATHS */}
                 <div className="border border-gray-200 bg-white rounded-2xl p-5 text-right space-y-3 col-span-1 md:col-span-2">

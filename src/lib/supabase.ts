@@ -21,7 +21,13 @@ export const hasSupabaseKeys = !!(
 const safeUrl = hasSupabaseKeys ? supabaseUrl : 'https://placeholder.supabase.co';
 const safeKey = hasSupabaseKeys ? supabaseAnonKey : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInN1YiI6Imhhc2JhIiwicm9sZSI6ImFub24ifQ.placeholder';
 
-export const supabase = createClient(safeUrl, safeKey);
+export const supabase = createClient(safeUrl, safeKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+  },
+});
 
 // Log URL prefix for verification
 if (hasSupabaseKeys) {
