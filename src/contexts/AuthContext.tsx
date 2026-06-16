@@ -420,11 +420,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     try {
-      const redirectUrl = `${window.location.origin}/auth/callback`;
+      const redirectTo = `${window.location.origin}/auth/callback`;
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: redirectUrl,
+          redirectTo,
         },
       });
       if (error) {
@@ -433,6 +433,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (error) {
       console.error('Failed to sign in with Google:', error);
+      throw error;
     }
   }
 
