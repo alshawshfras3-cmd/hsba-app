@@ -2023,7 +2023,7 @@ export default function AdminDashboard() {
                 <div className="flex gap-4 justify-start font-bold text-xs pt-2 font-sans">
                   <button
                     type="button"
-                    onClick={() => {
+                    onClick={async () => {
                       const customId = prompt("أدخل الرمز التعريفي للقطاع بالإنجليزية (مثال: semi_gov, companies):");
                       if (!customId) return;
                       const customLabel = prompt("أدخل الاسم العربي لعرض القطاع:");
@@ -2037,8 +2037,14 @@ export default function AdminDashboard() {
                         multiplier: 1.0,
                         descriptionAr: customLabel
                       };
-                      setApprovedSalaryDbRules(prev => [...prev, newRule]);
-                      showToast('تم إضافة قطاع جديد محلياً! انقر على حفظ التغييرات للرفع والمزامنة.', 'success');
+                      const updated = [...approvedSalaryDbRules, newRule];
+                      setApprovedSalaryDbRules(updated);
+                      try {
+                        await saveChanges(undefined, undefined, undefined, updated);
+                        showToast('تم إضافة قطاع جديد وحفظ التغييرات بنجاح في النظام وسحابة Supabase! 🎉', 'success');
+                      } catch (err: any) {
+                        showToast('تم إضافة القطاع مؤقتاً بالمتصفح، وفشلت المزامنة: ' + (err.message || err), 'refuse');
+                      }
                     }}
                     className="bg-white border border-gray-200 hover:border-[#0057B8] text-gray-700 hover:text-[#0057B8] px-5 py-2.5 rounded-xl transition-all cursor-pointer shadow-xs"
                   >
@@ -2126,12 +2132,18 @@ export default function AdminDashboard() {
                   </div>
 
                   <div className="bg-gray-50 px-6 py-4 flex flex-row-reverse gap-3 border-t border-gray-100 font-bold text-xs font-sans">
-                    <button
+                     <button
                       type="button"
-                      onClick={() => {
-                        setApprovedSalaryDbRules(prev => prev.map(r => r.sectorId === editingSalaryRule.sectorId && r.bankId === editingSalaryRule.bankId ? editingSalaryRule : r));
+                      onClick={async () => {
+                        const updated = approvedSalaryDbRules.map(r => r.sectorId === editingSalaryRule.sectorId && r.bankId === editingSalaryRule.bankId ? editingSalaryRule : r);
+                        setApprovedSalaryDbRules(updated);
                         setEditingSalaryRule(null);
-                        showToast('تم تعديل القواعد محلياً بنجاح! يرجى النقر على حفظ التغييرات للمزامنة النهائية.', 'success');
+                        try {
+                          await saveChanges(undefined, undefined, undefined, updated);
+                          showToast('تم حفظ وتعديل قاعدة احتساب الراتب المعتمد بنجاح في النظام وسحابة Supabase! 🎉', 'success');
+                        } catch (err: any) {
+                          showToast('تم تطبيق التعديل مؤقتاً بالمتصفح، وفشلت المزامنة: ' + (err.message || err), 'refuse');
+                        }
                       }}
                       className="bg-[#0057B8] hover:bg-blue-750 text-white px-5 py-2.5 rounded-xl transition-all cursor-pointer shadow-sm"
                     >
@@ -2384,13 +2396,19 @@ export default function AdminDashboard() {
                       <div className="flex gap-4 justify-start font-bold text-xs pt-2 font-sans">
                         <button
                           type="button"
-                          onClick={() => {
+                          onClick={async () => {
                             const methodType = confirm("هل تريد تحويل البنك بأكمله لطريقة النسبة الثابتة؟ انقر 'حسناً' للنسية الثابتة، أو 'إلغاء' لمعادلة سنوات الخدمة.") ? 'fixed_percentage' : 'service_based';
-                            setPensionDbRules(prev => prev.map(r => r.bankId === selectedPensionBankTabId ? {
+                            const updated = pensionDbRules.map(r => r.bankId === selectedPensionBankTabId ? {
                               ...r,
                               calculationMethod: methodType as any
-                            } : r));
-                            showToast('تم تعديل الطريقة مؤقتاً بالمسودة! انقر على حفظ لمزامنة التغيير.', 'success');
+                            } : r);
+                            setPensionDbRules(updated);
+                            try {
+                              await saveChanges(undefined, undefined, updated);
+                              showToast('تم تغيير طريقة الحساب للبنك وحفظها بنجاح في النظام وسحابة Supabase! 🎉', 'success');
+                            } catch (err: any) {
+                              showToast('تم تطبيق التعديلي مؤقتاً بالمتصفح، وفشلت المزامنة: ' + (err.message || err), 'refuse');
+                            }
                           }}
                           className="bg-white border border-gray-200 hover:border-[#0057B8] text-gray-700 hover:text-[#0057B8] px-5 py-2.5 rounded-xl transition-all cursor-pointer shadow-xs"
                         >
@@ -2543,10 +2561,16 @@ export default function AdminDashboard() {
                   <div className="bg-gray-50 px-6 py-4 flex flex-row-reverse gap-3 border-t border-gray-100 font-bold text-xs font-sans">
                     <button
                       type="button"
-                      onClick={() => {
-                        setPensionDbRules(prev => prev.map(r => r.sectorId === editingPensionRule.sectorId && r.bankId === editingPensionRule.bankId ? editingPensionRule : r));
+                      onClick={async () => {
+                        const updated = pensionDbRules.map(r => r.sectorId === editingPensionRule.sectorId && r.bankId === editingPensionRule.bankId ? editingPensionRule : r);
+                        setPensionDbRules(updated);
                         setEditingPensionRule(null);
-                        showToast('تم تحديل قواعد المعاش محلياً! يرجى النقر على حفظ التغييرات للرفع والمزامنة.', 'success');
+                        try {
+                          await saveChanges(undefined, undefined, updated);
+                          showToast('تم حفظ وتحديث قاعدة المعاش التقاعدي بنجاح في النظام وسحابة Supabase! 🎉', 'success');
+                        } catch (err: any) {
+                          showToast('تم تطبيق التعديلات مؤقتاً بالمتصفح، وفشلت المزامنة: ' + (err.message || err), 'refuse');
+                        }
                       }}
                       className="bg-[#0057B8] hover:bg-blue-750 text-white px-5 py-2.5 rounded-xl transition-all cursor-pointer shadow-sm"
                     >
@@ -3070,10 +3094,15 @@ export default function AdminDashboard() {
                           <td className="px-5 py-4 text-center">
                             <button
                                type="button"
-                               onClick={() => {
+                               onClick={async () => {
                                  const updated = bankSectorRules.map(r => r.id === ruleObj.id ? { ...r, isActive: !r.isActive } : r);
                                  setBankSectorRules(updated);
-                                 showToast("تم تحديث حالة التفعيل بنجاح! لا تنس حفظ تغييرات الربط.", "success");
+                                 try {
+                                   await saveChanges(undefined, updated);
+                                   showToast("تم تحديث حالة التفعيل لمحددات احتساب التقاعد وحفظها بنجاح في النظام وسحابة Supabase! 🎉", "success");
+                                 } catch (err: any) {
+                                   showToast("تم تطبيق تحديث حالة التفعيل محلياً بالمتصفح، وفشلت المزامنة: " + (err.message || err), "refuse");
+                                 }
                                }}
                                className="focus:outline-none cursor-pointer"
                             >
@@ -4592,7 +4621,7 @@ export default function AdminDashboard() {
               <div className="bg-gray-50 px-6 py-4 flex flex-row-reverse gap-3 border-t border-gray-100 font-bold text-xs">
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={async () => {
                     // 1. Validate & Parse fields based on calcMethod
                     const calcMethod = editingBankSectorRule.calcMethod || 'service_growth';
                     const salarySource = editingBankSectorRule.salarySource || 'basic_only';
@@ -4717,7 +4746,12 @@ export default function AdminDashboard() {
                     setBankSectorRules(updated);
                     setIsBankSectorModalOpen(false);
                     setEditingBankSectorRule(null);
-                    showToast("تم تطبيق التعديل محلياً. اضغط حفظ التغييرات لتثبيته في قاعدة البيانات.", "success");
+                    try {
+                      await saveChanges(undefined, updated);
+                      showToast("تم حفظ وتحديث محددات احتساب التقاعد لهذا القطاع بنجاح في النظام وسحابة Supabase! 🎉", "success");
+                    } catch (err: any) {
+                      showToast("تم تطبيق التعديلات محلياً بالمتصفح، وفشلت المزامنة: " + (err.message || err), "refuse");
+                    }
                   }}
                   className="bg-[#0057B8] hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer"
                 >

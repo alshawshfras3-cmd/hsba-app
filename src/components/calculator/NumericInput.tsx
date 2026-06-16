@@ -25,7 +25,7 @@ export default function NumericInput({
 
   // Sync with parent value if it changes externally
   useEffect(() => {
-    if (value === 0 || value === '') {
+    if (value === '') {
       if (localVal !== '') setLocalVal('');
     } else {
       const parsedLocal = parseFloat(localVal.replace(/,/g, ''));

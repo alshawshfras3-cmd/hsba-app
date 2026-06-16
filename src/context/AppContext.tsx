@@ -109,7 +109,12 @@ interface AppContextType {
   setIsMobileSettingsOpen: (val: boolean) => void;
 
   hasUnsavedChanges: boolean;
-  saveChanges: (overrideMarginRules?: MarginRule[]) => Promise<void>;
+  saveChanges: (
+    overrideMarginRules?: MarginRule[],
+    overrideBankSectorRules?: BankSectorPensionRule[],
+    overridePensionDbRules?: any[],
+    overrideApprovedSalaryRules?: any[]
+  ) => Promise<void>;
   cancelChanges: () => void;
   reinitializeAllSettings: () => Promise<void>;
   restoreLastBackup: () => Promise<void>;
@@ -918,12 +923,25 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     }
   }, [currentSettings, savedSettings, isSettingsLoading]);
 
-  const saveChanges = async (overrideMarginRules?: MarginRule[]) => {
+  const saveChanges = async (
+    overrideMarginRules?: MarginRule[],
+    overrideBankSectorRules?: BankSectorPensionRule[],
+    overridePensionDbRules?: any[],
+    overrideApprovedSalaryRules?: any[]
+  ) => {
     if (supabaseLoadStatus === 'read_only_protected' || supabaseLoadStatus === 'failed') {
       throw new Error('الحفظ محظور: لم يتم تحميل الإعدادات من Supabase بنجاح أو أن النظام قيد حماية القراءة فقط. أعد تحميل الصفحة.');
     }
 
     const clonedCurrent = deepClone(currentSettings);
+    if (overrideMarginRules) clonedCurrent.marginRules = overrideMarginRules;
+    if (overrideBankSectorRules) clonedCurrent.bankSectorRules = overrideBankSectorRules;
+    if (overridePensionDbRules) clonedCurrent.pensionDbRules = overridePensionDbRules;
+    if (overrideApprovedSalaryRules) {
+      clonedCurrent.approvedSalaryRules = overrideApprovedSalaryRules;
+      clonedCurrent.approvedSalaryDbRules = overrideApprovedSalaryRules;
+    }
+
     // Save dynamically to centralized 'app_settings' in system_settings table
     if (hasSupabaseKeys) {
       try {
@@ -1006,11 +1024,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           personalRules,
           advancedRules,
           customSectors,
-          bankSectorRules,
+          bankSectorRules: overrideBankSectorRules || bankSectorRules,
           pensionRulesLibrary,
-          approvedSalaryRules: currentSettings.approvedSalaryRules || currentSettings.approvedSalaryDbRules || [],
-          pensionDbRules: currentSettings.pensionDbRules || [],
-          sectorMappings: currentSettings.sectorMappings || [],
+          approvedSalaryRules: overrideApprovedSalaryRules || approvedSalaryRules || currentSettings.approvedSalaryRules || currentSettings.approvedSalaryDbRules || [],
+          pensionDbRules: overridePensionDbRules || pensionDbRules || currentSettings.pensionDbRules || [],
+          sectorMappings: sectorMappings || currentSettings.sectorMappings || [],
         };
 
         const updated_by_user = user?.email || user?.id || null;
