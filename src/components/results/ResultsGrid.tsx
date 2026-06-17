@@ -93,6 +93,42 @@ export default function ResultsGrid({
       lines.push(`القرض الشخصي: ${formatNum(offer.personalAmount)} ريال`);
     }
 
+    // --- الدعم بعد مبالغ التمويل وقبل الأقساط ---
+    const resolvedSupportAmount = offer.housingSupportAmount 
+      ?? (offer as any).supportAmount 
+      ?? (offer as any).monthlySupport 
+      ?? (offer as any).downPaymentSupport
+      ?? (offer.diagnostics?.monthlySupport || offer.diagnostics?.downPaymentSupport)
+      ?? 0;
+
+    let resolvedSupportType = offer.supportType || 'none';
+    if (resolvedSupportType === 'none' || !offer.supportType) {
+      if ((offer as any).monthlySupport && (offer as any).monthlySupport > 0) {
+        resolvedSupportType = 'monthly';
+      } else if ((offer as any).downPaymentSupport && (offer as any).downPaymentSupport > 0) {
+        resolvedSupportType = 'downpayment';
+      } else if (offer.diagnostics?.monthlySupport && offer.diagnostics?.monthlySupport > 0) {
+        resolvedSupportType = 'monthly';
+      } else if (offer.diagnostics?.downPaymentSupport && offer.diagnostics?.downPaymentSupport > 0) {
+        resolvedSupportType = 'downpayment';
+      }
+    }
+
+    if (resolvedSupportAmount > 0) {
+      if (resolvedSupportType === 'monthly') {
+        lines.push(`الدعم السكني الشهري: ${formatNum(resolvedSupportAmount)} ريال شهريًا`);
+      } else {
+        lines.push(`دعم الدفعة المقدمة: ${formatNum(resolvedSupportAmount)} ريال`);
+      }
+    } else {
+      lines.push(`الدعم السكني: غير مدعوم`);
+    }
+
+    const resolvedEtizaz = offer.etizazAmount ?? (offer as any).etizazAmount ?? 0;
+    if (resolvedEtizaz > 0) {
+      lines.push(`دعم اعتزاز: ${formatNum(resolvedEtizaz)} ريال`);
+    }
+
     lines.push(''); // empty line
 
     if (mainFinanceType === 'personal_only') {
@@ -301,21 +337,33 @@ export default function ResultsGrid({
       {/* Bank Cards Grid with optional Subscription blurred state and relative wrapper */}
       <div className={`relative ${!isSubscribed ? 'min-h-[480px]' : ''}`}>
         <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 ${!isSubscribed ? 'blur-md pointer-events-none select-none contrast-[0.80]' : ''}`}>
-          {sortedResults.map((offer) => {
+          {sortedResults.map((offer, index) => {
             const isApp = offer.status === 'approved';
             const isWarn = offer.status === 'warning';
             const isRej = offer.status === 'rejected';
+            const isBestOffer = index === 0 && offer.isEligible;
 
             return (
               <div
                 key={offer.bankId}
                 onClick={() => setSelectedOffer(offer)}
-                className={`bg-white rounded-2xl border transition-all p-6 relative flex flex-col justify-between cursor-pointer hover:shadow-md hover:border-[#0057B8] ${
-                  offer.isEligible ? 'border-[#E5E7EB]' : 'border-red-100 bg-red-50/10'
+                className={`bg-white rounded-3xl border transition-all duration-300 p-6 relative flex flex-col justify-between cursor-pointer group hover:-translate-y-1 ${
+                  isBestOffer
+                    ? 'border-[#0057B8] bg-gradient-to-tr from-[#0057B8]/[0.01] to-[#0057B8]/[0.03] ring-1 ring-[#0057B8]/20 shadow-premium hover:shadow-card-hover'
+                    : offer.isEligible
+                    ? 'border-slate-250/70 hover:border-[#0057B8]/80 hover:shadow-premium'
+                    : 'border-rose-100 bg-rose-50/10'
                 }`}
               >
+                {/* Outstanding Best Offer Badge */}
+                {isBestOffer && (
+                  <div className="absolute top-4 right-4 flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black bg-gradient-to-l from-amber-500 to-yellow-500 text-white shadow-xs">
+                    <span>⭐ أفضل خيار مرشح</span>
+                  </div>
+                )}
+
                 {/* Badge */}
-                <div className="absolute top-4 left-4">
+                <div className={`absolute top-4 ${isBestOffer ? 'left-4' : 'left-4'}`}>
                   {isApp && (
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                       <CheckCircle className="w-3.5 h-3.5" />
@@ -338,11 +386,13 @@ export default function ResultsGrid({
 
                 {/* Bank Logo / Header */}
                 <div className="flex items-center gap-4 mb-5">
-                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${offer.logoColor} text-white flex items-center justify-center font-bold text-center text-sm p-1 select-none`}>
+                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${offer.logoColor} text-white flex items-center justify-center font-bold text-center text-sm p-1 select-none shadow-xs group-hover:scale-105 transition-transform`}>
                     {offer.logoText}
                   </div>
                   <div>
-                    <h3 className="font-bold text-[#111827] text-lg">{offer.bankName}</h3>
+                    <h3 className="font-extrabold text-[#111827] text-lg flex items-center gap-2">
+                      <span>{offer.bankName}</span>
+                    </h3>
                     <p className={`text-xs ${offer.isAgeLimitingFactor ? 'text-rose-600 font-bold animate-pulse' : 'text-[#6B7280]'}`}>
                       {mainFinanceType === 'personal_only' 
                         ? 'مدة التمويل الشخصي: 5 سنوات (60 شهراً)' 
@@ -620,6 +670,17 @@ export default function ResultsGrid({
           })}
         </div>
 
+        {/* النتائج المعروضة تقديرية بناء على البيانات المدخلة وقواعد النظام */}
+        <div className="mt-8 bg-amber-50/60 dark:bg-amber-950/10 border border-amber-200/55 dark:border-amber-900/30 rounded-2xl p-5 flex items-start gap-3.5 select-none" dir="rtl">
+          <Info className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <h5 className="font-sans font-black text-amber-800 dark:text-amber-500 text-xs text-right">ملاحظة تنظيمية هامة:</h5>
+            <p className="text-[11px] text-gray-600 dark:text-slate-300 leading-relaxed font-bold text-right mb-0">
+              النتائج المعروضة تقديرية بناءً على البيانات المدخلة وقواعد النظام، ولا تعتبر موافقة نهائية أو التزامًا بمنح التمويل. القرار النهائي يخضع للبنك أو الجهة التمويلية.
+            </p>
+          </div>
+        </div>
+
         {/* Subscription Gate Overlay */}
         {!isSubscribed && (
           <div className="absolute inset-0 z-20 flex items-start justify-center pt-8 md:pt-16 px-4 bg-gradient-to-b from-transparent via-[#F5F7FA]/75 to-[#F5F7FA]/95">
@@ -719,7 +780,7 @@ export default function ResultsGrid({
                 </div>
                 <div>
                   <h3 className="text-xl font-bold">{selectedOffer.bankName}</h3>
-                  <p className="text-xs text-white/85">التحقيق وعجلة التشخيص للحسبة المستخرجة</p>
+                  <p className="text-xs text-white/85">ملخص النتيجة</p>
                 </div>
               </div>
               <button
@@ -732,362 +793,182 @@ export default function ResultsGrid({
 
             {/* Content Body */}
             <div className="p-6 space-y-6 flex-1">
+              
               {/* Overall Summary Stat */}
-              <div className="bg-white p-6 rounded-2xl border border-[#E5E7EB] shadow-xs">
-                <span className="text-xs font-bold text-[#6B7280] block mb-1">
-                  {mainFinanceType === 'personal_only' ? 'مبلغ التمويل الشخصي المتاح' : 'التمويل العقاري الاستثماري'}
-                </span>
-                <div className="flex items-baseline gap-2 mb-4">
-                  <span className="text-3xl font-extrabold text-[#0057B8]">
-                    {Math.round(mainFinanceType === 'personal_only' 
-                      ? selectedOffer.personalAmount 
-                      : selectedOffer.realEstateAmount).toLocaleString('ar-SA', { maximumFractionDigits: 0 })}
-                  </span>
-                  <span className="text-xs font-bold text-[#6B7280]">ريال سعودي</span>
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-premium flex flex-col md:flex-row justify-between items-center gap-4">
+                <div className="text-right w-full md:w-auto">
+                  <span className="text-xs font-bold text-slate-400 block mb-1">إجمالي التمويل المتاح</span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-3xl font-extrabold text-[#0057B8]">
+                      {Math.round(selectedOffer.realEstateAmount + (selectedOffer.supportsPersonal !== false ? selectedOffer.personalAmount : 0)).toLocaleString('ar-SA', { maximumFractionDigits: 0 })}
+                    </span>
+                    <span className="text-xs font-bold text-slate-500">ريال سعودي</span>
+                  </div>
                 </div>
+                <div className="w-full md:w-auto flex justify-end">
+                  <span className={`px-4 py-2 rounded-xl text-xs font-black shadow-xs ${
+                    selectedOffer.isEligible 
+                      ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' 
+                      : 'bg-rose-500/10 text-rose-600 border border-rose-500/20'
+                  }`}>
+                    {selectedOffer.isEligible ? 'مؤهل ومطابق مبدئياً' : 'غير مطابق للاشتراطات'}
+                  </span>
+                </div>
+              </div>
 
-                <div className="grid grid-cols-2 select-none md:grid-cols-3 gap-4 pt-4 border-t border-[#F1F5F9]">
-                  {mainFinanceType === 'personal_only' ? (
-                    <>
-                      <div>
-                        <span className="text-xs text-[#6B7280] block mb-1">قسط التمويل الشخصي</span>
-                        <span className="font-bold text-emerald-600">
-                          {Math.round(selectedOffer.monthlyInstallmentBeforeRetirement).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-xs text-[#6B7280] block mb-1">إجمالي الأرباح</span>
-                        <span className="font-bold text-rose-600">
-                          {Math.round(selectedOffer.personalProfitAmount !== undefined ? selectedOffer.personalProfitAmount : (selectedOffer.personalAmount * (selectedOffer.annualMargin / 100) * (selectedOffer.termMonths / 12))).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-xs text-[#6B7280] block mb-1">إجمالي السداد</span>
-                        <span className="font-bold text-slate-800">
-                          {Math.round(selectedOffer.personalTotalRepayment !== undefined ? selectedOffer.personalTotalRepayment : (selectedOffer.personalAmount + (selectedOffer.personalAmount * (selectedOffer.annualMargin / 100) * (selectedOffer.termMonths / 12)))).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-xs text-[#6B7280] block mb-1">نسبة الاستقطاع المعتمدة</span>
-                        <span className="font-bold text-[#111827]">{selectedOffer.dsrUsed}%</span>
-                      </div>
-                      <div>
-                        <span className="text-xs text-[#6B7280] block mb-1">نسبة الربح السنوية</span>
-                        <span className="font-bold text-[#0057B8]">{selectedOffer.annualMargin}%</span>
-                      </div>
-                      <div>
-                        <span className="text-xs text-[#6B7280] block mb-1">مدة التمويل</span>
-                        <span className="font-bold text-[#111827]">{selectedOffer.termMonths} شهراً</span>
-                      </div>
-                      {selectedOffer.personalDiagnostics?.source === 'fallback' && (
-                        <div className="col-span-2 md:col-span-3 bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2 text-xs text-amber-800">
-                          <span className="font-bold text-sm leading-none mt-0.5">⚠️</span>
-                          <div>
-                            <span className="font-bold block mb-0.5">تنبيه النظام:</span>
-                            <span>تم استخدام قاعدة افتراضية لعدم وجود قاعدة مفعلة لهذا البنك.</span>
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <div>
-                        <span className="text-xs text-[#6B7280] block mb-1">تمويل عقاري فقط</span>
-                        <span className="font-bold text-[#111827]">{Math.round(selectedOffer.realEstateAmount).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال</span>
-                      </div>
-                      {mainFinanceType === 'real_estate_with_existing_personal' ? (
-                        <div>
-                          <span className="text-xs text-[#6B7280] block mb-1">إجمالي التزامات شهرية قائمة</span>
-                          <span className="font-bold text-rose-600">{Math.round(existingMonthlyObligations).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال</span>
-                        </div>
-                      ) : (
-                        <div>
-                          <span className="text-xs text-[#6B7280] block mb-1">تمويل شخصي</span>
-                          <span className={selectedOffer.supportsPersonal === false ? "font-bold text-rose-600 text-xs" : "font-bold text-[#111827]"}>
-                            {selectedOffer.supportsPersonal === false ? "غير متوفر لدى هذه الجهة" : `${Math.round(selectedOffer.personalAmount).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال`}
-                          </span>
-                        </div>
-                      )}
-                      <div>
-                        <span className="text-xs text-[#6B7280] block mb-1">{selectedOffer?.supportType === 'monthly' ? 'الدعم الشهري' : 'دعم الدفعة'}</span>
-                        <span className="font-bold text-[#0EA5A4]">{Math.round(selectedOffer.housingSupportAmount).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال{selectedOffer.supportType === 'monthly' ? ' / شهر' : ''}</span>
-                      </div>
-                      {selectedOffer.etizazAmount !== undefined && selectedOffer.etizazAmount > 0 && (
-                        <div>
-                          <span className="text-xs text-[#6B7280] block mb-1">دعم اعتزاز غير مسترد</span>
-                          <span className="font-bold text-indigo-700">{Math.round(selectedOffer.etizazAmount).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال</span>
-                        </div>
-                      )}
-                      <div>
-                        <span className="text-xs text-[#6B7280] block mb-1">هامش الربح العقاري</span>
-                        <span className="font-bold text-indigo-700">{selectedOffer.annualMargin}%</span>
-                      </div>
-                    </>
+              {/* Informational Message replacing technical personal/duration reduction diagnostics */}
+              <div className="bg-blue-50/40 border border-blue-100/70 p-4 rounded-xl flex items-start gap-2.5 text-xs text-blue-800">
+                <span className="text-sm leading-none">ℹ️</span>
+                <p className="font-bold leading-relaxed mb-0 text-right w-full">
+                  تم ضبط مدة التمويل تلقائيًا بما يتوافق مع عمر العميل وحدود الجهة التمويلية.
+                </p>
+              </div>
+
+              {/* Detatils Grid */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-5">
+                <h4 className="font-sans font-black text-sm text-[#111827] pb-2 border-b border-slate-100 flex items-center gap-2">
+                  <div className="w-1.5 h-4 bg-[#0057B8] rounded-full"></div>
+                  <span>تفاصيل نتيجة الحسبة</span>
+                </h4>
+
+                <div className="grid grid-cols-2 lg:grid-cols-2 gap-4 text-right font-semibold select-none">
+                  {/* 1. التمويل العقاري */}
+                  <div className="bg-slate-50/50 hover:bg-slate-50 p-3.5 rounded-xl border border-slate-100/80 transition-all">
+                    <span className="text-[10px] text-slate-400 block mb-1">التمويل العقاري</span>
+                    <span className="font-bold text-slate-800 text-sm">
+                      {Math.round(selectedOffer.realEstateAmount).toLocaleString('ar-SA')} ريال
+                    </span>
+                  </div>
+
+                  {/* 2. التمويل الشخصي */}
+                  <div className="bg-slate-50/50 hover:bg-slate-50 p-3.5 rounded-xl border border-slate-100/80 transition-all">
+                    <span className="text-[10px] text-slate-400 block mb-1">التمويل الشخصي</span>
+                    <span className="font-bold text-slate-800 text-sm">
+                      {selectedOffer.supportsPersonal === false 
+                        ? 'غير متوفر' 
+                        : `${Math.round(selectedOffer.personalAmount).toLocaleString('ar-SA')} ريال`}
+                    </span>
+                  </div>
+
+                  {/* 3. الدعم السكني */}
+                  <div className="bg-[#0EA5A4]/5 hover:bg-[#0EA5A4]/10 p-3.5 rounded-xl border border-[#0EA5A4]/10 transition-all">
+                    <span className="text-[10px] text-[#0EA5A4] block mb-1">الدعم السكني</span>
+                    <span className="font-bold text-[#0EA5A4] text-sm">
+                      {Math.round(selectedOffer.housingSupportAmount).toLocaleString('ar-SA')} ريال
+                    </span>
+                  </div>
+
+                  {/* 4. القسط الشهري */}
+                  <div className="bg-emerald-50/40 hover:bg-emerald-50/60 p-3.5 rounded-xl border border-emerald-100/70 transition-all">
+                    <span className="text-[10px] text-emerald-600 block mb-1">القسط الشهري الإجمالي</span>
+                    <span className="font-bold text-emerald-600 text-sm">
+                      {Math.round(selectedOffer.monthlyInstallmentBeforeRetirement).toLocaleString('ar-SA')} ريال
+                    </span>
+                  </div>
+
+                  {/* 5. قسط العقاري */}
+                  <div className="bg-slate-50/50 hover:bg-slate-50 p-3.5 rounded-xl border border-slate-100/80 transition-all">
+                    <span className="text-[10px] text-slate-400 block mb-1">قسط التمويل العقاري</span>
+                    <span className="font-bold text-slate-800 text-sm">
+                      {Math.round(selectedOffer.realEstateInstallmentOnly || (selectedOffer.monthlyInstallmentBeforeRetirement - (selectedOffer.personalInstallmentAmount || 0))).toLocaleString('ar-SA')} ريال
+                    </span>
+                  </div>
+
+                  {/* 6. قسط الشخصي */}
+                  {selectedOffer.supportsPersonal !== false && (selectedOffer.personalAmount || 0) > 0 && (
+                    <div className="bg-slate-50/50 hover:bg-slate-50 p-3.5 rounded-xl border border-slate-100/80 transition-all">
+                      <span className="text-[10px] text-slate-400 block mb-1">قسط التمويل الشخصي</span>
+                      <span className="font-bold text-slate-800 text-sm">
+                        {Math.round(selectedOffer.personalInstallmentAmount || 0).toLocaleString('ar-SA')} ريال
+                      </span>
+                    </div>
                   )}
 
-                  {/* Retirement-based Personal Loan diagnostics */}
-                  {selectedOffer.personalDiagnostics?.reductionReason && (
-                    <div className="col-span-2 md:col-span-3 bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-start gap-2 text-xs text-[#1E40AF]">
-                      <span className="font-bold text-sm leading-none mt-0.5">ℹ️</span>
-                      <div>
-                        <span className="font-bold block mb-0.5 text-[#1E3A8A]">معالجة مدة التمويل الشخصي:</span>
-                        <span className="font-semibold text-[#1E40AF]">{selectedOffer.personalDiagnostics.reductionReason}</span>
-                        <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[10px] font-sans font-extrabold text-blue-800">
-                          {selectedOffer.personalDiagnostics.personalMaxTenorMonths !== undefined && (
-                            <span>الحد الأقصى للجهة: {selectedOffer.personalDiagnostics.personalMaxTenorMonths} شهر</span>
-                          )}
-                          {selectedOffer.personalDiagnostics.monthsUntilRetirement !== undefined && (
-                            <span>المتبقي للتقاعد: {selectedOffer.personalDiagnostics.monthsUntilRetirement} شهر</span>
-                          )}
-                          {selectedOffer.personalDiagnostics.effectivePersonalTenorMonths !== undefined && (
-                            <span>المدة الفعلية الاحتسابية: {selectedOffer.personalDiagnostics.effectivePersonalTenorMonths} شهر</span>
-                          )}
-                        </div>
-                      </div>
+                  {/* 7. القسط بعد انتهاء الشخصي */}
+                  {selectedOffer.monthlyInstallmentAfterPersonal !== undefined && selectedOffer.monthlyInstallmentAfterPersonal > 0 && (
+                    <div className="bg-[#0057B8]/5 hover:bg-[#0057B8]/10 p-3.5 rounded-xl border border-[#0057B8]/10 transition-all">
+                      <span className="text-[10px] text-[#0057B8] block mb-1">القسط بعد انتهاء الشخصي</span>
+                      <span className="font-bold text-[#0057B8] text-sm">
+                        {Math.round(selectedOffer.monthlyInstallmentAfterPersonal).toLocaleString('ar-SA')} ريال
+                      </span>
+                    </div>
+                  )}
+
+                  {/* 8. نسبة الاستقطاع */}
+                  <div className="bg-slate-50/50 hover:bg-slate-50 p-3.5 rounded-xl border border-slate-100/80 transition-all">
+                    <span className="text-[10px] text-slate-400 block mb-1">نسبة الاستقطاع (DSR)</span>
+                    <span className="font-bold text-slate-800 text-sm">
+                      {selectedOffer.dsrUsed}%
+                    </span>
+                  </div>
+
+                  {/* 9. هامش الربح */}
+                  <div className="bg-slate-50/50 hover:bg-slate-50 p-3.5 rounded-xl border border-slate-100/80 transition-all">
+                    <span className="text-[10px] text-slate-400 block mb-1">هامش الربح السنوي</span>
+                    <span className="font-bold text-[#0057B8] text-sm">
+                      {selectedOffer.annualMargin}%
+                    </span>
+                  </div>
+
+                  {/* 10. مدة التمويل */}
+                  <div className="bg-slate-50/50 hover:bg-slate-50 p-3.5 rounded-xl border border-slate-100/80 transition-all">
+                    <span className="text-[10px] text-slate-400 block mb-1">مدة التمويل</span>
+                    <span className="font-bold text-slate-800 text-sm">
+                      {selectedOffer.termMonths} شهراً <span className="text-[10px] text-slate-400 font-normal">({selectedOffer.termMonths / 12} سنة)</span>
+                    </span>
+                  </div>
+
+                  {/* 11. تفاصيل التقدم للتقاعد */}
+                  {selectedOffer.monthlyInstallmentAfterRetirement > 0 && (
+                    <div className="bg-amber-50/50 hover:bg-amber-50 p-3.5 rounded-xl border border-amber-100/70 transition-all col-span-2">
+                      <span className="text-[10px] text-amber-600 block mb-1">القسط التقاعدي اللاحق</span>
+                      <span className="font-bold text-amber-700 text-sm">
+                        {Math.round(selectedOffer.monthlyInstallmentAfterRetirement).toLocaleString('ar-SA')} ريال
+                      </span>
+                    </div>
+                  )}
+
+                  {/* 12. الملاحظات المختصرة / سبب الرفض إن وجد */}
+                  {!selectedOffer.isEligible && selectedOffer.rejectionReason && (
+                    <div className="bg-rose-50 hover:bg-rose-100/40 p-3.5 rounded-xl border border-rose-100 transition-all col-span-2 text-right">
+                      <span className="text-[10px] text-rose-500 block mb-1">سبب الاستبعاد أو ملاحظات الأهلية</span>
+                      <span className="font-bold text-rose-700 text-xs">
+                        {selectedOffer.rejectionReason}
+                      </span>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Installment Phases Cards */}
-              {mainFinanceType !== 'personal_only' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-white p-5 rounded-xl border border-[#E5E7EB]">
-                    <h4 className="font-bold text-sm text-[#111827] mb-3 border-b border-[#F1F5F9] pb-2">سداد فترة العمل المستمرة</h4>
-                    <div className="space-y-2 text-xs">
-                      {mainFinanceType === 'real_estate_with_existing_personal' || productId === 'real_estate_with_existing_personal' ? (
-                        <>
-                          <div className="flex justify-between">
-                            <span className="text-[#6B7280] font-bold">قسط المرحلة 1 (مدمج):</span>
-                            <span className="font-bold text-rose-600 text-sm">{Math.round(selectedOffer.totalCustomerStage1 || 0).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال</span>
-                          </div>
-                          <div className="flex justify-between pl-2 text-gray-500">
-                            <span>├─ قسط العقاري:</span>
-                            <span>{Math.round(selectedOffer.realEstateStage1 || 0).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال</span>
-                          </div>
-                          <div className="flex justify-between pl-2 text-gray-500">
-                            <span>├─ قسط الالتزام الشهري:</span>
-                            <span>{Math.round(selectedOffer.existingMonthlyObligations || 0).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال</span>
-                          </div>
-                          <div className="flex justify-between pl-2 text-amber-700 font-semibold">
-                            <span>└─ مدة المرحلة الأولى:</span>
-                            <span>{selectedOffer.stage1Months || 0} شهر</span>
-                          </div>
-
-                          {selectedOffer.stage2Months > 0 && (
-                            <div className="flex justify-between border-t border-dashed border-[#E5E7EB] pt-1.5 mt-1 font-semibold text-[#1F2937]">
-                              <span>قسط المرحلة 2 (صافي):</span>
-                              <span className="font-bold text-emerald-600">{Math.round(selectedOffer.realEstateStage2 || 0).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال <span className="text-[10px] text-gray-400 font-normal">({selectedOffer.stage2Months} شهر)</span></span>
-                            </div>
-                          )}
-                        </>
-                      ) : productId === 'real_estate_with_new_personal' ? (
-                        <>
-                          <div className="flex justify-between">
-                            <span className="text-[#6B7280] font-bold">القسط الشهري الإجمالي:</span>
-                            <span className="font-bold text-emerald-600 text-sm">{Math.round(selectedOffer.monthlyInstallmentBeforeRetirement).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال</span>
-                          </div>
-                          <div className="flex justify-between pl-2 text-gray-500">
-                            <span>├─ قسط العقاري:</span>
-                            <span>{Math.round(selectedOffer.realEstateInstallmentOnly || 0).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال</span>
-                          </div>
-                          <div className="flex justify-between pl-2 text-gray-500">
-                            <span>└─ قسط الشخصي:</span>
-                            <span>{Math.round(selectedOffer.personalInstallmentAmount || 0).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال</span>
-                          </div>
-                          {selectedOffer.monthlyInstallmentAfterPersonal !== undefined && selectedOffer.monthlyInstallmentAfterPersonal > 0 && (
-                            <div className="flex justify-between border-t border-dashed border-[#E5E7EB] pt-1.5 mt-1 font-semibold text-[#1F2937]">
-                              <span>بعد انتهاء الشخصي:</span>
-                              <span>{Math.round(selectedOffer.monthlyInstallmentAfterPersonal).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال</span>
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <div className="flex justify-between">
-                          <span className="text-[#6B7280]">القسط الشهري العقاري:</span>
-                          <span className="font-bold text-emerald-600 text-sm">{Math.round(selectedOffer.monthlyInstallmentBeforeRetirement).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال</span>
-                        </div>
-                      )}
-                      <div className="flex justify-between">
-                        <span className="text-[#6B7280]">نسبة الاستقطاع المسموح (DSR):</span>
-                        <span className="font-semibold">{selectedOffer.dsrUsed}%</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-white p-5 rounded-xl border border-[#E5E7EB]">
-                    <h4 className="font-bold text-sm text-[#111827] mb-3 border-b border-[#F1F5F9] pb-2">تقسيط مرحلة ما بعد التقاعد</h4>
-                    <div className="space-y-2 text-xs">
-                      <div className="flex justify-between">
-                        <span className="text-[#6B7280]">القسط العقاري التقاعدي:</span>
-                        <span className="font-bold text-amber-600 text-sm">{Math.round(selectedOffer.monthlyInstallmentAfterRetirement).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال <span className="text-[10px] text-gray-400 font-normal">{(selectedOffer.stage3Months > 0) && `(${selectedOffer.stage3Months} أشهر)`}</span></span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-[#6B7280]">الراتب التقاعدي للعميل:</span>
-                        <span className="font-semibold">{Math.round(selectedOffer.pensionSalary || 0).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال</span>
-                      </div>
-                      
-                      {selectedOffer.pensionDiagnostic && (
-                        <div className="mt-2 pt-2 border-t border-dashed border-gray-100 bg-amber-50/20 p-2.5 rounded-lg space-y-1 text-[11px] text-gray-700 font-sans">
-                          <div className="flex justify-between">
-                            <span className="text-gray-500">اسم القاعدة المطبقة:</span>
-                            <span className="font-semibold text-indigo-700">{selectedOffer.pensionDiagnostic.ruleName}</span>
-                          </div>
-                          <div className="flex justify-between font-sans">
-                            <span className="text-gray-500">القطاع الفعلي المطبق:</span>
-                            <span className="font-semibold">
-                              {['gov_civil'].includes(selectedOffer.pensionDiagnostic.effectiveSectorId) && 'حكومي مدني'}
-                              {selectedOffer.pensionDiagnostic.effectiveSectorId === 'semi_gov' && 'شبه حكومي'}
-                              {selectedOffer.pensionDiagnostic.effectiveSectorId === 'companies' && 'شركات كبرى (أرامكو/سابك)'}
-                              {selectedOffer.pensionDiagnostic.effectiveSectorId === 'military' && 'عسكري'}
-                              {selectedOffer.pensionDiagnostic.effectiveSectorId === 'military_officer' && 'عسكري (ضباط)'}
-                              {selectedOffer.pensionDiagnostic.effectiveSectorId === 'military_individual' && 'عسكري (أفراد)'}
-                              {selectedOffer.pensionDiagnostic.effectiveSectorId === 'retired' && 'متقاعد حالي'}
-                              {!['gov_civil', 'semi_gov', 'companies', 'military', 'military_officer', 'military_individual', 'retired'].includes(selectedOffer.pensionDiagnostic.effectiveSectorId) && selectedOffer.pensionDiagnostic.effectiveSectorId}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-500">مصدر راتب الاحتساب:</span>
-                            <span className="font-semibold">
-                              {selectedOffer.pensionDiagnostic.approvedSalarySource === 'basic_only' && 'الأساسي فقط'}
-                              {selectedOffer.pensionDiagnostic.approvedSalarySource === 'basic_housing' && 'الأساسي + بدل السكن'}
-                              {selectedOffer.pensionDiagnostic.approvedSalarySource === 'gross' && 'الأساسي + بدل السكن + البدلات'}
-                              {selectedOffer.pensionDiagnostic.approvedSalarySource === 'net_salary' && 'صافي الراتب الحالي'}
-                              {selectedOffer.pensionDiagnostic.approvedSalarySource === 'direct' && 'راتب مباشر'}
-                              {selectedOffer.pensionDiagnostic.approvedSalarySource === 'manual' && 'إدخال يدوي'}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-500">الراتب المعتمد قبل النمو:</span>
-                            <span className="font-semibold">{Math.round(selectedOffer.pensionDiagnostic.approvedSalaryBase || 0).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال</span>
-                          </div>
-
-                          {selectedOffer.pensionDiagnostic.growthRate !== undefined && selectedOffer.pensionDiagnostic.growthRate > 0 && (
-                            <>
-                              <div className="flex justify-between text-emerald-700">
-                                <span>معدل النمو السنوي:</span>
-                                <span className="font-bold">{(selectedOffer.pensionDiagnostic.growthRate * 100).toFixed(2)}%</span>
-                              </div>
-                              <div className="flex justify-between text-emerald-700">
-                                <span>سنوات النمو المحتسبة:</span>
-                                <span className="font-bold">{selectedOffer.pensionDiagnostic.growthYears} سنة</span>
-                              </div>
-                              <div className="flex justify-between text-indigo-700 font-bold">
-                                <span>الراتب المعتمد بعد النمو:</span>
-                                <span>{Math.round(selectedOffer.pensionDiagnostic.approvedSalaryAfterGrowth || selectedOffer.pensionDiagnostic.approvedSalaryBase || 0).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال</span>
-                              </div>
-                            </>
-                          )}
-
-                          <div className="flex justify-between">
-                            <span className="text-gray-500">آلية ومعادلة الحساب:</span>
-                            <span className="font-semibold text-amber-705">
-                              {selectedOffer.pensionDiagnostic.calculationMethod === 'service_growth' && 'خدمة مع نمو'}
-                              {selectedOffer.pensionDiagnostic.calculationMethod === 'service_based' && `معادلة الخدمة (أشهر الخدمة ÷ ${selectedOffer.pensionDiagnostic.divisorMonths || 480})`}
-                              {selectedOffer.pensionDiagnostic.calculationMethod === 'fixed_percentage' && `نسبة ثابتة (${selectedOffer.pensionDiagnostic.usedPercentage}%)`}
-                              {selectedOffer.pensionDiagnostic.calculationMethod === 'direct_pension' && 'تعيين مباشر للتقاعد'}
-                              {selectedOffer.pensionDiagnostic.calculationMethod === 'direct' && 'مباشر (متقاعد)'}
-                              {selectedOffer.pensionDiagnostic.calculationMethod === 'custom' && 'معادلة مخصصة لجهة الاستقطاع'}
-                            </span>
-                          </div>
-                          {selectedOffer.pensionDiagnostic.totalServiceYears !== undefined && (
-                            <div className="flex justify-between text-[10px] text-gray-500 pt-0.5 border-t border-gray-100/30">
-                              <span>إجمالي سنوات الخدمة عند التقاعد:</span>
-                              <span className="font-semibold">{selectedOffer.pensionDiagnostic.totalServiceYears.toFixed(1)} سنة</span>
-                            </div>
-                          )}
-                          {selectedOffer.pensionDiagnostic.calculationMethod === 'service_based' && (
-                            <div className="flex justify-between text-[10px] text-gray-500 pt-0.5 border-t border-gray-100/30">
-                              <span>أشهر الخدمة المطبقة:</span>
-                              <span>{selectedOffer.pensionDiagnostic.serviceMonthsAtRetirement} شهراً ({(selectedOffer.pensionDiagnostic.serviceMonthsAtRetirement / 12).toFixed(1)} سنة)</span>
-                            </div>
-                          )}
-                          {selectedOffer.pensionDiagnostic.calculationMethod === 'fixed_percentage' && (
-                            <div className="flex justify-between text-[10px] text-gray-500 pt-0.5 border-t border-gray-100/30">
-                              <span>المتبقي للتقاعد:</span>
-                              <span>{selectedOffer.pensionDiagnostic.yearsToRetirement.toFixed(1)} سنة (عتبة {selectedOffer.pensionDiagnostic.yearsThreshold} سنة)</span>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {/* Analysis of Diagnostic Trace */}
-              <div className="bg-white rounded-2xl border border-[#E5E7EB] p-6 space-y-4">
-                <h4 className="font-black text-sm text-[#111827] flex items-center gap-2">
+              <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4 shadow-xs">
+                <h4 className="font-black text-sm text-[#111827] flex items-center gap-2 pb-2 border-b border-slate-100">
                   <Activity className="w-4 h-4 text-[#0057B8]" />
-                  <span>خطوات وتشخيص محرك الـ Finance Engine لـ {selectedOffer.bankName}:</span>
+                  <span>مؤشرات الملاءمة</span>
                 </h4>
 
-                {/* Steps workflow visual */}
-                <div className="space-y-3.5 pr-2 border-r-2 border-slate-100">
-                  {(() => {
-                    const isUserAdmin = userRole === 'admin';
-                    const filteredSteps = selectedOffer.diagnosticSteps.filter((step: string) => {
-                      if (isUserAdmin) return true;
-                      
-                      const forbiddenKeywords = [
-                        'Exception Bps',
-                        'exceptionBps',
-                        'Base Margin',
-                        'Final Margin',
-                        'baseMargin',
-                        'نسبة الاستثناء',
-                        'استثناء',
-                        'الهامش النهائي',
-                        'هامش الجدول',
-                        'معادلة الاستثناء',
-                        'معادلة الهامش',
-                        'تفاصيل استثناء الهامش',
-                        'طريقة حساب التمويل العقاري',
-                        'نقاط أساس'
-                      ];
-                      
-                      return !forbiddenKeywords.some(keyword => step.includes(keyword));
-                    }).map((step: string) => {
-                      if (isUserAdmin) return step;
-                      // Clean any trailing exception text in any other matched log items
-                      return step.replace(/\s*\(تم تطبيق استثناء بمقدار.*\)\s*$/, '');
-                    });
-
-                    return filteredSteps.map((step, i) => (
-                      <div key={i} className="relative flex gap-3 items-start mr-3">
-                        <div className="w-5 h-5 rounded-full bg-slate-100 border border-slate-200 text-[#6B7280] font-bold text-[10px] flex items-center justify-center shrink-0">
-                          {i + 1}
-                        </div>
-                        <p className="text-xs text-[#4B5563] leading-relaxed font-sans">{step}</p>
-                      </div>
-                    ));
-                  })()}
-                </div>
-
-                {/* Status messages notifications */}
-                <div className="pt-2">
-                  <h4 className="font-bold text-xs text-[#111827] mb-2">إشعارات التشخيص والملاءمة:</h4>
-                  <div className="space-y-2">
-                    {selectedOffer.diagnosticMessages.map((msg, i) => (
-                      <div
-                        key={i}
-                        className={`p-3 rounded-xl text-xs font-semibold leading-relaxed flex items-start gap-2 ${
-                          selectedOffer.isEligible
-                            ? 'bg-emerald-50/50 text-emerald-800 border-emerald-100'
-                            : 'bg-red-50 text-red-700 border-red-100'
-                        } border`}
-                      >
-                        <Info className="w-4 h-4 shrink-0 mt-0.5" />
-                        <span>{msg}</span>
-                      </div>
-                    ))}
+                <div className="space-y-2">
+                  <div className="p-3.5 rounded-2xl text-xs font-semibold leading-relaxed flex items-start gap-2.5 bg-emerald-50/50 text-emerald-800 border border-emerald-100/80">
+                    <Info className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600" />
+                    <span className="text-right">تم حساب صافي الراتب والخصومات التقاعدية تلقائيًا.</span>
                   </div>
+                  {selectedOffer.isEligible ? (
+                    <div className="p-3.5 rounded-2xl text-xs font-semibold leading-relaxed flex items-start gap-2.5 bg-emerald-50/50 text-emerald-800 border border-emerald-100/80">
+                      <Info className="w-4 h-4 shrink-0 mt-0.5 text-[#0057B8]" />
+                      <span className="text-right">تم قبول العميل مبدئيًا لدى {selectedOffer.bankName} لتلبية اشتراطات الدخل، العمر، والخدمة والضوابط الائتمانية.</span>
+                    </div>
+                  ) : (
+                    <div className="p-3.5 rounded-2xl text-xs font-semibold leading-relaxed flex items-start gap-2.5 bg-rose-50/50 text-rose-800 border border-rose-100/80">
+                      <Info className="w-4 h-4 shrink-0 mt-0.5 text-rose-500" />
+                      <span className="text-right">نأمل مراجعة دقة البيانات لعدم تلبية بعض الضوابط التمويلية المحددة لدى الجهة.</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
               {/* Footer notes */}
               <p className="text-[10px] text-[#9CA3AF] text-center leading-relaxed font-sans">
-                هذه الحسبة مبدئية وتعتمد على الموديل الرياضي لـ "حسبة". تخضع القوانين لمراجعات لائحة السياسة الائتمانية للبنوك والبنك المركزي السعودي (SAMA).
+                هذه الحسبة مبدئية وتعتمد على الموديل الرياضي لـ "حسبة". تخضع المعايير لمراجعة لائحة السياسة الائتمانية الخاصة بكل جهة تمويلية.
               </p>
             </div>
           </div>

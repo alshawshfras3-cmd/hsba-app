@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppState } from '../../context/AppContext';
 import { supabase } from '../../lib/supabase';
+import AssistantWidget from '../layout/AssistantWidget';
 import { 
   Building2, Briefcase, Percent, Calendar, Hourglass, HelpCircle,
   Coins, ToggleLeft, ToggleRight, Trash2, Plus, RefreshCw, 
@@ -5457,6 +5458,7 @@ export default function AdminDashboard() {
         )}
 
       </main>
+      <AssistantWidget mode="admin" />
     </div>
   );
 }

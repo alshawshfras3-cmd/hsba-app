@@ -636,7 +636,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [activeStepLabel, setActiveStepLabel] = useState<string>('نوع الحسبة');
   const [currentStep, setCurrentStep] = useState<number>(() => {
     try {
-      const raw = localStorage.getItem('hesba_calculator_draft');
+      const raw = sessionStorage.getItem('hesba_calculator_draft');
       if (raw) {
         const parsed = JSON.parse(raw);
         if (parsed && typeof parsed.currentStep === 'number') {
@@ -719,7 +719,17 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   };
 
   // Consume from custom AuthProvider
-  const { user, setUser, profile, isOwner, isAdmin, isStaff, canAccessDashboard, signOut, loading: authLoading } = useAuth();
+  const { user, setUser, profile, isOwner, isAdmin, isStaff, canAccessDashboard, signOut: rawSignOut, loading: authLoading } = useAuth();
+  
+  const signOut = React.useCallback(async () => {
+    setResults(null);
+    setCurrentStep(1);
+    try {
+      sessionStorage.removeItem('hesba_calculator_draft');
+      localStorage.removeItem('hesba_calculator_draft');
+    } catch (e) {}
+    await rawSignOut();
+  }, [rawSignOut]);
   
   const userRole: 'admin' | 'user' = isAdmin ? 'admin' : 'user';
 

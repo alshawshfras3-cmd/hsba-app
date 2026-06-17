@@ -105,7 +105,7 @@ export const customMilitaryRanks = [
 
 const getDraftValue = <T,>(key: string, defaultValue: T): T => {
   try {
-    const raw = localStorage.getItem('hesba_calculator_draft');
+    const raw = sessionStorage.getItem('hesba_calculator_draft');
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && parsed[key] !== undefined) {
@@ -257,7 +257,7 @@ export default function StepWizard() {
   // Load draft values into AppContext's currentStep or results if they exist on mount
   useEffect(() => {
     try {
-      const raw = localStorage.getItem('hesba_calculator_draft');
+      const raw = sessionStorage.getItem('hesba_calculator_draft');
       if (raw) {
         const parsed = JSON.parse(raw);
         if (parsed) {
@@ -274,7 +274,7 @@ export default function StepWizard() {
     }
   }, []);
 
-  // Save Draft to localStorage on state changes
+  // Save Draft to sessionStorage on state changes
   useEffect(() => {
     const draft = {
       mainFinanceType,
@@ -317,9 +317,9 @@ export default function StepWizard() {
       results
     };
     try {
-      localStorage.setItem('hesba_calculator_draft', JSON.stringify(draft));
+      sessionStorage.setItem('hesba_calculator_draft', JSON.stringify(draft));
     } catch (e) {
-      console.error("Error writing draft to localStorage:", e);
+      console.error("Error writing draft to sessionStorage:", e);
     }
   }, [
     mainFinanceType,
@@ -410,11 +410,12 @@ export default function StepWizard() {
     setResults(null);
     setCurrentStep(1);
     
-    // 2. Clear localStorage draft
+    // 2. Clear draft
     try {
+      sessionStorage.removeItem('hesba_calculator_draft');
       localStorage.removeItem('hesba_calculator_draft');
     } catch (e) {
-      console.error("Error removing draft from localStorage:", e);
+      console.error("Error removing draft:", e);
     }
   };
 
@@ -1512,7 +1513,7 @@ export default function StepWizard() {
 
   return (
     <div className="w-full bg-[#F5F7FA]">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
         {/* Step Wizard visual Progress stepper indicators */}
         <div className="mb-6 md:mb-8 select-none">
@@ -1531,21 +1532,21 @@ export default function StepWizard() {
               else if (stepId === 'finance_options') stepLabel = 'خيارات الحسبة';
 
               return (
-                <div key={stepId} className="flex flex-col items-center flex-1 relative font-sans">
-                  <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center font-bold text-xs md:text-sm border-2 transition-all ${
+                <div key={stepId} className="flex flex-col items-center flex-1 relative font-sans group">
+                  <div className={`w-9 h-9 md:w-11 md:h-11 rounded-full flex items-center justify-center font-extrabold text-xs md:text-sm border-2 transition-all duration-300 ${
                     isActive
-                      ? 'bg-[#0057B8] text-white border-[#0057B8] shadow-md scale-110'
+                      ? 'bg-[#0057B8] text-white border-[#0057B8] shadow-premium scale-110 ring-4 ring-blue-500/10'
                       : isCompleted
-                      ? 'bg-emerald-500 text-white border-emerald-500'
-                      : 'bg-white text-gray-400 border-gray-200'
+                      ? 'bg-emerald-500 text-white border-emerald-500 shadow-xs'
+                      : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300'
                   }`}>
                     {isCompleted ? '✓' : s}
                   </div>
-                  <span className={`text-[9px] sm:text-xs font-semibold mt-2 text-center leading-tight truncate max-w-[64px] sm:max-w-none ${isActive ? 'text-[#0057B8] font-bold block' : 'text-[#6B7280] hidden sm:block'}`}>
+                  <span className={`text-[10px] sm:text-xs font-bold mt-2.5 text-center leading-tight transition-all truncate max-w-[64px] sm:max-w-none ${isActive ? 'text-[#0057B8] block scale-102' : 'text-[#6B7280] hidden sm:block'}`}>
                     {stepLabel}
                   </span>
                   {index < flow.length - 1 && (
-                    <div className={`absolute top-4 md:top-5 -left-1/2 w-full h-[2px] -z-10 ${isCompleted ? 'bg-emerald-400' : 'bg-gray-200'}`} />
+                    <div className={`absolute top-4.5 md:top-5.5 -left-1/2 w-full h-[2px] -z-10 transition-colors duration-300 ${isCompleted ? 'bg-emerald-400' : 'bg-slate-200'}`} />
                   )}
                 </div>
               );
@@ -1922,16 +1923,38 @@ export default function StepWizard() {
           </div>
 
           {/* RESULTS DISPLAY PAGE */}
-          {currentStep === flow.length && results && (
-            <ResultsGrid
-              results={results}
-              productId={productId}
-              onRestart={restartWizard}
-              existingMonthlyObligations={existingMonthlyObligations}
-              obligationRemainingMonths={obligationRemainingMonths}
-              mainFinanceType={mainFinanceType}
-              sectorId={effectiveSectorId || sectorId}
-            />
+          {currentStep === flow.length && (
+            results ? (
+              <ResultsGrid
+                results={results}
+                productId={productId}
+                onRestart={restartWizard}
+                existingMonthlyObligations={existingMonthlyObligations}
+                obligationRemainingMonths={obligationRemainingMonths}
+                mainFinanceType={mainFinanceType}
+                sectorId={effectiveSectorId || sectorId}
+              />
+            ) : (
+              <div className="max-w-md mx-auto my-16 px-4 text-center select-none animate-fade-in" dir="rtl">
+                <div className="bg-white border border-[#E5E7EB] rounded-3xl p-8 shadow-xl space-y-6">
+                  <div className="w-16 h-16 bg-blue-50 text-[#0057B8] rounded-full flex items-center justify-center mx-auto border border-blue-100/50">
+                    <Calculator className="w-7 h-7 text-[#0057B8]" />
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="font-sans font-black text-xl text-gray-950">لا توجد نتيجة حالية</h3>
+                    <p className="text-xs text-slate-500 leading-relaxed font-sans">
+                      الرجاء إجراء حسبة جديدة.
+                    </p>
+                  </div>
+                  <button
+                    onClick={restartWizard}
+                    className="w-full py-3.5 bg-[#0057B8] hover:bg-[#004bb0] text-white text-xs font-extrabold rounded-2xl transition-all shadow-md hover:shadow-blue-200 cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <span>إجراء حسبة جديدة</span>
+                  </button>
+                </div>
+              </div>
+            )
           )}
 
         </div>

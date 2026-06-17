@@ -37,10 +37,10 @@ export function AboutPage() {
             <div className="w-10 h-10 bg-rose-50 text-rose-600 rounded-xl flex items-center justify-center">
               <Heart className="w-5 h-5" />
             </div>
-            <h3 className="font-sans font-bold text-lg text-gray-900">المطابقة المعتمدة</h3>
+            <h3 className="font-sans font-bold text-lg text-gray-900">المطابقة والتقدير المستمر</h3>
           </div>
           <p className="text-xs text-gray-500 leading-relaxed font-sans">
-            نحن ملتزمون بالمطابقة المستمرة مع تعديلات البنك المركزي السعودي (SAMA) وأنظمة احتساب الراتب التقاعدي المعتمدة محلياً لتفادي أي فروقات في الاحتساب الفعلي. حساباتنا تضمن للعميل تقديرات دقيقة بنسبة تزيد عن 99.8% مقارنة بأنظمة البنوك الرسمية.
+            نحن ملتزمون بالمطابقة المستمرة مع تعديلات القواعد الرياضية لأنظمة التمويل العقاري والراتب التقاعدي المعمول بها لتفادي أي فروقات في الاحتساب الفعلي. حساباتنا تضمن للعميل تقديرات دقيقة ومحدثة مقارنة بالحسابات التمويلية التقريبية للمساعدة في مقارنة البرامج.
           </p>
         </div>
 
@@ -64,7 +64,7 @@ export function AboutPage() {
           </div>
           <div className="flex items-center gap-3 bg-white/50 p-3 rounded-xl border border-gray-100">
             <CheckCircle2 className="w-5 h-5 text-[#0EA5A4] shrink-0" />
-            <span className="text-xs font-bold text-gray-700">متوافق بالكامل مع ضوابط الشريعة الإسلامية</span>
+            <span className="text-xs font-bold text-gray-700">مقارنة شاملة لبرامج ومنتجات التمويل العقاري</span>
           </div>
           <div className="flex items-center gap-3 bg-white/50 p-3 rounded-xl border border-gray-100">
             <CheckCircle2 className="w-5 h-5 text-[#0EA5A4] shrink-0" />

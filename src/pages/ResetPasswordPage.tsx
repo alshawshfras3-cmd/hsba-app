@@ -121,7 +121,7 @@ export default function ResetPasswordPage() {
         </div>
 
         <div className="text-[10px] text-white/50 relative z-10 font-mono">
-          © {new Date().getFullYear()} منصة حسبة العقارية. جميع الحقوق محفوظة لوزارة التجارة.
+          © {new Date().getFullYear()} منصة حسبة العقارية. حاسبة تقديرية لمقارنة نتائج التمويل.
         </div>
       </div>
 

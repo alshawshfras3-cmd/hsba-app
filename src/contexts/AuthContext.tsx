@@ -90,6 +90,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       sessionStorage.removeItem('hesba_permissions_checked');
       sessionStorage.removeItem('hesba_calculator_permissions');
       sessionStorage.removeItem('hesba_is_admin');
+      sessionStorage.removeItem('hesba_calculator_draft');
+      localStorage.removeItem('hesba_calculator_draft');
     } catch (e) {
       console.error(e);
     }

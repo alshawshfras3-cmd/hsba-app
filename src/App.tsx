@@ -6,6 +6,9 @@ import { LoginPage } from './pages/LoginPage';
 import { AboutPage } from './pages/AboutPage';
 import { AccountPage } from './pages/AccountPage';
 import { ResultsPage } from './pages/ResultsPage';
+import { TermsPage } from './pages/TermsPage';
+import { PrivacyPage } from './pages/PrivacyPage';
+import { DisclaimerPage } from './pages/DisclaimerPage';
 import { useLocation } from './hooks/useLocation';
 import Header from './components/layout/Header';
 import BottomNavigation from './components/layout/BottomNavigation';
@@ -17,8 +20,11 @@ import ResetPasswordPage from './pages/ResetPasswordPage';
 import AuthCallbackPage from './pages/AuthCallbackPage';
 import { Calculator, ShieldCheck, Mail, Phone, ExternalLink, ShieldAlert, Loader2 } from 'lucide-react';
 import { supabase, hasSupabaseKeys, cleanStaleSupabaseSession } from './lib/supabase';
+import AssistantWidget from './components/layout/AssistantWidget';
 
 function MarketingFooter() {
+  const { navigate } = useLocation();
+
   return (
     <footer className="bg-slate-900 text-slate-400 py-12 border-t border-slate-800 select-none">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-3 gap-8 text-xs font-semibold text-right" dir="rtl">
@@ -32,7 +38,7 @@ function MarketingFooter() {
             <span className="text-white font-bold text-lg">حسبة الذكية</span>
           </div>
           <p className="font-sans leading-relaxed text-slate-400">
-            منصة تقنية مالية (Fintech) مرنة لحساب التمويل العقاري والشخصي بما يطابق تعليمات البنك المركزي السعودي (SAMA) ومصلحة معاشات التقاعد ومؤسسة تبادل المنافع.
+            حسبة أداة تقنية تقديرية لمقارنة نتائج التمويل بناءً على البيانات المدخلة والقواعد المتاحة مقارنة ببرامج التمويل السكني المختلفة.
           </p>
         </div>
 
@@ -58,15 +64,22 @@ function MarketingFooter() {
             </span>
             <span className="flex items-center gap-2">
               <ShieldCheck className="w-4 h-4 text-[#0EA5A4]" />
-              <span className="text-emerald-500">متوافق مع الشريعة الإسلامية بالكامل</span>
+              <span className="text-emerald-500">مقارنات شاملة للبرامج التمويلية</span>
             </span>
           </div>
         </div>
 
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 mt-8 border-t border-slate-800 text-center text-[10px] text-slate-500">
-        <p>© {new Date().getFullYear()} حسبة للحلول المالية والتقنية. جميع الحقوق محفوظة لوزارة التجارة وهيئة منشآت والمؤسسات المانحة.</p>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 mt-8 border-t border-slate-800 text-center text-[10px] text-slate-500 flex flex-col md:flex-row items-center justify-between gap-4" dir="rtl">
+        <p>© {new Date().getFullYear()} حسبة للحلول المالية والتقنية. لا تمثل المنصة بنكًا أو جهة تمويلية أو وسيطًا ائتمانيًا مرخصًا، ولا تُعد النتائج موافقة نهائية أو عرضًا تمويليًا ملزمًا.</p>
+        <div className="flex flex-wrap justify-center gap-4 font-bold text-slate-400">
+          <button onClick={() => navigate('/terms')} className="hover:text-white transition-colors cursor-pointer text-xs">شروط الاستخدام</button>
+          <span>•</span>
+          <button onClick={() => navigate('/privacy')} className="hover:text-white transition-colors cursor-pointer text-xs">سياسة الخصوصية</button>
+          <span>•</span>
+          <button onClick={() => navigate('/disclaimer')} className="hover:text-white transition-colors cursor-pointer text-xs">إخلاء المسؤولية</button>
+        </div>
       </div>
     </footer>
   );
@@ -80,7 +93,10 @@ function DashboardOrWizard() {
     "/about",
     "/signin",
     "/auth",
-    "/about-us"
+    "/about-us",
+    "/terms",
+    "/privacy",
+    "/disclaimer"
   ];
 
   const showMarketingFooter = footerAllowedPaths.includes(location.pathname);
@@ -97,6 +113,12 @@ function DashboardOrWizard() {
       case '/about':
       case '/about-us':
         return <AboutPage />;
+      case '/terms':
+        return <TermsPage />;
+      case '/privacy':
+        return <PrivacyPage />;
+      case '/disclaimer':
+        return <DisclaimerPage />;
       default:
         return <StepWizard />;
     }
@@ -121,7 +143,7 @@ function AppContent() {
 
   const hasDraft = React.useMemo(() => {
     try {
-      const draft = localStorage.getItem('hesba_calculator_draft');
+      const draft = sessionStorage.getItem('hesba_calculator_draft');
       return !!draft;
     } catch {
       return false;
@@ -170,17 +192,35 @@ function AppContent() {
     return <ResetPasswordPage />;
   }
 
-  // Support guest routing to /about or /about-us so unregistered users can view it
+  // Support guest routing to public pages so unregistered users can view them
   if (!user) {
-    if (location.pathname === '/about' || location.pathname === '/about-us') {
+    const publicPaths = ['/about', '/about-us', '/terms', '/privacy', '/disclaimer'];
+    if (publicPaths.includes(location.pathname)) {
+      const renderGuestContent = () => {
+        switch (location.pathname) {
+          case '/about':
+          case '/about-us':
+            return <AboutPage />;
+          case '/terms':
+            return <TermsPage />;
+          case '/privacy':
+            return <PrivacyPage />;
+          case '/disclaimer':
+            return <DisclaimerPage />;
+          default:
+            return <AboutPage />;
+        }
+      };
+
       return (
         <div className="min-h-screen flex flex-col justify-between pb-16 sm:pb-0 relative bg-slate-50 dark:bg-[#0B0F19] transition-colors duration-200">
           <Header />
           <main className="flex-grow">
-            <AboutPage />
+            {renderGuestContent()}
           </main>
           <MarketingFooter />
           <BottomNavigation />
+          <AssistantWidget mode="customer" />
         </div>
       );
     }
@@ -192,6 +232,7 @@ function AppContent() {
       <Header />
       <DashboardOrWizard />
       <BottomNavigation />
+      <AssistantWidget mode="customer" />
     </div>
   );
 }

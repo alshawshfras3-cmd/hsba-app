@@ -13,6 +13,7 @@ export function LoginPage() {
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [loadingAction, setLoadingAction] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   useEffect(() => {
     // Check if we came back from a recovery/reset password email
@@ -78,6 +79,10 @@ export function LoginPage() {
       }
       if (!fullName.trim()) {
         setErrorMsg('الرجاء كتابة الاسم الكامل لتسجيل العضوية');
+        return;
+      }
+      if (!acceptedTerms) {
+        setErrorMsg('يجب الموافقة على شروط الاستخدام وسياسة الخصوصية قبل إنشاء الحساب.');
         return;
       }
       setLoadingAction(true);
@@ -417,6 +422,25 @@ export function LoginPage() {
               </div>
             )}
 
+            {mode === 'signup' && (
+              <div className="flex items-start gap-2 pt-1">
+                <input
+                  id="accept-terms-checkbox"
+                  type="checkbox"
+                  checked={acceptedTerms}
+                  onChange={e => setAcceptedTerms(e.target.checked)}
+                  className="w-4 h-4 rounded text-[#0057B8] focus:ring-[#0057B8] border-gray-300 mt-0.5 cursor-pointer"
+                />
+                <label htmlFor="accept-terms-checkbox" className="text-[11.5px] text-gray-500 font-bold leading-relaxed cursor-pointer select-none">
+                  أوافق على{' '}
+                  <a href="/terms" target="_blank" className="text-[#0057B8] text-[11.5px] font-black hover:underline" onClick={e => { e.stopPropagation(); }}>شروط الاستخدام</a>
+                  {' '}و{' '}
+                  <a href="/privacy" target="_blank" className="text-[#0057B8] text-[11.5px] font-black hover:underline" onClick={e => { e.stopPropagation(); }}>سياسة الخصوصية</a>
+                  ، وأقر بأن نتائج حسبة تقديرية وإرشادية فقط ولا تُعد موافقة تمويلية أو عرضًا ملزمًا من أي بنك أو جهة تمويلية.
+                </label>
+              </div>
+            )}
+
             <button
               type="submit"
               disabled={loadingAction}
@@ -460,6 +484,15 @@ export function LoginPage() {
               </button>
             )}
           </p>
+
+          {/* Legal Quick Links bottom of form */}
+          <div className="text-center text-[11px] text-gray-400 font-bold pt-3.5 border-t border-gray-100 flex justify-center gap-3 select-none">
+            <a href="/terms" target="_blank" className="hover:text-slate-600 hover:underline">شروط الاستخدام</a>
+            <span>•</span>
+            <a href="/privacy" target="_blank" className="hover:text-slate-600 hover:underline">سياسة الخصوصية</a>
+            <span>•</span>
+            <a href="/disclaimer" target="_blank" className="hover:text-slate-600 hover:underline">إخلاء المسؤولية</a>
+          </div>
 
         </div>
       </div>

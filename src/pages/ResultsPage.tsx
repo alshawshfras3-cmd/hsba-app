@@ -145,7 +145,7 @@ export function ResultsPage() {
       <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 pt-8">
         
         {/* Header Block */}
-        <div className="max-w-4xl mx-auto mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4 text-right">
+        <div className="max-w-7xl mx-auto mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4 text-right">
           <div>
             <h1 className="text-xl md:text-2xl font-black text-[#111827] flex items-center gap-2">
               <Bookmark className="w-5.5 h-5.5 text-[#0057B8]" />
@@ -163,7 +163,7 @@ export function ResultsPage() {
         </div>
 
         {/* Tip strip */}
-        <div className="bg-white/50 border border-emerald-100 rounded-2xl p-4 mb-6 flex items-center gap-3 text-right max-w-4xl mx-auto">
+        <div className="bg-white/50 border border-emerald-100 rounded-2xl p-4 mb-6 flex items-center gap-3 text-right max-w-7xl mx-auto">
           <div className="w-8 h-8 bg-emerald-50 rounded-lg flex items-center justify-center text-emerald-600 shrink-0">
             <Sparkles className="w-4.5 h-4.5" />
           </div>
@@ -183,22 +183,22 @@ export function ResultsPage() {
             return (
               <div 
                 key={item.id}
-                className="bg-white border border-slate-200/65 rounded-3xl overflow-hidden shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
+                className="bg-white border border-slate-200/70 rounded-3xl overflow-hidden shadow-xs hover:shadow-premium hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between"
               >
                 {/* Card Top Banner with Bank Identity */}
-                <div className={`p-4 bg-gradient-to-r ${logoColor} text-white flex justify-between items-center`}>
+                <div className={`p-4 bg-gradient-to-r ${logoColor} text-white flex justify-between items-center shadow-xs`}>
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 bg-white/20 backdrop-blur-md rounded-lg flex items-center justify-center font-bold text-xs select-none">
                       {logoText}
                     </div>
                     <div>
                       <h3 className="font-extrabold text-sm leading-tight">{item.bank_name}</h3>
-                      <p className="text-[10px] text-white/80">{item.finance_type}</p>
+                      <p className="text-[10px] text-white/80 font-medium">{item.finance_type}</p>
                     </div>
                   </div>
                   
-                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold select-none ${
-                    isEligible ? "bg-emerald-500/20 text-emerald-100" : "bg-red-500/20 text-red-100"
+                  <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase select-none tracking-wider ${
+                    isEligible ? "bg-emerald-500/25 text-emerald-100 border border-emerald-400/20" : "bg-red-500/25 text-red-100 border border-red-400/20"
                   }`}>
                     {isEligible ? "مقبول ائتمانياً" : "غير مطابق"}
                   </span>
@@ -208,17 +208,17 @@ export function ResultsPage() {
                 <div className="p-5 text-right space-y-4 flex-1">
                   {/* Calculation custom Title */}
                   <div>
-                    <h4 className="font-extrabold text-xs text-slate-800 leading-tight">{item.title}</h4>
+                    <h4 className="font-extrabold text-xs text-slate-800 leading-snug">{item.title}</h4>
                     {item.customer_name && (
-                      <div className="flex items-center gap-1.5 text-slate-400 mt-1.5">
+                      <div className="flex items-center gap-1.5 text-slate-400 mt-2">
                         <User className="w-3.5 h-3.5" />
-                        <span className="text-[10px] font-bold">العميل: {item.customer_name}</span>
+                        <span className="text-[10px] font-bold text-slate-500">العميل: {item.customer_name}</span>
                       </div>
                     )}
                   </div>
 
                   {/* Finance values blocks */}
-                  <div className="grid grid-cols-2 gap-3.5 bg-slate-50 border border-slate-100 p-3 rounded-2xl">
+                  <div className="grid grid-cols-2 gap-3 bg-slate-50 border border-slate-100 p-3 rounded-2xl">
                     <div className="space-y-0.5 text-right">
                       <span className="text-[10px] font-sans text-slate-400 font-bold block">مبلغ التمويل المقدر:</span>
                       <span className="text-xs font-black text-[#0057B8]" dir="ltr">
@@ -416,6 +416,17 @@ export function ResultsPage() {
                     ))}
                   </div>
                 )}
+              </div>
+
+              {/* النتائج المعروضة تقديرية بناء على البيانات المدخلة وقواعد النظام */}
+              <div className="bg-amber-50/60 dark:bg-amber-950/10 border border-amber-200/55 dark:border-amber-900/30 rounded-2xl p-5 flex items-start gap-3 select-none" dir="rtl">
+                <Info className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <h5 className="font-sans font-black text-amber-800 dark:text-amber-500 text-xs text-right">ملاحظة تنظيمية هامة:</h5>
+                  <p className="text-[11px] text-gray-600 dark:text-slate-300 leading-relaxed font-bold text-right mb-0">
+                    النتائج المعروضة تقديرية بناءً على البيانات المدخلة وقواعد النظام، ولا تعتبر موافقة نهائية أو التزامًا بمنح التمويل. القرار النهائي يخضع للبنك أو الجهة التمويلية.
+                  </p>
+                </div>
               </div>
 
             </div>
