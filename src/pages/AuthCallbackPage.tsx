@@ -15,27 +15,43 @@ export default function AuthCallbackPage() {
 
     let mounted = true;
 
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    const oauthError = params.get('error_description') ?? params.get('error');
+
+    // Prompt 6: Once we have processed the code, clear the URL query parameters using replaceState to avoid replay on page refresh
+    try {
+      if (typeof window !== 'undefined' && window.history && window.history.replaceState) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    } catch (e) {
+      console.warn('Failed to clear URL parameters:', e);
+    }
+
+    // Prompt 4: Add an ultimate timeout of 8 seconds. If no session is resolved within this window, abort loading and display expired link message.
+    let timeoutTriggered = false;
+    const timeoutId = setTimeout(() => {
+      if (mounted && status === 'loading') {
+        timeoutTriggered = true;
+        setStatus('error');
+        setErrorMessage('تعذر إكمال تأكيد الحساب. قد يكون الرابط منتهي الصلاحية، يرجى طلب رابط جديد.');
+      }
+    }, 8000);
+
     const completeAuthCallback = async () => {
       try {
-        const params = new URLSearchParams(window.location.search);
-
-        const oauthError =
-          params.get('error_description') ??
-          params.get('error');
-
         if (oauthError) {
           throw new Error(oauthError);
         }
 
-        const code = params.get('code');
-
-        console.log('Auth callback started', {
+        console.log('Auth callback started handling:', {
           hasCode: Boolean(code),
           origin: window.location.origin,
         });
 
         let session = null;
 
+        // Prompt 2: Handle code exchange or session query fallback
         if (code) {
           const { data, error } = await supabase.auth.exchangeCodeForSession(code);
           if (error) {
@@ -59,7 +75,7 @@ export default function AuthCallbackPage() {
         const isGoogle = userObj.app_metadata?.provider === 'google' || 
                          userObj.identities?.some((id: any) => id.provider === 'google');
 
-        // Attempt app_users synchronization
+        // Attempt app_users synchronization (ignoring silent non-blocking errors here)
         try {
           const emailValue = userObj.email?.toLowerCase().trim() || '';
           const fullName = userObj.user_metadata?.full_name ?? userObj.user_metadata?.name ?? '';
@@ -84,13 +100,13 @@ export default function AuthCallbackPage() {
           console.error('User profile sync failed:', syncError);
         }
 
-        if (!mounted) return;
+        if (!mounted || timeoutTriggered) return;
 
         if (isGoogle) {
           setStatus('success_google');
           navigate('/');
         } else {
-          // Sign out so they can log in fresh as requested, but keep them on success page for 2 seconds
+          // For email signup confirmation, prompt asks to log in fresh. We sign them out, show success and button or auto redirection
           try {
             await supabase.auth.signOut();
           } catch (signOutError) {
@@ -99,14 +115,18 @@ export default function AuthCallbackPage() {
           setStatus('success_email');
         }
       } catch (error: any) {
+        if (timeoutTriggered) return;
         console.error('Auth callback failed:', error);
 
         if (!mounted) return;
 
         setStatus('error');
+        // Prompt 7: clear and friendly Arabic error message
         setErrorMessage(
           'رابط التحقق غير صالح أو انتهت صلاحيته. يرجى طلب رابط جديد.'
         );
+      } finally {
+        clearTimeout(timeoutId);
       }
     };
 
@@ -114,6 +134,7 @@ export default function AuthCallbackPage() {
 
     return () => {
       mounted = false;
+      clearTimeout(timeoutId);
     };
   }, [navigate]);
 
@@ -168,7 +189,7 @@ export default function AuthCallbackPage() {
               <p className="text-sm font-semibold text-gray-600 dark:text-slate-300 leading-relaxed">
                 يمكنك الآن الدخول إلى حسابك واستخدام حسبة.
               </p>
-              <p className="text-[10px] text-gray-400 dark:text-slate-400">
+              <p className="text-[10px] text-gray-400 dark:text-slate-400 animate-pulse">
                 سيتم تحويلك تلقائياً خلال ثانيتين...
               </p>
             </div>
@@ -177,7 +198,7 @@ export default function AuthCallbackPage() {
               onClick={() => navigate('/login')}
               className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white py-3 text-xs font-bold transition-all shadow-md cursor-pointer mt-4"
             >
-              الانتقال إلى تسجيل الدخول
+              الدخول إلى حسابي
             </button>
           </>
         )}

@@ -912,13 +912,13 @@ export default function StepWizard() {
               className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] focus:border-transparent cursor-pointer"
             >
               <option value="">-- اختر البنك المحول عليه راتبك --</option>
-              <option id="opt-alahli" value="alahli">البنك الأهلي</option>
-              <option id="opt-rajhi" value="rajhi">بنك الراجحي</option>
-              <option id="opt-albilad" value="albilad">بنك البلاد</option>
-              <option id="opt-alinma" value="alinma">بنك الإنماء</option>
-              <option id="opt-fransi" value="fransi">البنك السعودي الفرنسي</option>
-              <option id="opt-alarabi" value="alarabi">البنك العربي</option>
-              <option id="opt-bidaya" value="bidaya">بداية</option>
+              {sortedActiveBanks
+                .filter(b => b.institutionType === 'bank' || !b.institutionType)
+                .map((bank) => (
+                  <option key={bank.id} id={`opt-${bank.id}`} value={bank.id}>
+                    {bank.nameAr}
+                  </option>
+                ))}
               <option id="opt-other_bank" value="other_bank">بنك آخر</option>
             </select>
           </div>
