@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { BankCalculationResult, ProductId } from '../../types';
 import { 
   Building2, CheckCircle, XCircle, AlertTriangle, ArrowLeftRight, Clock, Percent, ListCollapse,
-  Download, HelpCircle, Activity, Info, Users, ChevronDown, Award, Bookmark, Copy
+  Download, HelpCircle, Activity, Info, Users, ChevronDown, Award, Bookmark, Copy, Share2
 } from 'lucide-react';
 import { useAppState } from '../../context/AppContext';
 import { saveCalculationResult } from '../../lib/savedResultsService';
@@ -155,6 +155,130 @@ export default function ResultsGrid({
       setTimeout(() => setToast(null), 3000);
     } catch (err: any) {
       console.error('Failed to copy calculation:', err);
+    }
+  };
+
+  const handleShare = async (offer: BankCalculationResult, e: React.MouseEvent) => {
+    e.stopPropagation(); // prevent modal opening!
+
+    const isApp = offer.status === 'approved';
+    const isWarn = offer.status === 'warning';
+    const isRej = offer.status === 'rejected';
+
+    const statusAr = isApp ? 'مقبول' : isWarn ? 'مقبول بتحفظ' : 'غير مقبول';
+
+    const termText = mainFinanceType === 'personal_only' 
+      ? 'مدة التمويل الشخصي: 5 سنوات (60 شهراً)' 
+      : `مدة التمويل العقاري: ${Math.floor(offer.termMonths / 12)} سنة${Math.round(offer.termMonths % 12) > 0 ? ` و ${Math.round(offer.termMonths % 12)} أشهر` : ''}`;
+
+    const formatNum = (num: number) => Math.round(num).toLocaleString('en-US');
+
+    const totalAmount = mainFinanceType === 'personal_only' 
+      ? offer.personalAmount 
+      : mainFinanceType === 'real_estate_with_existing_personal'
+      ? offer.realEstateAmount
+      : offer.totalPurchasingPower;
+
+    let lines: string[] = [];
+
+    lines.push(`البنك: ${offer.bankName}`);
+    lines.push(`الحالة: ${statusAr}`);
+    lines.push(termText);
+    lines.push(''); // empty line
+
+    lines.push(`إجمالي التمويل المتاح: ${formatNum(totalAmount)} ريال`);
+
+    if (productId !== 'personal_only') {
+      lines.push(`القرض العقاري: ${formatNum(offer.realEstateAmount)} ريال`);
+    }
+    if (productId !== 'real_estate_only' && mainFinanceType !== 'real_estate_with_existing_personal' && offer.supportsPersonal !== false) {
+      lines.push(`القرض الشخصي: ${formatNum(offer.personalAmount)} ريال`);
+    }
+
+    // --- الدعم بعد مبالغ التمويل وقبل الأقساط ---
+    const resolvedSupportAmount = offer.housingSupportAmount 
+      ?? (offer as any).supportAmount 
+      ?? (offer as any).monthlySupport 
+      ?? (offer as any).downPaymentSupport
+      ?? (offer.diagnostics?.monthlySupport || offer.diagnostics?.downPaymentSupport)
+      ?? 0;
+
+    let resolvedSupportType = offer.supportType || 'none';
+    if (resolvedSupportType === 'none' || !offer.supportType) {
+      if ((offer as any).monthlySupport && (offer as any).monthlySupport > 0) {
+        resolvedSupportType = 'monthly';
+      } else if ((offer as any).downPaymentSupport && (offer as any).downPaymentSupport > 0) {
+        resolvedSupportType = 'downpayment';
+      } else if (offer.diagnostics?.monthlySupport && offer.diagnostics?.monthlySupport > 0) {
+        resolvedSupportType = 'monthly';
+      } else if (offer.diagnostics?.downPaymentSupport && offer.diagnostics?.downPaymentSupport > 0) {
+        resolvedSupportType = 'downpayment';
+      }
+    }
+
+    if (resolvedSupportAmount > 0) {
+      if (resolvedSupportType === 'monthly') {
+        lines.push(`الدعم السكني الشهري: ${formatNum(resolvedSupportAmount)} ريال شهريًا`);
+      } else {
+        lines.push(`دعم الدفعة المقدمة: ${formatNum(resolvedSupportAmount)} ريال`);
+      }
+    } else {
+      lines.push(`الدعم السكني: غير مدعوم`);
+    }
+
+    const resolvedEtizaz = offer.etizazAmount ?? (offer as any).etizazAmount ?? 0;
+    if (resolvedEtizaz > 0) {
+      lines.push(`دعم اعتزاز: ${formatNum(resolvedEtizaz)} ريال`);
+    }
+
+    lines.push(''); // empty line
+
+    if (mainFinanceType === 'personal_only') {
+      lines.push(`قسط التمويل الشخصي: ${formatNum(offer.monthlyInstallmentBeforeRetirement)} ريال`);
+    } else if (productId === 'real_estate_with_new_personal') {
+      lines.push(`القسط الشهري الإجمالي: ${formatNum(offer.monthlyInstallmentBeforeRetirement)} ريال`);
+      lines.push(`├─ قسط العقاري: ${formatNum(offer.realEstateInstallmentOnly || 0)} ريال`);
+      lines.push(`└─ قسط الشخصي: ${offer.supportsPersonal === false ? "غير متوفر" : `${formatNum(offer.personalInstallmentAmount || 0)} ريال`}`);
+    } else {
+      lines.push(`قسط التمويل العقاري: ${formatNum(offer.monthlyInstallmentBeforeRetirement)} ريال`);
+    }
+
+    if (offer.monthlyInstallmentAfterRetirement > 0) {
+      lines.push(`القسط التقاعدي العقاري: ${formatNum(offer.monthlyInstallmentAfterRetirement)} ريال / شهر`);
+    }
+
+    lines.push(`هامش الربح السنوي: ${offer.annualMargin}%`);
+
+    const textToShare = lines.join('\n');
+    const shareTitle = `تمويل حسبة - ${offer.bankName}`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: shareTitle,
+          text: textToShare,
+          url: window.location.href
+        });
+        setToast({ message: 'تمت المشاركة بنجاح', type: 'success' });
+        setTimeout(() => setToast(null), 3000);
+      } catch (err: any) {
+        if (err.name !== 'AbortError') {
+          console.warn('Native share error, using copy fallback:', err);
+          fallbackShareCopy(textToShare);
+        }
+      }
+    } else {
+      fallbackShareCopy(textToShare);
+    }
+  };
+
+  const fallbackShareCopy = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setToast({ message: 'تم نسخ ملخص الحسبة للمشاركة لعدم دعم المتصفح للمشاركة المباشرة', type: 'success' });
+      setTimeout(() => setToast(null), 3500);
+    } catch (err: any) {
+      console.error('Clipboard fallback failed:', err);
     }
   };
 
@@ -640,10 +764,10 @@ export default function ResultsGrid({
                 )}
 
                 {/* Action Buttons */}
-                <div className="flex gap-2 mt-3 w-full">
+                <div className="grid grid-cols-2 gap-2 mt-3 w-full">
                   <button 
                     onClick={() => setSelectedOffer(offer)}
-                    className="flex-1 text-center py-2.5 rounded-xl border border-[#0057B8]/20 text-[#0057B8] font-bold text-[11px] transition-all hover:bg-[#0057B8]/10 cursor-pointer flex items-center justify-center gap-1 select-none"
+                    className="text-center py-2.5 rounded-xl border border-[#0057B8]/20 text-[#0057B8] font-bold text-[11px] transition-all hover:bg-[#0057B8]/10 cursor-pointer flex items-center justify-center gap-1 select-none"
                   >
                     <Info className="w-3.5 h-3.5 shrink-0" />
                     <span>التفاصيل والمخطط</span>
@@ -651,7 +775,7 @@ export default function ResultsGrid({
                   
                   <button 
                     onClick={(e) => handleSaveClick(offer, e)}
-                    className="flex-1 text-center py-2.5 rounded-xl bg-emerald-50/70 hover:bg-emerald-600 border border-emerald-100 text-emerald-700 hover:text-white font-bold text-[11px] transition-all cursor-pointer flex items-center justify-center gap-1 select-none"
+                    className="text-center py-2.5 rounded-xl bg-emerald-50/70 hover:bg-emerald-600 border border-emerald-100 text-emerald-700 hover:text-white font-bold text-[11px] transition-all cursor-pointer flex items-center justify-center gap-1 select-none"
                   >
                     <Bookmark className="w-3.5 h-3.5 shrink-0" />
                     <span>حفظ النتيجة</span>
@@ -659,10 +783,18 @@ export default function ResultsGrid({
 
                   <button 
                     onClick={(e) => handleCopyText(offer, e)}
-                    className="flex-1 text-center py-2.5 rounded-xl border border-slate-200 hover:border-slate-300 text-slate-700 font-bold text-[11px] transition-all hover:bg-slate-50 cursor-pointer flex items-center justify-center gap-1 select-none"
+                    className="text-center py-2.5 rounded-xl border border-slate-200 hover:border-slate-300 text-slate-700 font-bold text-[11px] transition-all hover:bg-slate-50 cursor-pointer flex items-center justify-center gap-1 select-none"
                   >
                     <Copy className="w-3.5 h-3.5 shrink-0" />
                     <span>نسخ الحسبة</span>
+                  </button>
+
+                  <button 
+                    onClick={(e) => handleShare(offer, e)}
+                    className="text-center py-2.5 rounded-xl bg-cyan-50/50 hover:bg-cyan-600 border border-cyan-100/70 dark:border-cyan-900/30 text-cyan-700 hover:text-white font-bold text-[11px] transition-all cursor-pointer flex items-center justify-center gap-2 select-none"
+                  >
+                    <Share2 className="w-3.5 h-3.5 shrink-0" />
+                    <span>مشاركة الحسبة</span>
                   </button>
                 </div>
               </div>
