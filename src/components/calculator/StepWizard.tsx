@@ -1517,8 +1517,8 @@ export default function StepWizard() {
   const logicalStepId = activeStepId === 'main_type' ? 1 : (activeStepId === 'finance_options' ? 3 : 2);
 
   return (
-    <div className="w-full bg-[#F8FAFC]">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="w-full bg-[#F8FAFC] min-h-[calc(100vh-64px)] flex flex-col">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 flex flex-col w-full">
         
         {/* Step Wizard visual Progress stepper indicators */}
         <div className="mb-8 md:mb-10 select-none">
@@ -1927,7 +1927,7 @@ export default function StepWizard() {
         </div>
 
         {/* 5. Trust Banner (شريط الثقة أسفل البطاقة) */}
-        {currentStep === 1 && !results && (
+        {currentStep === 1 && (
           <div className="mt-8 bg-blue-50/20 border border-blue-100/60 rounded-2xl p-6 sm:p-8 space-y-6 text-right font-sans">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               
@@ -1949,7 +1949,7 @@ export default function StepWizard() {
                 </div>
                 <div>
                   <h4 className="font-black text-[#0057B8] text-sm leading-tight mb-1.5 font-sans">آمن وموثوق</h4>
-                  <p className="text-xs text-slate-500 leading-relaxed font-medium">تُسخدم بياناتك لإجراء الحسبة ولا تظهر ضمن النتائج المشاركة.</p>
+                  <p className="text-xs text-slate-500 leading-relaxed font-medium">تُستخدم بياناتك لإجراء الحسبة ولا تظهر ضمن النتائج المشاركة.</p>
                 </div>
               </div>
 
@@ -1975,7 +1975,7 @@ export default function StepWizard() {
         )}
 
         {/* 6. Minimalist Footer (الفوتر الصغير) */}
-        {!results && (
+        {currentStep === 1 && (
           <div className="border-t border-slate-200/40 mt-12 py-6 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs font-sans max-w-6xl mx-auto" dir="rtl">
             <div className="text-slate-400 font-medium">
               <span>© 2026 حسبة</span>
