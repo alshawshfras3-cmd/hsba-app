@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAppState } from '../../context/AppContext';
-import { Calculator, ShieldAlert, Award, FileText, LogOut, Settings, X, ShieldCheck, User, BarChart3, HelpCircle } from 'lucide-react';
+import { Calculator, ShieldAlert, Award, FileText, LogOut, Settings, X, ShieldCheck, User, BarChart3, HelpCircle, Sparkles } from 'lucide-react';
 import { useLocation } from '../../hooks/useLocation';
 
 export default function Header() {
@@ -92,6 +92,17 @@ export default function Header() {
           >
             <HelpCircle className="w-4 h-4" />
             <span>من نحن</span>
+          </button>
+
+          <button
+            id="nav-assistant-btn"
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent('open-customer-assistant'));
+            }}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-sans text-xs font-bold transition-all text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+          >
+            <Sparkles className="w-4 h-4 text-[#0ea5a4]" />
+            <span>مساعد حسبة</span>
           </button>
           
           {user && (
@@ -190,6 +201,18 @@ export default function Header() {
             </div>
  
             <div className="space-y-3 pt-1">
+              {/* Assistant Button */}
+              <button
+                onClick={() => {
+                  setIsMobileSettingsOpen(false);
+                  window.dispatchEvent(new CustomEvent('open-customer-assistant'));
+                }}
+                className="w-full py-3 bg-gradient-to-tr from-[#0057B8] to-[#0ea5a4] hover:from-[#004eab] hover:to-[#0d9493] text-white text-xs font-black rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer min-h-[44px] shadow-sm active:scale-98"
+              >
+                <Sparkles className="w-4 h-4 text-white animate-pulse" />
+                <span>مساعد حسبة الذكي</span>
+              </button>
+
               {/* User Email & Plan display */}
               <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl p-4 border border-slate-150 dark:border-slate-800 space-y-2">
                 <div className="flex justify-between text-xs font-bold text-slate-500 dark:text-slate-400">
