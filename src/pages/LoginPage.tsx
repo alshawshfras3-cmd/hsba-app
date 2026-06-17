@@ -245,34 +245,16 @@ export function LoginPage() {
 
           {/* OFFLINE/BYPASS NOTICE - Only show for login mode */}
           {!hasSupabaseKeys && mode === 'login' && (
-            <div className="bg-amber-50/70 border border-amber-200/85 p-4 rounded-xl space-y-3">
-              <div className="flex gap-2 text-amber-900 text-xs font-bold leading-relaxed">
-                <AlertTriangle className="w-5 h-5 shrink-0 text-amber-600 mt-0.5" />
+            <div className="bg-red-50/70 border border-red-200 p-4 rounded-xl">
+              <div className="flex gap-2 text-red-900 text-xs font-bold leading-relaxed">
+                <AlertTriangle className="w-5 h-5 shrink-0 text-red-600 mt-0.5" />
                 <div className="space-y-1">
-                  <p>قشرة قاعدة البيانات (Supabase) غير مفعلة</p>
-                  <p className="font-normal text-[10px] text-amber-700 leading-normal">
-                    يرجى تزويد متغيرات البيئة <code className="font-mono text-[10px] font-bold bg-amber-100/80 rounded px-1">VITE_SUPABASE_URL</code> و <code className="font-mono text-[10px] font-bold bg-amber-100/80 rounded px-1">VITE_SUPABASE_ANON_KEY</code> لتفعيل تخزين سحابي حقيقي.
+                  <p>تنبيه: بوابة الخدمات غير متوفرة حالياً</p>
+                  <p className="font-normal text-[10px] text-red-700 leading-normal">
+                    بوابة قاعدة البيانات (Supabase) غير مهيأة بعد. يرجى تهيئة متغيرات البيئة <code className="font-mono text-[10px] font-bold bg-red-100/80 rounded px-1">VITE_SUPABASE_URL</code> و <code className="font-mono text-[10px] font-bold bg-red-100/80 rounded px-1">VITE_SUPABASE_ANON_KEY</code> للتواصل مع الخادم والمتابعة.
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={async () => {
-                  setLoadingAction(true);
-                  try {
-                    // TODO: legacy admin fallback, do not remove until auth is unified
-                    await signInWithEmail('admin@hesba.com', 'bypass');
-                  } catch (e) {
-                    console.error(e);
-                  } finally {
-                    setLoadingAction(false);
-                  }
-                }}
-                className="w-full py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-sm cursor-pointer"
-              >
-                <Sparkles className="w-4 h-4" />
-                <span>الدخول الفوري كمسؤول (admin@hesba.com)</span>
-              </button>
             </div>
           )}
 

@@ -36,16 +36,8 @@ export default function AdminAuth() {
     setSuccessMsg(null);
 
     if (!hasSupabaseKeys) {
-      setTimeout(() => {
-        setLoading(false);
-        setUser({
-          id: `local_${Date.now()}`,
-          email: email.trim().toLowerCase(),
-          user_metadata: {
-            username: username.trim() || email.split('@')[0],
-          }
-        });
-      }, 500);
+      setErrorMsg('إعداد اتصال قاعدة البيانات غير مكتمل والمفاتيح غير متوفرة. لا يمكن تسجيل الدخول.');
+      setLoading(false);
       return;
     }
 
@@ -59,6 +51,7 @@ export default function AdminAuth() {
             data: {
               username: username.trim() || email.split('@')[0],
             },
+            emailRedirectTo: `${window.location.origin}/auth/callback`
           },
         });
 
@@ -87,17 +80,8 @@ export default function AdminAuth() {
     setErrorMsg(null);
 
     if (!hasSupabaseKeys) {
-      setTimeout(() => {
-        setGoogleLoading(false);
-        setUser({
-          id: 'mock_google_id',
-          // TODO: legacy admin fallback, do not remove until auth is unified
-          email: 'admin@hesba.com',
-          user_metadata: {
-            username: 'مدير النظام'
-          }
-        });
-      }, 500);
+      setErrorMsg('إعداد اتصال قاعدة البيانات غير مكتمل والمفاتيح غير متوفرة. لا يمكن تسجيل الدخول.');
+      setGoogleLoading(false);
       return;
     }
 
@@ -134,33 +118,16 @@ export default function AdminAuth() {
 
         {/* Status Alerts */}
         {!hasSupabaseKeys && (
-          <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl space-y-3">
-            <div className="flex gap-2 text-amber-900 text-xs font-bold leading-relaxed">
-              <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
+          <div className="bg-red-50 border border-red-200 p-4 rounded-xl">
+            <div className="flex gap-2 text-red-900 text-xs font-bold leading-relaxed">
+              <AlertTriangle className="w-5 h-5 shrink-0 text-red-600 mt-0.5" />
               <div className="space-y-1">
-                <p>قشرة قاعدة البيانات (Supabase) غير مفعلة</p>
-                <p className="font-normal text-[10px] text-amber-700 leading-normal">
-                  للانتقال للوضع السحابي الدائم، يرجى تزويد متغيرات البيئة <code className="font-mono text-xs font-bold bg-amber-100 rounded px-1">VITE_SUPABASE_URL</code> و <code className="font-mono text-xs font-bold bg-amber-100 rounded px-1">VITE_SUPABASE_ANON_KEY</code>.
+                <p>إعداد الاتصال غير مكتمل</p>
+                <p className="font-normal text-[10px] text-red-700 leading-normal">
+                  لا يمكنك تسجيل الدخول كمسؤول حتى يتم إعداد متغيرات الاتصال بـ Supabase بشكل صحيح. يرجى تزويد متغيرات البيئة <code className="font-mono text-xs font-bold bg-red-100 rounded px-1">VITE_SUPABASE_URL</code> و <code className="font-mono text-xs font-bold bg-red-100 rounded px-1">VITE_SUPABASE_ANON_KEY</code>.
                 </p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                setUser({
-                  id: 'offline_admin',
-                  // TODO: legacy admin fallback, do not remove until auth is unified
-                  email: 'admin@hesba.com',
-                  user_metadata: {
-                    username: 'مدير النظام'
-                  }
-                });
-              }}
-              className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[10px] font-bold flex items-center justify-center gap-1.5 transition-all shadow-sm cursor-pointer"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>الدخول الفوري بصفة مسؤول (وضع المعاينة المحلي)</span>
-            </button>
           </div>
         )}
 

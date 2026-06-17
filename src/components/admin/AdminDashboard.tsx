@@ -634,7 +634,7 @@ export default function AdminDashboard() {
         fromBankId: copySourceBank,
         toBankId: copyTargetBank,
         sections: copySections,
-        currentUserEmail: user?.email || 'admin@hesba.com',
+        currentUserEmail: user?.email || 'system',
         marginRules,
         dsrRules,
         personalRules,
@@ -667,7 +667,7 @@ export default function AdminDashboard() {
         personalRules,
         approvedSalaryDbRules,
         pensionRules: pensionDbRules,
-        currentUserEmail: user?.email || 'admin@hesba.com',
+        currentUserEmail: user?.email || 'system',
         bankNameAr
       });
 
@@ -698,7 +698,7 @@ export default function AdminDashboard() {
         personalRules,
         approvedSalaryDbRules,
         pensionDbRules,
-        currentUserEmail: user?.email || 'admin@hesba.com'
+        currentUserEmail: user?.email || 'system'
       });
 
       // Update states
@@ -725,7 +725,7 @@ export default function AdminDashboard() {
         personalRules,
         approvedSalaryDbRules,
         pensionDbRules,
-        currentUserEmail: user?.email || 'admin@hesba.com'
+        currentUserEmail: user?.email || 'system'
       });
 
       // Update states

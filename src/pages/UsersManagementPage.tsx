@@ -139,7 +139,7 @@ export function UsersManagementPage() {
 
   // Filter users
   const filteredUsers = users.filter(u => {
-    if (adminUserIds.includes(u.id) || u.id === currentAdminUserId || u.email.toLowerCase().trim() === 'admin@hesba.com') {
+    if (adminUserIds.includes(u.id) || u.id === currentAdminUserId) {
       return false;
     }
 

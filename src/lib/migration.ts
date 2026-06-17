@@ -54,6 +54,19 @@ export function migrateAllowedSectors(sectors: string[] | undefined | null): Sec
 
 export function runAllStorageMigrations(): void {
   try {
+    // One-time security cleanup of legacy financial result keys in localStorage
+    const keysToRemove = [
+      'hasba_saved_results_local',
+      'hasba_saved_results_local_backup',
+      'hesba_calculator_draft',
+      'hasba_settings_cache' // Force refresh of settings cache as well for fresh logins
+    ];
+    keysToRemove.forEach(key => {
+      try {
+        localStorage.removeItem(key);
+      } catch {}
+    });
+
     // If a consolidated unified cache already exists, we can immediately clean up all old separate legacy keys
     const cacheExists = localStorage.getItem("hasba_settings_cache");
     if (cacheExists) {

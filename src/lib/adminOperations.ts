@@ -91,7 +91,7 @@ export async function logVersion(
   oldData: any,
   newData: any,
   changeNote: string,
-  changedBy: string = 'admin@hesba.com'
+  changedBy: string = 'system'
 ) {
   if (!hasSupabaseKeys) {
     console.log(`[Local Version Log] Table: ${tableName}, Bank: ${bankId}, Note: ${changeNote}`);
@@ -121,7 +121,7 @@ export async function saveWithVersioning<T extends { id?: any; bankId?: string; 
   newData: T,
   oldData: T | null,
   changeNote?: string,
-  changedBy: string = 'admin@hesba.com'
+  changedBy: string = 'system'
 ) {
   const recordId = newData.id || `${tableName}_${bankId}_single`;
   
@@ -170,7 +170,7 @@ export async function copyBankSettings(
   let nextApprovedSalaryDbRules = [...approvedSalaryDbRules];
   let nextPensionDbRules = [...pensionDbRules];
 
-  const changedBy = currentUserEmail || 'admin@hesba.com';
+  const changedBy = currentUserEmail || 'system';
 
   for (const section of sections) {
     if (section === 'margins') {
@@ -324,7 +324,7 @@ export async function exportBankSettings(
   return {
     exportVersion: '1.0',
     exportedAt: new Date().toISOString(),
-    exportedBy: currentUserEmail || 'admin@hesba.com',
+    exportedBy: currentUserEmail || 'system',
     institution: { bankId, bankName: bankNameAr },
     sections: {
       marginRules: margins,
@@ -375,7 +375,7 @@ export async function importBankSettings(
   } = params;
 
   const remapped = remapBankId(exportData.sections, targetBankId);
-  const changedBy = currentUserEmail || 'admin@hesba.com';
+  const changedBy = currentUserEmail || 'system';
   const sourceBankId = exportData.institution?.bankId || 'unknown';
 
   let nextMarginRules = [...marginRules];
@@ -496,7 +496,7 @@ export async function restoreVersion(
     currentUserEmail
   } = params;
 
-  const changedBy = currentUserEmail || 'admin@hesba.com';
+  const changedBy = currentUserEmail || 'system';
   const tableName = version.table_name;
   const targetBankId = version.bank_id;
   

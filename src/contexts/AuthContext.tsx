@@ -92,6 +92,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       sessionStorage.removeItem('hesba_is_admin');
       sessionStorage.removeItem('hesba_calculator_draft');
       localStorage.removeItem('hesba_calculator_draft');
+      localStorage.removeItem('hasba_saved_results_local');
+      localStorage.removeItem('hasba_saved_results_local_backup');
+      sessionStorage.removeItem('hasba_saved_results_local');
+      sessionStorage.removeItem('hasba_saved_results_local_backup');
     } catch (e) {
       console.error(e);
     }
@@ -165,11 +169,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (profileData) {
         const lowercaseEmail = (email || profileData.email || '').toLowerCase().trim();
-        // TODO: legacy admin fallback, do not remove until auth is unified
-        const isOwnerEmail = lowercaseEmail === 'admin@hesba.com';
+        
+        let isOwnerUser = false;
+        try {
+          const { data: adminCheck } = await supabase
+            .from('admins')
+            .select('user_id')
+            .eq('user_id', userId)
+            .maybeSingle();
+          isOwnerUser = !!adminCheck;
+        } catch {}
         
         // Block suspended/blocked users (except the protected super admin)
-        if (profileData.is_blocked === true && !isOwnerEmail) {
+        if (profileData.is_blocked === true && !isOwnerUser) {
           setIsSuspendedUser(true);
           const profObj: UserProfile = {
             id: profileData.id,
@@ -216,9 +228,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (err) {
       console.warn("Could not fetch profile, falling back to basic details:", err);
-      const lowercaseEmail = (email || '').toLowerCase().trim();
-      // TODO: legacy admin fallback, do not remove until auth is unified
-      const isOwnerEmail = lowercaseEmail === 'admin@hesba.com';
       
       setIsSuspendedUser(false);
 
@@ -242,7 +251,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function checkAdminStatus(userId: string): Promise<boolean> {
-    console.log("[AUTH_DEBUG] checkAdminStatus bypassed.");
+    if (!hasSupabaseKeys) return false;
+    try {
+      const { data, error } = await supabase
+        .from('admins')
+        .select('user_id')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (!error && data) {
+        return true;
+      }
+    } catch (err) {
+      console.warn("[AUTH_DEBUG] checkAdminStatus error:", err);
+    }
     return false;
   }
 
@@ -251,12 +272,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (!hasSupabaseKeys) {
       setLoading(false);
-      const cachedUser = getCachedUser();
-      if (cachedUser) {
-        // TODO: legacy admin fallback, do not remove until auth is unified
-        const isOwner = cachedUser.email?.toLowerCase().trim() === 'admin@hesba.com';
-        setIsAdminInDb(isOwner);
-      }
+      setIsAdminInDb(false);
       return;
     }
 
@@ -277,8 +293,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           } catch (e) {
             console.error(e);
           }
-          const isAdminUser = session.user.app_metadata?.role === 'admin' || isOwnerEmail(session.user.email);
-          console.log("[AUTH_DEBUG] initializeAuth: setting isAdminInDb on app_metadata basis:", isAdminUser);
+          const isAdminUser = await checkAdminStatus(session.user.id);
+          console.log("[AUTH_DEBUG] initializeAuth: setting isAdminInDb on DB basis:", isAdminUser);
           if (active) {
             setIsAdminInDb(isAdminUser);
             try {
@@ -350,14 +366,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           } catch (e) {
             console.error(e);
           }
-          const isAdminUser = session.user.app_metadata?.role === 'admin' || isOwnerEmail(session.user.email);
-          console.log("[AUTH_DEBUG] onAuthStateChange: setting isAdminInDb on app_metadata basis:", isAdminUser);
-          if (active) {
-            setIsAdminInDb(isAdminUser);
-            try {
-              sessionStorage.setItem('hesba_is_admin', isAdminUser ? 'true' : 'false');
-            } catch {}
-          }
+          checkAdminStatus(session.user.id).then((isAdminUser) => {
+            console.log("[AUTH_DEBUG] onAuthStateChange: setting isAdminInDb on DB basis:", isAdminUser);
+            if (active) {
+              setIsAdminInDb(isAdminUser);
+              try {
+                sessionStorage.setItem('hesba_is_admin', isAdminUser ? 'true' : 'false');
+              } catch {}
+            }
+          });
           if (active) {
             setLoading(false);
           }
@@ -381,13 +398,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const isOwnerEmail = (email?: string) => {
-    const e = email?.toLowerCase().trim();
-    // TODO: legacy admin fallback, do not remove until auth is unified
-    return e === 'admin@hesba.com';
-  };
-
-  const isAdmin = user?.app_metadata?.role === 'admin' || isOwnerEmail(user?.email);
+  const isAdmin = isAdminInDb;
   const isOwner = isAdmin;
   const isStaff = isAdmin;
   const isCustomer = !isAdmin;
@@ -400,26 +411,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function signInWithGoogle() {
     if (!hasSupabaseKeys) {
-      // Mock OAuth Flow for Preview
-      // TODO: legacy admin fallback, do not remove until auth is unified
-      const mockEmail = 'admin@hesba.com';
-      setUser({
-        id: 'mock_google_user',
-        email: mockEmail,
-        user_metadata: {
-          full_name: 'مدير المنصة',
-        }
-      } as any);
-      setProfile({
-        id: 'mock_google_user',
-        email: mockEmail,
-        full_name: 'مدير المنصة',
-        avatar_url: null,
-        role: 'user',
-        is_blocked: false
-      });
-      setIsAdminInDb(true);
-      return;
+      throw new Error('إعداد اتصال قاعدة السحابية (Supabase) غير مكتمل. يرجى تهيئة متغيرات البيئة أولاً.');
     }
     try {
       const redirectTo = `${window.location.origin}/auth/callback`;
@@ -442,39 +434,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function signInWithEmail(email: string, password: string) {
     setLoading(true);
     const emailLower = email.trim().toLowerCase();
-    const isOwnerFlg = isOwnerEmail(emailLower);
 
     if (!hasSupabaseKeys) {
-      // Mock email password for Preview
-      const mockUser = {
-        id: 'mock_email_user',
-        email: emailLower,
-        user_metadata: {
-          full_name: isOwnerFlg ? 'مدير المنصة' : emailLower.split('@')[0],
-        }
-      } as any;
-      setUser(mockUser);
-      setProfile({
-        id: 'mock_email_user',
-        email: emailLower,
-        full_name: isOwnerFlg ? 'مدير المنصة' : emailLower.split('@')[0],
-        avatar_url: null,
-        role: 'user',
-        is_blocked: false
-      });
-      setIsAdminInDb(isOwnerFlg);
-      setIsSuspendedUser(false);
       setLoading(false);
-      try {
-        sessionStorage.setItem('hesba_permissions_checked', 'true');
-        sessionStorage.setItem('hesba_calculator_permissions', 'true');
-        sessionStorage.setItem('hesba_is_admin', isOwnerFlg ? 'true' : 'false');
-      } catch {}
-
-      return {
-        user: mockUser,
-        isAdmin: isOwnerFlg
-      };
+      throw new Error('إعداد اتصال قاعدة السحابية (Supabase) غير مكتمل. يرجى تهيئة متغيرات البيئة أولاً.');
     }
 
     try {
@@ -488,8 +451,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(data.session);
       setUser(data.user);
 
-      // Check admin status on app_metadata or email basis
-      const adminStatus = data.user.app_metadata?.role === 'admin' || isOwnerEmail(data.user.email);
+      // Check admin status on DB basis
+      const adminStatus = await checkAdminStatus(data.user.id);
       setIsAdminInDb(adminStatus);
 
       // Run background task
@@ -542,31 +505,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function signUpWithEmail(email: string, password: string, fullName: string) {
     if (!hasSupabaseKeys) {
-      const emailLower = email.trim().toLowerCase();
-      const isOwner = isOwnerEmail(emailLower);
-      const mockUser = {
-        id: 'mock_email_user',
-        email: emailLower,
-        user_metadata: {
-          full_name: fullName,
-        }
-      } as any;
-      setUser(mockUser);
-      setProfile({
-        id: 'mock_email_user',
-        email: emailLower,
-        full_name: fullName,
-        avatar_url: null,
-        role: 'user',
-        is_blocked: false
-      });
-      setIsAdminInDb(isOwner);
-      return { user: mockUser, session: { access_token: 'mock_token' } };
+      throw new Error('إعداد اتصال قاعدة السحابية (Supabase) غير مكتمل. يرجى تهيئة متغيرات البيئة أولاً.');
     }
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName } }
+      options: { 
+        data: { full_name: fullName },
+        emailRedirectTo: `${window.location.origin}/auth/callback`
+      }
     });
     if (error) throw error;
 
@@ -622,7 +569,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signInWithGoogle, signInWithEmail, signUpWithEmail, signOut,
       setUser, setProfile
     }}>
-      {isSuspendedUser && user && !isOwnerEmail(user.email) ? (
+      {isSuspendedUser && user && !isAdmin ? (
         <div className="fixed inset-0 bg-[#F8FAFC] z-[99999] flex items-center justify-center p-6 select-none" dir="rtl">
           <div className="bg-white border border-[#E2E8F0] p-8 rounded-2xl shadow-xl max-w-sm w-full text-center space-y-6">
             <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto border border-red-100 animate-pulse">

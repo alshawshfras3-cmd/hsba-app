@@ -727,6 +727,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     try {
       sessionStorage.removeItem('hesba_calculator_draft');
       localStorage.removeItem('hesba_calculator_draft');
+      localStorage.removeItem('hasba_saved_results_local');
+      localStorage.removeItem('hasba_saved_results_local_backup');
+      sessionStorage.removeItem('hasba_saved_results_local');
+      sessionStorage.removeItem('hasba_saved_results_local_backup');
     } catch (e) {}
     await rawSignOut();
   }, [rawSignOut]);

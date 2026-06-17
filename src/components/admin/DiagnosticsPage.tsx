@@ -296,7 +296,7 @@ export function DiagnosticsPage() {
         const exported = {
           exportVersion: '1.0',
           exportedAt: new Date().toISOString(),
-          exportedBy: 'system@hesba.com',
+          exportedBy: 'system',
           institution: { bankId: 'rajhi', bankName: 'مصرف الراجحي' },
           sections: {
             marginRules: marginRules || [],
