@@ -822,6 +822,7 @@ export default function ResultsGrid({
 
                 {/* Action Buttons */}
                 <div className="grid grid-cols-2 gap-2 mt-3 w-full">
+                  {/* Row 1 */}
                   <button 
                     onClick={() => setSelectedOffer(offer)}
                     className="text-center py-2.5 rounded-xl border border-[#0057B8]/20 text-[#0057B8] font-bold text-[11px] transition-all hover:bg-[#0057B8]/10 cursor-pointer flex items-center justify-center gap-1 select-none"
@@ -838,23 +839,14 @@ export default function ResultsGrid({
                     <span>حفظ النتيجة</span>
                   </button>
 
-                   <button 
-                     onClick={(e) => handleCopyText(offer, e)}
-                     className="text-center py-2.5 rounded-xl border border-slate-200 hover:border-slate-300 text-slate-700 font-bold text-[11px] transition-all hover:bg-slate-50 cursor-pointer flex items-center justify-center gap-1 select-none"
-                   >
-                     <Copy className="w-3.5 h-3.5 shrink-0" />
-                     <span>نسخ الحسبة</span>
-                   </button>
- 
-                   {getWhatsAppContactInfo(offer.bankId) && (
-                     <button 
-                       onClick={(e) => handleWhatsAppContact(offer, e)}
-                       className="text-center py-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-600 border border-emerald-100 text-emerald-700 hover:text-white font-bold text-[11px] transition-all cursor-pointer flex items-center justify-center gap-1 select-none"
-                     >
-                       <MessageCircle className="w-3.5 h-3.5 shrink-0" />
-                       <span>تواصل مع الموظف</span>
-                     </button>
-                   )}
+                  {/* Row 2 */}
+                  <button 
+                    onClick={(e) => handleCopyText(offer, e)}
+                    className="text-center py-2.5 rounded-xl border border-slate-200 hover:border-slate-300 text-slate-700 font-bold text-[11px] transition-all hover:bg-slate-50 cursor-pointer flex items-center justify-center gap-1 select-none"
+                  >
+                    <Copy className="w-3.5 h-3.5 shrink-0" />
+                    <span>نسخ الحسبة</span>
+                  </button>
 
                   <button 
                     onClick={(e) => handleShare(offer, e)}
@@ -863,6 +855,17 @@ export default function ResultsGrid({
                     <Share2 className="w-3.5 h-3.5 shrink-0" />
                     <span>مشاركة الحسبة</span>
                   </button>
+
+                  {/* Row 3 (Full width) */}
+                  {getWhatsAppContactInfo(offer.bankId) && (
+                    <button 
+                      onClick={(e) => handleWhatsAppContact(offer, e)}
+                      className="text-center py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs transition-all duration-200 shadow-lg shadow-emerald-100/50 hover:shadow-xl cursor-pointer flex items-center justify-center gap-2 select-none col-span-2"
+                    >
+                      <MessageCircle className="w-4 h-4 shrink-0" />
+                      <span>تواصل مع الموظف</span>
+                    </button>
+                  )}
                 </div>
               </div>
             );
