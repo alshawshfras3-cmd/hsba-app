@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAppState } from '../../context/AppContext';
+import { useLocation } from '../../hooks/useLocation';
 import { calculateBanksFinancing } from '../../lib/finance-engine';
 import { calculatePensionSalary } from '../../lib/finance-engine/pension';
 import { convertHijriToGregorian } from '../../lib/date-utils';
@@ -144,6 +145,8 @@ export default function StepWizard() {
     pensionDbRules: contextPensionDbRules,
     sectorMappings: contextSectorMappings
   } = useAppState();
+
+  const { navigate } = useLocation();
 
   const bankOrder = ['alahli', 'rajhi', 'alinma', 'fransi', 'bidaya', 'albilad', 'alarabi'];
   const sortedActiveBanks = [...banks.filter(b => b.isActive)].sort((a, b) => {
@@ -1511,59 +1514,59 @@ export default function StepWizard() {
     );
   };
 
+  const logicalStepId = activeStepId === 'main_type' ? 1 : (activeStepId === 'finance_options' ? 3 : 2);
+
   return (
-    <div className="w-full bg-[#F5F7FA]">
+    <div className="w-full bg-[#F8FAFC]">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
         {/* Step Wizard visual Progress stepper indicators */}
-        <div className="mb-6 md:mb-8 select-none">
-          {/* Desktop circles (hidden on mobile) */}
-          <div className="hidden sm:flex items-center justify-between">
-            {flow.map((stepId, index) => {
-              const s = index + 1;
-              const isActive = s === currentStep;
-              const isCompleted = s < currentStep;
+        <div className="mb-8 md:mb-10 select-none">
+          {/* Unified responsive 3-circle stepper */}
+          <div className="relative w-full max-w-xl mx-auto flex items-center justify-between px-2 sm:px-6 py-2" dir="rtl">
+            {/* Background line segment 1 */}
+            <div className={`absolute top-7 right-[18%] left-[50%] h-[1.5px] -z-10 transition-all duration-300 ${logicalStepId >= 2 ? 'bg-[#0057B8]' : 'bg-slate-200'}`} />
+            {/* Background line segment 2 */}
+            <div className={`absolute top-7 right-[50%] left-[18%] h-[1.5px] -z-10 transition-all duration-300 ${logicalStepId >= 3 ? 'bg-[#0057B8]' : 'bg-slate-200'}`} />
 
-              let stepLabel = '';
-              if (stepId === 'main_type') stepLabel = 'نوع الحسبة';
-              else if (stepId === 'personal_info') stepLabel = 'بيانات العميل';
-              else if (stepId === 'salary') stepLabel = 'الراتب والدخل';
-              else if (stepId === 'personal_info_and_salary') stepLabel = 'بيانات العميل والدخل';
-              else if (stepId === 'finance_options') stepLabel = 'خيارات الحسبة';
-
-              return (
-                <div key={stepId} className="flex flex-col items-center flex-1 relative font-sans group">
-                  <div className={`w-9 h-9 md:w-11 md:h-11 rounded-full flex items-center justify-center font-extrabold text-xs md:text-sm border-2 transition-all duration-300 ${
-                    isActive
-                      ? 'bg-[#0057B8] text-white border-[#0057B8] shadow-premium scale-110 ring-4 ring-blue-500/10'
-                      : isCompleted
-                      ? 'bg-emerald-500 text-white border-emerald-500 shadow-xs'
-                      : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300'
-                  }`}>
-                    {isCompleted ? '✓' : s}
-                  </div>
-                  <span className={`text-[10px] sm:text-xs font-bold mt-2.5 text-center leading-tight transition-all truncate max-w-[64px] sm:max-w-none ${isActive ? 'text-[#0057B8] block scale-102' : 'text-[#6B7280] hidden sm:block'}`}>
-                    {stepLabel}
-                  </span>
-                  {index < flow.length - 1 && (
-                    <div className={`absolute top-4.5 md:top-5.5 -left-1/2 w-full h-[2px] -z-10 transition-colors duration-300 ${isCompleted ? 'bg-emerald-400' : 'bg-slate-200'}`} />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Mobile Progress Bar (hidden on desktop) */}
-          <div className="block sm:hidden space-y-2 px-1">
-            <div className="flex justify-between items-center text-xs font-bold text-slate-700">
-              <span>التقدم في خطوات الحاسبة:</span>
-              <span className="text-[#0057B8] font-mono">الخطوة {currentStep} من {flow.length}</span>
+            {/* Step 1 */}
+            <div className="flex flex-col items-center">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm transition-all duration-300 z-10 ${
+                logicalStepId === 1 
+                  ? 'bg-[#0057B8] text-white border-2 border-[#0057B8] shadow-md shadow-blue-100 ring-4 ring-blue-500/10 scale-102' 
+                  : logicalStepId > 1 
+                  ? 'bg-[#0057B8] text-white border-2 border-[#0057B8]' 
+                  : 'bg-white text-slate-400 border border-slate-200'
+              }`}>
+                {logicalStepId > 1 ? '✓' : '1'}
+              </div>
+              <span className={`text-[10px] sm:text-xs font-sans font-extrabold mt-2 transition-all ${logicalStepId === 1 ? 'text-[#0057B8]' : 'text-slate-400 font-medium'}`}>نوع الحسبة</span>
             </div>
-            <div className="w-full h-2.5 bg-slate-150 rounded-full overflow-hidden border border-slate-200/40">
-              <div 
-                className="h-full bg-gradient-to-r from-[#0057B8] to-[#0ea5a4] rounded-full transition-all duration-300" 
-                style={{ width: `${Math.min(100, (currentStep / flow.length) * 100)}%` }}
-              />
+
+            {/* Step 2 */}
+            <div className="flex flex-col items-center">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm transition-all duration-300 z-10 ${
+                logicalStepId === 2 
+                  ? 'bg-[#0057B8] text-white border-2 border-[#0057B8] shadow-md shadow-blue-100 ring-4 ring-blue-500/10 scale-102' 
+                  : logicalStepId > 2 
+                  ? 'bg-[#0057B8] text-white border-2 border-[#0057B8]' 
+                  : 'bg-white text-slate-400 border border-slate-200'
+              }`}>
+                {logicalStepId > 2 ? '✓' : '2'}
+              </div>
+              <span className={`text-[10px] sm:text-xs font-sans font-extrabold mt-2 transition-all ${logicalStepId === 2 ? 'text-[#0057B8]' : 'text-slate-400 font-medium'}`}>بيانات العميل والدخل</span>
+            </div>
+
+            {/* Step 3 */}
+            <div className="flex flex-col items-center">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm transition-all duration-300 z-10 ${
+                logicalStepId === 3 
+                  ? 'bg-[#0057B8] text-white border-2 border-[#0057B8] shadow-md shadow-blue-100 ring-4 ring-blue-500/10 scale-102' 
+                  : 'bg-white text-slate-400 border border-slate-200'
+              }`}>
+                3
+              </div>
+              <span className={`text-[10px] sm:text-xs font-sans font-extrabold mt-2 transition-all ${logicalStepId === 3 ? 'text-[#0057B8]' : 'text-slate-400 font-medium'}`}>خيارات الحسبة</span>
             </div>
           </div>
         </div>
@@ -1586,55 +1589,67 @@ export default function StepWizard() {
           
           {/* STEP 1: Main Type Selection */}
           {activeStepId === 'main_type' && (
-            <div className="space-y-6 animate-fade-in text-right">
-              <div className="text-center max-w-lg mx-auto mb-8">
-                <h3 className="text-xl font-bold text-[#111827]">ما الذي تريد حسابه أولاً؟</h3>
-                <p className="text-sm text-[#6B7280] mt-1 font-sans">اختر مسار الحسبة المناسب للبدء في توجيه التمويل بدقة.</p>
+            <div className="space-y-8 animate-fade-in text-right">
+              <div className="text-center max-w-xl mx-auto mb-10">
+                <h3 className="text-2xl font-black text-[#1E293B] font-sans tracking-tight leading-snug">ما الذي تريد حسابه أولاً؟</h3>
+                <p className="text-sm text-slate-400 mt-1.5 font-sans leading-relaxed">اختر مسار الحسبة المناسب للبدء في توجيه التمويل بدقة.</p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-3xl mx-auto">
+                {/* Option 1: Real Estate */}
                 <div
                   id="re-type-card"
                   onClick={() => {
                     setMainFinanceType('real_estate');
-                    setCurrentStep(2);
                   }}
-                  className={`flex flex-col items-center justify-between text-center p-6 cursor-pointer transition-all border-2 rounded-2xl ${
+                  className={`relative flex flex-col items-center justify-between text-center p-8 cursor-pointer transition-all duration-300 border rounded-2xl ${
                     mainFinanceType === 'real_estate' && productId !== 'personal_only'
-                      ? 'border-[#0057B8] bg-[#0057B8]/5 shadow-sm scale-[1.02]' 
-                      : 'border-slate-200 bg-white hover:bg-slate-50'
+                      ? 'border-2 border-[#0057B8] bg-blue-50/25 shadow-md shadow-blue-50/50 scale-[1.01]' 
+                      : 'border-slate-200/95 bg-white hover:bg-slate-50/40 hover:border-slate-300 shadow-xs'
                   }`}
                 >
                   <div className="flex flex-col items-center w-full">
-                    <div className="w-14 h-14 bg-[#0057B8]/10 text-[#0057B8] rounded-2xl flex items-center justify-center shrink-0 mb-4">
-                      <Home className="w-7 h-7" />
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 mb-5 transition-colors duration-300 ${
+                      mainFinanceType === 'real_estate' && productId !== 'personal_only'
+                        ? 'bg-blue-100/80 text-[#0057B8] border border-blue-200/50'
+                        : 'bg-slate-100 text-slate-500'
+                    }`}>
+                      <Home className="w-6 h-6" />
                     </div>
                     <div className="text-center">
-                      <h4 className="font-extrabold text-[#111827] text-base">تمويل عقاري</h4>
-                      <p className="text-xs text-gray-500 mt-2 leading-relaxed font-sans">لحساب الحلول العقارية المتكاملة (عقاري فقط، عقاري بلس مع شخصي جديد، أو عقاري مع شخصي قائم).</p>
+                      <h4 className="font-extrabold text-[#0F172A] text-base leading-none">تمويل عقاري</h4>
+                      <p className="text-xs text-slate-400 mt-3 leading-relaxed font-sans font-medium">
+                        لحساب الحلول العقارية المتكاملة (عقاري فقط، عقاري بلس مع شخصي جديد، أو عقاري مع شخصي قائم).
+                      </p>
                     </div>
                   </div>
                 </div>
 
+                {/* Option 2: Personal Only */}
                 <div
                   id="pf-type-card"
                   onClick={() => {
                     setMainFinanceType('personal_only');
-                    setCurrentStep(2);
                   }}
-                  className={`flex flex-col items-center justify-between text-center p-6 cursor-pointer transition-all border-2 rounded-2xl ${
+                  className={`relative flex flex-col items-center justify-between text-center p-8 cursor-pointer transition-all duration-300 border rounded-2xl ${
                     mainFinanceType === 'personal_only' 
-                      ? 'border-amber-500 bg-amber-50/10 shadow-sm scale-[1.02]' 
-                      : 'border-slate-200 bg-white hover:bg-slate-50'
+                      ? 'border-2 border-[#0057B8] bg-blue-50/25 shadow-md shadow-blue-50/50 scale-[1.01]' 
+                      : 'border-slate-200/95 bg-white hover:bg-slate-50/40 hover:border-slate-300 shadow-xs'
                   }`}
                 >
                   <div className="flex flex-col items-center w-full">
-                    <div className="w-14 h-14 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center shrink-0 mb-4">
-                      <Coins className="w-7 h-7" />
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 mb-5 transition-colors duration-300 ${
+                      mainFinanceType === 'personal_only'
+                        ? 'bg-amber-100 text-amber-600 border border-amber-200/50'
+                        : 'bg-slate-100 text-slate-500'
+                    }`}>
+                      <Coins className="w-6 h-6" />
                     </div>
                     <div className="text-center">
-                      <h4 className="font-extrabold text-[#111827] text-base">تمويل شخصي فقط</h4>
-                      <p className="text-xs text-gray-500 mt-2 leading-relaxed font-sans">لحساب التمويل الشخصي الاستهلاكي القصير المستقل بنسب استقطاع مخصصة.</p>
+                      <h4 className="font-extrabold text-[#0F172A] text-base leading-none">تمويل شخصي فقط</h4>
+                      <p className="text-xs text-slate-400 mt-3 leading-relaxed font-sans font-medium">
+                        لحساب التمويل الشخصي الاستهلاكي القصير المستقل بنسب استقطاع مخصصة.
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -1770,7 +1785,7 @@ export default function StepWizard() {
                         </div>
                       </div>
                       <div className="space-y-1.5">
-                        <label className="block text-xs font-bold text-gray-700">الشهور المتبقية للالتزام الحالي:</label>
+                        <label className="block text-[10px] font-bold text-gray-400 font-sans">الشهور المتبقية للالتزام الحالي:</label>
                         <div className="relative">
                           <NumericInput
                             id="obligation-remaining-months-input-direct"
@@ -1791,9 +1806,9 @@ export default function StepWizard() {
                 {/* Sakani Program (Mortgage support) - ONLY FOR MORTGAGES */}
                 {mainFinanceType !== 'personal_only' && (
                   <div className="border border-gray-200 bg-white rounded-2xl p-5 text-right space-y-3">
-                    <label className="block text-xs font-bold text-gray-700 flex items-center justify-between">
+                    <label className="block text-xs font-bold text-gray-700 flex items-center justify-between font-sans">
                       <span>برنامج الدعم السكني (سكني):</span>
-                      <HelpCircle className="w-4.5 h-4.5 text-gray-400" />
+                      <HelpCircle className="w-4.5 h-4.5 text-gray-400 font-sans" />
                     </label>
                     <div className="grid grid-cols-3 gap-2">
                       {[
@@ -1817,54 +1832,6 @@ export default function StepWizard() {
                     </div>
                   </div>
                 )}
-
-                {/* Term Option Mode - ONLY FOR MORTGAGES */}
-                {mainFinanceType !== 'personal_only' && (
-                  <div className="border border-[#E5E7EB] bg-white rounded-2xl p-5 text-right space-y-3">
-                    <label className="block text-xs font-bold text-gray-700">المدة المستهدفة للتمويل العقاري:</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {[
-                        { id: 'max', label: 'المدة الأقصى' },
-                        { id: 'until_retirement', label: 'حتى التقاعد' },
-                        { id: 'manual', label: 'اختيار يدوي' }
-                      ].map((tm) => (
-                        <button
-                          key={tm.id}
-                          type="button"
-                          onClick={() => setTermMode(tm.id as TermMode)}
-                          className={`py-2 px-1 text-xs font-bold rounded-lg border text-center transition-all cursor-pointer ${
-                            termMode === tm.id
-                              ? 'border-[#0057B8] bg-[#0057B8]/5 text-[#0057B8]'
-                              : 'border-gray-200 text-gray-500 hover:bg-gray-50 hover:border-gray-300'
-                          }`}
-                        >
-                          {tm.label}
-                        </button>
-                      ))}
-                    </div>
-
-                    {termMode === 'manual' && (
-                      <div className="mt-3 space-y-2 animate-fade-in">
-                        <label className="block text-[10px] font-bold text-gray-400">عدد سنوات التمويل المستهدفة (بحد أقصى 30 سنة):</label>
-                        <div className="relative">
-                          <NumericInput
-                            id="manual-term-years-input"
-                            min={1}
-                            max={30}
-                            allowDecimals={false}
-                            placeholder="مثال: 30"
-                            value={manualTermYears}
-                            onChange={setManualTermYears}
-                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
-                          />
-                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-500">سنة</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-
 
                 {/* Preferred Bank Filter - FOR BOTH PATHS */}
                 <div className="border border-gray-200 bg-white rounded-2xl p-5 text-right space-y-3 col-span-1 md:col-span-2">
@@ -1893,7 +1860,7 @@ export default function StepWizard() {
               type="button"
               onClick={handleBack}
               disabled={currentStep === 1}
-              className="w-full sm:w-auto min-h-[44px] justify-center px-6 py-3 rounded-xl border border-gray-200 text-gray-500 font-semibold text-xs leading-none hover:bg-gray-50 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed flex items-center gap-1.5 transition-all"
+              className="w-full sm:w-auto min-h-[44px] justify-center px-6 py-2.5 rounded-xl border border-gray-200 text-gray-500 font-semibold text-xs leading-none hover:bg-gray-50 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed flex items-center gap-1.5 transition-all"
             >
               <ChevronRight className="w-3.5 h-3.5" />
               <span>رجوع</span>
@@ -1904,7 +1871,7 @@ export default function StepWizard() {
                 id="next-step-btn"
                 type="button"
                 onClick={handleNext}
-                className="w-full sm:w-auto min-h-[44px] justify-center px-6 py-3 rounded-xl bg-[#0057B8] text-white font-semibold text-xs leading-none hover:bg-[#004494] cursor-pointer flex items-center gap-1.5 transition-all shadow-md shadow-blue-100"
+                className="w-full sm:w-auto min-h-[44px] justify-center px-6 py-2.5 rounded-xl bg-[#0057B8] text-white font-semibold text-xs leading-none hover:bg-[#004494] cursor-pointer flex items-center gap-1.5 transition-all shadow-sm active:scale-98"
               >
                 <span>التالي</span>
                 <ChevronLeft className="w-3.5 h-3.5" />
@@ -1914,7 +1881,7 @@ export default function StepWizard() {
                 id="calc-submit-btn"
                 type="button"
                 onClick={triggerCalculations}
-                className="w-full sm:w-auto min-h-[44px] justify-center px-8 py-3.5 rounded-xl bg-[#0057B8] text-white font-bold text-sm leading-none hover:bg-[#004494] transition-all cursor-pointer flex items-center gap-2 shadow-lg shadow-blue-200"
+                className="w-full sm:w-auto min-h-[44px] justify-center px-8 py-3.5 rounded-xl bg-[#0057B8] text-white font-bold text-sm leading-none hover:bg-[#004494] transition-all cursor-pointer flex items-center gap-2 shadow-sm"
               >
                 <Calculator className="w-4 h-4" />
                 <span>{results ? 'تحديث وإعادة الحساب' : 'احسب النتائج ومقارنة العروض'}</span>
@@ -1958,6 +1925,75 @@ export default function StepWizard() {
           )}
 
         </div>
+
+        {/* 5. Trust Banner (شريط الثقة أسفل البطاقة) */}
+        {currentStep === 1 && !results && (
+          <div className="mt-8 bg-blue-50/20 border border-blue-100/60 rounded-2xl p-6 sm:p-8 space-y-6 text-right font-sans">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              
+              {/* Column 1 */}
+              <div className="flex gap-3.5 items-start">
+                <div className="w-10 h-10 rounded-xl bg-blue-100/60 flex items-center justify-center shrink-0 border border-blue-200/40 text-[#0057B8]">
+                  <Calculator className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="font-black text-[#0057B8] text-sm leading-tight mb-1.5 font-sans">ذكي ومفيد</h4>
+                  <p className="text-xs text-slate-500 leading-relaxed font-medium">يقارن نتائج التمويل وفق بيانات العميل وقواعد البنوك المتاحة.</p>
+                </div>
+              </div>
+
+              {/* Column 2 */}
+              <div className="flex gap-3.5 items-start">
+                <div className="w-10 h-10 rounded-xl bg-blue-100/60 flex items-center justify-center shrink-0 border border-blue-200/40 text-[#0057B8]">
+                  <Scale className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="font-black text-[#0057B8] text-sm leading-tight mb-1.5 font-sans">آمن وموثوق</h4>
+                  <p className="text-xs text-slate-500 leading-relaxed font-medium">تُسخدم بياناتك لإجراء الحسبة ولا تظهر ضمن النتائج المشاركة.</p>
+                </div>
+              </div>
+
+              {/* Column 3 */}
+              <div className="flex gap-3.5 items-start">
+                <div className="w-10 h-10 rounded-xl bg-blue-100/60 flex items-center justify-center shrink-0 border border-blue-200/40 text-[#0057B8]">
+                  <HelpCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="font-black text-[#0057B8] text-sm leading-tight mb-1.5 font-sans">بسيط وسهل</h4>
+                  <p className="text-xs text-slate-500 leading-relaxed font-medium">خطوات مختصرة ونتائج واضحة تساعدك على مقارنة الخيارات.</p>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Disclaimer disclaimer line below columns */}
+            <div className="border-t border-blue-100/40 pt-4 flex gap-2 items-center justify-center text-center text-[10px] text-slate-450 leading-relaxed">
+              <Info className="w-3.5 h-3.5 text-blue-500/70 inline-block shrink-0" />
+              <span>النتائج تقديرية ولا تمثل موافقة نهائية أو عرضًا ملزمًا من أي بنك أو جهة تمويلية.</span>
+            </div>
+          </div>
+        )}
+
+        {/* 6. Minimalist Footer (الفوتر الصغير) */}
+        {!results && (
+          <div className="border-t border-slate-200/40 mt-12 py-6 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs font-sans max-w-6xl mx-auto" dir="rtl">
+            <div className="text-slate-400 font-medium">
+              <span>© 2026 حسبة</span>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 font-bold text-slate-500 selection:bg-blue-100">
+              <button onClick={() => navigate('/terms')} className="hover:text-[#0057B8] transition-colors cursor-pointer">شروط الاستخدام</button>
+              <span className="text-slate-200">|</span>
+              <button onClick={() => navigate('/privacy')} className="hover:text-[#0057B8] transition-colors cursor-pointer">سياسة الخصوصية</button>
+              <span className="text-slate-200">|</span>
+              <button onClick={() => navigate('/disclaimer')} className="hover:text-[#0057B8] transition-colors cursor-pointer">إخلاء المسؤولية</button>
+              <span className="text-slate-200">|</span>
+              <button onClick={() => {
+                window.dispatchEvent(new CustomEvent('open-customer-assistant'));
+              }} className="hover:text-[#0057B8] transition-colors cursor-pointer">تواصل معنا</button>
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );

@@ -41,56 +41,56 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-40 w-full bg-white/95 dark:bg-[#0B0F19]/95 backdrop-blur-md border-b border-slate-200/85 dark:border-slate-800/80 transition-all duration-200 shadow-xs">
       {/* 1. DESKTOP HEADER (hidden on mobile) */}
-      <div className="hidden sm:flex max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 items-center justify-between">
+      <div className="hidden sm:flex max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 items-center justify-between">
         {/* Brand Identity */}
-        <div className="flex items-center gap-4">
-          <div className="w-11 h-11 bg-gradient-to-tr from-[#0057B8] to-[#0074F0] rounded-xl flex items-center justify-center shadow-md text-white font-sans font-black text-xl select-none transform hover:scale-102 transition-transform">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-[#0057B8] rounded-xl flex items-center justify-center shadow-md text-white font-sans font-black text-lg select-none transform hover:scale-102 transition-transform">
             ح
           </div>
-          <div>
-            <h1 className="font-sans font-extrabold text-xl tracking-tight text-[#111827] dark:text-white leading-none">حسبة</h1>
-            <span className="text-[10px] text-gray-400 dark:text-slate-400 block mt-1.5 font-medium">التمويل الذكي للمواطن السعودي</span>
+          <div className="text-right">
+            <h1 className="font-sans font-black text-base tracking-tight text-[#111827] dark:text-white leading-none">حسبة</h1>
+            <span className="text-[9px] text-gray-400 dark:text-slate-400 block mt-1 font-medium font-sans">التمويل الذي للمواطن السعودي</span>
           </div>
         </div>
 
         {/* Global Navigation */}
-        <div className="flex items-center gap-1.5 bg-slate-100/80 dark:bg-slate-800/60 p-1 rounded-xl border border-slate-200/50">
+        <div className="flex items-center gap-1 bg-[#F1F5F9]/80 dark:bg-slate-800/60 p-1 rounded-xl border border-slate-100 dark:border-slate-700/50">
           <button
             id="nav-calc-btn"
             onClick={() => handleNavChange('calculator')}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-sans text-xs font-bold transition-all ${
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg font-sans text-xs font-bold transition-all duration-200 cursor-pointer ${
               location.pathname !== '/admin' && location.pathname !== '/account' && location.pathname !== '/results' && location.pathname !== '/about' && location.pathname !== '/about-us'
-                ? 'bg-white dark:bg-[#0F172A] text-[#0057B8] dark:text-white shadow-xs'
-                : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                ? 'bg-white dark:bg-[#0F172A] text-[#0057B8] dark:text-white border border-[#0057B8]/10 shadow-[0_2px_8px_-1px_rgba(0,87,184,0.08)]'
+                : 'text-[#64748B] hover:text-[#0F172A] dark:text-slate-400 dark:hover:text-white'
             }`}
           >
-            <Calculator className="w-4 h-4" />
+            <Calculator className="w-3.5 h-3.5" />
             <span>حاسبة العميل</span>
           </button>
 
           <button
             id="nav-results-btn"
             onClick={() => location.navigate('/results')}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-sans text-xs font-bold transition-all ${
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg font-sans text-xs font-bold transition-all duration-200 cursor-pointer ${
               location.pathname === '/results'
-                ? 'bg-white dark:bg-[#0F172A] text-[#0057B8] dark:text-white shadow-xs'
-                : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                ? 'bg-white dark:bg-[#0F172A] text-[#0057B8] dark:text-white border border-[#0057B8]/10 shadow-[0_2px_8px_-1px_rgba(0,87,184,0.08)]'
+                : 'text-[#64748B] hover:text-[#0F172A] dark:text-slate-400 dark:hover:text-white'
             }`}
           >
-            <BarChart3 className="w-4 h-4" />
+            <BarChart3 className="w-3.5 h-3.5" />
             <span>نتائجي</span>
           </button>
 
           <button
             id="nav-about-btn"
             onClick={() => location.navigate('/about')}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-sans text-xs font-bold transition-all ${
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg font-sans text-xs font-bold transition-all duration-200 cursor-pointer ${
               location.pathname === '/about' || location.pathname === '/about-us'
-                ? 'bg-white dark:bg-[#0F172A] text-[#0057B8] dark:text-white shadow-xs'
-                : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                ? 'bg-white dark:bg-[#0F172A] text-[#0057B8] dark:text-white border border-[#0057B8]/10 shadow-[0_2px_8px_-1px_rgba(0,87,184,0.08)]'
+                : 'text-[#64748B] hover:text-[#0F172A] dark:text-slate-400 dark:hover:text-white'
             }`}
           >
-            <HelpCircle className="w-4 h-4" />
+            <HelpCircle className="w-3.5 h-3.5" />
             <span>من نحن</span>
           </button>
 
@@ -99,9 +99,9 @@ export default function Header() {
             onClick={() => {
               window.dispatchEvent(new CustomEvent('open-customer-assistant'));
             }}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-sans text-xs font-bold transition-all text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg font-sans text-xs font-bold text-[#64748B] hover:text-[#0F172A] dark:text-slate-400 dark:hover:text-white transition-all cursor-pointer"
           >
-            <Sparkles className="w-4 h-4 text-[#0ea5a4]" />
+            <Sparkles className="w-3.5 h-3.5 text-[#0ea5a4]" />
             <span>مساعد حسبة</span>
           </button>
           
@@ -109,13 +109,13 @@ export default function Header() {
             <button
               id="nav-account-btn"
               onClick={() => location.navigate('/account')}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-sans text-xs font-bold transition-all ${
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg font-sans text-xs font-bold transition-all duration-200 cursor-pointer ${
                 location.pathname === '/account'
-                  ? 'bg-white dark:bg-[#0F172A] text-[#0057B8] dark:text-white shadow-xs'
-                  : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                  ? 'bg-white dark:bg-[#0F172A] text-[#0057B8] dark:text-white border border-[#0057B8]/10 shadow-[0_2px_8px_-1px_rgba(0,87,184,0.08)]'
+                  : 'text-[#64748B] hover:text-[#0F172A] dark:text-slate-400 dark:hover:text-white'
               }`}
             >
-              <User className="w-4 h-4" />
+              <User className="w-3.5 h-3.5" />
               <span>ملفي الشخصي</span>
             </button>
           )}
@@ -125,7 +125,7 @@ export default function Header() {
         {/* Brand Minimal Accent */}
         <div className="hidden md:flex items-center gap-3">
           {user ? (
-            <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 p-1.5 pr-4 pl-1.5 rounded-full select-none font-sans shadow-xs">
+            <div className="flex items-center gap-2 bg-[#F1F5F9]/60 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 p-1 pr-3 pl-1 rounded-xl select-none font-sans">
               <div className="text-right">
                 <span className="text-[10px] text-gray-600 dark:text-slate-200 font-bold block max-w-[140px] truncate leading-none font-mono" title={user.email}>
                   {user.email}
@@ -134,9 +134,9 @@ export default function Header() {
               <button
                 onClick={signOut}
                 title="تسجيل الخروج"
-                className="w-8 h-8 bg-white dark:bg-slate-700 border border-slate-200/60 dark:border-slate-600 hover:border-red-200 hover:text-red-600 dark:text-slate-200 dark:hover:text-red-400 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-xs shrink-0"
+                className="w-7 h-7 bg-white dark:bg-slate-700 border border-slate-200/60 dark:border-slate-600 hover:border-red-200 hover:text-red-600 dark:text-slate-200 dark:hover:text-red-400 rounded-lg flex items-center justify-center transition-all cursor-pointer shadow-xs shrink-0"
               >
-                <LogOut className="w-3.5 h-3.5" />
+                <LogOut className="w-3 h-3" />
               </button>
             </div>
           ) : (
