@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { BankCalculationResult, ProductId } from '../../types';
 import { 
   Building2, CheckCircle, XCircle, AlertTriangle, ArrowLeftRight, Clock, Percent, ListCollapse,
-  Download, HelpCircle, Activity, Info, Users, ChevronDown, Award, Bookmark, Copy, Share2, MessageCircle
+  Download, HelpCircle, Activity, Info, Users, ChevronDown, Award, Bookmark, Copy, Share2
 } from 'lucide-react';
 import { useAppState } from '../../context/AppContext';
 import { saveCalculationResult } from '../../lib/savedResultsService';
@@ -37,7 +37,7 @@ export default function ResultsGrid({
     ? 'personal_only'
     : rawProductId;
 
-  const { user, userRole, userSubscriptions, setUserSubscriptions, banks } = useAppState();
+  const { user, userRole, userSubscriptions, setUserSubscriptions } = useAppState();
   const [activeSort, setActiveSort] = useState<'power' | 'installment' | 'margin' | 'term'>('power');
   const [selectedOffer, setSelectedOffer] = useState<BankCalculationResult | null>(null);
   const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
@@ -56,7 +56,9 @@ export default function ResultsGrid({
 
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'refuse' } | null>(null);
 
-  const getCalculationCopyText = (offer: BankCalculationResult): string => {
+  const handleCopyText = async (offer: BankCalculationResult, e: React.MouseEvent) => {
+    e.stopPropagation(); // prevent modal opening!
+
     const isApp = offer.status === 'approved';
     const isWarn = offer.status === 'warning';
     const isRej = offer.status === 'rejected';
@@ -145,13 +147,7 @@ export default function ResultsGrid({
 
     lines.push(`هامش الربح السنوي: ${offer.annualMargin}%`);
 
-    return lines.join('\n');
-  };
-
-  const handleCopyText = async (offer: BankCalculationResult, e: React.MouseEvent) => {
-    e.stopPropagation(); // prevent modal opening!
-
-    const textToCopy = getCalculationCopyText(offer);
+    const textToCopy = lines.join('\n');
 
     try {
       await navigator.clipboard.writeText(textToCopy);
@@ -159,59 +155,6 @@ export default function ResultsGrid({
       setTimeout(() => setToast(null), 3000);
     } catch (err: any) {
       console.error('Failed to copy calculation:', err);
-    }
-  };
-
-  const getWhatsAppContactInfo = (bankId: string) => {
-    const bankObj = banks?.find(b => b.id === bankId);
-    const rawContact = bankObj?.employeeWhatsApp?.trim();
-    if (!rawContact) return null;
-
-    if (rawContact.startsWith('http://') || rawContact.startsWith('https://') || rawContact.includes('wa.me') || rawContact.includes('whatsapp.com')) {
-      return { type: 'url' as const, value: rawContact };
-    }
-
-    const cleanNumber = rawContact.replace(/[\s+\-()]/g, '');
-    if (/^\d+$/.test(cleanNumber)) {
-      return { type: 'number' as const, value: cleanNumber };
-    }
-
-    return null;
-  };
-
-  const handleWhatsAppContact = (offer: BankCalculationResult, e: React.MouseEvent) => {
-    e.stopPropagation();
-
-    const contactInfo = getWhatsAppContactInfo(offer.bankId);
-    if (!contactInfo) return;
-
-    const message = `السلام عليكم، لدي استفسار عن نتيجة الحسبة التالية:\n\n${getCalculationCopyText(offer)}`;
-    const encodedText = encodeURIComponent(message);
-
-    let url = '';
-
-    if (contactInfo.type === 'number') {
-      url = `https://wa.me/${contactInfo.value}?text=${encodedText}`;
-    } else if (contactInfo.type === 'url') {
-      let baseUrl = contactInfo.value;
-      if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
-        baseUrl = 'https://' + baseUrl;
-      }
-      try {
-        const parsedUrl = new URL(baseUrl);
-        parsedUrl.searchParams.set('text', message);
-        url = parsedUrl.toString();
-      } catch (err) {
-        if (baseUrl.includes('?')) {
-          url = `${baseUrl}&text=${encodedText}`;
-        } else {
-          url = `${baseUrl}?text=${encodedText}`;
-        }
-      }
-    }
-
-    if (url) {
-      window.open(url, '_blank', 'noopener,noreferrer');
     }
   };
 
@@ -838,23 +781,13 @@ export default function ResultsGrid({
                     <span>حفظ النتيجة</span>
                   </button>
 
-                   <button 
-                     onClick={(e) => handleCopyText(offer, e)}
-                     className="text-center py-2.5 rounded-xl border border-slate-200 hover:border-slate-300 text-slate-700 font-bold text-[11px] transition-all hover:bg-slate-50 cursor-pointer flex items-center justify-center gap-1 select-none"
-                   >
-                     <Copy className="w-3.5 h-3.5 shrink-0" />
-                     <span>نسخ الحسبة</span>
-                   </button>
- 
-                   {getWhatsAppContactInfo(offer.bankId) && (
-                     <button 
-                       onClick={(e) => handleWhatsAppContact(offer, e)}
-                       className="text-center py-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-600 border border-emerald-100 text-emerald-700 hover:text-white font-bold text-[11px] transition-all cursor-pointer flex items-center justify-center gap-1 select-none"
-                     >
-                       <MessageCircle className="w-3.5 h-3.5 shrink-0" />
-                       <span>تواصل مع الموظف</span>
-                     </button>
-                   )}
+                  <button 
+                    onClick={(e) => handleCopyText(offer, e)}
+                    className="text-center py-2.5 rounded-xl border border-slate-200 hover:border-slate-300 text-slate-700 font-bold text-[11px] transition-all hover:bg-slate-50 cursor-pointer flex items-center justify-center gap-1 select-none"
+                  >
+                    <Copy className="w-3.5 h-3.5 shrink-0" />
+                    <span>نسخ الحسبة</span>
+                  </button>
 
                   <button 
                     onClick={(e) => handleShare(offer, e)}

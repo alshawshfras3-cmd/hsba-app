@@ -52,7 +52,6 @@ export const BanksSection: React.FC<BanksSectionProps> = ({
   const [instIsActive, setInstIsActive] = useState(true);
   const [instCalendarType, setInstCalendarType] = useState<'hijri' | 'gregorian'>('gregorian');
   const [instInternalNotes, setInstInternalNotes] = useState('');
-  const [instEmployeeWhatsApp, setInstEmployeeWhatsApp] = useState('');
   const [instModalError, setInstModalError] = useState('');
 
   const openAddInstitution = () => {
@@ -70,7 +69,6 @@ export const BanksSection: React.FC<BanksSectionProps> = ({
     setInstIsActive(true);
     setInstCalendarType('gregorian');
     setInstInternalNotes('');
-    setInstEmployeeWhatsApp('');
     setInstModalError('');
     setIsInstitutionModalOpen(true);
   };
@@ -90,7 +88,6 @@ export const BanksSection: React.FC<BanksSectionProps> = ({
     setInstIsActive(bank.isActive !== false);
     setInstCalendarType(bank.calendarType || 'gregorian');
     setInstInternalNotes(bank.internalNotes || '');
-    setInstEmployeeWhatsApp(bank.employeeWhatsApp || '');
     setInstModalError('');
     setIsInstitutionModalOpen(true);
   };
@@ -125,8 +122,7 @@ export const BanksSection: React.FC<BanksSectionProps> = ({
       maxAgeAtEnd: Number(instMaxAgeAtEnd) || 75,
       monthsAfterRetirement: instAllowAfterRetirement ? (Number(instMonthsAfterRetirement) || 0) : 0,
       allowAfterRetirement: instAllowAfterRetirement,
-      displayOrder: editingInstitution ? (editingInstitution.displayOrder || 1) : (banks.length + 1),
-      employeeWhatsApp: instEmployeeWhatsApp.trim() || undefined
+      displayOrder: editingInstitution ? (editingInstitution.displayOrder || 1) : (banks.length + 1)
     };
 
     if (instInternalNotes.trim()) {
@@ -630,18 +626,6 @@ export const BanksSection: React.FC<BanksSectionProps> = ({
                   placeholder="مثال: SNB Finance, Rajhi Bank"
                   className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-right"
                 />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">رقم أو رابط واتساب الموظف (اختياري):</label>
-                <input
-                  type="text"
-                  value={instEmployeeWhatsApp}
-                  onChange={(e) => setInstEmployeeWhatsApp(e.target.value)}
-                  placeholder="رقم أو رابط واتساب الموظف"
-                  className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-right"
-                />
-                <p className="text-[10px] text-gray-400 mt-1">الاسم الداخلي للحقل هو `employeeWhatsApp` ويستخدم لإضافة زر تواصل واتساب مع موظف البنك في بطاقة النتيجة.</p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

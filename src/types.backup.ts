@@ -33,7 +33,6 @@ export interface Bank {
   maxRealEstateAmount?: number;
   minPersonalAmount?: number;
   maxPersonalAmount?: number;
-  employeeWhatsApp?: string;
 }
 
 export interface ProductAcceptance {
