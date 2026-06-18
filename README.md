@@ -1,20 +1,36 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# حسبة - Hesba App
 
-# Run and deploy your AI Studio app
+تطبيق ويب ذكي للمقارنة التقديرية والمبدئية لمنتجات التمويل السكني والشركات والتمويل الشخصي بين البنوك السعودية المختلفة بناءً على معايير الدعم الائتماني والتقاعد.
 
-This contains everything you need to run your app locally.
+## طريقة التشغيل المحلي
 
-View your app in AI Studio: https://ai.studio/apps/1978fcc5-d88b-4e95-bfa3-12bccbf5b782
+1. تأكد من تثبيت Node.js (الموصى به الإصدار 18 فما فوق).
+2. تثبيت الحزم البرمجية المطلوبة:
+   ```bash
+   npm install
+   ```
+3. تشغيل خادم التطوير المحلي:
+   ```bash
+   npm run dev
+   ```
 
-## Run Locally
+## أوامر البناء والإنتاج
 
-**Prerequisites:**  Node.js
+لبناء التطبيق للإنتاج وتوليد حزمة الملفات الثابتة (Static assets):
+```bash
+npm run build
+```
 
+لتشغيل فحص الأخطاء (Lint):
+```bash
+npm run lint
+```
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## متغيرات البيئة المطلوبة (Environment Variables)
+
+يتطلب التطبيق توفر الإعدادات التالية في ملف البيئة الخاص بك `.env`:
+* `VITE_SUPABASE_URL` : رابط مشروع قاعدة بيانات Supabase.
+* `VITE_SUPABASE_ANON_KEY` : مفتاح الاتصال العادي (Anonymous Key) لقاعدة بيانات Supabase.
+
+## ملاحظة هامة
+النتائج كافة هي نتائج حسبة تقديرية تمهيدية ومبدئية للمقارنة تهدف إلى تسهيل اتخاذ القرارات، والقرار النهائي والالتزام يعود كلياً إلى البنك أو الجهة التمويلية بعد تقديم ومراجعة الطلبات الرسمية.

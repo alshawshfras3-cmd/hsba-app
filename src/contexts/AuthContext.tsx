@@ -70,11 +70,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(() => getCachedProfile());
   const [loading, setLoading] = useState(() => !isCheckedInSession());
   const [isSuspendedUser, setIsSuspendedUser] = useState(false);
-  const [isAdminInDb, setIsAdminInDb] = useState<boolean>(() => {
-    try {
-      return sessionStorage.getItem('hesba_is_admin') === 'true';
-    } catch { return false; }
-  });
+  const [isAdminVerified, setIsAdminVerified] = useState(false);
+  const [isAdminInDb, setIsAdminInDb] = useState<boolean>(false);
 
   function clearLocalAuthState() {
     setUser(null);
@@ -82,6 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSession(null);
     setIsSuspendedUser(false);
     setIsAdminInDb(false);
+    setIsAdminVerified(false);
     setLoading(false);
 
     try {
@@ -293,10 +291,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           } catch (e) {
             console.error(e);
           }
-          const isAdminUser = await checkAdminStatus(session.user.id);
+           const isAdminUser = await checkAdminStatus(session.user.id);
           console.log("[AUTH_DEBUG] initializeAuth: setting isAdminInDb on DB basis:", isAdminUser);
           if (active) {
             setIsAdminInDb(isAdminUser);
+            setIsAdminVerified(true);
             try {
               sessionStorage.setItem('hesba_is_admin', isAdminUser ? 'true' : 'false');
             } catch {}
@@ -312,6 +311,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (active) {
             console.log("[AUTH_DEBUG] initializeAuth: No user session found, setting isAdminInDb false");
             setIsAdminInDb(false);
+            setIsAdminVerified(true);
             try { sessionStorage.removeItem('hesba_is_admin'); } catch {}
           }
         }
@@ -366,10 +366,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           } catch (e) {
             console.error(e);
           }
-          checkAdminStatus(session.user.id).then((isAdminUser) => {
+           checkAdminStatus(session.user.id).then((isAdminUser) => {
             console.log("[AUTH_DEBUG] onAuthStateChange: setting isAdminInDb on DB basis:", isAdminUser);
             if (active) {
               setIsAdminInDb(isAdminUser);
+              setIsAdminVerified(true);
               try {
                 sessionStorage.setItem('hesba_is_admin', isAdminUser ? 'true' : 'false');
               } catch {}
@@ -398,7 +399,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const isAdmin = isAdminInDb;
+  const isAdmin = isAdminInDb && isAdminVerified;
   const isOwner = isAdmin;
   const isStaff = isAdmin;
   const isCustomer = !isAdmin;
@@ -561,9 +562,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     clearLocalAuthState();
   }
 
+  const compoundLoading = loading || (!!session?.user && !isAdminVerified);
+
   return (
     <AuthContext.Provider value={{
-      user, session, profile, loading,
+      user, session, profile, loading: compoundLoading,
       isOwner, isAdmin: legacyIsAdmin, isStaff, isCustomer, isManager: legacyIsManager,
       canAccessDashboard,
       signInWithGoogle, signInWithEmail, signUpWithEmail, signOut,

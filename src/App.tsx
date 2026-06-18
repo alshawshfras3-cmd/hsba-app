@@ -3,24 +3,26 @@ import { AppStateProvider, useAppState } from './context/AppContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { LoginPage } from './pages/LoginPage';
-import { AboutPage } from './pages/AboutPage';
-import { AccountPage } from './pages/AccountPage';
-import { ResultsPage } from './pages/ResultsPage';
-import { TermsPage } from './pages/TermsPage';
-import { PrivacyPage } from './pages/PrivacyPage';
-import { DisclaimerPage } from './pages/DisclaimerPage';
 import { useLocation } from './hooks/useLocation';
 import Header from './components/layout/Header';
 import BottomNavigation from './components/layout/BottomNavigation';
 import StepWizard from './components/calculator/StepWizard';
-import AdminDashboard from './components/admin/AdminDashboard';
-import { AdminLoginPage } from './pages/AdminLoginPage';
 import { AdminDashboardGuard } from './components/admin/AdminDashboardGuard';
-import ResetPasswordPage from './pages/ResetPasswordPage';
 import AuthCallbackPage from './pages/AuthCallbackPage';
 import { Calculator, ShieldCheck, Mail, Phone, ExternalLink, ShieldAlert, Loader2 } from 'lucide-react';
 import { supabase, hasSupabaseKeys, cleanStaleSupabaseSession } from './lib/supabase';
 import AssistantWidget from './components/layout/AssistantWidget';
+
+// Lazy loading heavy pages to reduce initial bundle size
+const AboutPage = React.lazy(() => import('./pages/AboutPage').then(module => ({ default: module.AboutPage })));
+const AccountPage = React.lazy(() => import('./pages/AccountPage').then(module => ({ default: module.AccountPage })));
+const ResultsPage = React.lazy(() => import('./pages/ResultsPage').then(module => ({ default: module.ResultsPage })));
+const TermsPage = React.lazy(() => import('./pages/TermsPage').then(module => ({ default: module.TermsPage })));
+const PrivacyPage = React.lazy(() => import('./pages/PrivacyPage').then(module => ({ default: module.PrivacyPage })));
+const DisclaimerPage = React.lazy(() => import('./pages/DisclaimerPage').then(module => ({ default: module.DisclaimerPage })));
+const AdminLoginPage = React.lazy(() => import('./pages/AdminLoginPage').then(module => ({ default: module.AdminLoginPage })));
+const AdminDashboard = React.lazy(() => import('./components/admin/AdminDashboard'));
+const ResetPasswordPage = React.lazy(() => import('./pages/ResetPasswordPage'));
 
 function MarketingFooter() {
   const { navigate } = useLocation();
@@ -44,10 +46,15 @@ function MarketingFooter() {
 
         {/* Quick links info */}
         <div className="space-y-3">
-          <h4 className="text-white font-bold text-sm">سرعة التنقل والتحكم لمدير الحسبة:</h4>
-          <p className="font-sans leading-relaxed">
-            يمكنك الدخول إلى لوحة تحكم الإشراف وتغيير هوامش البنوك أو تعديل معايير الحد الأدنى للرواتب والمقاييس عبر النوافذ في القائمة الجانبية بنقرة واحدة لتجربة الملاءمة والمقارنة الفورية في حاسبة العميل.
-          </p>
+          <h4 className="text-white font-bold text-sm">روابط الوصول السريع:</h4>
+          <div className="flex flex-col items-start gap-2 pt-1 font-semibold">
+            <button onClick={() => navigate('/terms')} className="text-slate-400 hover:text-white transition-colors cursor-pointer text-xs">شروط الاستخدام</button>
+            <button onClick={() => navigate('/privacy')} className="text-slate-400 hover:text-white transition-colors cursor-pointer text-xs">سياسة الخصوصية</button>
+            <button onClick={() => navigate('/disclaimer')} className="text-slate-400 hover:text-white transition-colors cursor-pointer text-xs">إخلاء المسؤولية</button>
+            <button onClick={() => {
+              window.dispatchEvent(new CustomEvent('open-customer-assistant'));
+            }} className="text-slate-400 hover:text-white transition-colors cursor-pointer text-xs">تواصل معنا</button>
+          </div>
         </div>
 
         {/* Contact Details */}
@@ -242,7 +249,16 @@ export default function App() {
     <AuthProvider>
       <ThemeProvider>
         <AppStateProvider>
-          <AppContent />
+          <React.Suspense
+            fallback={
+              <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] flex flex-col items-center justify-center space-y-4" dir="rtl">
+                <Loader2 className="w-10 h-10 animate-spin text-[#0057B8] dark:text-[#0EA5A4]" />
+                <span className="text-xs text-gray-400 dark:text-slate-400 font-bold select-none">جاري تحميل الصفحة...</span>
+              </div>
+            }
+          >
+            <AppContent />
+          </React.Suspense>
         </AppStateProvider>
       </ThemeProvider>
     </AuthProvider>

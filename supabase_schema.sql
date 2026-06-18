@@ -223,8 +223,10 @@ CREATE POLICY "Only admins can update system settings" ON public.system_settings
 CREATE POLICY "Only admins can delete system settings" ON public.system_settings FOR DELETE USING (public.is_admin(auth.uid()));
 
 -- سياسات app_settings_history
-CREATE POLICY "Authenticated users can insert history snapshots" ON public.app_settings_history FOR INSERT WITH CHECK (auth.role() = 'authenticated' OR auth.uid() IS NOT NULL);
+CREATE POLICY "Only admins can insert history snapshots" ON public.app_settings_history FOR INSERT WITH CHECK (public.is_admin(auth.uid()));
 CREATE POLICY "Only admins can select history snapshots" ON public.app_settings_history FOR SELECT USING (public.is_admin(auth.uid()));
+CREATE POLICY "Only admins can update history snapshots" ON public.app_settings_history FOR UPDATE USING (public.is_admin(auth.uid()));
+CREATE POLICY "Only admins can delete history snapshots" ON public.app_settings_history FOR DELETE USING (public.is_admin(auth.uid()));
 
 CREATE POLICY "users_select_own" ON public.saved_results FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "users_insert_own" ON public.saved_results FOR INSERT WITH CHECK (auth.uid() = user_id);

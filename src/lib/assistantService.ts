@@ -968,7 +968,14 @@ export function handleAssistantTurn(
     
     if (chosenResult) {
       const fullBank = context.banks.find((b: any) => b.id === chosenResult.bankId);
-      const whatsNumber = fullBank?.employeeWhatsApp || '+966506612761';
+      const whatsNumber = fullBank?.employeeWhatsApp?.trim();
+
+      if (!whatsNumber) {
+        return {
+          response: "لا يوجد رقم موظف متاح لهذا البنك حاليًا.",
+          newState: state
+        };
+      }
 
       const summaryTextFormatted = `تفاصيل الحسبة المبدئية لحسبة العميل:\n` +
         `• جهة التمويل: ${chosenResult.bankName}\n` +
@@ -1009,7 +1016,14 @@ export function handleAssistantTurn(
       const chosenResult = state.selectedBankForContact;
       if (chosenResult) {
         const fullBank = context.banks.find((b: any) => b.id === chosenResult.bankId);
-        const whatsNumber = fullBank?.employeeWhatsApp || '+966506612761';
+        const whatsNumber = fullBank?.employeeWhatsApp?.trim();
+
+        if (!whatsNumber) {
+          return {
+            response: "لا يوجد رقم موظف متاح لهذا البنك حاليًا.",
+            newState: { ...state, conversationMode: 'showing_results', currentAskField: 'confirm_calc' }
+          };
+        }
         
         const textToUrl = encodeURIComponent(`السلام عليكم، حسبة مالية من تطبيق حسبة:\n\n• جهة التمويل: ${chosenResult.bankName}\n• التمويل الإجمالي: ${chosenResult.totalPurchasingPower.toLocaleString('ar-SA')} ريال\n• القسط: ${chosenResult.monthlyInstallment.toLocaleString('ar-SA')} ريال\n• دعم: ${chosenResult.supportAmount.toLocaleString('ar-SA')} ريال`);
         const targetUrl = `https://api.whatsapp.com/send?phone=${whatsNumber.replace('+', '')}&text=${textToUrl}`;
