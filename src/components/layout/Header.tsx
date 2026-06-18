@@ -49,7 +49,7 @@ export default function Header() {
           </div>
           <div className="text-right">
             <h1 className="font-sans font-black text-base tracking-tight text-[#111827] dark:text-white leading-none">حسبة</h1>
-            <span className="text-[9px] text-gray-400 dark:text-slate-400 block mt-1 font-medium font-sans">التمويل الذي للمواطن السعودي</span>
+            <span className="text-[9px] text-gray-400 dark:text-slate-400 block mt-1 font-medium font-sans">قبل البنك… اعرف فرصتك</span>
           </div>
         </div>
 

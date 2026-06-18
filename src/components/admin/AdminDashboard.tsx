@@ -6,7 +6,7 @@ import {
   Building2, Briefcase, Percent, Calendar, Hourglass, HelpCircle,
   Coins, ToggleLeft, ToggleRight, Trash2, Plus, RefreshCw, 
   Map, UserPlus, ListOrdered, CheckCircle2, ChevronRight, Calculator,
-  Lock, Settings, ShieldAlert, Award, FileSpreadsheet, Users, Edit, Loader2
+  Lock, Settings, ShieldAlert, Award, FileSpreadsheet, Users, Edit, Loader2, Sparkles
 } from 'lucide-react';
 
 import { BanksSection } from './sections/BanksSection';
@@ -1724,6 +1724,17 @@ export default function AdminDashboard() {
         </nav>
         
         <div className="mt-6 pt-4 border-t border-slate-100 px-2">
+          <button
+            type="button"
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent('open-admin-assistant'));
+            }}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 mb-2 bg-gradient-to-tr from-indigo-50 to-violet-50 hover:from-indigo-100 hover:to-violet-100 dark:from-indigo-950/10 dark:to-violet-950/10 text-indigo-700 dark:text-indigo-450 border border-indigo-200/40 dark:border-indigo-900/30 rounded-xl text-xs font-bold transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-indigo-500 shrink-0 animate-pulse" />
+            <span>مساعد الإدارة الذكي</span>
+          </button>
+
           <button
             type="button"
             onClick={() => {
