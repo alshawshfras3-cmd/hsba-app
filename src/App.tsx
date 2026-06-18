@@ -12,6 +12,7 @@ import AuthCallbackPage from './pages/AuthCallbackPage';
 import { Calculator, ShieldCheck, Mail, Phone, ExternalLink, ShieldAlert, Loader2 } from 'lucide-react';
 import { supabase, hasSupabaseKeys, cleanStaleSupabaseSession } from './lib/supabase';
 import AssistantWidget from './components/layout/AssistantWidget';
+import { LegalLayout } from './components/layout/LegalLayout';
 
 // Lazy loading heavy pages to reduce initial bundle size
 const AboutPage = React.lazy(() => import('./pages/AboutPage').then(module => ({ default: module.AboutPage })));
@@ -201,19 +202,35 @@ function AppContent() {
 
   // Support guest routing to public pages so unregistered users can view them
   if (!user) {
-    const publicPaths = ['/about', '/about-us', '/terms', '/privacy', '/disclaimer'];
-    if (publicPaths.includes(location.pathname)) {
-      const renderGuestContent = () => {
+    const legalPaths = ['/terms', '/privacy', '/disclaimer'];
+    if (legalPaths.includes(location.pathname)) {
+      const renderLegalContent = () => {
         switch (location.pathname) {
-          case '/about':
-          case '/about-us':
-            return <AboutPage />;
           case '/terms':
             return <TermsPage />;
           case '/privacy':
             return <PrivacyPage />;
           case '/disclaimer':
             return <DisclaimerPage />;
+          default:
+            return <TermsPage />;
+        }
+      };
+
+      return (
+        <LegalLayout>
+          {renderLegalContent()}
+        </LegalLayout>
+      );
+    }
+
+    const publicPaths = ['/about', '/about-us'];
+    if (publicPaths.includes(location.pathname)) {
+      const renderGuestContent = () => {
+        switch (location.pathname) {
+          case '/about':
+          case '/about-us':
+            return <AboutPage />;
           default:
             return <AboutPage />;
         }

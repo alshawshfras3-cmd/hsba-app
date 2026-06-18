@@ -1,9 +1,11 @@
 import React from 'react';
 import { ArrowRight, ShieldCheck, CheckCircle } from 'lucide-react';
 import { useLocation } from '../hooks/useLocation';
+import { useAuth } from '../contexts/AuthContext';
 
 export function PrivacyPage() {
   const location = useLocation();
+  const { user } = useAuth();
 
   const handleBack = () => {
     location.navigate('/');
@@ -22,13 +24,15 @@ export function PrivacyPage() {
             <p className="text-xs text-gray-400 dark:text-slate-400 mt-1">آخر تحديث: يونيو 2026</p>
           </div>
         </div>
-        <button
-          onClick={handleBack}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-gray-600 hover:text-gray-900 dark:text-slate-300 dark:hover:text-white bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-800 dark:hover:bg-slate-700/80 transition-all cursor-pointer"
-        >
-          <ArrowRight className="w-4 h-4" />
-          <span>العودة للحسبة</span>
-        </button>
+        {user && (
+          <button
+            onClick={handleBack}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-gray-600 hover:text-gray-900 dark:text-slate-300 dark:hover:text-white bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-800 dark:hover:bg-slate-700/80 transition-all cursor-pointer"
+          >
+            <ArrowRight className="w-4 h-4" />
+            <span>العودة للحسبة</span>
+          </button>
+        )}
       </div>
 
       {/* Main Content */}
