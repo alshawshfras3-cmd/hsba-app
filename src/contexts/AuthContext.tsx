@@ -276,11 +276,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     async function initializeAuth() {
       try {
-        console.log("[AUTH_DEBUG] initializeAuth: Calling getSession...");
         const { data: { session }, error } = await supabase.auth.getSession();
         if (error) throw error;
 
-        console.log("[AUTH_DEBUG] initializeAuth: getSession success, session user:", session?.user?.id || 'none');
         if (!active) return;
         setSession(session ?? null);
         setUser(session?.user ?? null);
@@ -292,7 +290,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.error(e);
           }
            const isAdminUser = await checkAdminStatus(session.user.id);
-          console.log("[AUTH_DEBUG] initializeAuth: setting isAdminInDb on DB basis:", isAdminUser);
           if (active) {
             setIsAdminInDb(isAdminUser);
             setIsAdminVerified(true);
@@ -309,7 +306,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }, 0);
         } else {
           if (active) {
-            console.log("[AUTH_DEBUG] initializeAuth: No user session found, setting isAdminInDb false");
             setIsAdminInDb(false);
             setIsAdminVerified(true);
             try { sessionStorage.removeItem('hesba_is_admin'); } catch {}
@@ -323,7 +319,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.error(e);
         }
       } catch (err) {
-        console.error("[AUTH_DEBUG] Error getting session on mount:", err);
+        console.error("Auth initialization error:", err);
         const errMsg = String(err?.message || '').toLowerCase();
         if (errMsg.includes('refresh token') || errMsg.includes('refresh_token') || errMsg.includes('not found') || errMsg.includes('invalid')) {
           cleanStaleSupabaseSession();
@@ -345,7 +341,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } finally {
         if (active) {
-          console.log("[AUTH_DEBUG] initializeAuth completed, setting loading=false");
           setLoading(false);
         }
       }
@@ -355,7 +350,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        console.log("[AUTH_DEBUG] onAuthStateChange event received:", event, "session user ID:", session?.user?.id || 'none');
         if (!active) return;
         setSession(session);
         setUser(session?.user ?? null);
@@ -367,7 +361,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.error(e);
           }
            checkAdminStatus(session.user.id).then((isAdminUser) => {
-            console.log("[AUTH_DEBUG] onAuthStateChange: setting isAdminInDb on DB basis:", isAdminUser);
             if (active) {
               setIsAdminInDb(isAdminUser);
               setIsAdminVerified(true);
