@@ -121,6 +121,10 @@ export default function IntegrationsSection() {
 
   useEffect(() => {
     loadStatsAndData();
+    return () => {
+      setSandboxApiKey('');
+      setShowSandboxKey(false);
+    };
   }, [user]);
 
   // Load client keys dynamically
@@ -1178,7 +1182,7 @@ export default function IntegrationsSection() {
             </p>
             <ul className="text-[10px] text-slate-400 list-disc list-inside space-y-1">
               <li>معدلات DSR غير قابلة للاستخراج الخارجي.</li>
-              <li>تفاصيل هوامش وأرباح البنوك مشفرة.</li>
+              <li>تفاصيل الهوامش وقواعد البنوك غير معروضة عبر API العام.</li>
               <li>التحقق من الكيانات محمي بRLS أمني صارم.</li>
               <li>تسجيل فوري لسرعة الاستراد بالأجزاء من الثانية.</li>
             </ul>

@@ -17,7 +17,6 @@ export interface ApiKey {
   id: string;
   client_id: string;
   key_prefix: string;
-  key_hash: string;
   status: 'active' | 'revoked';
   daily_limit: number;
   last_used_at: string | null;
@@ -124,7 +123,7 @@ export async function updateApiClientStatus(
 export async function listApiKeys(clientId: string): Promise<ApiKey[]> {
   const { data, error } = await supabase
     .from('api_keys')
-    .select('*')
+    .select('id, client_id, key_prefix, status, daily_limit, last_used_at, created_by, created_at, revoked_at')
     .eq('client_id', clientId)
     .order('created_at', { ascending: false });
 
@@ -203,8 +202,18 @@ export async function getApiIntegrationStats() {
 
     // We fallback logs to 0 if table empty or requests aren't made yet
     const todayRequests = requests?.length || 0;
-    const todaySuccess = requests?.filter(r => r.status === 'success' || r.status === 'completed' || r.status === 'received').length || 0;
-    const todayFailed = requests?.filter(r => r.status === 'failed' || r.status === 'error').length || 0;
+    const successStatuses = ['success'];
+    const failedStatuses = [
+      'validation_error',
+      'engine_error',
+      'calculation_error',
+      'server_error',
+      'configuration_error',
+      'failed',
+      'error'
+    ];
+    const todaySuccess = requests?.filter(r => successStatuses.includes(r.status)).length || 0;
+    const todayFailed = requests?.filter(r => failedStatuses.includes(r.status)).length || 0;
 
     return {
       totalClients,
