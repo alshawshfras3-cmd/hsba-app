@@ -16,8 +16,14 @@
       (function () {
         try {
           var root = document.documentElement;
-          root.classList.remove('dark');
-          root.classList.add('light');
+          var theme = localStorage.getItem('hesba_theme');
+          if (theme === 'dark') {
+            root.classList.remove('light');
+            root.classList.add('dark');
+          } else {
+            root.classList.remove('dark');
+            root.classList.add('light');
+          }
         } catch (e) {}
       })();
     </script>

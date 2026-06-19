@@ -30,13 +30,17 @@ import {
   MessageSquare,
   HelpCircle,
   FileText,
-  AlertCircle
+  AlertCircle,
+  Sun,
+  Moon
 } from "lucide-react";
+import { useTheme } from "../contexts/ThemeContext";
 
 export function AccountPage() {
   const { user, signOut, userSubscriptions, banks } = useAppState();
   const { profile, canAccessDashboard } = useAuth();
   const location = useLocation();
+  const { theme, setTheme } = useTheme();
 
   // Profile states
   const [fullNameInput, setFullNameInput] = useState(profile?.full_name || user?.user_metadata?.full_name || '');
@@ -425,7 +429,7 @@ export function AccountPage() {
           <div className="lg:col-span-1 space-y-6 hidden lg:block sticky top-24">
             
             {/* Sidebar Active Navigation Card */}
-            <div className="bg-white dark:bg-[#151F32] rounded-[30px] border border-slate-100/80 dark:border-slate-800 p-3 shadow-md">
+            <div className="bg-white dark:bg-[#111827] rounded-[30px] border border-slate-100/80 dark:border-slate-800 p-3 shadow-md">
               <nav className="space-y-1.5">
                 {menuTabsList.map((tab) => {
                   const IconComp = tab.icon;
@@ -437,7 +441,7 @@ export function AccountPage() {
                       className={`w-full flex items-center justify-between px-4 py-3.5 rounded-[20px] transition-all duration-300 font-bold text-sm cursor-pointer ${
                         isActive 
                           ? "bg-[#E6F0FA] dark:bg-blue-950/40 text-[#0057B8] dark:text-[#38BDF8] border-r-4 border-[#0057B8] dark:border-[#38BDF8]" 
-                          : "text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-900/50 hover:text-slate-800"
+                          : "text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-900/50 hover:text-slate-800 dark:hover:text-slate-200"
                       }`}
                     >
                       <div className="flex items-center gap-3">
@@ -452,8 +456,8 @@ export function AccountPage() {
             </div>
 
             {/* Sidebar Shield Security Card Footer */}
-            <div className="bg-white dark:bg-[#151F32] rounded-[30px] border border-slate-100/80 dark:border-slate-800 p-6 shadow-sm flex flex-col items-center text-center space-y-3">
-              <div className="w-12 h-12 bg-blue-50 dark:bg-blue-950/30 text-[#0057B8] dark:text-[#38BDF8] rounded-full flex items-center justify-center border border-blue-100/40">
+            <div className="bg-white dark:bg-[#111827] rounded-[30px] border border-slate-100/80 dark:border-slate-800 p-6 shadow-sm flex flex-col items-center text-center space-y-3">
+              <div className="w-12 h-12 bg-blue-50 dark:bg-blue-950/30 text-[#0057B8] dark:text-[#38BDF8] rounded-full flex items-center justify-center border border-blue-100/40 dark:border-blue-900/30">
                 <ShieldCheck className="w-6 h-6" />
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 font-bold max-w-[200px] leading-relaxed">
@@ -468,8 +472,41 @@ export function AccountPage() {
               ======================================================= */}
           <div className="lg:col-span-3 space-y-6">
 
+            {/* 0. DYNAMIC THEME SELECTOR CARD */}
+            <div className="bg-white dark:bg-[#111827] rounded-[30px] border border-slate-100/80 dark:border-slate-800 p-6 shadow-md flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-4 text-center sm:text-right w-full sm:w-auto flex-col sm:flex-row">
+                <div className="w-12 h-12 bg-slate-50 dark:bg-[#0F172A] rounded-2xl flex items-center justify-center text-slate-500 shrink-0 border border-slate-100 dark:border-slate-800">
+                  {theme === 'dark' ? (
+                    <Moon className="w-6 h-6 text-yellow-400" />
+                  ) : (
+                    <Sun className="w-6 h-6 text-amber-500" />
+                  )}
+                </div>
+                <div>
+                  <h3 className="font-sans font-black text-sm text-slate-900 dark:text-white leading-none">مظهر التطبيق</h3>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold mt-1">تخصيص المظهر وتفعيل الوضع الفاتح أو الداكن</p>
+                </div>
+              </div>
+              <button
+                onClick={() => { handleVibrate(); setTheme(theme === 'dark' ? 'light' : 'dark'); }}
+                className="w-full sm:w-auto px-6 py-3 bg-slate-50 dark:bg-[#0F172A] hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-100 font-black text-xs rounded-xl border border-slate-150 dark:border-slate-850 cursor-pointer transition-all flex items-center justify-center gap-2 select-none"
+              >
+                {theme === 'dark' ? (
+                  <>
+                    <Sun className="w-4 h-4 text-amber-500" />
+                    <span>تفعيل الوضع الفاتح</span>
+                  </>
+                ) : (
+                  <>
+                    <Moon className="w-4 h-4 text-indigo-600 dark:text-yellow-400" />
+                    <span>تفعيل الوضع الداكن</span>
+                  </>
+                )}
+              </button>
+            </div>
+
             {/* 1. USER ACCOUNT INFORMATION CARD */}
-            <div id="section-my-account" className="bg-white dark:bg-[#151F32] rounded-[30px] border border-slate-100/80 dark:border-slate-800 p-6 md:p-8 shadow-md relative overflow-hidden">
+            <div id="section-my-account" className="bg-white dark:bg-[#111827] rounded-[30px] border border-slate-100/80 dark:border-slate-800 p-6 md:p-8 shadow-md relative overflow-hidden">
               
               <div className="flex flex-col md:flex-row items-center justify-between gap-6">
                 
@@ -719,7 +756,7 @@ export function AccountPage() {
                 <span>الأمان والخصوصية</span>
               </h3>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 
                 {/* A. Change Password button Card */}
                 <button

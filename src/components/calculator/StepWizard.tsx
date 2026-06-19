@@ -710,10 +710,10 @@ export default function StepWizard() {
         if (!supportType) {
           stepErrors.push('يرجى تحديد نوع الدعم السكني المطلوب (مستحق أو غير مدعوم).');
         }
-        if (termMode === 'manual') {
-          if (!manualTermYears || manualTermYears < 1 || manualTermYears > 30) {
-            stepErrors.push('يرجى إدخال مدة تمويل مستهدفة صحيحة بين 1 و 30 سنة.');
-          }
+      }
+      if (termMode === 'manual') {
+        if (!manualTermYears || manualTermYears < 1 || manualTermYears > 30) {
+          stepErrors.push('يرجى إدخال مدة تمويل مستهدفة صحيحة بين 1 و 30 سنة.');
         }
       }
     }
@@ -830,7 +830,7 @@ export default function StepWizard() {
       <div className="space-y-6">
         {/* 1. Sector Picker */}
         <div className="space-y-3">
-          <label className="block text-xs font-bold text-gray-700">ما هو القطاع المهني لجهة العمل؟</label>
+          <label className="block text-xs font-bold text-gray-700 dark:text-slate-300">ما هو القطاع المهني لجهة العمل؟</label>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
             {[
               { id: 'gov_civil', label: 'حكومي مدني', icon: Briefcase },
@@ -893,12 +893,12 @@ export default function StepWizard() {
                 }}
                 className={`flex flex-col items-center justify-center p-4 cursor-pointer transition-all border rounded-2xl text-center ${
                   sectorId === sec.id
-                    ? 'border-[#0057B8] bg-[#0057B8]/5 ring-2 ring-[#0057B8]/15 font-bold'
-                    : 'border-slate-200 bg-white hover:bg-slate-50'
+                    ? 'border-[#0057B8] dark:border-[#0ea5a4] bg-[#0057B8]/5 dark:bg-[#0ea5a4]/5 ring-2 ring-[#0057B8]/15 dark:ring-[#0ea5a4]/15 font-bold text-[#0057B8] dark:text-[#0ea5a4]'
+                    : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111827] text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
                 }`}
               >
-                <sec.icon className={`w-5 h-5 mb-2 shrink-0 ${sectorId === sec.id ? 'text-[#0057B8]' : 'text-gray-500'}`} />
-                <span className="text-xs text-[#111827]">{sec.label}</span>
+                <sec.icon className={`w-5 h-5 mb-2 shrink-0 ${sectorId === sec.id ? 'text-[#0057B8] dark:text-[#0ea5a4]' : 'text-gray-500 dark:text-slate-500'}`} />
+                <span className="text-xs">{sec.label}</span>
               </div>
             ))}
           </div>
@@ -907,12 +907,12 @@ export default function StepWizard() {
         {/* Salary Bank Input */}
         {sectorId && sectorId !== 'retired' && (
           <div id="salary-bank-selector-wrapper" className="space-y-2 animate-fade-in">
-            <label className="block text-xs font-bold text-gray-700">راتبك على أي بنك؟ <span className="text-rose-500">*</span></label>
+            <label className="block text-xs font-bold text-gray-700 dark:text-slate-300">راتبك على أي بنك؟ <span className="text-rose-500">*</span></label>
             <select
               id="salary-bank-select"
               value={salaryBankId}
               onChange={(e) => setSalaryBankId(e.target.value)}
-              className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] focus:border-transparent cursor-pointer"
+              className="w-full bg-white dark:bg-[#111827] border border-gray-200 dark:border-slate-800 text-slate-800 dark:text-slate-100 rounded-xl px-4 py-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] dark:focus:ring-[#0ea5a4] focus:border-transparent cursor-pointer"
             >
               <option value="">-- اختر البنك المحول عليه راتبك --</option>
               {sortedActiveBanks
@@ -929,11 +929,11 @@ export default function StepWizard() {
 
         {/* 2. Military Selector details (only if Sector is Military) */}
         {sectorId === 'military' && (
-          <div id="military-rank-selector-wrapper" className="bg-gray-50 rounded-2xl p-6 border border-gray-200 animate-fade-in text-right space-y-4">
+          <div id="military-rank-selector-wrapper" className="bg-gray-50 dark:bg-slate-900 rounded-2xl p-6 border border-gray-200 dark:border-slate-800 animate-fade-in text-right space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Category subclass selector */}
               <div className="space-y-2">
-                <label className="block text-xs font-bold text-gray-700">تصنيف الخدمة العسكرية:</label>
+                <label className="block text-xs font-bold text-gray-700 dark:text-slate-300">تصنيف الخدمة العسكرية:</label>
                 <div className="grid grid-cols-2 gap-3">
                   {[
                     { id: 'enlisted', type: 'individual', scope: 'enlisted', label: 'عسكري أفراد' },
@@ -958,10 +958,10 @@ export default function StepWizard() {
                             setAhliGroup(firstRank.ahliGroup || (sub.id === 'officer' ? 'A' : 'B'));
                           }
                         }}
-                        className={`py-2 px-4 rounded-xl text-xs font-bold transition-all border text-center ${
+                        className={`py-2 px-4 rounded-xl text-xs font-bold transition-all border text-center cursor-pointer ${
                           isSelected
-                            ? 'bg-[#0057B8] text-white border-[#0057B8] shadow-xs'
-                            : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                            ? 'bg-[#0057B8] dark:bg-[#0ea5a4] text-white border-[#0057B8] dark:border-[#0ea5a4] shadow-xs'
+                            : 'bg-white dark:bg-[#111827] text-gray-700 dark:text-slate-300 border-gray-200 dark:border-slate-800 hover:bg-gray-50 dark:hover:bg-slate-800'
                         }`}
                       >
                         {sub.label}
@@ -973,7 +973,7 @@ export default function StepWizard() {
 
               {/* Rank dropdown */}
               <div className="space-y-2">
-                <label className="block text-xs font-bold text-gray-700">الرتبة العسكرية للعميل:</label>
+                <label className="block text-xs font-bold text-gray-700 dark:text-slate-300">الرتبة العسكرية للعميل:</label>
                 <select
                   id="rank-select-step2"
                   value={rankId}
@@ -988,7 +988,7 @@ export default function StepWizard() {
                       setAhliGroup(matched.ahliGroup || (militarySubtype === 'officer' ? 'A' : 'B'));
                     }
                   }}
-                  className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] focus:border-transparent cursor-pointer"
+                  className="w-full bg-white dark:bg-[#111827] border border-gray-200 dark:border-slate-800 text-slate-800 dark:text-slate-100 rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] dark:focus:ring-[#0ea5a4] focus:border-transparent cursor-pointer"
                 >
                   {militaryRanks
                     .filter(rank => rank.sectorScope === (militarySubtype === 'officer' ? 'officer' : 'enlisted') && rank.isActive)
@@ -1004,8 +1004,8 @@ export default function StepWizard() {
 
             {/* هل العميل مؤهل لدعم اعتزاز؟ */}
             {supportSettings.etizaz?.enabled !== false && (
-              <div className="border-t border-gray-150 pt-4 space-y-2">
-                <label className="block text-xs font-bold text-gray-700">هل العميل مؤهل لدعم اعتزاز؟</label>
+              <div className="border-t border-gray-150 dark:border-slate-800 pt-4 space-y-2">
+                <label className="block text-xs font-bold text-gray-700 dark:text-slate-300">هل العميل مؤهل لدعم اعتزاز؟</label>
                 <div className="flex gap-3 max-w-xs">
                   {[
                     { id: 'no', label: 'لا' },
@@ -1018,8 +1018,8 @@ export default function StepWizard() {
                       onClick={() => setIsEtizazEligible(opt.id as 'yes' | 'no')}
                       className={`flex-1 py-2 px-4 rounded-xl text-xs font-bold transition-all border text-center cursor-pointer ${
                         isEtizazEligible === opt.id
-                          ? 'bg-[#0057B8] text-white border-[#0057B8] shadow-xs'
-                          : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                          ? 'bg-[#0057B8] dark:bg-[#0ea5a4] text-white border-[#0057B8] dark:border-[#0ea5a4] shadow-xs'
+                          : 'bg-white dark:bg-[#111827] text-gray-700 dark:text-slate-300 border-gray-200 dark:border-slate-800 hover:bg-gray-50 dark:hover:bg-slate-800'
                       }`}
                     >
                       {opt.label}
@@ -1029,18 +1029,18 @@ export default function StepWizard() {
               </div>
             )}
 
-            <div className="bg-white p-3 rounded-xl border border-gray-100 text-xs font-bold text-gray-600 text-center animate-fade-in max-w-xs mx-auto">
+            <div className="bg-white dark:bg-[#111827] p-3 rounded-xl border border-gray-100 dark:border-slate-800 text-xs font-bold text-gray-600 dark:text-slate-400 text-center animate-fade-in max-w-xs mx-auto">
               <span>سن التقاعد للرتبة: </span>
-              <strong className="text-[#0057B8]">{retirementAge} سنة</strong>
+              <strong className="text-[#0057B8] dark:text-[#0ea5a4]">{retirementAge} سنة</strong>
             </div>
           </div>
         )}
 
         {/* Standalone Etizaz Selector for non-military eligible sectors */}
         {sectorId !== 'military' && sectorId && (supportSettings.etizaz?.eligibleSectors || ['military']).includes(sectorId) && supportSettings.etizaz?.enabled !== false && (
-          <div id="etizaz-non-military-selector-wrapper" className="bg-gray-50 rounded-2xl p-6 border border-gray-200 animate-fade-in text-right space-y-4">
+          <div id="etizaz-non-military-selector-wrapper" className="bg-gray-50 dark:bg-slate-900 rounded-2xl p-6 border border-gray-200 dark:border-slate-800 animate-fade-in text-right space-y-4">
             <div className="space-y-2">
-              <label className="block text-xs font-bold text-gray-700">هل العميل مؤهل لدعم اعتزاز؟</label>
+              <label className="block text-xs font-bold text-gray-700 dark:text-slate-300">هل العميل مؤهل لدعم اعتزاز؟</label>
               <div className="flex gap-3 max-w-xs">
                 {[
                   { id: 'no', label: 'لا' },
@@ -1053,8 +1053,8 @@ export default function StepWizard() {
                     onClick={() => setIsEtizazEligible(opt.id as 'yes' | 'no')}
                     className={`flex-1 py-2 px-4 rounded-xl text-xs font-bold transition-all border text-center cursor-pointer ${
                       isEtizazEligible === opt.id
-                        ? 'bg-[#0057B8] text-white border-[#0057B8] shadow-xs'
-                        : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                        ? 'bg-[#0057B8] dark:bg-[#0ea5a4] text-white border-[#0057B8] dark:border-[#0ea5a4] shadow-xs'
+                        : 'bg-white dark:bg-[#111827] text-gray-700 dark:text-slate-300 border-gray-200 dark:border-slate-800 hover:bg-gray-50 dark:hover:bg-slate-800'
                     }`}
                   >
                     {opt.label}
@@ -1068,24 +1068,24 @@ export default function StepWizard() {
         {/* 3. Dates Selector Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* DOB Card */}
-          <div className="border border-gray-200 rounded-2xl p-6 bg-white space-y-4 font-sans">
-            <div className="flex justify-between items-center border-b border-gray-100 pb-3">
-              <span className="text-xs font-bold text-[#111827] flex items-center gap-1.5">
-                <Calendar className="w-4 h-4 text-[#0057B8]" />
+          <div className="border border-gray-200 dark:border-slate-800 rounded-2xl p-6 bg-white dark:bg-[#111827] space-y-4 font-sans">
+            <div className="flex justify-between items-center border-b border-gray-100 dark:border-slate-800 pb-3">
+              <span className="text-xs font-bold text-[#111827] dark:text-slate-300 flex items-center gap-1.5">
+                <Calendar className="w-4 h-4 text-[#0057B8] dark:text-[#0ea5a4]" />
                 <span>تاريخ الميلاد:</span>
               </span>
-              <div className="flex bg-gray-100 p-0.5 rounded-lg border border-gray-200">
+              <div className="flex bg-gray-100 dark:bg-slate-800 p-0.5 rounded-lg border border-gray-200 dark:border-slate-700">
                 <button
                   type="button"
                   onClick={() => setBirthCalendar('gregorian')}
-                  className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all ${birthCalendar === 'gregorian' ? 'bg-white text-[#0057B8] shadow-xs' : 'text-gray-500 hover:text-gray-900'}`}
+                  className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all cursor-pointer ${birthCalendar === 'gregorian' ? 'bg-white dark:bg-[#111827] text-[#0057B8] dark:text-[#0ea5a4] shadow-xs' : 'text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white'}`}
                 >
                   ميلادي
                 </button>
                 <button
                   type="button"
                   onClick={() => setBirthCalendar('hijri')}
-                  className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all ${birthCalendar === 'hijri' ? 'bg-white text-[#0057B8] shadow-xs' : 'text-gray-500 hover:text-gray-900'}`}
+                  className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all cursor-pointer ${birthCalendar === 'hijri' ? 'bg-white dark:bg-[#111827] text-[#0057B8] dark:text-[#0ea5a4] shadow-xs' : 'text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white'}`}
                 >
                   هجري
                 </button>
@@ -1094,7 +1094,7 @@ export default function StepWizard() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1">الشهر (1 - 12)</label>
+                <label className="block text-xs font-semibold text-gray-500 dark:text-slate-400 mb-1">الشهر (1 - 12)</label>
                 <NumericInput
                   id="birth-month-input-fields"
                   min={1}
@@ -1103,11 +1103,11 @@ export default function StepWizard() {
                   placeholder="05"
                   value={birthMonth}
                   onChange={setBirthMonth}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                  className="w-full bg-gray-50 dark:bg-[#0F172A] border border-gray-200 dark:border-slate-800 rounded-xl px-4 py-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] dark:text-white dark:focus:ring-[#0ea5a4]"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1">السنة</label>
+                <label className="block text-xs font-semibold text-gray-500 dark:text-slate-400 mb-1">السنة</label>
                 <NumericInput
                   id="birth-year-input-fields"
                   min={birthCalendar === 'gregorian' ? 1940 : 1360}
@@ -1116,7 +1116,7 @@ export default function StepWizard() {
                   placeholder={birthCalendar === 'gregorian' ? '1990' : '1410'}
                   value={birthYear}
                   onChange={setBirthYear}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                  className="w-full bg-gray-50 dark:bg-[#0F172A] border border-gray-200 dark:border-slate-800 rounded-xl px-4 py-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] dark:text-white dark:focus:ring-[#0ea5a4]"
                 />
               </div>
             </div>
@@ -1124,24 +1124,24 @@ export default function StepWizard() {
 
           {/* Appointment date Card (only for Real Estate AND not retired!) */}
           {mainFinanceType !== 'personal_only' && sectorId !== 'retired' ? (
-            <div className="border border-gray-200 rounded-2xl p-6 bg-white space-y-4 animate-fade-in shadow-xs font-sans">
-              <div className="flex justify-between items-center border-b border-gray-100 pb-3">
-                <span className="text-xs font-bold text-[#111827] flex items-center gap-1.5">
+            <div className="border border-gray-200 dark:border-slate-800 rounded-2xl p-6 bg-white dark:bg-[#111827] space-y-4 animate-fade-in shadow-xs font-sans">
+              <div className="flex justify-between items-center border-b border-gray-100 dark:border-slate-800 pb-3">
+                <span className="text-xs font-bold text-[#111827] dark:text-slate-300 flex items-center gap-1.5">
                   <Briefcase className="w-4 h-4 text-emerald-600" />
                   <span>تاريخ المباشرة / التعيين:</span>
                 </span>
-                <div className="flex bg-gray-100 p-0.5 rounded-lg border border-gray-200">
+                <div className="flex bg-gray-100 dark:bg-slate-800 p-0.5 rounded-lg border border-gray-200 dark:border-slate-700">
                   <button
                     type="button"
                     onClick={() => setAppointmentCalendar('gregorian')}
-                    className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all ${appointmentCalendar === 'gregorian' ? 'bg-white text-[#0057B8] shadow-xs' : 'text-gray-500 hover:text-gray-900'}`}
+                    className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all cursor-pointer ${appointmentCalendar === 'gregorian' ? 'bg-white dark:bg-[#111827] text-[#0057B8] dark:text-[#0ea5a4] shadow-xs' : 'text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white'}`}
                   >
                     ميلادي
                   </button>
                   <button
                     type="button"
                     onClick={() => setAppointmentCalendar('hijri')}
-                    className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all ${appointmentCalendar === 'hijri' ? 'bg-white text-[#0057B8] shadow-xs' : 'text-gray-500 hover:text-gray-900'}`}
+                    className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all cursor-pointer ${appointmentCalendar === 'hijri' ? 'bg-white dark:bg-[#111827] text-[#0057B8] dark:text-[#0ea5a4] shadow-xs' : 'text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white'}`}
                   >
                     هجري
                   </button>
@@ -1150,7 +1150,7 @@ export default function StepWizard() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1">الشهر (1 - 12)</label>
+                  <label className="block text-xs font-semibold text-gray-500 dark:text-slate-400 mb-1">الشهر (1 - 12)</label>
                   <NumericInput
                     id="appointment-month-input-fields"
                     min={1}
@@ -1159,11 +1159,11 @@ export default function StepWizard() {
                     placeholder="09"
                     value={appointmentMonth}
                     onChange={setAppointmentMonth}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                    className="w-full bg-gray-50 dark:bg-[#0F172A] border border-gray-200 dark:border-slate-800 rounded-xl px-4 py-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] dark:text-white dark:focus:ring-[#0ea5a4]"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1">السنة</label>
+                  <label className="block text-xs font-semibold text-gray-500 dark:text-slate-400 mb-1">السنة</label>
                   <NumericInput
                     id="appointment-year-input-fields"
                     min={appointmentCalendar === 'gregorian' ? 1970 : 1390}
@@ -1172,14 +1172,14 @@ export default function StepWizard() {
                     placeholder={appointmentCalendar === 'gregorian' ? '2015' : '1436'}
                     value={appointmentYear}
                     onChange={setAppointmentYear}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                    className="w-full bg-gray-50 dark:bg-[#0F172A] border border-gray-200 dark:border-slate-800 rounded-xl px-4 py-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] dark:text-white dark:focus:ring-[#0ea5a4]"
                   />
                 </div>
               </div>
             </div>
           ) : mainFinanceType !== 'personal_only' && sectorId === 'retired' ? (
-            <div className="bg-amber-50 rounded-2xl p-6 border border-amber-200 flex flex-col justify-center animate-fade-in shadow-xs">
-              <p className="text-xs text-amber-800 leading-relaxed font-sans font-medium">
+            <div className="bg-amber-50 dark:bg-amber-950/20 rounded-2xl p-6 border border-amber-200 dark:border-amber-900/30 flex flex-col justify-center animate-fade-in shadow-xs">
+              <p className="text-xs text-amber-800 dark:text-amber-400 leading-relaxed font-sans font-medium">
                 بما أن القطاع المهني المختار هو <strong>"متقاعد حالي"</strong>، فلن نطلب تاريخ مباشرة العمل ويتم الاعتماد القياسي المطلق على السن لدورة الحياة التمويلية.
               </p>
             </div>
@@ -1194,19 +1194,19 @@ export default function StepWizard() {
       <div className="space-y-6">
         {/* Sub tabs: manual net vs detailed (only if sector is NOT retired and NOT military) */}
         {sectorId !== 'retired' && effectiveSectorId !== 'military' && (
-          <div className="flex bg-gray-100 p-1.5 rounded-xl border border-gray-200 gap-1 font-semibold font-sans">
+          <div className="flex bg-gray-100 dark:bg-slate-800 p-1.5 rounded-xl border border-gray-200 dark:border-slate-750 gap-1 font-semibold font-sans">
             <button
               type="button"
               id="salary-details-tab-field"
               onClick={() => setSalaryMode('details')}
               className={`flex-1 text-center py-2.5 rounded-lg font-bold text-xs transition-all cursor-pointer ${
                 salaryMode === 'details'
-                  ? 'bg-white text-[#0057B8] shadow-xs'
-                  : 'text-gray-500 hover:text-gray-900 hover:bg-white/50'
+                  ? 'bg-white dark:bg-[#111827] text-[#0057B8] dark:text-[#0ea5a4] shadow-xs'
+                  : 'text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-slate-800'
               }`}
             >
               <span>إدخال تفاصيل الراتب (الأساسي والبدلات)</span>
-              <span className="text-[10px] font-normal text-[#0057B8]/80 block sm:inline-block sm:mr-1 mt-0.5 sm:mt-0 font-sans">(الخيار الموصى به والمساعد للحاسبة)</span>
+              <span className="text-[10px] font-normal text-[#0057B8]/80 dark:text-[#0ea5a4]/80 block sm:inline-block sm:mr-1 mt-0.5 sm:mt-0 font-sans">(الخيار الموصى به والمساعد للحاسبة)</span>
             </button>
             <button
               type="button"
@@ -1214,8 +1214,8 @@ export default function StepWizard() {
               onClick={() => setSalaryMode('direct')}
               className={`flex-1 text-center py-2.5 rounded-lg font-bold text-xs transition-all cursor-pointer ${
                 salaryMode === 'direct'
-                  ? 'bg-white text-[#0057B8] shadow-xs'
-                  : 'text-gray-500 hover:text-gray-900 hover:bg-white/50'
+                  ? 'bg-white dark:bg-[#111827] text-[#0057B8] dark:text-[#0ea5a4] shadow-xs'
+                  : 'text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-slate-800'
               }`}
             >
               أدخل الراتب الصافي مباشرة
@@ -1228,7 +1228,7 @@ export default function StepWizard() {
           <div className="space-y-6 animate-fade-in text-right">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 font-sans">
               <div className="space-y-2">
-                <label className="block text-xs font-bold text-gray-700">الراتب الأساسي <span className="text-rose-500">*</span>:</label>
+                <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 font-sans">الراتب الأساسي <span className="text-rose-500">*</span>:</label>
                 <div className="relative">
                   <NumericInput
                     id="basic-salary-input-fields"
@@ -1237,14 +1237,14 @@ export default function StepWizard() {
                     value={basicSalary}
                     onChange={setBasicSalary}
                     placeholder="مثال: 4555"
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                    className="w-full bg-gray-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-800 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] dark:text-white dark:focus:ring-[#0ea5a4]"
                   />
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">ريال</span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400 dark:text-slate-500">ريال</span>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="block text-xs font-bold text-gray-700">بدل النقل:</label>
+                <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 font-sans">بدل النقل:</label>
                 <div className="relative">
                   <NumericInput
                     id="housing-salary-input-fields"
@@ -1253,14 +1253,14 @@ export default function StepWizard() {
                     value={housingAllowance}
                     onChange={setHousingAllowance}
                     placeholder="مثال: 500"
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                    className="w-full bg-gray-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-800 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] dark:text-white dark:focus:ring-[#0ea5a4]"
                   />
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">ريال</span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400 dark:text-slate-500">ريال</span>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="block text-xs font-bold text-gray-700">البدلات / العلاوات الأخرى:</label>
+                <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 font-sans">البدلات / العلاوات الأخرى:</label>
                 <div className="relative">
                   <NumericInput
                     id="other-salary-input-fields"
@@ -1269,16 +1269,16 @@ export default function StepWizard() {
                     value={otherAllowances}
                     onChange={setOtherAllowances}
                     placeholder="مثال: 4337.5"
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                    className="w-full bg-gray-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-800 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] dark:text-white dark:focus:ring-[#0ea5a4]"
                   />
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">ريال</span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400 dark:text-slate-500">ريال</span>
                 </div>
               </div>
             </div>
 
-            <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100 flex justify-between items-center text-xs">
-              <span className="text-emerald-800 font-bold">صافي الراتب المحسوب تلقائيًا:</span>
-              <span className="font-extrabold text-emerald-700 text-sm">{(localCalculatedNet).toLocaleString('ar-SA')} ريال سعودي</span>
+            <div className="bg-emerald-50 dark:bg-emerald-950/20 rounded-2xl p-4 border border-emerald-100 dark:border-emerald-900/30 flex justify-between items-center text-xs">
+              <span className="text-emerald-800 dark:text-emerald-400 font-bold">صافي الراتب المحسوب تلقائيًا:</span>
+              <span className="font-extrabold text-emerald-700 dark:text-emerald-300 text-sm">{(localCalculatedNet).toLocaleString('ar-SA')} ريال سعودي</span>
             </div>
           </div>
         ) : salaryMode === 'direct' || sectorId === 'retired' ? (
@@ -1286,7 +1286,7 @@ export default function StepWizard() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {sectorId === 'retired' ? (
                 <div className="space-y-2">
-                  <label className="block text-xs font-bold text-gray-700 font-sans">الراتب التقاعدي الصافي المستلم شهريًا:</label>
+                  <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 font-sans">الراتب التقاعدي الصافي المستلم شهريًا:</label>
                   <div className="relative font-sans">
                     <NumericInput
                       id="retired-salary-input-fields"
@@ -1295,15 +1295,15 @@ export default function StepWizard() {
                       value={directPensionSalary}
                       onChange={setDirectPensionSalary}
                       placeholder="مثال: 8000"
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                      className="w-full bg-gray-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-800 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] dark:text-white dark:focus:ring-[#0ea5a4]"
                     />
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">ريال سعودي</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400 dark:text-slate-500">ريال سعودي</span>
                   </div>
                 </div>
               ) : (
                 <>
                   <div className="space-y-2">
-                    <label className="block text-xs font-bold text-gray-700">مبلغ الراتب الصافي الكلي (المحول للبنك):</label>
+                    <label className="block text-xs font-bold text-gray-700 dark:text-slate-300">مبلغ الراتب الصافي الكلي (المحول للبنك):</label>
                     <div className="relative">
                       <NumericInput
                         id="direct-salary-input-fields"
@@ -1312,16 +1312,16 @@ export default function StepWizard() {
                         value={directNetSalary}
                         onChange={setDirectNetSalary}
                         placeholder="مثال: 12500"
-                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                        className="w-full bg-gray-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-800 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] dark:text-white dark:focus:ring-[#0ea5a4]"
                       />
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">ريال سعودي</span>
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400 dark:text-slate-500">ريال سعودي</span>
                     </div>
                   </div>
 
                   {/* If chosen Direct Net Salary AND real_estate path, ask for Basic Salary (for pension selection) */}
                   {mainFinanceType !== 'personal_only' && (
                     <div className="space-y-2 animate-fade-in">
-                      <label className="block text-xs font-bold text-gray-700">الراتب الأساسي (لأغراض احتساب التقاعد فقط):</label>
+                      <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 font-sans">الراتب الأساسي (لأغراض احتساب التقاعد فقط):</label>
                       <div className="relative">
                         <NumericInput
                           id="basic-pension-salary-input-fields"
@@ -1330,9 +1330,9 @@ export default function StepWizard() {
                           value={basicSalary}
                           onChange={setBasicSalary}
                           placeholder="مثال: 9000"
-                          className="w-full bg-slate-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                          className="w-full bg-slate-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-800 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] dark:text-white dark:focus:ring-[#0ea5a4]"
                         />
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">ريال سعودي</span>
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400 dark:text-slate-500">ريال سعودي</span>
                       </div>
                     </div>
                   )}
@@ -1344,7 +1344,7 @@ export default function StepWizard() {
           <div className="space-y-6 animate-fade-in text-right font-sans">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="space-y-2">
-                <label className="block text-xs font-bold text-gray-700">الراتب الأساسي:</label>
+                <label className="block text-xs font-bold text-gray-700 dark:text-slate-300">الراتب الأساسي:</label>
                 <div className="relative">
                   <NumericInput
                     id="basic-salary-input-fields"
@@ -1353,14 +1353,14 @@ export default function StepWizard() {
                     value={basicSalary}
                     onChange={setBasicSalary}
                     placeholder="مثال: 9000"
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                    className="w-full bg-gray-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-800 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] dark:text-white dark:focus:ring-[#0ea5a4]"
                   />
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">ريال</span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400 dark:text-slate-500">ريال</span>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="block text-xs font-bold text-gray-700">بدل السكن:</label>
+                <label className="block text-xs font-bold text-gray-700 dark:text-slate-300">بدل السكن:</label>
                 <div className="relative">
                   <NumericInput
                     id="housing-salary-input-fields"
@@ -1369,14 +1369,14 @@ export default function StepWizard() {
                     value={housingAllowance}
                     onChange={setHousingAllowance}
                     placeholder="مثال: 2250"
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                    className="w-full bg-gray-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-800 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] dark:text-white dark:focus:ring-[#0ea5a4]"
                   />
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">ريال</span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400 dark:text-slate-500">ريال</span>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="block text-xs font-bold text-gray-700">بدلات أخرى:</label>
+                <label className="block text-xs font-bold text-gray-700 dark:text-slate-300">بدلات أخرى:</label>
                 <div className="relative">
                   <NumericInput
                     id="other-salary-input-fields"
@@ -1385,31 +1385,31 @@ export default function StepWizard() {
                     value={otherAllowances}
                     onChange={setOtherAllowances}
                     placeholder="مثال: 1500"
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                    className="w-full bg-gray-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-800 rounded-xl px-4 py-3.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] dark:text-white dark:focus:ring-[#0ea5a4]"
                   />
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">ريال</span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400 dark:text-slate-500">ريال</span>
                 </div>
               </div>
             </div>
 
-            <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100 flex justify-between items-center text-xs">
-              <span className="text-emerald-800 font-bold">صافي الراتب المتوقع بعد خصم المعاشات:</span>
-              <span className="font-extrabold text-emerald-700 text-sm">{(localCalculatedNet).toLocaleString('ar-SA')} ريال سعودي</span>
+            <div className="bg-emerald-50 dark:bg-emerald-950/20 rounded-2xl p-4 border border-emerald-100 dark:border-emerald-900/30 flex justify-between items-center text-xs">
+              <span className="text-emerald-800 dark:text-emerald-400 font-bold">صافي الراتب المتوقع بعد خصم المعاشات:</span>
+              <span className="font-extrabold text-emerald-700 dark:text-emerald-300 text-sm">{(localCalculatedNet).toLocaleString('ar-SA')} ريال سعودي</span>
             </div>
           </div>
         )}
 
         {mainFinanceType === 'personal_only' && (
-          <div className="mt-8 pt-6 border-t border-dashed border-gray-200 space-y-6 font-sans">
-            <div className="flex items-center gap-2 pb-2 text-slate-800">
-              <Coins className="w-5 h-5 text-amber-500" />
+          <div className="mt-8 pt-6 border-t border-dashed border-gray-200 dark:border-slate-800 space-y-6 font-sans">
+            <div className="flex items-center gap-2 pb-2 text-slate-800 dark:text-slate-200">
+              <Coins className="w-5 h-5 text-amber-500 dark:text-amber-400" />
               <h4 className="text-sm font-bold font-sans">خيارات الحسبة والجهات المفضلة</h4>
             </div>
             
             {/* 1. مدة التمويل الشخصي */}
-            <div className="border border-gray-200 bg-white rounded-2xl p-5 text-right space-y-4">
-              <label className="block text-xs font-bold text-gray-700 flex items-center gap-1.5 pb-1">
-                <Calendar className="w-4 h-4 text-[#0057B8]" />
+            <div className="border border-gray-200 dark:border-slate-800 bg-white dark:bg-[#151F32] rounded-2xl p-5 text-right space-y-4">
+              <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 flex items-center gap-1.5 pb-1">
+                <Calendar className="w-4 h-4 text-[#0057B8] dark:text-[#0ea5a4]" />
                 <span>مدة التمويل الشخصي:</span>
               </label>
 
@@ -1423,13 +1423,13 @@ export default function StepWizard() {
                   }}
                   className={`p-4 rounded-xl border text-right transition-all cursor-pointer font-sans duration-200 flex flex-col gap-1.5 ${
                     personalTenorSelectionMode === 'auto'
-                      ? 'border-[#0057B8] bg-[#0057B8]/5 text-[#0057B8]'
-                      : 'border-gray-200 text-gray-700 hover:bg-gray-50'
+                      ? 'border-[#0057B8] dark:border-[#0ea5a4] bg-[#0057B8]/5 dark:bg-[#0ea5a4]/5 text-[#0057B8] dark:text-[#0ea5a4] font-bold'
+                      : 'border-gray-200 dark:border-slate-800 text-gray-700 dark:text-slate-400 bg-white dark:bg-[#111827] hover:bg-slate-50 dark:hover:bg-slate-800/80'
                   }`}
                 >
                   <span className="text-xs font-extrabold">تلقائي</span>
                   <span className={`text-[10px] leading-relaxed ${
-                    personalTenorSelectionMode === 'auto' ? 'text-blue-700/80' : 'text-gray-400'
+                    personalTenorSelectionMode === 'auto' ? 'text-blue-700/80 dark:text-[#0ea5a4]/80' : 'text-gray-400 dark:text-slate-500'
                   }`}>
                     يحدد النظام المدة المناسبة حسب قاعدة البنك والمدة المتبقية قبل التقاعد.
                   </span>
@@ -1445,13 +1445,13 @@ export default function StepWizard() {
                   }}
                   className={`p-4 rounded-xl border text-right transition-all cursor-pointer font-sans duration-200 flex flex-col gap-1.5 ${
                     personalTenorSelectionMode === 'custom'
-                      ? 'border-[#0057B8] bg-[#0057B8]/5 text-[#0057B8]'
-                      : 'border-gray-200 text-gray-700 hover:bg-gray-50'
+                      ? 'border-[#0057B8] dark:border-[#0ea5a4] bg-[#0057B8]/5 dark:bg-[#0ea5a4]/5 text-[#0057B8] dark:text-[#0ea5a4] font-bold'
+                      : 'border-gray-200 dark:border-slate-800 text-gray-700 dark:text-slate-400 bg-white dark:bg-[#111827] hover:bg-slate-50 dark:hover:bg-slate-800/80'
                   }`}
                 >
                   <span className="text-xs font-extrabold font-sans">اختيار يدوي</span>
                   <span className={`text-[10px] leading-relaxed ${
-                    personalTenorSelectionMode === 'custom' ? 'text-blue-700/80' : 'text-gray-400'
+                    personalTenorSelectionMode === 'custom' ? 'text-blue-700/80 dark:text-[#0ea5a4]/80' : 'text-gray-400 dark:text-slate-500'
                   }`}>
                     تحديد مدة مخصصة للتمويل الشخصي (بالأشهر) تناسب رغبتك.
                   </span>
@@ -1459,8 +1459,8 @@ export default function StepWizard() {
               </div>
 
               {personalTenorSelectionMode === 'custom' && (
-                <div className="mt-4 pt-4 border-t border-gray-100 space-y-3 animate-fade-in font-sans">
-                  <span className="block text-[11px] font-bold text-gray-500">اختر مدة التمويل الشخصي المفضلة (بالأشهر):</span>
+                <div className="mt-4 pt-4 border-t border-gray-100 dark:border-slate-800 space-y-3 animate-fade-in font-sans">
+                  <span className="block text-[11px] font-bold text-gray-500 dark:text-slate-400">اختر مدة التمويل الشخصي المفضلة (بالأشهر):</span>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                     {(() => {
                       const activeMax = selectedBankId === 'all' ? 60 : getSelectedBankPersonalMaxTenor();
@@ -1480,8 +1480,8 @@ export default function StepWizard() {
                           onClick={() => setRequestedPersonalTenorMonths(opt.value)}
                           className={`py-3 px-2 text-xs font-bold rounded-xl border text-center transition-all cursor-pointer ${
                             requestedPersonalTenorMonths === opt.value
-                              ? 'border-[#0057B8] bg-[#0057B8] text-white font-extrabold'
-                              : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                              ? 'border-[#0057B8] dark:border-[#0ea5a4] bg-[#0057B8] dark:bg-[#0ea5a4] text-white font-extrabold shadow-sm'
+                              : 'border-gray-200 dark:border-slate-800 text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 bg-white dark:bg-[#111827]'
                           }`}
                         >
                           {opt.label}
@@ -1494,17 +1494,17 @@ export default function StepWizard() {
             </div>
 
             {/* 2. جهة التمويل المفضلة للتمويل الشخصي */}
-            <div className="border border-gray-200 bg-white rounded-2xl p-5 text-right space-y-3">
-              <label className="block text-xs font-bold text-gray-700">جهة التمويل المفضلة للتمويل الشخصي:</label>
+            <div className="border border-gray-200 dark:border-slate-800 bg-white dark:bg-[#151F32] rounded-2xl p-5 text-right space-y-3">
+              <label className="block text-xs font-bold text-gray-700 dark:text-slate-300">جهة التمويل المفضلة للتمويل الشخصي:</label>
               <select
                 id="personal-bank-filter-select"
                 value={selectedBankId}
                 onChange={(e) => setSelectedBankId(e.target.value)}
-                className="w-full bg-slate-50 border border-gray-200 rounded-xl px-4 py-3.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-[#0057B8] focus:border-transparent cursor-pointer font-sans text-gray-800"
+                className="w-full bg-[#FAFAFA] dark:bg-[#0F172A] border border-gray-200 dark:border-slate-800 text-slate-800 dark:text-slate-100 rounded-xl px-4 py-3.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] dark:focus:ring-[#0ea5a4] focus:border-transparent cursor-pointer font-sans"
               >
-                <option value="all">جميع جهات التمويل النشطة المتاحة (مقارنة العروض)</option>
+                <option value="all" className="dark:bg-[#0f172a]">جميع جهات التمويل النشطة المتاحة (مقارنة العروض)</option>
                 {sortedActiveBanks.map(bank => (
-                  <option key={bank.id} value={bank.id}>{bank.nameAr}</option>
+                  <option key={bank.id} value={bank.id} className="dark:bg-[#0f172a]">{bank.nameAr}</option>
                 ))}
               </select>
             </div>
@@ -1517,7 +1517,7 @@ export default function StepWizard() {
   const logicalStepId = activeStepId === 'main_type' ? 1 : (activeStepId === 'finance_options' ? 3 : 2);
 
   return (
-    <div className="w-full bg-[#F8FAFC] min-h-[calc(100vh-64px)] flex flex-col">
+    <div className="w-full bg-[#F8FAFC] dark:bg-[#0B0F19] min-h-[calc(100vh-64px)] flex flex-col">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 flex flex-col w-full">
         
         {/* Step Wizard visual Progress stepper indicators */}
@@ -1525,55 +1525,55 @@ export default function StepWizard() {
           {/* Unified responsive 3-circle stepper */}
           <div className="relative w-full max-w-xl mx-auto flex items-center justify-between px-2 sm:px-6 py-2" dir="rtl">
             {/* Background line segment 1 */}
-            <div className={`absolute top-7 right-[18%] left-[50%] h-[1.5px] -z-10 transition-all duration-300 ${logicalStepId >= 2 ? 'bg-[#0057B8]' : 'bg-slate-200'}`} />
+            <div className={`absolute top-7 right-[18%] left-[50%] h-[1.5px] -z-10 transition-all duration-300 ${logicalStepId >= 2 ? 'bg-[#0057B8] dark:bg-[#0ea5a4]' : 'bg-slate-200 dark:bg-slate-800'}`} />
             {/* Background line segment 2 */}
-            <div className={`absolute top-7 right-[50%] left-[18%] h-[1.5px] -z-10 transition-all duration-300 ${logicalStepId >= 3 ? 'bg-[#0057B8]' : 'bg-slate-200'}`} />
+            <div className={`absolute top-7 right-[50%] left-[18%] h-[1.5px] -z-10 transition-all duration-300 ${logicalStepId >= 3 ? 'bg-[#0057B8] dark:bg-[#0ea5a4]' : 'bg-slate-200 dark:bg-slate-800'}`} />
 
             {/* Step 1 */}
             <div className="flex flex-col items-center">
               <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm transition-all duration-300 z-10 ${
                 logicalStepId === 1 
-                  ? 'bg-[#0057B8] text-white border-2 border-[#0057B8] shadow-md shadow-blue-100 ring-4 ring-blue-500/10 scale-102' 
+                  ? 'bg-[#0057B8] dark:bg-[#0ea5a4] text-white border-2 border-[#0057B8] dark:border-[#0ea5a4] shadow-md shadow-blue-100 dark:shadow-none ring-4 ring-blue-500/10 scale-102' 
                   : logicalStepId > 1 
-                  ? 'bg-[#0057B8] text-white border-2 border-[#0057B8]' 
-                  : 'bg-white text-slate-400 border border-slate-200'
+                  ? 'bg-[#0057B8] dark:bg-[#0ea5a4] text-white border-2 border-[#0057B8] dark:border-[#0ea5a4]' 
+                  : 'bg-white dark:bg-[#111827] text-slate-400 border border-slate-200 dark:border-slate-800'
               }`}>
                 {logicalStepId > 1 ? '✓' : '1'}
               </div>
-              <span className={`text-[10px] sm:text-xs font-sans font-extrabold mt-2 transition-all ${logicalStepId === 1 ? 'text-[#0057B8]' : 'text-slate-400 font-medium'}`}>نوع الحسبة</span>
+              <span className={`text-[10px] sm:text-xs font-sans font-extrabold mt-2 transition-all ${logicalStepId === 1 ? 'text-[#0057B8] dark:text-[#0ea5a4]' : 'text-slate-400 dark:text-slate-500 font-medium'}`}>نوع الحسبة</span>
             </div>
 
             {/* Step 2 */}
             <div className="flex flex-col items-center">
               <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm transition-all duration-300 z-10 ${
                 logicalStepId === 2 
-                  ? 'bg-[#0057B8] text-white border-2 border-[#0057B8] shadow-md shadow-blue-100 ring-4 ring-blue-500/10 scale-102' 
+                  ? 'bg-[#0057B8] dark:bg-[#0ea5a4] text-white border-2 border-[#0057B8] dark:border-[#0ea5a4] shadow-md shadow-blue-100 dark:shadow-none ring-4 ring-blue-500/10 scale-102' 
                   : logicalStepId > 2 
-                  ? 'bg-[#0057B8] text-white border-2 border-[#0057B8]' 
-                  : 'bg-white text-slate-400 border border-slate-200'
+                  ? 'bg-[#0057B8] dark:bg-[#0ea5a4] text-white border-2 border-[#0057B8] dark:border-[#0ea5a4]' 
+                  : 'bg-white dark:bg-[#111827] text-slate-400 border border-slate-200 dark:border-slate-800'
               }`}>
                 {logicalStepId > 2 ? '✓' : '2'}
               </div>
-              <span className={`text-[10px] sm:text-xs font-sans font-extrabold mt-2 transition-all ${logicalStepId === 2 ? 'text-[#0057B8]' : 'text-slate-400 font-medium'}`}>بيانات العميل والدخل</span>
+              <span className={`text-[10px] sm:text-xs font-sans font-extrabold mt-2 transition-all ${logicalStepId === 2 ? 'text-[#0057B8] dark:text-[#0ea5a4]' : 'text-slate-400 dark:text-slate-500 font-medium'}`}>بيانات العميل والدخل</span>
             </div>
 
             {/* Step 3 */}
             <div className="flex flex-col items-center">
               <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm transition-all duration-300 z-10 ${
                 logicalStepId === 3 
-                  ? 'bg-[#0057B8] text-white border-2 border-[#0057B8] shadow-md shadow-blue-100 ring-4 ring-blue-500/10 scale-102' 
-                  : 'bg-white text-slate-400 border border-slate-200'
+                  ? 'bg-[#0057B8] dark:bg-[#0ea5a4] text-white border-2 border-[#0057B8] dark:border-[#0ea5a4] shadow-md shadow-blue-100 dark:shadow-none ring-4 ring-blue-500/10 scale-102' 
+                  : 'bg-white dark:bg-[#111827] text-slate-400 border border-slate-200 dark:border-slate-800'
               }`}>
                 3
               </div>
-              <span className={`text-[10px] sm:text-xs font-sans font-extrabold mt-2 transition-all ${logicalStepId === 3 ? 'text-[#0057B8]' : 'text-slate-400 font-medium'}`}>خيارات الحسبة</span>
+              <span className={`text-[10px] sm:text-xs font-sans font-extrabold mt-2 transition-all ${logicalStepId === 3 ? 'text-[#0057B8] dark:text-[#0ea5a4]' : 'text-slate-400 dark:text-slate-500 font-medium'}`}>خيارات الحسبة</span>
             </div>
           </div>
         </div>
 
         {/* Validation Alert */}
         {errors.length > 0 && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-2xl text-xs text-red-700 space-y-1">
+          <div className="mb-6 p-4 bg-red-50 dark:bg-red-955/20 border border-red-200 dark:border-red-900/30 rounded-2xl text-xs text-red-700 dark:text-red-300 space-y-1">
             <div className="flex items-center gap-2 font-bold mb-1">
               <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
               <span>تنبيه التحقق من صحة المدخلات:</span>
@@ -1585,14 +1585,14 @@ export default function StepWizard() {
         )}
 
         {/* Main Step Cards Form container */}
-        <div className="bg-white rounded-2xl md:rounded-3xl border border-[#E5E7EB] p-4 sm:p-8 md:p-10 shadow-xs">
+        <div className="bg-white dark:bg-[#111827] rounded-2xl md:rounded-3xl border border-[#E5E7EB] dark:border-slate-800 p-4 sm:p-8 md:p-10 shadow-xs">
           
           {/* STEP 1: Main Type Selection */}
           {activeStepId === 'main_type' && (
             <div className="space-y-8 animate-fade-in text-right">
               <div className="text-center max-w-xl mx-auto mb-10">
-                <h3 className="text-2xl font-black text-[#1E293B] font-sans tracking-tight leading-snug">ما الذي تريد حسابه أولاً؟</h3>
-                <p className="text-sm text-slate-400 mt-1.5 font-sans leading-relaxed">اختر مسار الحسبة المناسب للبدء في توجيه التمويل بدقة.</p>
+                <h3 className="text-2xl font-black text-[#1E293B] dark:text-white font-sans tracking-tight leading-snug">ما الذي تريد حسابه أولاً؟</h3>
+                <p className="text-sm text-slate-400 dark:text-slate-500 mt-1.5 font-sans leading-relaxed">اختر مسار الحسبة المناسب للبدء في توجيه التمويل بدقة.</p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-3xl mx-auto">
@@ -1604,21 +1604,21 @@ export default function StepWizard() {
                   }}
                   className={`relative flex flex-col items-center justify-between text-center p-8 cursor-pointer transition-all duration-300 border rounded-2xl ${
                     mainFinanceType === 'real_estate' && productId !== 'personal_only'
-                      ? 'border-2 border-[#0057B8] bg-blue-50/25 shadow-md shadow-blue-50/50 scale-[1.01]' 
-                      : 'border-slate-200/95 bg-white hover:bg-slate-50/40 hover:border-slate-300 shadow-xs'
+                      ? 'border-2 border-[#0057B8] dark:border-[#0ea5a4] bg-blue-50/25 dark:bg-[#0ea5a4]/5 shadow-md shadow-blue-50/50 dark:shadow-none scale-[1.01]' 
+                      : 'border-slate-200/95 dark:border-slate-850 bg-white dark:bg-[#151F32] hover:bg-slate-50/40 dark:hover:bg-slate-800/60 hover:border-slate-300 dark:hover:border-slate-700 shadow-xs'
                   }`}
                 >
                   <div className="flex flex-col items-center w-full">
                     <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 mb-5 transition-colors duration-300 ${
                       mainFinanceType === 'real_estate' && productId !== 'personal_only'
-                        ? 'bg-blue-100/80 text-[#0057B8] border border-blue-200/50'
-                        : 'bg-slate-100 text-slate-500'
+                        ? 'bg-blue-100/80 dark:bg-[#0ea5a4]/10 text-[#0057B8] dark:text-[#0ea5a4] border border-blue-200/50 dark:border-[#0ea5a4]/25'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
                     }`}>
-                      <Home className="w-6 h-6" />
+                      <Home className="w-6 h-6 animate-pulse" />
                     </div>
                     <div className="text-center">
-                      <h4 className="font-extrabold text-[#0F172A] text-base leading-none">تمويل عقاري</h4>
-                      <p className="text-xs text-slate-400 mt-3 leading-relaxed font-sans font-medium">
+                      <h4 className="font-extrabold text-[#0F172A] dark:text-white text-base leading-none">تمويل عقاري</h4>
+                      <p className="text-xs text-slate-400 dark:text-slate-400 mt-3 leading-relaxed font-sans font-medium">
                         لحساب الحلول العقارية المتكاملة (عقاري فقط، عقاري بلس مع شخصي جديد، أو عقاري مع شخصي قائم).
                       </p>
                     </div>
@@ -1633,21 +1633,21 @@ export default function StepWizard() {
                   }}
                   className={`relative flex flex-col items-center justify-between text-center p-8 cursor-pointer transition-all duration-300 border rounded-2xl ${
                     mainFinanceType === 'personal_only' 
-                      ? 'border-2 border-[#0057B8] bg-blue-50/25 shadow-md shadow-blue-50/50 scale-[1.01]' 
-                      : 'border-slate-200/95 bg-white hover:bg-slate-50/40 hover:border-slate-300 shadow-xs'
+                      ? 'border-2 border-[#0057B8] dark:border-[#0ea5a4] bg-blue-50/25 dark:bg-[#0ea5a4]/5 shadow-md shadow-blue-50/50 dark:shadow-none scale-[1.01]' 
+                      : 'border-slate-200/95 dark:border-slate-850 bg-white dark:bg-[#151F32] hover:bg-slate-50/40 dark:hover:bg-slate-800/60 hover:border-slate-300 dark:hover:border-slate-700 shadow-xs'
                   }`}
                 >
                   <div className="flex flex-col items-center w-full">
                     <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 mb-5 transition-colors duration-300 ${
                       mainFinanceType === 'personal_only'
-                        ? 'bg-amber-100 text-amber-600 border border-amber-200/50'
-                        : 'bg-slate-100 text-slate-500'
+                        ? 'bg-amber-100 dark:bg-amber-500/10 text-amber-600 dark:text-amber-500 border border-amber-200/50 dark:border-amber-500/25'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
                     }`}>
                       <Coins className="w-6 h-6" />
                     </div>
                     <div className="text-center">
-                      <h4 className="font-extrabold text-[#0F172A] text-base leading-none">تمويل شخصي فقط</h4>
-                      <p className="text-xs text-slate-400 mt-3 leading-relaxed font-sans font-medium">
+                      <h4 className="font-extrabold text-[#0F172A] dark:text-white text-base leading-none">تمويل شخصي فقط</h4>
+                      <p className="text-xs text-slate-400 dark:text-slate-400 mt-3 leading-relaxed font-sans font-medium">
                         لحساب التمويل الشخصي الاستهلاكي القصير المستقل بنسب استقطاع مخصصة.
                       </p>
                     </div>
@@ -1661,24 +1661,24 @@ export default function StepWizard() {
           {activeStepId === 'personal_info_and_salary' && (
             <div className="space-y-8 animate-fade-in text-right">
               <div className="text-center max-w-lg mx-auto mb-8">
-                <h3 className="text-xl font-bold text-[#111827]">أدخل بيانات العميل والدخل</h3>
-                <p className="text-sm text-[#6B7280] mt-1 font-sans">يرجى إدخال تفاصيل جهة العمل والدخل الشهري لتقرير نسب الملاءمة وتحديد العروض المناسبة بدقة.</p>
+                <h3 className="text-xl font-bold text-[#111827] dark:text-white">أدخل بيانات العميل والدخل</h3>
+                <p className="text-sm text-[#6B7280] dark:text-slate-400 mt-1 font-sans">يرجى إدخال تفاصيل جهة العمل والدخل الشهري لتقرير نسب الملاءمة وتحديد العروض المناسبة بدقة.</p>
               </div>
 
               <div className="space-y-8">
                 {/* Section 1: Personal Info */}
-                <div className="space-y-6 bg-slate-50/10 p-6 md:p-8 rounded-2xl border border-gray-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-                  <h4 className="text-sm md:text-base font-bold text-[#0057B8] flex items-center gap-2 border-b border-gray-200/60 pb-3 mb-4">
-                    <User className="w-5 h-5" />
+                <div className="space-y-6 bg-slate-50/10 dark:bg-slate-900/10 p-6 md:p-8 rounded-2xl border border-gray-200/80 dark:border-slate-800 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
+                  <h4 className="text-sm md:text-base font-bold text-[#0057B8] dark:text-[#0ea5a4] flex items-center gap-2 border-b border-gray-200/60 dark:border-slate-800 pb-3 mb-4">
+                    <User className="w-5 h-5 text-[#0057B8] dark:text-[#0ea5a4]" />
                     <span>القسم الأول: بيانات العميل المهنية والشخصية</span>
                   </h4>
                   {renderPersonalInfoFields()}
                 </div>
 
                 {/* Section 2: Salary Info */}
-                <div className="space-y-6 bg-slate-50/10 p-6 md:p-8 rounded-2xl border border-gray-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-                  <h4 className="text-sm md:text-base font-bold text-[#0057B8] flex items-center gap-2 border-b border-gray-200/60 pb-3 mb-4 font-sans">
-                    <Coins className="w-5 h-5 text-emerald-600" />
+                <div className="space-y-6 bg-slate-50/10 dark:bg-slate-900/10 p-6 md:p-8 rounded-2xl border border-gray-200/80 dark:border-slate-800 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
+                  <h4 className="text-sm md:text-base font-bold text-[#0057B8] dark:text-[#0ea5a4] flex items-center gap-2 border-b border-gray-200/60 dark:border-slate-800 pb-3 mb-4 font-sans">
+                    <Coins className="w-5 h-5 text-emerald-600 dark:text-emerald-500" />
                     <span>القسم الثاني: الرواتب والمستحقات والبدلات</span>
                   </h4>
                   {renderSalaryFields()}
@@ -1691,8 +1691,8 @@ export default function StepWizard() {
           {activeStepId === 'personal_info' && (
             <div className="space-y-8 animate-fade-in text-right">
               <div className="text-center max-w-lg mx-auto mb-8">
-                <h3 className="text-xl font-bold text-[#111827]">أدخل بيانات العميل المهنية والشخصية</h3>
-                <p className="text-sm text-[#6B7280] mt-1 font-sans">تساعد جهة العمل وتفاصيل السن والخدمة في ترجيح معايير الاستحقاق وهوامش التسعير.</p>
+                <h3 className="text-xl font-bold text-[#111827] dark:text-white">أدخل بيانات العميل المهنية والشخصية</h3>
+                <p className="text-sm text-[#6B7280] dark:text-slate-400 mt-1 font-sans">تساعد جهة العمل وتفاصيل السن والخدمة في ترجيح معايير الاستحقاق وهوامش التسعير.</p>
               </div>
               {renderPersonalInfoFields()}
             </div>
@@ -1702,8 +1702,8 @@ export default function StepWizard() {
           {activeStepId === 'salary' && (
             <div className="space-y-6 animate-fade-in text-right">
               <div className="text-center max-w-lg mx-auto mb-8">
-                <h3 className="text-xl font-bold text-[#111827]">الرواتب والمستحقات والبدلات</h3>
-                <p className="text-sm text-[#6B7280] mt-1 font-sans">يُشترط الإدخال الصحيح للراتب لتقرير عوامل الاستقطاع ونسب الملاءمة ائتمانياً لدى كافة البنوك.</p>
+                <h3 className="text-xl font-bold text-[#111827] dark:text-white">الرواتب والمستحقات والبدلات</h3>
+                <p className="text-sm text-[#6B7280] dark:text-slate-400 mt-1 font-sans">يُشترط الإدخال الصحيح للراتب لتقرير عوامل الاستقطاع ونسب الملاءمة ائتمانياً لدى كافة البنوك.</p>
               </div>
               {renderSalaryFields()}
             </div>
@@ -1712,8 +1712,8 @@ export default function StepWizard() {
           {activeStepId === 'finance_options' && (
             <div className="space-y-6 animate-fade-in text-right">
               <div className="text-center max-w-lg mx-auto mb-8">
-                <h3 className="text-xl font-bold text-[#111827]">تخصيص منتج التمويل والالتزامات</h3>
-                <p className="text-sm text-[#6B7280] mt-1 font-sans">تتحكم مدة السداد وتفصيل الدعم والالتزامات بجدول الفائدة التراكمية وهوامش أرباح البنوك.</p>
+                <h3 className="text-xl font-bold text-[#111827] dark:text-white">تخصيص منتج التمويل والالتزامات</h3>
+                <p className="text-sm text-[#6B7280] dark:text-slate-400 mt-1 font-sans">تتحكم مدة السداد وتفصيل الدعم والالتزامات بجدول الفائدة التراكمية وهوامش أرباح البنوك.</p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1721,7 +1721,7 @@ export default function StepWizard() {
                 {/* 1. Real Estate Product Options Cards (Mortgage Flow Only) */}
                 {mainFinanceType !== 'personal_only' && (
                   <div className="col-span-1 md:col-span-2 space-y-3">
-                    <label className="block text-xs font-bold text-gray-700">نوع منتج التمويل العقاري المطلوب:</label>
+                    <label className="block text-xs font-bold text-gray-700 dark:text-slate-300">نوع منتج التمويل العقاري المطلوب:</label>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                       {[
                         { id: 'real_estate_only', label: 'عقاري فقط', desc: 'للحصول على تمويل شراء المسكن أو العقار السكني المستقل.' },
@@ -1748,12 +1748,12 @@ export default function StepWizard() {
                             }}
                             className={`p-4 rounded-xl border-2 text-right transition-all flex flex-col justify-between cursor-pointer min-h-[110px] ${
                               isSelected
-                                ? 'border-[#0057B8] bg-[#0057B8]/5 text-[#111827]'
-                                : 'border-gray-200 hover:border-gray-300 text-gray-600 bg-white'
+                                ? 'border-[#0057B8] dark:border-[#0ea5a4] bg-[#0057B8]/5 dark:bg-[#0ea5a4]/5 text-[#111827] dark:text-white font-extrabold'
+                                : 'border-gray-200 dark:border-slate-800 hover:border-gray-300 dark:hover:border-slate-750 text-gray-600 dark:text-slate-400 bg-white dark:bg-[#111827] dark:hover:bg-slate-800'
                             }`}
                           >
                             <span className="font-extrabold text-xs">{prod.label}</span>
-                            <span className="text-[10px] text-gray-400 mt-1.5 leading-relaxed font-sans">{prod.desc}</span>
+                            <span className="text-[10px] text-gray-400 dark:text-slate-500 mt-1.5 leading-relaxed font-sans">{prod.desc}</span>
                           </button>
                         );
                       })}
@@ -1763,14 +1763,14 @@ export default function StepWizard() {
 
                 {/* 2. Direct Obligations Fields (Shown Inline if Real Estate + Existing Personal is chosen) */}
                 {productId === 'real_estate_with_existing_personal' && (
-                  <div className="col-span-1 md:col-span-2 border border-blue-100 bg-blue-50/20 rounded-2xl p-5 space-y-4 animate-fade-in shadow-xs">
-                    <h4 className="text-xs font-bold text-blue-900 flex items-center gap-1.5">
-                      <Coins className="w-4 h-4 text-[#0057B8]" />
+                  <div className="col-span-1 md:col-span-2 border border-blue-100 dark:border-slate-800 bg-blue-50/20 dark:bg-slate-900/20 rounded-2xl p-5 space-y-4 animate-fade-in shadow-xs">
+                    <h4 className="text-xs font-bold text-blue-900 dark:text-[#0ea5a4] flex items-center gap-1.5">
+                      <Coins className="w-4 h-4 text-[#0057B8] dark:text-[#0ea5a4]" />
                       <span>تفاصيل الالتزام المالي القائم:</span>
                     </h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                        <label className="block text-xs font-bold text-gray-700">القسط الشهري الحالي للالتزام الشخصي:</label>
+                        <label className="block text-xs font-bold text-gray-700 dark:text-slate-300">القسط الشهري الحالي للالتزام الشخصي:</label>
                         <div className="relative">
                           <NumericInput
                             id="existing-monthly-obligations-input-direct"
@@ -1779,13 +1779,13 @@ export default function StepWizard() {
                             value={existingMonthlyObligations}
                             onChange={setExistingMonthlyObligations}
                             placeholder="مثال: 1500"
-                            className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                            className="w-full bg-white dark:bg-[#0F172A] border border-gray-200 dark:border-slate-800 text-slate-800 dark:text-slate-100 rounded-xl px-4 py-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] dark:focus:ring-[#0ea5a4]"
                           />
-                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400">ريال/شهرياً</span>
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400 dark:text-slate-500">ريال/شهرياً</span>
                         </div>
                       </div>
                       <div className="space-y-1.5">
-                        <label className="block text-[10px] font-bold text-gray-400 font-sans">الشهور المتبقية للالتزام الحالي:</label>
+                        <label className="block text-[10px] font-bold text-gray-400 dark:text-slate-500 font-sans">الشهور المتبقية للالتزام الحالي:</label>
                         <div className="relative">
                           <NumericInput
                             id="obligation-remaining-months-input-direct"
@@ -1794,9 +1794,9 @@ export default function StepWizard() {
                             value={obligationRemainingMonths}
                             onChange={setObligationRemainingMonths}
                             placeholder="مثال: 36"
-                            className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8]"
+                            className="w-full bg-white dark:bg-[#0F172A] border border-gray-200 dark:border-slate-800 text-slate-800 dark:text-slate-100 rounded-xl px-4 py-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] dark:focus:ring-[#0ea5a4]"
                           />
-                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400">شهر متبقي</span>
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400 dark:text-slate-500">شهر متبقي</span>
                         </div>
                       </div>
                     </div>
@@ -1805,8 +1805,8 @@ export default function StepWizard() {
 
                 {/* Sakani Program (Mortgage support) - ONLY FOR MORTGAGES */}
                 {mainFinanceType !== 'personal_only' && (
-                  <div className="border border-gray-200 bg-white rounded-2xl p-5 text-right space-y-3">
-                    <label className="block text-xs font-bold text-gray-700 flex items-center justify-between font-sans">
+                  <div className="border border-gray-200 dark:border-slate-800 bg-white dark:bg-[#151F32] rounded-2xl p-5 text-right space-y-3">
+                    <label className="block text-xs font-bold text-gray-750 dark:text-slate-300 flex items-center justify-between font-sans">
                       <span>برنامج الدعم السكني (سكني):</span>
                       <HelpCircle className="w-4.5 h-4.5 text-gray-400 font-sans" />
                     </label>
@@ -1822,8 +1822,8 @@ export default function StepWizard() {
                           onClick={() => setSupportType(st.id as SupportType)}
                           className={`py-2 px-1 text-xs font-bold rounded-lg border text-center transition-all cursor-pointer ${
                             supportType === st.id
-                              ? 'border-[#0057B8] bg-[#0057B8]/5 text-[#0057B8]'
-                              : 'border-gray-200 text-gray-500 hover:bg-gray-50 hover:border-gray-300'
+                              ? 'border-[#0057B8] dark:border-[#0ea5a4] bg-[#0057B8]/5 dark:bg-[#0ea5a4]/5 text-[#0057B8] dark:text-[#0ea5a4]'
+                              : 'border-gray-200 dark:border-slate-800 text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 hover:border-gray-300 dark:hover:border-slate-705'
                           }`}
                         >
                           {st.label}
@@ -1833,18 +1833,74 @@ export default function StepWizard() {
                   </div>
                 )}
 
+                {/* 3. Requested Finance Duration (Always Visible in finance_options step) */}
+                <div className="border border-gray-200 dark:border-slate-800 bg-white dark:bg-[#151F32] rounded-2xl p-5 text-right space-y-3">
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between font-sans">
+                    <span>مدة التمويل المطلوبة:</span>
+                    <Calendar className="w-4 h-4 text-[#0057B8] dark:text-[#0ea5a4]" />
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { id: 'until_retirement', label: 'حتى التقاعد' },
+                      { id: 'manual', label: 'اختيار يدوي' },
+                      { id: 'max', label: 'الحد الأقصى' }
+                    ].map((mode) => (
+                      <button
+                        key={mode.id}
+                        type="button"
+                        onClick={() => {
+                          setTermMode(mode.id as TermMode);
+                          if (mode.id === 'manual' && !manualTermYears) {
+                            setManualTermYears(25);
+                          }
+                        }}
+                        className={`py-2 px-1 text-xs font-bold rounded-lg border text-center transition-all cursor-pointer ${
+                          termMode === mode.id
+                            ? 'border-[#0057B8] dark:border-[#0ea5a4] bg-[#0057B8]/5 dark:bg-[#0ea5a4]/5 text-[#0057B8] dark:text-[#0ea5a4]'
+                            : 'border-gray-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                        }`}
+                      >
+                        {mode.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {termMode === 'manual' && (
+                    <div className="pt-2 space-y-1.5 animate-fade-in">
+                      <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 font-sans">مدة التمويل المستهدفة (سنوات):</label>
+                      <div className="relative">
+                        <NumericInput
+                          id="manual-term-years-input-desktop"
+                          min={1}
+                          max={30}
+                          allowDecimals={false}
+                          value={manualTermYears}
+                          onChange={(val) => {
+                            if (val === '' || (Number(val) >= 1 && Number(val) <= 30)) {
+                              setManualTermYears(val);
+                            }
+                          }}
+                          placeholder="مثال: 25"
+                          className="w-full bg-slate-50 dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0057B8] dark:focus:ring-[#0ea5a4]"
+                        />
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 dark:text-slate-500 font-sans">سنة (1 إلى 30)</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {/* Preferred Bank Filter - FOR BOTH PATHS */}
-                <div className="border border-gray-200 bg-white rounded-2xl p-5 text-right space-y-3 col-span-1 md:col-span-2">
-                  <label className="block text-xs font-bold text-gray-700">جهة التمويل المفضلة:</label>
+                <div className="border border-gray-200 dark:border-slate-800 bg-white dark:bg-[#151F32] rounded-2xl p-5 text-right space-y-3 col-span-1 md:col-span-2">
+                  <label className="block text-xs font-bold text-gray-700 dark:text-slate-300">جهة التمويل المفضلة:</label>
                   <select
                     id="bank-filter-select"
                     value={selectedBankId}
                     onChange={(e) => setSelectedBankId(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] focus:border-transparent cursor-pointer font-sans"
+                    className="w-full bg-gray-50 dark:bg-[#0F172A] border border-gray-200 dark:border-slate-800 rounded-xl px-4 py-3.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] dark:focus:ring-[#0ea5a4] focus:border-transparent cursor-pointer font-sans dark:text-white"
                   >
-                    <option value="all">جميع جهات التمويل النشطة المتاحة (مقارنة العروض)</option>
+                    <option value="all" className="dark:bg-[#0f172a]">جميع جهات التمويل النشطة المتاحة (مقارنة العروض)</option>
                     {sortedActiveBanks.map(bank => (
-                      <option key={bank.id} value={bank.id}>{bank.nameAr}</option>
+                      <option key={bank.id} value={bank.id} className="dark:bg-[#0f172a]">{bank.nameAr}</option>
                     ))}
                   </select>
                 </div>
@@ -1854,13 +1910,13 @@ export default function StepWizard() {
           )}
 
           {/* Stepper Buttons */}
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-8 border-t border-gray-100 mt-8 font-sans">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-8 border-t border-gray-150 dark:border-slate-850 mt-8 font-sans">
             <button
               id="prev-step-btn"
               type="button"
               onClick={handleBack}
               disabled={currentStep === 1}
-              className="w-full sm:w-auto min-h-[44px] justify-center px-6 py-2.5 rounded-xl border border-gray-200 text-gray-500 font-semibold text-xs leading-none hover:bg-gray-50 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed flex items-center gap-1.5 transition-all"
+              className="w-full sm:w-auto min-h-[44px] justify-center px-6 py-2.5 rounded-xl border border-gray-200 dark:border-slate-700 text-gray-500 dark:text-slate-400 font-semibold text-xs leading-none hover:bg-gray-50 dark:hover:bg-slate-800 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed flex items-center gap-1.5 transition-all"
             >
               <ChevronRight className="w-3.5 h-3.5" />
               <span>رجوع</span>
@@ -1871,7 +1927,7 @@ export default function StepWizard() {
                 id="next-step-btn"
                 type="button"
                 onClick={handleNext}
-                className="w-full sm:w-auto min-h-[44px] justify-center px-6 py-2.5 rounded-xl bg-[#0057B8] text-white font-semibold text-xs leading-none hover:bg-[#004494] cursor-pointer flex items-center gap-1.5 transition-all shadow-sm active:scale-98"
+                className="w-full sm:w-auto min-h-[44px] justify-center px-6 py-2.5 rounded-xl bg-[#0057B8] dark:bg-[#0ea5a4] text-white font-semibold text-xs leading-none hover:bg-[#004494] dark:hover:bg-[#0c8e8d] cursor-pointer flex items-center gap-1.5 transition-all shadow-sm active:scale-98"
               >
                 <span>التالي</span>
                 <ChevronLeft className="w-3.5 h-3.5" />
@@ -1881,7 +1937,7 @@ export default function StepWizard() {
                 id="calc-submit-btn"
                 type="button"
                 onClick={triggerCalculations}
-                className="w-full sm:w-auto min-h-[44px] justify-center px-8 py-3.5 rounded-xl bg-[#0057B8] text-white font-bold text-sm leading-none hover:bg-[#004494] transition-all cursor-pointer flex items-center gap-2 shadow-sm"
+                className="w-full sm:w-auto min-h-[44px] justify-center px-8 py-3.5 rounded-xl bg-[#0057B8] dark:bg-[#0ea5a4] text-white font-bold text-sm leading-none hover:bg-[#004494] dark:hover:bg-[#0c8e8d] transition-all cursor-pointer flex items-center gap-2 shadow-sm"
               >
                 <Calculator className="w-4 h-4" />
                 <span>{results ? 'تحديث وإعادة الحساب' : 'احسب النتائج ومقارنة العروض'}</span>
@@ -1903,19 +1959,19 @@ export default function StepWizard() {
               />
             ) : (
               <div className="max-w-md mx-auto my-16 px-4 text-center select-none animate-fade-in" dir="rtl">
-                <div className="bg-white border border-[#E5E7EB] rounded-3xl p-8 shadow-xl space-y-6">
-                  <div className="w-16 h-16 bg-blue-50 text-[#0057B8] rounded-full flex items-center justify-center mx-auto border border-blue-100/50">
-                    <Calculator className="w-7 h-7 text-[#0057B8]" />
+                <div className="bg-white dark:bg-[#111827] border border-[#E5E7EB] dark:border-slate-800 rounded-3xl p-8 shadow-xl space-y-6">
+                  <div className="w-16 h-16 bg-blue-50 dark:bg-slate-800 text-[#0057B8] dark:text-[#0ea5a4] rounded-full flex items-center justify-center mx-auto border border-blue-100/50 dark:border-slate-700/50">
+                    <Calculator className="w-7 h-7 text-[#0057B8] dark:text-[#0ea5a4]" />
                   </div>
                   <div className="space-y-2">
-                    <h3 className="font-sans font-black text-xl text-gray-950">لا توجد نتيجة حالية</h3>
-                    <p className="text-xs text-slate-500 leading-relaxed font-sans">
-                      الرجاء إجراء حسبة جديدة.
+                    <h3 className="font-sans font-black text-xl text-gray-950 dark:text-white">لا توجد نتيجة حالية</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-sans">
+                      الرجاء إدخال بياناتك بالكامل في الخطوات والضغط على الزر أدناه لحساب مبالغ التمويل ومقارنة العروض تلقائياً.
                     </p>
                   </div>
                   <button
                     onClick={restartWizard}
-                    className="w-full py-3.5 bg-[#0057B8] hover:bg-[#004bb0] text-white text-xs font-extrabold rounded-2xl transition-all shadow-md hover:shadow-blue-200 cursor-pointer flex items-center justify-center gap-2"
+                    className="w-full py-3.5 bg-[#0057B8] dark:bg-[#0ea5a4] hover:bg-[#004bb0] dark:hover:bg-[#0c8e8d] text-white text-xs font-extrabold rounded-2xl transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
                   >
                     <span>إجراء حسبة جديدة</span>
                   </button>
@@ -1928,47 +1984,47 @@ export default function StepWizard() {
 
         {/* 5. Trust Banner (شريط الثقة أسفل البطاقة) */}
         {currentStep === 1 && (
-          <div className="mt-8 bg-blue-50/20 border border-blue-100/60 rounded-2xl p-6 sm:p-8 space-y-6 text-right font-sans">
+          <div className="mt-8 bg-blue-50/20 dark:bg-slate-900/20 border border-blue-100/60 dark:border-slate-800/60 rounded-2xl p-6 sm:p-8 space-y-6 text-right font-sans">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               
               {/* Column 1 */}
               <div className="flex gap-3.5 items-start">
-                <div className="w-10 h-10 rounded-xl bg-blue-100/60 flex items-center justify-center shrink-0 border border-blue-200/40 text-[#0057B8]">
+                <div className="w-10 h-10 rounded-xl bg-blue-100/60 dark:bg-slate-800/60 flex items-center justify-center shrink-0 border border-blue-200/40 dark:border-slate-700/40 text-[#0057B8] dark:text-[#0ea5a4]">
                   <Calculator className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="font-black text-[#0057B8] text-sm leading-tight mb-1.5 font-sans">ذكي ومفيد</h4>
-                  <p className="text-xs text-slate-500 leading-relaxed font-medium">يقارن نتائج التمويل وفق بيانات العميل وقواعد البنوك المتاحة.</p>
+                  <h4 className="font-black text-[#0057B8] dark:text-[#0ea5a4] text-sm leading-tight mb-1.5 font-sans">ذكي ومفيد</h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-medium">يقارن نتائج التمويل وفق بيانات العميل وقواعد البنوك المتاحة.</p>
                 </div>
               </div>
 
               {/* Column 2 */}
               <div className="flex gap-3.5 items-start">
-                <div className="w-10 h-10 rounded-xl bg-blue-100/60 flex items-center justify-center shrink-0 border border-blue-200/40 text-[#0057B8]">
+                <div className="w-10 h-10 rounded-xl bg-blue-100/60 dark:bg-slate-800/60 flex items-center justify-center shrink-0 border border-blue-200/40 dark:border-slate-700/40 text-[#0057B8] dark:text-[#0ea5a4]">
                   <Scale className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="font-black text-[#0057B8] text-sm leading-tight mb-1.5 font-sans">آمن وموثوق</h4>
-                  <p className="text-xs text-slate-500 leading-relaxed font-medium">تُستخدم بياناتك لإجراء الحسبة ولا تظهر ضمن النتائج المشاركة.</p>
+                  <h4 className="font-black text-[#0057B8] dark:text-[#0ea5a4] text-sm leading-tight mb-1.5 font-sans">آمن وموثوق</h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-medium">تُستخدم بياناتك لإجراء الحسبة ولا تظهر ضمن النتائج المشاركة.</p>
                 </div>
               </div>
 
               {/* Column 3 */}
               <div className="flex gap-3.5 items-start">
-                <div className="w-10 h-10 rounded-xl bg-blue-100/60 flex items-center justify-center shrink-0 border border-blue-200/40 text-[#0057B8]">
+                <div className="w-10 h-10 rounded-xl bg-blue-100/60 dark:bg-slate-800/60 flex items-center justify-center shrink-0 border border-blue-200/40 dark:border-slate-700/40 text-[#0057B8] dark:text-[#0ea5a4]">
                   <HelpCircle className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="font-black text-[#0057B8] text-sm leading-tight mb-1.5 font-sans">بسيط وسهل</h4>
-                  <p className="text-xs text-slate-500 leading-relaxed font-medium">خطوات مختصرة ونتائج واضحة تساعدك على مقارنة الخيارات.</p>
+                  <h4 className="font-black text-[#0057B8] dark:text-[#0ea5a4] text-sm leading-tight mb-1.5 font-sans">بسيط وسهل</h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-medium">خطوات مختصرة ونتائج واضحة تساعدك على مقارنة الخيارات.</p>
                 </div>
               </div>
 
             </div>
 
             {/* Disclaimer disclaimer line below columns */}
-            <div className="border-t border-blue-100/40 pt-4 flex gap-2 items-center justify-center text-center text-[10px] text-slate-450 leading-relaxed">
-              <Info className="w-3.5 h-3.5 text-blue-500/70 inline-block shrink-0" />
+            <div className="border-t border-blue-100/40 dark:border-slate-800/40 pt-4 flex gap-2 items-center justify-center text-center text-[10px] text-slate-400 leading-relaxed">
+              <Info className="w-3.5 h-3.5 text-blue-500/70 dark:text-[#0ea5a4]/75 inline-block shrink-0" />
               <span>النتائج تقديرية ولا تمثل موافقة نهائية أو عرضًا ملزمًا من أي بنك أو جهة تمويلية.</span>
             </div>
           </div>
@@ -1976,20 +2032,20 @@ export default function StepWizard() {
 
         {/* 6. Minimalist Footer (الفوتر الصغير) */}
         {currentStep === 1 && (
-          <div className="border-t border-slate-200/40 mt-12 py-6 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs font-sans max-w-6xl mx-auto" dir="rtl">
+          <div className="border-t border-slate-200/40 dark:border-slate-800/40 mt-12 py-6 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs font-sans max-w-6xl mx-auto" dir="rtl">
             <div className="text-slate-400 font-medium">
               <span>© 2026 حسبة</span>
             </div>
-            <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 font-bold text-slate-500 selection:bg-blue-100">
-              <button onClick={() => navigate('/terms')} className="hover:text-[#0057B8] transition-colors cursor-pointer">شروط الاستخدام</button>
-              <span className="text-slate-200">|</span>
-              <button onClick={() => navigate('/privacy')} className="hover:text-[#0057B8] transition-colors cursor-pointer">سياسة الخصوصية</button>
-              <span className="text-slate-200">|</span>
-              <button onClick={() => navigate('/disclaimer')} className="hover:text-[#0057B8] transition-colors cursor-pointer">إخلاء المسؤولية</button>
-              <span className="text-slate-200">|</span>
+            <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 font-bold text-slate-500 dark:text-slate-400 selection:bg-blue-100">
+              <button onClick={() => navigate('/terms')} className="hover:text-[#0057B8] dark:hover:text-[#0ea5a4] transition-colors cursor-pointer">شروط الاستخدام</button>
+              <span className="text-slate-200 dark:text-slate-800">|</span>
+              <button onClick={() => navigate('/privacy')} className="hover:text-[#0057B8] dark:hover:text-[#0ea5a4] transition-colors cursor-pointer">سياسة الخصوصية</button>
+              <span className="text-slate-200 dark:text-slate-800">|</span>
+              <button onClick={() => navigate('/disclaimer')} className="hover:text-[#0057B8] dark:hover:text-[#0ea5a4] transition-colors cursor-pointer">إخلاء المسؤولية</button>
+              <span className="text-slate-200 dark:text-slate-800">|</span>
               <button onClick={() => {
                 window.dispatchEvent(new CustomEvent('open-customer-assistant'));
-              }} className="hover:text-[#0057B8] transition-colors cursor-pointer">تواصل معنا</button>
+              }} className="hover:text-[#0057B8] dark:hover:text-[#0ea5a4] transition-colors cursor-pointer">تواصل معنا</button>
             </div>
           </div>
         )}

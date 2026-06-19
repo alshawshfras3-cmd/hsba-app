@@ -1,29 +1,47 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
-export type ThemeMode = 'light';
+export type ThemeMode = 'light' | 'dark';
 
 interface ThemeContextType {
   theme: ThemeMode;
-  setTheme: (newTheme: ThemeMode) => Promise<void>;
+  setTheme: (newTheme: ThemeMode) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme] = useState<ThemeMode>('light');
+  const [theme, setThemeState] = useState<ThemeMode>(() => {
+    try {
+      const stored = localStorage.getItem('hesba_theme');
+      if (stored === 'light' || stored === 'dark') {
+        return stored;
+      }
+    } catch {}
+    return 'light';
+  });
 
-  // Ensure light mode is always applied, and dark class is completely removed
+  // Apply theme to document elements
   useEffect(() => {
     const root = window.document.documentElement;
     const body = window.document.body;
-    root.classList.remove('dark');
-    body.classList.remove('dark');
-    root.classList.add('light');
-    body.classList.add('light');
-  }, []);
+    if (theme === 'dark') {
+      root.classList.add('dark');
+      root.classList.remove('light');
+      body.classList.add('dark');
+      body.classList.remove('light');
+    } else {
+      root.classList.add('light');
+      root.classList.remove('dark');
+      body.classList.add('light');
+      body.classList.remove('dark');
+    }
+  }, [theme]);
 
-  const setTheme = async (_: ThemeMode) => {
-    // No-op, always light
+  const setTheme = (newTheme: ThemeMode) => {
+    try {
+      localStorage.setItem('hesba_theme', newTheme);
+    } catch {}
+    setThemeState(newTheme);
   };
 
   return (

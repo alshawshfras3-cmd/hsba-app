@@ -7,11 +7,11 @@ export function AboutPage() {
       
       {/* Hero section */}
       <div className="text-center space-y-4 mb-12">
-        <div className="w-16 h-16 bg-[#0057B8]/10 text-[#0057B8] rounded-2xl flex items-center justify-center mx-auto shadow-sm">
+        <div className="w-16 h-16 bg-[#0057B8]/10 text-[#0057B8] dark:text-[#0ea5a4] dark:bg-[#0ea5a4]/15 rounded-2xl flex items-center justify-center mx-auto shadow-sm">
           <Award className="w-8 h-8" />
         </div>
-        <h1 className="font-sans font-black text-3xl text-gray-900 tracking-tight">عن منصة حسبة الذكية</h1>
-        <p className="text-sm text-gray-500 max-w-xl mx-auto leading-relaxed">
+        <h1 className="font-sans font-black text-3xl text-gray-900 dark:text-white tracking-tight">عن منصة حسبة الذكية</h1>
+        <p className="text-sm text-gray-500 dark:text-slate-400 max-w-xl mx-auto leading-relaxed">
           حسبة هي منصة تقنية مالية (Fintech) رائدة، مخصصة لمساعدة المواطنين والمقيمين بالمملكة العربية السعودية في اتخاذ قرارات التمويل العقاري والشخصي الأذكى بمطابقة تامة مع أنظمة البنوك ومؤسسات الملاءة الائتمانية.
         </p>
       </div>
@@ -19,27 +19,27 @@ export function AboutPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
         
         {/* Card 1: Our vision */}
-        <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-xs space-y-4">
+        <div className="bg-white dark:bg-[#111827] border border-gray-100 dark:border-slate-800 rounded-2xl p-6 shadow-xs space-y-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center">
+            <div className="w-10 h-10 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 rounded-xl flex items-center justify-center">
               <ShieldCheck className="w-5 h-5" />
             </div>
-            <h3 className="font-sans font-bold text-lg text-gray-900">رؤيتنا المنهجية</h3>
+            <h3 className="font-sans font-bold text-lg text-gray-900 dark:text-white">رؤيتنا المنهجية</h3>
           </div>
-          <p className="text-xs text-gray-500 leading-relaxed font-sans">
+          <p className="text-xs text-gray-500 dark:text-slate-400 leading-relaxed font-sans">
             الريادة في تحسين الوعي الائتماني والتمويلي، وتوفير تجربة برمجية حديثة تمنح المقترض السعودي الشفافية الكاملة والمطابقة اللحظية بين لوائح التمويل بالبنوك المختلفة (كـ الراجحي والأهلي) وواقع حساباته ومدخراته الخاصة.
           </p>
         </div>
 
         {/* Card 2: Value focus */}
-        <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-xs space-y-4">
+        <div className="bg-white dark:bg-[#111827] border border-gray-100 dark:border-slate-800 rounded-2xl p-6 shadow-xs space-y-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-rose-50 text-rose-600 rounded-xl flex items-center justify-center">
+            <div className="w-10 h-10 bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 rounded-xl flex items-center justify-center">
               <Heart className="w-5 h-5" />
             </div>
-            <h3 className="font-sans font-bold text-lg text-gray-900">المطابقة والتقدير المستمر</h3>
+            <h3 className="font-sans font-bold text-lg text-gray-900 dark:text-white">المطابقة والتقدير المستمر</h3>
           </div>
-          <p className="text-xs text-gray-500 leading-relaxed font-sans">
+          <p className="text-xs text-gray-500 dark:text-slate-400 leading-relaxed font-sans">
             نحن ملتزمون بالمطابقة المستمرة مع تعديلات القواعد الرياضية لأنظمة التمويل العقاري والراتب التقاعدي المعمول بها لتفادي أي فروقات في الاحتساب الفعلي. حساباتنا تضمن للعميل تقديرات دقيقة ومحدثة مقارنة بالحسابات التمويلية التقريبية للمساعدة في مقارنة البرامج.
           </p>
         </div>
@@ -47,34 +47,34 @@ export function AboutPage() {
       </div>
 
       {/* Checklist section */}
-      <div className="bg-[#0057B8]/5 border border-[#0057B8]/10 rounded-2xl p-6 md:p-8 space-y-6 mb-12">
-        <h3 className="font-sans font-bold text-lg text-gray-900 flex items-center gap-2">
-          <Users className="w-5 h-5 text-[#0057B8]" />
+      <div className="bg-[#0057B8]/5 dark:bg-blue-950/15 border border-[#0057B8]/10 dark:border-blue-900/30 rounded-2xl p-6 md:p-8 space-y-6 mb-12">
+        <h3 className="font-sans font-bold text-lg text-gray-900 dark:text-white flex items-center gap-2">
+          <Users className="w-5 h-5 text-[#0057B8] dark:text-[#0ea5a4]" />
           <span>لماذا يثق بنا مستخدمو المنصة والعملاء؟</span>
         </h3>
         
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="flex items-center gap-3 bg-white/50 p-3 rounded-xl border border-gray-100">
+          <div className="flex items-center gap-3 bg-white/50 dark:bg-[#0f172a]/50 p-3 rounded-xl border border-gray-100 dark:border-slate-800/80">
             <CheckCircle2 className="w-5 h-5 text-[#0EA5A4] shrink-0" />
-            <span className="text-xs font-bold text-gray-700">تحديث فوري لهوامش ومقاييس البنوك</span>
+            <span className="text-xs font-bold text-gray-700 dark:text-slate-300">تحديث فوري لهوامش ومقاييس البنوك</span>
           </div>
-          <div className="flex items-center gap-3 bg-white/50 p-3 rounded-xl border border-gray-100">
+          <div className="flex items-center gap-3 bg-white/50 dark:bg-[#0f172a]/50 p-3 rounded-xl border border-gray-100 dark:border-slate-800/80">
             <CheckCircle2 className="w-5 h-5 text-[#0EA5A4] shrink-0" />
-            <span className="text-xs font-bold text-gray-700">محاكاة متكاملة لقواعد معاشات التقاعد</span>
+            <span className="text-xs font-bold text-gray-700 dark:text-slate-300">محاكاة متكاملة لقواعد معاشات التقاعد</span>
           </div>
-          <div className="flex items-center gap-3 bg-white/50 p-3 rounded-xl border border-gray-100">
+          <div className="flex items-center gap-3 bg-white/50 dark:bg-[#0f172a]/50 p-3 rounded-xl border border-gray-100 dark:border-slate-800/80">
             <CheckCircle2 className="w-5 h-5 text-[#0EA5A4] shrink-0" />
-            <span className="text-xs font-bold text-gray-700">مقارنة شاملة لبرامج ومنتجات التمويل العقاري</span>
+            <span className="text-xs font-bold text-gray-700 dark:text-slate-300">مقارنة شاملة لبرامج ومنتجات التمويل العقاري</span>
           </div>
-          <div className="flex items-center gap-3 bg-white/50 p-3 rounded-xl border border-gray-100">
+          <div className="flex items-center gap-3 bg-white/50 dark:bg-[#0f172a]/50 p-3 rounded-xl border border-gray-100 dark:border-slate-800/80">
             <CheckCircle2 className="w-5 h-5 text-[#0EA5A4] shrink-0" />
-            <span className="text-xs font-bold text-gray-700">دعم متقدم لجميع الباقات والعسكريين والمتقاعدين</span>
+            <span className="text-xs font-bold text-gray-700 dark:text-slate-300">دعم متقدم لجميع الباقات والعسكريين والمتقاعدين</span>
           </div>
         </div>
       </div>
 
       {/* Technical Contacts details bar */}
-      <div className="bg-slate-900 text-white rounded-3xl p-8 flex flex-col md:flex-row items-center justify-between gap-6">
+      <div className="bg-slate-900 border border-slate-800 text-white rounded-3xl p-8 flex flex-col md:flex-row items-center justify-between gap-6">
         <div className="space-y-2 text-center md:text-right">
           <h4 className="font-sans font-bold text-lg">هل تحتاج لمساعدة تقنية أو استشارة تمويلية؟</h4>
           <p className="text-xs text-slate-400">فريق الدعم الفني متواجد على مدار الساعة لخدمتكم والإجابة على استفساراتكم.</p>

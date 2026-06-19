@@ -36,7 +36,7 @@ export function PrivacyPage() {
       </div>
 
       {/* Main Content */}
-      <div className="bg-white dark:bg-[#0B0F19] border border-slate-200/60 dark:border-slate-800/80 rounded-3xl p-6 sm:p-10 shadow-premium space-y-8">
+      <div className="bg-white dark:bg-[#111827] border border-slate-200/60 dark:border-slate-800/80 rounded-3xl p-6 sm:p-10 shadow-premium space-y-8">
         
         <div className="space-y-4">
           <h2 className="font-sans font-extrabold text-lg text-gray-900 dark:text-white pb-2 border-b border-slate-100 dark:border-slate-800/50">1. التزامنا بحماية الخصوصية</h2>

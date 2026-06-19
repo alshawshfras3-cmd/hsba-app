@@ -15,9 +15,9 @@ export function LegalLayout({ children }: LegalLayoutProps) {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex flex-col justify-between font-sans selection:bg-[#0057B8]/10 select-none text-right" dir="rtl">
+    <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] flex flex-col justify-between font-sans selection:bg-[#0057B8]/10 select-none text-right transition-colors duration-200" dir="rtl">
       {/* Isolated Header */}
-      <header className="sticky top-0 z-50 bg-white border-b border-slate-100 py-3.5 px-4 sm:px-6 lg:px-8 shadow-xs">
+      <header className="sticky top-0 z-50 bg-white dark:bg-[#0F172A] border-b border-slate-100 dark:border-slate-800 py-3.5 px-4 sm:px-6 lg:px-8 shadow-xs">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           {/* Logo */}
           <div className="flex items-center gap-3">
@@ -25,17 +25,17 @@ export function LegalLayout({ children }: LegalLayoutProps) {
               ح
             </div>
             <div className="text-right">
-              <h1 className="font-sans font-black text-sm tracking-tight text-[#111827] leading-none">حسبة</h1>
-              <span className="text-[8px] text-gray-400 block mt-1 font-sans font-semibold">قبل البنك… اعرف فرصتك</span>
+              <h1 className="font-sans font-black text-sm tracking-tight text-[#111827] dark:text-white leading-none">حسبة</h1>
+              <span className="text-[8px] text-gray-400 dark:text-slate-400 block mt-1 font-sans font-semibold">قبل البنك… اعرف فرصتك</span>
             </div>
           </div>
 
           {/* Action button */}
           <button
             onClick={handleBackToAuth}
-            className="flex items-center gap-2 px-4 py-2 border border-slate-200/80 hover:border-slate-300 bg-white hover:bg-slate-50 rounded-xl text-xs font-bold text-gray-700 transition-all cursor-pointer shadow-xs"
+            className="flex items-center gap-2 px-4 py-2 border border-slate-200/80 hover:border-slate-300 dark:border-slate-800 bg-white dark:bg-[#1E293B] hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl text-xs font-bold text-gray-700 dark:text-slate-200 transition-all cursor-pointer shadow-xs"
           >
-            <span>العودة لتسجيل الدخول / إنشاء الحساب</span>
+            <span>العودة لإنشاء الحساب / تسجيل الدخول</span>
             <ArrowLeft className="w-3.5 h-3.5 text-gray-400" />
           </button>
         </div>
@@ -49,15 +49,15 @@ export function LegalLayout({ children }: LegalLayoutProps) {
       </main>
 
       {/* Minimal Footer */}
-      <footer className="bg-white border-t border-slate-100 py-5 text-center text-[10px] text-gray-400 font-bold select-none">
+      <footer className="bg-white dark:bg-[#0F172A] border-t border-slate-100 dark:border-slate-800 py-5 text-center text-[10px] text-gray-400 dark:text-slate-500 font-bold select-none">
         <div className="max-w-4xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p>© {new Date().getFullYear()} حسبة للحلول المالية والتقنية. جميع الحقوق محفوظة.</p>
           <div className="flex gap-4 text-xs">
-            <button onClick={() => navigate('/terms')} className="text-gray-400 hover:text-[#0057B8] transition-colors cursor-pointer">شروط الاستخدام</button>
-            <span className="text-slate-200">•</span>
-            <button onClick={() => navigate('/privacy')} className="text-gray-400 hover:text-[#0057B8] transition-colors cursor-pointer">سياسة الخصوصية</button>
-            <span className="text-slate-200">•</span>
-            <button onClick={() => navigate('/disclaimer')} className="text-gray-400 hover:text-[#0057B8] transition-colors cursor-pointer">إخلاء المسؤولية</button>
+            <button onClick={() => navigate('/terms')} className="text-gray-400 hover:text-[#0057B8] dark:hover:text-[#38BDF8] transition-colors cursor-pointer">شروط الاستخدام</button>
+            <span className="text-slate-200 dark:text-slate-705">•</span>
+            <button onClick={() => navigate('/privacy')} className="text-gray-400 hover:text-[#0057B8] dark:hover:text-[#38BDF8] transition-colors cursor-pointer">سياسة الخصوصية</button>
+            <span className="text-slate-200 dark:text-slate-705">•</span>
+            <button onClick={() => navigate('/disclaimer')} className="text-gray-400 hover:text-[#0057B8] dark:hover:text-[#38BDF8] transition-colors cursor-pointer">إخلاء المسؤولية</button>
           </div>
         </div>
       </footer>

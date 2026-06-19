@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useAppState } from '../../context/AppContext';
-import { Calculator, ShieldAlert, Award, FileText, LogOut, Settings, X, ShieldCheck, User, BarChart3, HelpCircle, Sparkles } from 'lucide-react';
+import { Calculator, ShieldAlert, Award, FileText, LogOut, Settings, X, ShieldCheck, User, BarChart3, HelpCircle, Sparkles, Sun, Moon } from 'lucide-react';
 import { useLocation } from '../../hooks/useLocation';
+import { useTheme } from '../../contexts/ThemeContext';
 
 export default function Header() {
   const { 
@@ -15,7 +16,7 @@ export default function Header() {
   } = useAppState();
 
   const location = useLocation();
-  const [isMobileSettingsOpen, setIsMobileSettingsOpen] = useState(false);
+  const { theme, setTheme } = useTheme();
 
   const handleNavChange = (target: 'calculator' | 'admin') => {
     if (target === 'calculator') {
@@ -23,16 +24,6 @@ export default function Header() {
     } else {
       location.navigate('/admin');
     }
-  };
-
-  const handleToggleSettingsMobile = () => {
-    // Vibrate haptic feedback
-    if (window.navigator && window.navigator.vibrate) {
-      window.navigator.vibrate(12);
-    }
-    
-    // Toggle mobile settings modal
-    setIsMobileSettingsOpen(!isMobileSettingsOpen);
   };
 
   const currentSub = userSubscriptions?.find(sub => sub.email === user?.email);
@@ -124,6 +115,19 @@ export default function Header() {
 
         {/* Brand Minimal Accent */}
         <div className="hidden md:flex items-center gap-3">
+          {/* Theme Toggle Button */}
+          <button
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            title={theme === 'dark' ? 'الوضع الفاتح' : 'الوضع الداكن'}
+            className="w-8 h-8 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center transition-all cursor-pointer shadow-xs shrink-0"
+          >
+            {theme === 'dark' ? (
+              <Sun className="w-4 h-4 text-amber-500" />
+            ) : (
+              <Moon className="w-4 h-4 text-indigo-600 dark:text-yellow-400" />
+            )}
+          </button>
+
           {user ? (
             <div className="flex items-center gap-2 bg-[#F1F5F9]/60 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 p-1 pr-3 pl-1 rounded-xl select-none font-sans">
               <div className="text-right">
@@ -146,7 +150,7 @@ export default function Header() {
       </div>
 
       {/* 2. MOBILE HEADER (56px tall, specific layout: Logo left, Active Step center, Settings right) */}
-      <div className="flex sm:hidden w-full h-14 bg-white dark:bg-[#0B0F19] relative items-center select-none" dir="rtl font-semibold">
+      <div className="flex sm:hidden w-full h-14 bg-white dark:bg-[#0B0F19] relative items-center select-none font-semibold" dir="rtl">
         
         {/* Left (يسار): Brand Logo */}
         <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
@@ -166,76 +170,23 @@ export default function Header() {
           </span>
          </div>
  
-        {/* Right (يمين): Settings button */}
+        {/* Right (يمين): Assistant button */}
         <div className="absolute right-4 top-1/2 -translate-y-1/2">
           <button
-            onClick={handleToggleSettingsMobile}
-            className={`w-9 h-9 flex items-center justify-center rounded-xl border transition-all cursor-pointer min-h-[36px] min-w-[36px] ${
-              isMobileSettingsOpen 
-                ? 'bg-[#0057B8] text-white border-[#0057B8]' 
-                : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-[#6B7280] dark:text-slate-300'
-            }`}
-            title="الإعدادات السريعة"
+            onClick={() => {
+              if (window.navigator && window.navigator.vibrate) {
+                window.navigator.vibrate(12);
+              }
+              window.dispatchEvent(new CustomEvent('open-customer-assistant'));
+            }}
+            className="w-9 h-9 flex items-center justify-center rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-[#0ea5a4] hover:text-[#0057B8] transition-all cursor-pointer min-h-[36px] min-w-[36px]"
+            title="مساعد حسبة"
           >
-            <Settings className="w-4 h-4" />
+            <Sparkles className="w-4 h-4 animate-pulse text-[#0ea5a4]" />
           </button>
         </div>
  
       </div>
- 
-      {/* Mobile Settings dropdown / dialog popup */}
-      {isMobileSettingsOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:hidden text-right" dir="rtl">
-          <div className="w-full bg-white dark:bg-[#0F172A] rounded-t-3xl p-6 space-y-5 animate-slide-up shadow-2xl border-t border-slate-100 dark:border-slate-800 pb-10">
-            <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                <Settings className="w-5 h-5 text-[#0057B8]" />
-                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">إعدادات الحساب والنظام</h3>
-              </div>
-              <button 
-                onClick={() => setIsMobileSettingsOpen(false)}
-                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-bold text-slate-600 dark:text-slate-200 cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
- 
-            <div className="space-y-3 pt-1">
-              {/* Assistant Button */}
-              <button
-                onClick={() => {
-                  setIsMobileSettingsOpen(false);
-                  window.dispatchEvent(new CustomEvent('open-customer-assistant'));
-                }}
-                className="w-full py-3 bg-gradient-to-tr from-[#0057B8] to-[#0ea5a4] hover:from-[#004eab] hover:to-[#0d9493] text-white text-xs font-black rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer min-h-[44px] shadow-sm active:scale-98"
-              >
-                <Sparkles className="w-4 h-4 text-white animate-pulse" />
-                <span>مساعد حسبة الذكي</span>
-              </button>
-
-              {/* User Email & Plan display */}
-              <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl p-4 border border-slate-150 dark:border-slate-800 space-y-2">
-                <div className="flex justify-between text-xs font-bold text-slate-500 dark:text-slate-400">
-                  <span>البريد الحالي:</span>
-                  <span className="font-mono text-slate-800 dark:text-slate-200">{user?.email || 'حساب زائر'}</span>
-                </div>
-              </div>
-
-              {/* Logout button */}
-              <button
-                onClick={() => {
-                  setIsMobileSettingsOpen(false);
-                  signOut();
-                }}
-                className="w-full mt-4 py-3 bg-rose-50 dark:bg-rose-950/20 hover:bg-rose-100 dark:hover:bg-rose-900/30 text-rose-600 dark:text-rose-400 text-xs font-bold rounded-xl transition-all border border-rose-200/50 dark:border-rose-900/30 flex items-center justify-center gap-2 cursor-pointer min-h-[44px]"
-              >
-                <LogOut className="w-4 h-4" />
-                <span>تسجيل الخروج الآمن</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </header>
   );
 }

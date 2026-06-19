@@ -36,7 +36,7 @@ export function DisclaimerPage() {
       </div>
 
       {/* Main Content */}
-      <div className="bg-white dark:bg-[#0B0F19] border border-slate-200/60 dark:border-slate-800/80 rounded-3xl p-6 sm:p-10 shadow-premium space-y-8">
+      <div className="bg-white dark:bg-[#111827] border border-slate-200/60 dark:border-slate-800/80 rounded-3xl p-6 sm:p-10 shadow-premium space-y-8">
         
         <div className="bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/55 dark:border-amber-800/40 p-5 rounded-2xl flex flex-col sm:flex-row gap-4">
           <AlertTriangle className="w-8 h-8 text-amber-600 shrink-0 mt-0.5" />
