@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <rect width="512" height="512" rx="120" fill="#0057B8" />
+  <text 
+    x="50%" 
+    y="52%" 
+    font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" 
+    font-size="290" 
+    font-weight="900" 
+    fill="#FFFFFF" 
+    dominant-baseline="central" 
+    text-anchor="middle"
+  >ح</text>
+</svg>
