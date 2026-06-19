@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, hasSupabaseKeys } from '../lib/supabase';
-import { Mail, Lock, User, ShieldCheck, Sparkles, AlertCircle, Loader2, AlertTriangle, Building2, TrendingUp, CheckCircle2 } from 'lucide-react';
+import { Mail, Lock, User, ShieldCheck, Sparkles, AlertCircle, Loader2, AlertTriangle, Building2, TrendingUp, CheckCircle2, Phone } from 'lucide-react';
 
 export function LoginPage() {
   const { signInWithGoogle, signInWithEmail, signUpWithEmail, loading } = useAuth();
@@ -10,6 +10,7 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [loadingAction, setLoadingAction] = useState(false);
@@ -81,17 +82,36 @@ export function LoginPage() {
         setErrorMsg('الرجاء كتابة الاسم الكامل لتسجيل العضوية');
         return;
       }
+      if (!phone.trim()) {
+        setErrorMsg('الرجاء كتابة رقم الجوال لتنشيط اشتراكك');
+        return;
+      }
+
+      // Normalization and Saudi validation
+      let normalizedPhone = phone.trim().replace(/\s+/g, '');
+      if (normalizedPhone.startsWith('+9665')) {
+        normalizedPhone = '05' + normalizedPhone.substring(5);
+      } else if (normalizedPhone.startsWith('9665')) {
+        normalizedPhone = '05' + normalizedPhone.substring(4);
+      }
+
+      const saudiRegex = /^05\d{8}$/;
+      if (!saudiRegex.test(normalizedPhone)) {
+        setErrorMsg('يرجى إدخال رقم جوال سعودي صحيح يبدأ بـ 05 ويتكون من 10 أرقام (مثال: 0512345678)');
+        return;
+      }
+
       if (!acceptedTerms) {
         setErrorMsg('يجب الموافقة على شروط الاستخدام وسياسة الخصوصية قبل إنشاء الحساب.');
         return;
       }
       setLoadingAction(true);
       try {
-        const data = await signUpWithEmail(email.trim(), password, fullName.trim());
+        const data = await signUpWithEmail(email.trim(), password, fullName.trim(), normalizedPhone);
         if (hasSupabaseKeys && (!data || !data.session)) {
-          setSuccessMsg('تم إنشاء الحساب. تحقق من بريدك الإلكتروني لتفعيل الحساب قبل تسجيل الدخول.');
+          setSuccessMsg('تم إنشاء الحساب وتفعيل الباقة التجريبية بنجاح 7 أيام مجانية. تحقق من بريدك لتأكيد حسابك.');
         } else {
-          setSuccessMsg('تم إنشاء العضوية وتأكيد الحساب بنجاح!');
+          setSuccessMsg('تم إنشاء العضوية وتأكيد الحساب وتفعيل الباقة التجريبية 7 أيام بنجاح!');
         }
       } catch (e: any) {
         setErrorMsg(translateError(e));
@@ -289,6 +309,24 @@ export function LoginPage() {
                     className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-800 focus:border-[#0057B8] dark:focus:border-[#0ea5a4] text-xs font-semibold rounded-xl focus:ring-1 focus:ring-[#0057B8] dark:focus:ring-[#0ea5a4] outline-none transition-all pr-11 text-right text-gray-900 dark:text-white placeholder-gray-450 dark:placeholder-slate-500"
                   />
                   <User className="w-4 h-4 text-gray-400 absolute right-4 top-1/2 -translate-y-1/2" />
+                </div>
+              </div>
+            )}
+
+            {mode === 'signup' && (
+              <div className="space-y-1.5 text-right">
+                <label className="text-[11px] font-bold text-gray-600 dark:text-slate-300 block">رقم الجوال (مطلوب ولن يمكن تعديله)</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    required
+                    value={phone}
+                    onChange={e => setPhone(e.target.value)}
+                    placeholder="0512345678"
+                    className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-800 focus:border-[#0057B8] dark:focus:border-[#0ea5a4] text-xs font-semibold rounded-xl focus:ring-1 focus:ring-[#0057B8] dark:focus:ring-[#0ea5a4] outline-none transition-all pr-11 text-left text-gray-900 dark:text-white placeholder-gray-450 dark:placeholder-slate-500"
+                    dir="ltr"
+                  />
+                  <Phone className="w-4 h-4 text-gray-400 absolute right-4 top-1/2 -translate-y-1/2" />
                 </div>
               </div>
             )}

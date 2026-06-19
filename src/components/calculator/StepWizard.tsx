@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppState } from '../../context/AppContext';
 import { useLocation } from '../../hooks/useLocation';
+import { useSubscriptionStatus } from '../../hooks/useSubscriptionStatus';
 import { calculateBanksFinancing } from '../../lib/finance-engine';
 import { calculatePensionSalary } from '../../lib/finance-engine/pension';
 import { convertHijriToGregorian } from '../../lib/date-utils';
@@ -147,6 +148,7 @@ export default function StepWizard() {
   } = useAppState();
 
   const { navigate } = useLocation();
+  const { incrementUsage } = useSubscriptionStatus();
 
   const bankOrder = ['alahli', 'rajhi', 'alinma', 'fransi', 'bidaya', 'albilad', 'alarabi'];
   const sortedActiveBanks = [...banks.filter(b => b.isActive)].sort((a, b) => {
@@ -735,7 +737,7 @@ export default function StepWizard() {
   };
 
   // Trigger Calculations
-  const triggerCalculations = () => {
+  const triggerCalculations = async () => {
     if (!validateStep(currentStep)) return;
 
     const calcParams = {
@@ -807,6 +809,9 @@ export default function StepWizard() {
       };
       setCalculationLogs(prev => [newLog, ...prev]);
     }
+
+    // Increment Usage count after successful core computation
+    await incrementUsage();
 
     setCurrentStep(flow.length);
   };

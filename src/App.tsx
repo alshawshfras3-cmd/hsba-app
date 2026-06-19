@@ -9,6 +9,7 @@ import BottomNavigation from './components/layout/BottomNavigation';
 import StepWizard from './components/calculator/StepWizard';
 import { AdminDashboardGuard } from './components/admin/AdminDashboardGuard';
 import AuthCallbackPage from './pages/AuthCallbackPage';
+import { SubscriptionGate } from './components/subscription/SubscriptionGate';
 import { Calculator, ShieldCheck, Mail, Phone, ExternalLink, ShieldAlert, Loader2 } from 'lucide-react';
 import { supabase, hasSupabaseKeys, cleanStaleSupabaseSession } from './lib/supabase';
 import AssistantWidget from './components/layout/AssistantWidget';
@@ -24,6 +25,7 @@ const DisclaimerPage = React.lazy(() => import('./pages/DisclaimerPage').then(mo
 const AdminLoginPage = React.lazy(() => import('./pages/AdminLoginPage').then(module => ({ default: module.AdminLoginPage })));
 const AdminDashboard = React.lazy(() => import('./components/admin/AdminDashboard'));
 const ResetPasswordPage = React.lazy(() => import('./pages/ResetPasswordPage'));
+const SubscriptionPage = React.lazy(() => import('./pages/SubscriptionPage').then(module => ({ default: module.SubscriptionPage })));
 
 function MarketingFooter() {
   const { navigate } = useLocation();
@@ -113,11 +115,21 @@ function DashboardOrWizard() {
     switch (location.pathname) {
       case '/':
       case '/calculator':
-        return <StepWizard />;
+        return (
+          <SubscriptionGate>
+            <StepWizard />
+          </SubscriptionGate>
+        );
       case '/results':
-        return <ResultsPage />;
+        return (
+          <SubscriptionGate>
+            <ResultsPage />
+          </SubscriptionGate>
+        );
       case '/account':
         return <AccountPage />;
+      case '/subscription':
+        return <SubscriptionPage />;
       case '/about':
       case '/about-us':
         return <AboutPage />;

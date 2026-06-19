@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase, hasSupabaseKeys, SUPABASE_TIMEOUT_MS, cleanStaleSupabaseSession } from '../lib/supabase';
 import { Shield } from 'lucide-react';
+import { createBillingProfile, createTrialSubscription, testBillingProfileUniquePhone } from '../lib/subscriptionService';
 
 export type UserRole = 'admin' | 'user';
 
@@ -27,7 +28,7 @@ interface AuthContextType {
   canAccessDashboard: boolean;
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<any>;
-  signUpWithEmail: (email: string, password: string, fullName: string) => Promise<any>;
+  signUpWithEmail: (email: string, password: string, fullName: string, phone: string) => Promise<any>;
   signOut: () => Promise<void>;
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
   setProfile: React.Dispatch<React.SetStateAction<UserProfile | null>>;
@@ -497,15 +498,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  async function signUpWithEmail(email: string, password: string, fullName: string) {
+  async function signUpWithEmail(email: string, password: string, fullName: string, phone: string) {
     if (!hasSupabaseKeys) {
       throw new Error('إعداد اتصال قاعدة السحابية (Supabase) غير مكتمل. يرجى تهيئة متغيرات البيئة أولاً.');
     }
+
+    // 1. Enforce unique phone check
+    const isUnique = await testBillingProfileUniquePhone(phone.trim());
+    if (!isUnique) {
+      throw new Error('رقم الجوال المدخل مسجل بالفعل لحساب آخر. يرجى محاولة رقم آخر أو تسجيل الدخول.');
+    }
+
+    // 2. Perform register
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { 
-        data: { full_name: fullName },
+        data: { full_name: fullName, phone: phone.trim() },
         emailRedirectTo: `${window.location.origin}/auth/callback`
       }
     });
@@ -513,14 +522,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (data?.user) {
       try {
+        // 3. Create app_users entry
         const { error: profileError } = await supabase
           .from('app_users')
           .upsert({
             id: data.user.id,
             email: data.user.email?.toLowerCase().trim() || email.toLowerCase().trim(),
             full_name: fullName || data.user.user_metadata?.full_name || '',
-            phone: data.user.user_metadata?.phone || '',
-            status: 'active',
+            phone: phone.trim() || data.user.user_metadata?.phone || '',
+            is_blocked: false,
+            created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           }, {
             onConflict: 'id'
@@ -529,8 +540,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (profileError) {
           console.error('Failed to create app_users profile:', profileError);
         }
-      } catch (err) {
-        console.error('Failed to run profile upsert logic after sign up:', err);
+
+        // 4. Create billing profile (phone locked inside)
+        await createBillingProfile({
+          user_id: data.user.id,
+          phone_number: phone.trim(),
+          full_name: fullName,
+          email: email
+        });
+
+        // 5. Seeding trial subscription (status: trialing)
+        await createTrialSubscription(data.user.id);
+
+      } catch (err: any) {
+        console.error('Failed to run subscription profiles signup logic:', err);
+        // Fallback cleanup
+        try {
+          await supabase.rpc('delete_current_user');
+        } catch (delErr) {
+          console.error('Failed user signup fallback cleanup:', delErr);
+        }
+        throw new Error(`فشل إعداد باقة الاشتراك: ${err.message || err}`);
       }
     }
     return data;
