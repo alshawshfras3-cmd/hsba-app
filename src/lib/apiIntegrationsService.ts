@@ -265,4 +265,108 @@ export async function listRecentApiRequests(limit: number = 20): Promise<ApiRequ
   }
 }
 
+// 9. List recent API calculation results log
+export interface ApiResultLog {
+  id: string;
+  request_id: string;
+  client_id: string | null;
+  api_key_id: string | null;
+  result_payload: any;
+  status: string;
+  error_message: string | null;
+  created_at: string;
+  duration_ms: number | null;
+  client_name?: string;
+}
+
+export async function listRecentApiResults(limit: number = 20): Promise<ApiResultLog[]> {
+  try {
+    const { data: results, error: err } = await supabase
+      .from('api_calculation_results')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (err) throw err;
+    if (!results || results.length === 0) return [];
+
+    const clientIds = Array.from(new Set(results.map(r => r.client_id).filter(Boolean)));
+    const clientMap: Record<string, string> = {};
+    if (clientIds.length > 0) {
+      const { data: clients } = await supabase
+        .from('api_clients')
+        .select('id, name')
+        .in('id', clientIds);
+      if (clients) {
+        clients.forEach(c => {
+          clientMap[c.id] = c.name;
+        });
+      }
+    }
+
+    return results.map(r => ({
+      ...r,
+      client_name: r.client_id ? (clientMap[r.client_id] || 'جهة غير معروفة') : 'عام'
+    }));
+  } catch (err) {
+    console.warn('[API INTEGRATIONS SERVICE] Error fetching recent API results log:', err);
+    return [];
+  }
+}
+
+// Sandbox testing utilities calling Supabase Edge Functions with arbitrary credentials
+const metaEnv = (import.meta as any).env || {};
+const supabaseUrl = (metaEnv.VITE_SUPABASE_URL || '').trim() || 'https://placeholder.supabase.co';
+
+export async function testApiHealth() {
+  try {
+    const response = await fetch(`${supabaseUrl}/functions/v1/api-health`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    const status = response.status;
+    const data = await response.json().catch(() => ({}));
+    return { status, data };
+  } catch (err: any) {
+    return { status: 500, error: err.message || err };
+  }
+}
+
+export async function testApiKeyCheck(apiKey: string) {
+  try {
+    const response = await fetch(`${supabaseUrl}/functions/v1/api-key-check`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+    });
+    const status = response.status;
+    const data = await response.json().catch(() => ({}));
+    return { status, data };
+  } catch (err: any) {
+    return { status: 500, error: err.message || err };
+  }
+}
+
+export async function testApiCalculate(apiKey: string, payload: any) {
+  try {
+    const response = await fetch(`${supabaseUrl}/functions/v1/api-calculate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(payload),
+    });
+    const status = response.status;
+    const data = await response.json().catch(() => ({}));
+    return { status, data };
+  } catch (err: any) {
+    return { status: 500, error: err.message || err };
+  }
+}
+
 
