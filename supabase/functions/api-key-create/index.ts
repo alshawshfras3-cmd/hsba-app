@@ -121,15 +121,12 @@ Deno.serve(async (req) => {
       );
     }
 
-    // 6. Return response containing the raw key ONCE (without key_hash)
-    const { key_hash, ...sanitizedRecord } = apiKeyRecord;
-
+    // 6. Return response containing the raw key ONCE (without key_hash or full record)
     return new Response(
       JSON.stringify({
         success: true,
         apiKey: rawKey,
         keyPrefix: prefix,
-        apiKeyRecord: sanitizedRecord,
         message: 'انسخ هذا المفتاح الآن. لن تتمكن من رؤيته مرة أخرى.'
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

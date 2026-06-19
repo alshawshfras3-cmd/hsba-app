@@ -1,3 +1,5 @@
+// AUTO-GENERATED FILE.\n// Do not edit manually.\n// Regenerate after any Finance Engine change.\n
+
 // src/lib/finance-engine/salary.ts
 function calculateNetSalary(params) {
   const { sectorId, basicSalary = 0, housingAllowance = 0, otherAllowances = 0, method, directNetSalary = 0, directPensionSalary = 0, rules: rules2 } = params;

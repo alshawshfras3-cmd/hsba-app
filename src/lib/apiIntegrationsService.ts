@@ -148,9 +148,12 @@ export async function createApiKey(
   }
 
   return {
-    ...data.apiKeyRecord,
-    rawKey: data.apiKey
-  };
+    rawKey: data.apiKey,
+    client_id: clientId,
+    key_prefix: data.keyPrefix,
+    daily_limit: dailyLimit,
+    status: 'active',
+  } as any;
 }
 
 // 6. Revoke API Key (secure soft revoke)

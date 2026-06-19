@@ -51,8 +51,7 @@ import {
 } from '../date-utils';
 import { 
   combineToRetirementRules
-} from './pensionDbMock'
-;
+} from './pensionDbMock';
 
 const getSectorRetirementAge = (sectorId: string, defaultValue = 60, customSectors?: any[]): number => {
   if (customSectors && Array.isArray(customSectors)) {

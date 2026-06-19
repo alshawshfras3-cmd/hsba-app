@@ -5,6 +5,7 @@ import { getSupabaseAdmin } from '../_shared/supabaseAdmin.ts';
 import { loadAppSettings } from '../_shared/loadAppSettings.ts';
 import { mapPayloadToEngineInput } from '../_shared/calculateAdapter.ts';
 import { calculateBanksFinancing } from '../_shared/financeEngine.ts';
+import { sanitizeBankResponse } from '../_shared/calculateResponseSanitizer.ts';
 
 Deno.serve(async (req) => {
   const startTime = Date.now();
@@ -211,51 +212,14 @@ Deno.serve(async (req) => {
       throw new Error('Calculation engine returned an invalid result format (not an array).');
     }
 
-    // 7. Sanitize external response results
-    const sanitizedResults = engineResults.map((r: any) => ({
-      bankId: r.bankId,
-      bankName: r.bankName,
-      isEligible: !!r.isEligible,
-      rejectionReason: r.isEligible ? null : (r.rejectionReason || 'غير متوافق مع معايير البنك للأهلية'),
-      summary: {
-        totalPurchasingPower: Number(r.totalPurchasingPower ?? 0),
-        maxRealEstateLoan: Number(r.realEstateAmount ?? 0),
-        maxPersonalLoan: Number(r.personalAmount ?? 0),
-        monthlyInstallment: Number(r.monthlyInstallmentBeforeRetirement ?? 0),
-        monthlyInstallmentAfterRetirement: Number(r.monthlyInstallmentAfterRetirement ?? r.monthlyInstallmentBeforeRetirement ?? 0),
-        termMonths: Number(r.termMonths ?? 0),
-        annualMarginRate: Number(r.annualMargin ?? 0),
-        dsrUsedPercentage: Number(r.dsrUsed ?? 0)
-      },
-      support: {
-        type: r.supportType || 'none',
-        monthlySupportAmount: Number(r.housingSupportAmount ?? 0),
-        isSupported: (r.supportType && r.supportType !== 'none' && (r.housingSupportAmount ?? 0) > 0) ? true : false
-      }
-    }));
+    // 7. Sanitize external response results using centralized response sanitizer
+    const propertyPrice = validation.normalizedData?.finance?.propertyPrice
+      ? Number(validation.normalizedData.finance.propertyPrice)
+      : 0;
 
-    // Choose best eligible option
-    const eligibleResults = sanitizedResults.filter((r: any) => r.isEligible);
-    let bestOption = null;
-    if (eligibleResults.length > 0) {
-      eligibleResults.sort((a: any, b: any) => {
-        if (b.summary.totalPurchasingPower !== a.summary.totalPurchasingPower) {
-          return b.summary.totalPurchasingPower - a.summary.totalPurchasingPower;
-        }
-        return b.summary.maxRealEstateLoan - a.summary.maxRealEstateLoan;
-      });
-      bestOption = eligibleResults[0];
-    }
-
-    const payloadResponse = {
-      success: true,
-      requestId: extReqId,
-      internalRequestId: reqId || null,
-      bestOption,
-      results: sanitizedResults
-    };
-
+    const sanitizedObj = sanitizeBankResponse(engineResults, propertyPrice);
     const duration = Date.now() - startTime;
+    let resultId = null;
 
     // Save final status and results to tables in database
     if (reqId) {
@@ -268,21 +232,64 @@ Deno.serve(async (req) => {
         })
         .eq('id', reqId);
 
-      // 2. Insert into api_calculation_results
-      await supabase
+      // 2. Insert into api_calculation_results with exactly the sanitized response contract
+      try {
+        const { data: record, error: resErr } = await supabase
+          .from('api_calculation_results')
+          .insert({
+            request_id: reqId,
+            client_id: clientId,
+            api_key_id: apiKeyId,
+            result_payload: {
+              success: true,
+              resultId: null, // placeholder to be updated below, or fallback
+              requestId: extReqId,
+              eligible: sanitizedObj.eligible,
+              status: sanitizedObj.status,
+              summary: sanitizedObj.summary,
+              banks: sanitizedObj.banks,
+              notes: sanitizedObj.notes
+            },
+            status: 'success',
+            duration_ms: duration
+          })
+          .select('id')
+          .single();
+
+        if (record) {
+          resultId = record.id;
+        } else if (resErr) {
+          console.error('[API CALCULATE] Failed to log sanitized result payload:', resErr);
+        }
+      } catch (insertErr) {
+        console.error('[API CALCULATE] Unexpected exception logging result row:', insertErr);
+      }
+    }
+
+    const finalPayload = {
+      success: true,
+      resultId,
+      requestId: extReqId,
+      eligible: sanitizedObj.eligible,
+      status: sanitizedObj.status,
+      summary: sanitizedObj.summary,
+      banks: sanitizedObj.banks,
+      notes: sanitizedObj.notes
+    };
+
+    // Keep result_payload in sync with resultId asynchronously
+    if (resultId && reqId) {
+      supabase
         .from('api_calculation_results')
-        .insert({
-          request_id: reqId,
-          client_id: clientId,
-          api_key_id: apiKeyId,
-          result_payload: payloadResponse,
-          status: 'success',
-          duration_ms: duration
+        .update({ result_payload: finalPayload })
+        .eq('id', resultId)
+        .then(({ error }) => {
+          if (error) console.error('[API CALCULATE] Failed to update logged payload with resultId:', error);
         });
     }
 
     return new Response(
-      JSON.stringify(payloadResponse),
+      JSON.stringify(finalPayload),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
