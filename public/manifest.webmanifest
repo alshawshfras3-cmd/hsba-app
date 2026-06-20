@@ -2,23 +2,27 @@
   "name": "حسبة",
   "short_name": "حسبة",
   "description": "حاسبة التمويل العقاري والشخصي حسبة - قارن عروض البنوك واعرف فرصتك قبل البنك",
+  "id": "/",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
   "theme_color": "#0057B8",
   "background_color": "#FFFFFF",
   "dir": "rtl",
-  "lang": "ar",
+  "lang": "ar-SA",
   "icons": [
     {
       "src": "/icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
       "src": "/icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
       "src": "/apple-touch-icon.png",

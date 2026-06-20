@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase, hasSupabaseKeys } from '../lib/supabase';
+import NumericInput from '../components/calculator/NumericInput';
 import { 
   Shield, 
   User, 
@@ -1219,47 +1220,46 @@ export function UsersManagementPage() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-1">
                       <label className="text-gray-400 text-[11px] block">سعر الباقة الإجمالي (ريال):</label>
-                      <input 
-                        type="number"
+                      <NumericInput 
+                        allowDecimals={true}
                         required
-                        step="0.01"
                         className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 text-gray-900 dark:text-white rounded-xl outline-none text-xs font-mono"
-                        value={newPlan.price_sar || 0}
-                        onChange={e => setNewPlan({ ...newPlan, price_sar: Number(e.target.value) })}
+                        value={newPlan.price_sar === undefined || newPlan.price_sar === null ? '' : newPlan.price_sar}
+                        onChange={val => setNewPlan({ ...newPlan, price_sar: val === '' ? 0 : Number(val) })}
                       />
                     </div>
 
                     <div className="space-y-1">
                       <label className="text-gray-400 text-[11px] block">فترة الصلاحية بالأيام:</label>
-                      <input 
-                        type="number"
+                      <NumericInput 
+                        allowDecimals={false}
                         required
                         className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 text-gray-900 dark:text-white rounded-xl outline-none text-xs font-mono"
-                        value={newPlan.duration_days || 30}
-                        onChange={e => setNewPlan({ ...newPlan, duration_days: Number(e.target.value) })}
+                        value={newPlan.duration_days === undefined || newPlan.duration_days === null ? '' : newPlan.duration_days}
+                        onChange={val => setNewPlan({ ...newPlan, duration_days: val === '' ? 30 : Number(val) })}
                       />
                     </div>
 
                     <div className="space-y-1">
                       <label className="text-gray-400 text-[11px] block">الترتيب بالفهرس (Sort Order):</label>
-                      <input 
-                        type="number"
+                      <NumericInput 
+                        allowDecimals={false}
                         required
                         className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 text-gray-900 dark:text-white rounded-xl outline-none text-xs font-mono"
-                        value={newPlan.sort_order || 0}
-                        onChange={e => setNewPlan({ ...newPlan, sort_order: Number(e.target.value) })}
+                        value={newPlan.sort_order === undefined || newPlan.sort_order === null ? '' : newPlan.sort_order}
+                        onChange={val => setNewPlan({ ...newPlan, sort_order: val === '' ? 0 : Number(val) })}
                       />
                     </div>
                   </div>
 
                   <div className="space-y-1">
                     <label className="text-gray-400 text-[11px] block">سقف العمليات اليومي للعميل (أو اتركه خاليًا للوصول المفتوح):</label>
-                    <input 
-                      type="number"
+                    <NumericInput 
+                      allowDecimals={false}
                       placeholder="مثال: 25 عملية مقارنة تمويل يومية (أو اتركه فارغاً للمفتوح)"
                       className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 text-gray-900 dark:text-white rounded-xl outline-none text-xs font-mono"
                       value={newPlan.daily_calculation_limit === null || newPlan.daily_calculation_limit === undefined ? '' : newPlan.daily_calculation_limit}
-                      onChange={e => setNewPlan({ ...newPlan, daily_calculation_limit: e.target.value === '' ? null : Number(e.target.value) })}
+                      onChange={val => setNewPlan({ ...newPlan, daily_calculation_limit: val === '' ? null : Number(val) })}
                     />
                   </div>
 
@@ -1430,44 +1430,43 @@ export function UsersManagementPage() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-1">
                       <label className="text-gray-400 text-[11px] block">السعر بالريال السعودي (price_sar):</label>
-                      <input 
-                        type="number"
-                        step="0.01"
+                      <NumericInput 
+                        allowDecimals={true}
                         className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 text-gray-900 dark:text-white rounded-xl outline-none text-xs font-mono"
-                        value={editingPlan.price_sar}
-                        onChange={e => setEditingPlan({ ...editingPlan, price_sar: Number(e.target.value) })}
+                        value={editingPlan.price_sar === undefined || editingPlan.price_sar === null ? '' : editingPlan.price_sar}
+                        onChange={val => setEditingPlan({ ...editingPlan, price_sar: val === '' ? 0 : Number(val) })}
                       />
                     </div>
 
                     <div className="space-y-1">
                       <label className="text-gray-400 text-[11px] block">صلاحية الباقة بالأيام (duration_days):</label>
-                      <input 
-                        type="number"
+                      <NumericInput 
+                        allowDecimals={false}
                         className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 text-gray-900 dark:text-white rounded-xl outline-none text-xs font-mono"
-                        value={editingPlan.duration_days}
-                        onChange={e => setEditingPlan({ ...editingPlan, duration_days: Number(e.target.value) })}
+                        value={editingPlan.duration_days === undefined || editingPlan.duration_days === null ? '' : editingPlan.duration_days}
+                        onChange={val => setEditingPlan({ ...editingPlan, duration_days: val === '' ? 30 : Number(val) })}
                       />
                     </div>
 
                     <div className="space-y-1">
                       <label className="text-gray-400 text-[11px] block">الترتيب بالفهرس (Sort Order):</label>
-                      <input 
-                        type="number"
+                      <NumericInput 
+                        allowDecimals={false}
                         className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 text-gray-900 dark:text-white rounded-xl outline-none text-xs font-mono"
-                        value={editingPlan.sort_order || 0}
-                        onChange={e => setEditingPlan({ ...editingPlan, sort_order: Number(e.target.value) })}
+                        value={editingPlan.sort_order === undefined || editingPlan.sort_order === null ? '' : editingPlan.sort_order}
+                        onChange={val => setEditingPlan({ ...editingPlan, sort_order: val === '' ? 0 : Number(val) })}
                       />
                     </div>
                   </div>
 
                   <div className="space-y-1">
                     <label className="text-gray-400 text-[11px] block">سقف العمليات اليومي (أو اتركه فارغًا للمفتوح):</label>
-                    <input 
-                      type="number"
+                    <NumericInput 
+                      allowDecimals={false}
                       placeholder="للوصول المفتوح غير المحدود اتركه خاليًا"
                       className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 text-gray-900 dark:text-white rounded-xl outline-none text-xs font-mono"
-                      value={editingPlan.daily_calculation_limit === null ? '' : editingPlan.daily_calculation_limit}
-                      onChange={e => setEditingPlan({ ...editingPlan, daily_calculation_limit: e.target.value === '' ? null : Number(e.target.value) })}
+                      value={editingPlan.daily_calculation_limit === null || editingPlan.daily_calculation_limit === undefined ? '' : editingPlan.daily_calculation_limit}
+                      onChange={val => setEditingPlan({ ...editingPlan, daily_calculation_limit: val === '' ? null : Number(val) })}
                     />
                     <span className="text-[10px] text-gray-400 font-sans block mt-1 leading-normal">* اتركه فارغًا لتعيين حد الحسابات اليومية إلى لا نهائي (مفتوح بالكامل).</span>
                   </div>
@@ -1927,13 +1926,13 @@ export function UsersManagementPage() {
                 {/* Number of days */}
                 <div className="space-y-1">
                   <label className="text-gray-400 block">عدد أيام الترخيص بالشرط:</label>
-                  <input 
-                    type="number"
-                    min="1"
-                    className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 text-gray-900 dark:text-white rounded-xl outline-none font-mono text-center"
+                  <NumericInput 
+                    allowDecimals={false}
+                    min={1}
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 text-gray-900 dark:text-white rounded-xl outline-none font-mono text-center font-bold"
                     required
-                    value={freeGrantDays}
-                    onChange={e => setFreeGrantDays(Number(e.target.value))}
+                    value={freeGrantDays === undefined || freeGrantDays === null ? '' : freeGrantDays}
+                    onChange={val => setFreeGrantDays(val === '' ? 14 : Number(val))}
                   />
                 </div>
               </div>
@@ -1941,12 +1940,12 @@ export function UsersManagementPage() {
               {/* Custom Daily Limit Limit */}
               <div className="space-y-1">
                 <label className="text-gray-400 block">حد العمليات اليومي الممنوح (اختياري):</label>
-                <input 
-                  type="number"
+                <NumericInput 
+                  allowDecimals={false}
                   placeholder="اتركه فارغًا لتمنحه إمكانية حسابية لا نهائية (∞)"
                   className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 text-gray-900 dark:text-white rounded-xl outline-none font-mono"
-                  value={freeGrantLimit}
-                  onChange={e => setFreeGrantLimit(e.target.value)}
+                  value={freeGrantLimit === '' ? '' : Number(freeGrantLimit)}
+                  onChange={val => setFreeGrantLimit(val === '' ? '' : val.toString())}
                 />
                 <span className="text-[10px] text-gray-400 font-sans block mt-1 leading-normal">
                   * إذا حدّدت رقماً (مثلاً 15)، فلن يسمح له النظام بتجاوز 15 حسبة في اليوم الواحد طيلة فترة المنحة.
@@ -2134,12 +2133,12 @@ export function UsersManagementPage() {
                   {/* CUSTOM DAILY LIMIT OVERRIDE */}
                   <div className="space-y-1">
                     <label className="text-gray-400 block">سقف العمليات اليومي المخصص (أوفررايد):</label>
-                    <input 
-                      type="number"
+                    <NumericInput 
+                      allowDecimals={false}
                       placeholder="للامتياز المفتوح اتكه خاليًا"
                       className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 text-gray-900 dark:text-white rounded-xl outline-none font-mono font-bold"
-                      value={editCustomLimit}
-                      onChange={e => setEditCustomLimit(e.target.value)}
+                      value={editCustomLimit === '' ? '' : Number(editCustomLimit)}
+                      onChange={val => setEditCustomLimit(val === '' ? '' : val.toString())}
                     />
                     <span className="text-[10px] text-gray-400 font-sans block mt-1 leading-normal font-medium">
                       * يحل هذا الحد المخصص محل المعايير الأساسية للباقة المحددة في الأعلى (إذا تم ملؤه).

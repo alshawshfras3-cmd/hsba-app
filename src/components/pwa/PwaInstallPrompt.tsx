@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Download, Share, CheckCircle } from 'lucide-react';
 import { usePwaInstallPrompt } from '../../hooks/usePwaInstallPrompt';
+import { useLocation } from '../../hooks/useLocation';
 
 export default function PwaInstallPrompt() {
+  const { pathname } = useLocation();
   const {
     canInstall,
     isInstalled,
@@ -16,9 +18,22 @@ export default function PwaInstallPrompt() {
   const [visible, setVisible] = useState(false);
   const [justInstalled, setJustInstalled] = useState(false);
 
+  // List of excluded paths where the install prompt must never appear
+  const excludedPaths = [
+    '/admin',
+    '/admin/login',
+    '/admin/dashboard',
+    '/auth/callback',
+    '/reset-password'
+  ];
+
+  const isExcluded = excludedPaths.some(path => 
+    pathname === path || pathname === `${path}/` || pathname.startsWith(`${path}/`)
+  );
+
   // Add a slight delay before showing the prompt so it feels premium and less aggressive
   useEffect(() => {
-    if (shouldShowPrompt) {
+    if (shouldShowPrompt && !isExcluded) {
       const timer = setTimeout(() => {
         setVisible(true);
       }, 2000); // 2 seconds delay
@@ -26,9 +41,9 @@ export default function PwaInstallPrompt() {
     } else {
       setVisible(false);
     }
-  }, [shouldShowPrompt]);
+  }, [shouldShowPrompt, isExcluded]);
 
-  if (!visible) return null;
+  if (isExcluded || !visible) return null;
 
   const handleInstallClick = async () => {
     if (isIosSafari) {

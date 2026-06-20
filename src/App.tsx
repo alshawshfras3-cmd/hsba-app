@@ -270,7 +270,6 @@ function AppContent() {
       <DashboardOrWizard />
       <BottomNavigation />
       <AssistantWidget mode="customer" />
-      <PwaInstallPrompt />
     </div>
   );
 }
@@ -289,6 +288,7 @@ export default function App() {
             }
           >
             <AppContent />
+            <PwaInstallPrompt />
           </React.Suspense>
         </AppStateProvider>
       </ThemeProvider>

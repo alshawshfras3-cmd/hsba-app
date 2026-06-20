@@ -45,13 +45,20 @@ CREATE TABLE IF NOT EXISTS public.user_calculation_usage (
 CREATE TABLE IF NOT EXISTS public.user_billing_profiles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL UNIQUE,
-  phone_number text NOT NULL UNIQUE,
-  phone_locked boolean NOT NULL DEFAULT true,
+  phone_number text,
+  normalized_phone text,
+  phone_verified_at timestamptz,
+  phone_locked boolean NOT NULL DEFAULT false,
   full_name text,
   email text,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- CREATE UNIQUE INDEX IF NOT EXISTS
+CREATE UNIQUE INDEX IF NOT EXISTS unique_billing_normalized_phone
+ON public.user_billing_profiles(normalized_phone)
+WHERE normalized_phone IS NOT NULL;
 
 -- 5. Create payment_transactions table
 CREATE TABLE IF NOT EXISTS public.payment_transactions (

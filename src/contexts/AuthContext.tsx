@@ -510,7 +510,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // 1. Enforce unique phone check
     const isUnique = await testBillingProfileUniquePhone(normalizedPhone);
     if (!isUnique) {
-      throw new Error('رقم الجوال مستخدم مسبقًا. يرجى تسجيل الدخول أو استخدام رقم آخر.');
+      throw new Error('رقم الجوال مستخدم مسبقًا.');
     }
 
     // 2. Perform register

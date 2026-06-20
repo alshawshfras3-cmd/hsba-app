@@ -43,6 +43,7 @@ export function AccountPage() {
 
   // Profile states
   const [fullNameInput, setFullNameInput] = useState(profile?.full_name || user?.user_metadata?.full_name || '');
+  const [installError, setInstallError] = useState<string | null>(null);
   const [billingProfile, setBillingProfile] = useState<any>(null);
   const [emailInput, setEmailInput] = useState(user?.email || '');
   const [phoneInput, setPhoneInput] = useState('');
@@ -163,7 +164,7 @@ export function AccountPage() {
       showToast(msg, 'error');
       return;
     }
-    if (!isValidSaudiPhone(phoneInput)) {
+    if (phoneInput.trim() && !isValidSaudiPhone(phoneInput)) {
       const msg = 'يرجى إدخال رقم جوال سعودي صحيح.';
       setProfileMessage({ type: 'error', text: msg });
       showToast(msg, 'error');
@@ -174,16 +175,18 @@ export function AccountPage() {
     setProfileSaving(true);
     setProfileMessage(null);
 
-    const normalizedPhone = normalizeSaudiPhone(phoneInput);
+    const normalizedPhone = phoneInput.trim() ? normalizeSaudiPhone(phoneInput) : null;
     const newEmail = emailInput.trim().toLowerCase();
     const newName = fullNameInput.trim();
 
     try {
       if (hasSupabaseKeys && user) {
         // Check Phone Uniqueness
-        const isUnique = await testBillingProfileUniquePhone(normalizedPhone, user.id);
-        if (!isUnique) {
-          throw new Error('phone_duplicate');
+        if (normalizedPhone) {
+          const isUnique = await testBillingProfileUniquePhone(normalizedPhone, user.id);
+          if (!isUnique) {
+            throw new Error('phone_duplicate');
+          }
         }
 
         // Check if we are updating email
@@ -222,6 +225,7 @@ export function AccountPage() {
             .from('user_billing_profiles')
             .update({
               phone_number: normalizedPhone,
+              normalized_phone: normalizedPhone,
               full_name: newName,
               email: newEmail,
               updated_at: new Date().toISOString()
@@ -234,6 +238,7 @@ export function AccountPage() {
             .insert({
               user_id: user.id,
               phone_number: normalizedPhone,
+              normalized_phone: normalizedPhone,
               phone_locked: false,
               full_name: newName,
               email: newEmail,
@@ -275,7 +280,7 @@ export function AccountPage() {
       console.error(err);
       let errorMessage = 'تعذر تحديث البيانات حاليًا. حاول مرة أخرى.';
       if (err.message === 'phone_duplicate') {
-        errorMessage = 'رقم الجوال مستخدم في حساب آخر.';
+        errorMessage = 'رقم الجوال مستخدم مسبقًا.';
       } else if (err.message === 'email_error') {
         errorMessage = 'تعذر تحديث البريد الإلكتروني. تحقق من البريد أو استخدم بريدًا آخر.';
       } else if (err.message) {
@@ -825,27 +830,45 @@ export function AccountPage() {
                         </p>
                       </div>
                     ) : (
-                      <button
-                        onClick={async () => {
-                          handleVibrate();
-                          resetDismissalAndPrompt();
-                          setTimeout(async () => {
-                            const success = await promptInstall();
-                            if (!success) {
-                              alert('يرجى النقر على القائمة الثلاثية للمتصفح واختيار "تثبيت التطبيق" أو "إضافة إلى الشاشة الرئيسية".');
+                      <div className="space-y-3">
+                        <button
+                          onClick={async () => {
+                            handleVibrate();
+                            setInstallError(null);
+                            if (!canInstall) {
+                              setInstallError('يرجى النقر على القائمة الثلاثية للمتصفح واختيار "تثبيت التطبيق" أو "إضافة إلى الشاشة الرئيسية".');
+                              return;
                             }
-                          }, 150);
-                        }}
-                        disabled={!canInstall}
-                        className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border text-xs font-black transition-all cursor-pointer ${
-                          canInstall
-                            ? 'bg-[#0057B8] hover:bg-blue-700 text-white border-[#0057B8]/20 shadow-sm'
-                            : 'bg-slate-100 dark:bg-slate-900 text-slate-400 dark:text-slate-500 border-slate-200/50 dark:border-slate-800 cursor-not-allowed'
-                        }`}
-                      >
-                        <Download className="w-4 h-4" />
-                        <span>تثبيت حسبة كتطبيق</span>
-                      </button>
+                            resetDismissalAndPrompt();
+                            setTimeout(async () => {
+                              const success = await promptInstall();
+                              if (!success) {
+                                setInstallError('يرجى النقر على القائمة الثلاثية للمتصفح واختيار "تثبيت التطبيق" أو "إضافة إلى الشاشة الرئيسية".');
+                              }
+                            }, 150);
+                          }}
+                          className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border text-xs font-black transition-all cursor-pointer ${
+                            canInstall
+                              ? 'bg-[#0057B8] hover:bg-blue-700 text-white border-[#0057B8]/20 shadow-sm'
+                              : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200/50 dark:border-slate-800'
+                          }`}
+                        >
+                          <Download className="w-4 h-4" />
+                          <span>تثبيت حسبة كتطبيق</span>
+                        </button>
+
+                        {installError && (
+                          <p className="text-xs font-bold text-rose-600 dark:text-[#F87171] mt-2 font-sans">
+                            {installError}
+                          </p>
+                        )}
+
+                        {!canInstall && (
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 bg-slate-50 dark:bg-slate-900 p-3.5 rounded-xl border border-slate-100 dark:border-slate-800 leading-relaxed font-sans">
+                            إذا لم يظهر زر التثبيت، افتح قائمة المتصفح واختر "تثبيت التطبيق" أو "إضافة إلى الشاشة الرئيسية".
+                          </p>
+                        )}
+                      </div>
                     )}
                   </div>
                 )}

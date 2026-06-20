@@ -63,7 +63,9 @@ export interface DbSubscription {
 export interface UserBillingProfile {
   id: string;
   user_id: string;
-  phone_number: string;
+  phone_number: string | null;
+  normalized_phone?: string | null;
+  phone_verified_at?: string | null;
   phone_locked: boolean;
   full_name: string | null;
   email: string | null;
@@ -494,7 +496,8 @@ export async function createBillingProfile(profile: { user_id: string; phone_num
       id: 'mock-created-billing',
       user_id: profile.user_id,
       phone_number: normPhone,
-      phone_locked: true,
+      normalized_phone: normPhone,
+      phone_locked: false,
       full_name: profile.full_name || null,
       email: profile.email || null
     };
@@ -505,7 +508,8 @@ export async function createBillingProfile(profile: { user_id: string; phone_num
     .insert({
       user_id: profile.user_id,
       phone_number: normPhone,
-      phone_locked: true,
+      normalized_phone: normPhone,
+      phone_locked: false,
       full_name: profile.full_name || '',
       email: profile.email || '',
       created_at: new Date().toISOString(),
@@ -526,10 +530,11 @@ export async function testBillingProfileUniquePhone(phone: string, excludeUserId
   if (!hasSupabaseKeys) return true;
   try {
     const normalized = normalizePhone(phone);
+    if (!normalized) return true; // Empty is allowed for existing users
     const { data, error } = await supabase
       .from('user_billing_profiles')
       .select('id, user_id')
-      .eq('phone_number', normalized);
+      .or(`normalized_phone.eq.${normalized},phone_number.eq.${normalized}`);
 
     if (error) return true;
     if (data && data.length > 0) {
@@ -1253,7 +1258,11 @@ export async function adminUpdatePhoneNumber(userId: string, newPhone: string): 
     // 1. Update user_billing_profiles
     const { error: profileError } = await supabase
       .from('user_billing_profiles')
-      .update({ phone_number: normalized, updated_at: new Date().toISOString() })
+      .update({ 
+        phone_number: normalized || null, 
+        normalized_phone: normalized || null, 
+        updated_at: new Date().toISOString() 
+      })
       .eq('user_id', userId);
 
     if (profileError) throw profileError;

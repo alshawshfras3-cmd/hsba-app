@@ -31,6 +31,9 @@ export function LoginPage() {
 
   const translateError = (err: any) => {
     const msg = err?.message || err || '';
+    if (msg.includes('unique_billing_normalized_phone') || msg.includes('unique_billing_phone_number') || msg.includes('رقم الجوال مستخدم مسبقًا')) {
+      return 'رقم الجوال مستخدم مسبقًا.';
+    }
     if (msg.includes('Invalid login credentials')) {
       return 'البريد الإلكتروني أو كلمة المرور غير صحيحة';
     }
