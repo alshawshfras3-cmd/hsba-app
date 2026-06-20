@@ -160,7 +160,7 @@ export function validateCalculatePayload(body: any): ValidationResult {
         downPayment: finance.downPayment !== undefined ? Number(finance.downPayment) : 0,
         supportType: finance.supportType || 'none',
         preferredBank: finance.preferredBank || null,
-        termYears: finance.termYears !== undefined ? Number(finance.termYears) : 25
+        termYears: finance.termYears !== undefined ? Number(finance.termYears) : undefined
       }
     };
   }

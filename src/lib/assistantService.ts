@@ -614,43 +614,63 @@ export function tryAnswerResultInquiry(
 }
 
 /**
+ * Convert Arabic/Hindi digits (٠١٢٣٤٥٦٧٨٩) to standard English/Latin digits (0123456789)
+ */
+function convertArabicDigits(str: string): string {
+  const hindiNums = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+  const englishNums = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+  let result = str || '';
+  for (let i = 0; i < 10; i++) {
+    result = result.replace(new RegExp(hindiNums[i], 'g'), englishNums[i]);
+  }
+  return result;
+}
+
+/**
+ * Standardizes Arabic numbers, removing commas and normalizing 'الف' text multipliers (e.g. 12 الف -> 12000)
+ */
+function normalizeNumbersInArabicText(text: string): string {
+  let res = convertArabicDigits(text);
+  
+  // Remove commas (like 12,500 or ١٢،٥٠٠) inside digits to compile complete number values
+  res = res.replace(/(\d)[,،](\d)/g, '$1$2');
+
+  // Convert "ألف" or "الف" following numbers to proper multipliers
+  res = res.replace(/(\d+(?:\.\d+)?)\s*(?:الف|ألف)/g, (match, p1) => {
+    const val = parseFloat(p1);
+    return Math.round(val * 1000).toString();
+  });
+  
+  return res;
+}
+
+/**
  * Extracts values from an Arabic sentence using regular expressions and keywords
  */
 export function parseFieldsFromMessage(text: string, currentInputs: AssistantCalculationInput): AssistantCalculationInput {
-  const norm = normalizeArabic(text);
+  const normalizedText = normalizeNumbersInArabicText(text);
+  const norm = normalizeArabic(normalizedText);
   const updated = { ...currentInputs };
 
-  // Parse numbers
-  const extractNumbers = (pattern: RegExp): number[] => {
-    const matches = norm.match(pattern);
-    if (!matches) return [];
-    return matches.map(m => {
-      const cleanNum = m.replace(/[^\d]/g, '');
-      return parseInt(cleanNum, 10);
-    }).filter(n => !isNaN(n));
-  };
-
   // 1. Sector parsing
-  if (norm.includes('عسكري') || norm.includes('جيش') || norm.includes('وزاره الدفاع') || norm.includes('داخليه') || norm.includes('امن')) {
+  if (norm.includes('عسكري') || norm.includes('جيش') || norm.includes('وزاره الدفاع') || norm.includes('وزارة الدفاع') || norm.includes('داخليه') || norm.includes('داخلية') || norm.includes('امن') || norm.includes('أمن')) {
     updated.sectorId = 'military';
   } else if (norm.includes('متقاعد') || norm.includes('تقاعد')) {
     updated.sectorId = 'retired';
-  } else if (norm.includes('مدني') || norm.includes('حكومي') || norm.includes('وزاره')) {
+  } else if (norm.includes('مدني') || norm.includes('حكومي') || norm.includes('وزاره') || norm.includes('وزارة') || norm.includes('شبه حكومي') || norm.includes('هيئه') || norm.includes('هيئة')) {
     updated.sectorId = 'gov_civil';
-  } else if (norm.includes('خاص') || norm.includes('اهلي') || norm.includes('غير معتمد')) {
-    updated.sectorId = 'companies';
-  } else if (norm.includes('معتمد') || norm.includes('شركات') || norm.includes('سابك') || norm.includes('ارامكو')) {
+  } else if (norm.includes('خاص') || norm.includes('اهلي') || norm.includes('أهلي') || norm.includes('غير معتمد') || norm.includes('شركات') || norm.includes('سابك') || norm.includes('ارامكو') || norm.includes('شركه') || norm.includes('شركة')) {
     updated.sectorId = 'companies';
   }
 
   // 2. Military Ranks and subtype
   const ranksList = [
-    { id: 'jundi', keywords: ['جندي', 'جندي اول'], scope: 'military_individual' },
+    { id: 'jundi', keywords: ['جندي', 'جندى'], scope: 'military_individual' },
     { id: 'areef', keywords: ['عريف'], scope: 'military_individual' },
     { id: 'wakeel_raqeeb', keywords: ['وكيل رقيب', 'وكيل'], scope: 'military_individual' },
-    { id: 'raqeeb', keywords: ['رقيب', 'رقيب اول'], scope: 'military_individual' },
+    { id: 'raqeeb', keywords: ['رقيب'], scope: 'military_individual' },
     { id: 'rayees_ruqaba', keywords: ['رئيس رقباء', 'رئيس'], scope: 'military_individual' },
-    { id: 'mulazim', keywords: ['ملازم', 'ملازم اول'], scope: 'military_officer' },
+    { id: 'mulazim', keywords: ['ملازم'], scope: 'military_officer' },
     { id: 'naqeeb', keywords: ['نقيب'], scope: 'military_officer' },
     { id: 'raid', keywords: ['رائد'], scope: 'military_officer' },
     { id: 'muqaddam', keywords: ['مقدم'], scope: 'military_officer' },
@@ -677,19 +697,19 @@ export function parseFieldsFromMessage(text: string, currentInputs: AssistantCal
     updated.appointmentCalendar = 'gregorian';
   }
 
-  // 4. Extract Salaries (راتب, رواتب, صافي)
+  // 4. Extract Salaries (صافي, راتب, رواتب, الصافي)
   const salaryRegexes = [
-    /(?:راتب|الراتب|صافي|الصافي|الاساسي|الدخل|دخل)\s*(?:هو|يبغ|يساوي|=|\:|بقيمه)?\s*(\d{1,3}[\s,]*\d{3})/g,
-    /(?:رواتب|رواتبي|دخلي|استلم)\s*(\d{1,3}[\s,]*\d{3})/g,
-    /(\d{1,3}[\s,]*\d{3})\s*(?:ريال)/g
+    /(?:راتب|الراتب|صافي|الصافي|الاساسي|الدخل|دخل|رواتبي|راتبي|استلم|رواتب)\s*(?:هو|يبغ|يساوي|=|\:|بقيمه|بقيمة)?\s*(\d{4,6})/g,
+    /(\d{4,6})\s*(?:ريال)\s*(?:صافي|راتب)/g,
+    /(?:صافي|الصافي)\s*(?:راتبي|الراتب|الدخل)?\s*(?:هو|يبلغ|يبغ|يساوي|=|\:)?\s*(\d{4,6})/g
   ];
 
   let extractedSalaries: number[] = [];
   for (const reg of salaryRegexes) {
     let match;
     while ((match = reg.exec(norm)) !== null) {
-      const parsedVal = parseInt(match[1].replace(/[^\d]/g, ''), 10);
-      if (parsedVal > 1000 && parsedVal < 250000) {
+      const parsedVal = parseInt(match[1], 10);
+      if (parsedVal >= 2000 && parsedVal <= 250000) {
         extractedSalaries.push(parsedVal);
       }
     }
@@ -700,14 +720,25 @@ export function parseFieldsFromMessage(text: string, currentInputs: AssistantCal
     updated.salaryMode = 'direct';
   }
 
-  // 5. Extract Obligations (التزام, قسط, ديون)
-  const obligationRegex = /(?:التزام|التزامات|قسط|سمه|قرض|اقساط)\s*(?:هو|يبلغ|شهري|عقد|=|\:)?\s*(\d{1,4}(?:[\s,]*\d{2,3})*)/g;
-  let matchOb;
-  while ((matchOb = obligationRegex.exec(norm)) !== null) {
-    const val = parseInt(matchOb[1].replace(/[^\d]/g, ''), 10);
-    if (val > 0 && val < 50000 && val !== updated.directNetSalary) {
-      updated.obligations = val;
+  // 5. Extract Obligations (التزام, قسط, ديون, قرض, قائم)
+  const obligationRegexes = [
+    /(?:التزام|التزامات|التزاماتي|قسط|قسطي|اقساط|اقساطي|سمه|قرض|ديون|قروض|قائم)\s*(?:هو|يبلغ|شهري|عقد|=|\:)?\s*(\d{1,5})/g,
+    /(\d{1,5})\s*(?:ريال)?\s*(?:التزام|قسط|قرض)/g
+  ];
+
+  let extractedObligations: number[] = [];
+  for (const reg of obligationRegexes) {
+    let matchOb;
+    while ((matchOb = reg.exec(norm)) !== null) {
+      const val = parseInt(matchOb[1], 10);
+      if (val >= 0 && val < 50000 && val !== updated.directNetSalary) {
+        extractedObligations.push(val);
+      }
     }
+  }
+
+  if (extractedObligations.length > 0) {
+    updated.obligations = extractedObligations[0];
   }
 
   // 6. Dates (birth/appointment)
@@ -754,6 +785,43 @@ export function parseFieldsFromMessage(text: string, currentInputs: AssistantCal
     }
   }
 
+  // 6b. Age extraction: "عمري 33" -> birthYear = 2026 - 33 = 1993
+  const ageRegex = /(?:عمري|عمر|السن|سني)\s*(?:هو|يبلغ|يبغ|بحدود)?\s*(\d{2})/g;
+  let matchAge = ageRegex.exec(norm);
+  if (matchAge && !updated.birthYear) {
+    const age = parseInt(matchAge[1], 10);
+    if (age >= 18 && age <= 85) {
+      updated.birthYear = 2026 - age;
+      updated.birthMonth = 1;
+      updated.birthDay = 1;
+    }
+  }
+
+  // 6c. Employment Year extraction: "توظفت عام 2017" or "تعينت سنة 2015"
+  const recruitmentRegex = /(?:توظفت|تعينت|التعيين|تعييني|توظيفي|الخدمه|الخدمة|الخدمه|باشرت)\s*(?:عام|سنه|سنة|في)?\s*(\d{4})/g;
+  let matchRecruit = recruitmentRegex.exec(norm);
+  if (matchRecruit && !updated.appointmentYear) {
+    const rYear = parseInt(matchRecruit[1], 10);
+    if (rYear > 1350 && rYear < 2028) {
+      updated.appointmentYear = rYear;
+      updated.appointmentMonth = 1;
+      updated.appointmentDay = 1;
+    }
+  }
+
+  // 6d. Service duration extraction: "خدمتي 10 سنوات" or "مدة الخدمة 10 سنين"
+  const serviceRegex = /(?:خدمه|خدمتي|الخدمة|الخدمه)\s*(\d{1,2})\s*(?:سنه|سنة|اعوام|سنوات|سنين)/g;
+  let matchService = serviceRegex.exec(norm);
+  if (matchService && !updated.appointmentYear) {
+    const sYears = parseInt(matchService[1], 10);
+    if (sYears > 0 && sYears < 50) {
+      updated.appointmentYear = 2026 - sYears;
+      updated.appointmentMonth = 1;
+      updated.appointmentDay = 1;
+    }
+  }
+
+  // Adjust dates calendars
   if (updated.birthYear) {
     if (updated.birthYear > 1350 && updated.birthYear < 1450) {
       updated.birthCalendar = 'hijri';
@@ -770,24 +838,48 @@ export function parseFieldsFromMessage(text: string, currentInputs: AssistantCal
   }
 
   // 7. Support types parsing
-  if (norm.includes('دعم شهري') || norm.includes('شهري')) {
+  if (norm.includes('دعم شهري') || norm.includes('شهري') || norm.includes('الدعم الشهري')) {
     updated.supportType = 'monthly';
-  } else if (norm.includes('باقه') || norm.includes('دفعه') || norm.includes('مسبق') || norm.includes('دفعه مسبقه') || norm.includes('دفعة مسبقة')) {
+  } else if (norm.includes('باقه') || norm.includes('دفعه') || norm.includes('مسبق') || norm.includes('دفعه مسبقه') || norm.includes('دفعة مسبقة') || norm.includes('باقة') || norm.includes('150 الف') || norm.includes('100 الف')) {
     updated.supportType = 'downpayment';
-  } else if (norm.includes('بدون دعم') || norm.includes('غير مستحق') || norm.includes('لا استحق') || norm.includes('بدون')) {
+  } else if (norm.includes('بدون دعم') || norm.includes('غير مستحق') || norm.includes('لا استحق') || norm.includes('بدون') || norm.includes('غياب الدعم')) {
     updated.supportType = 'none';
   }
 
   // 8. Product types
-  if (norm.includes('شخصي فقط') || norm.includes('تمويل شخصي فقط')) {
+  if (norm.includes('شخصي فقط') || norm.includes('تمويل شخصي فقط') || (norm.includes('شخصي') && !norm.includes('عقاري'))) {
     updated.productId = 'personal_only';
-  } else if (norm.includes('عقاري فقط') || norm.includes('عقار مالي فقط')) {
+  } else if (norm.includes('عقاري فقط') || norm.includes('عقار مالي فقط') || (norm.includes('عقاري') && !norm.includes('شخصي')) || norm.includes('بيت') || norm.includes('شراء عقار')) {
     updated.productId = 'real_estate_only';
-  } else if (norm.includes('عقاري وشخصي') || norm.includes('تمويلين') || norm.includes('دمج') || norm.includes('مدمج')) {
+  } else if (norm.includes('عقاري وشخصي') || norm.includes('تمويلين') || norm.includes('دمج') || norm.includes('مدمج') || norm.includes('الشخصي المدمج') || norm.includes('مع الشخصي')) {
     updated.productId = 'real_estate_with_new_personal';
   }
 
-  // 9. Bank preference
+  // 9. Back context fallback of context numbers
+  // Parse any free numbers of salary and obligation that weren't captured by explicit regexes
+  const allNums = norm.match(/\b\d+\b/g);
+  if (allNums) {
+    const cleanNumbers = allNums.map(n => parseInt(n, 10)).filter(n => !isNaN(n));
+    // Let's identify unused numbers
+    for (const num of cleanNumbers) {
+      // If it's a valid year or age, skip or use
+      if (num > 1350 && num < 2028) continue;
+      if (num > 18 && num <= 85 && (norm.includes('عمر') || norm.includes('سني'))) continue;
+
+      if (num >= 2000 && num <= 250000) {
+        if (!updated.directNetSalary) {
+          updated.directNetSalary = num;
+          updated.salaryMode = 'direct';
+        }
+      } else if (num > 0 && num < 30000) {
+        if (updated.directNetSalary && updated.directNetSalary !== num && !updated.obligations) {
+          updated.obligations = num;
+        }
+      }
+    }
+  }
+
+  // 10. Bank preference
   const bankSearchMap: { [key: string]: string } = {
     alahli: 'alahli', ahli: 'alahli', اهلي: 'alahli', الأهلي: 'alahli',
     rajhi: 'rajhi', راجحي: 'rajhi', الراجحي: 'rajhi',
@@ -934,6 +1026,257 @@ export function handleAssistantTurn(
             pendingResultQuestion: isAnyBankAsk ? (hasPending ? state.pendingResultQuestion : messageText) : undefined
           },
           richContent: resultInquiry.richContent
+        };
+      }
+    }
+  }
+
+  // Helper to detect incomplete estimation queries
+  const isEstimationInquiry = (msg: string): boolean => {
+    const normalised = normalizeArabic(normalizeNumbersInArabicText(msg));
+    
+    // Explicit starting requests should always override estimation inquiries
+    const isExplicitStart = 
+      normalised.includes('ابدأ حسبة') || 
+      normalised.includes('ابدء حسبه') || 
+      normalised.includes('بدء الحسبة') || 
+      normalised.includes('بدء حسبة') || 
+      normalised.includes('خلنا نحسب') || 
+      normalised.includes('أبغى أحسب') || 
+      normalised.includes('أبى أحسب') || 
+      normalised.includes('ابي احسب') || 
+      normalised.includes('ابغى احسب') || 
+      normalised.includes('اريد ان احسب') ||
+      normalised.includes('احسب تمويلي') ||
+      normalised.includes('احسب لي') ||
+      normalised.includes('كيف احسب') ||
+      normalised.includes('طريقة الحسبة');
+
+    if (isExplicitStart) {
+      return false;
+    }
+
+    const keywords = [
+      'كم يعطوني', 'كم يعطيني', 'كم اطلع', 'كم أطلع', 'كم اقدر', 'كم أقدر',
+      'كم استحق', 'كم أستحق', 'كم المسموح', 'كم مسموح', 'كم يطلع', 'كم التمويل',
+      'كم القرض', 'كم الحد', 'كم يعطي', 'إذا راتبي', 'اذا راتبي', 'لو راتبي',
+      'الراجحي كم', 'كم الراجحي'
+    ];
+
+    const hasKeywords = keywords.some(kw => normalised.includes(kw));
+    const hasSalaryWithQuestion = normalised.includes('راتب') && (normalised.includes('كم') || normalised.includes('لو') || normalised.includes('اذا') || normalised.includes('إذا'));
+    const hasSupportWithQuestion = normalised.includes('مدعوم') && (normalised.includes('كم') || normalised.includes('لو') || normalised.includes('اذا') || normalised.includes('إذا'));
+
+    return hasKeywords || hasSalaryWithQuestion || hasSupportWithQuestion;
+  };
+
+  // If we are not currently collecting data or displaying results/whatsapp approval, check if the user is providing initiating data to start calculation
+  if (state.conversationMode !== 'collecting_data' && state.conversationMode !== 'ready_to_calculate' && state.conversationMode !== 'showing_results' && state.conversationMode !== 'whatsapp_approval') {
+    const parsed = parseFieldsFromMessage(messageText, state.inputs);
+    
+    // Check if it is classified as an incomplete estimation inquiry
+    if (isEstimationInquiry(messageText)) {
+      // 1. نوع التمويل (productId)
+      if (!parsed.productId) {
+        let resp = "أقدر أحسب لك، لكن الراتب وحده لا يكفي. أحتاج نوع التمويل والقطاع والعمر أو تاريخ الميلاد وتاريخ التعيين والالتزامات. نبدأ بنوع التمويل: عقاري، شخصي، أو عقاري مع شخصي؟";
+        if (parsed.directNetSalary && parsed.supportType) {
+          resp = "أقدر أحسبها لك، لكن الراتب والدعم وحدهم لا يكفون لتحديد مبلغ التمويل. أحتاج أولًا نوع التمويل المطلوب: عقاري، شخصي، أو عقاري مع شخصي؟";
+        } else if (norm.includes('الراجحي') || norm.includes('البنك')) {
+          resp = "أقدر أحسب التمويل المتاح لك لدى البنك بدقة، لكن أحتاج بعض البيانات أولاً. نبدأ بنوع التمويل المطلوب: عقاري، شخصي، أو عقاري مع شخصي؟";
+          if (norm.includes('الراجحي')) {
+            resp = "أقدر أحسب لك الراجحي لكن أحتاج بياناتك أولاً. نبدأ بنوع التمويل المطلوب: عقاري، شخصي، أو عقاري مع شخصي؟";
+          }
+        }
+        return {
+          response: resp,
+          newState: {
+            ...state,
+            inputs: parsed,
+            conversationMode: 'collecting_data',
+            currentAskField: 'productId'
+          },
+          richContent: {
+            type: 'buttons',
+            buttons: [
+              { id: 'real_estate_only', label: '🏠 تمويل عقاري فقط', action: 'تمويل عقاري فقط' },
+              { id: 'personal_only', label: '💼 تمويل شخصي فقط', action: 'تمويل شخصي فقط' },
+              { id: 'real_estate_with_new_personal', label: '🔄 عقاري وشخصي مدمج', action: 'عقاري وشخصي مدمج' }
+            ]
+          }
+        };
+      }
+
+      // 2. القطاع (sectorId)
+      if (!parsed.sectorId) {
+        const prodLabel = parsed.productId === 'personal_only' ? 'الشخصي' : 'العقاري';
+        return {
+          response: `أقدر أحسب لك التمويل ${prodLabel}، لكن الراتب وحده لا يكفي. أحتاج القطاع أولًا: حكومي، عسكري، خاص، شبه حكومي، أو متقاعد؟`,
+          newState: {
+            ...state,
+            inputs: parsed,
+            conversationMode: 'collecting_data',
+            currentAskField: 'sectorId'
+          },
+          richContent: {
+            type: 'buttons',
+            buttons: [
+              { id: 'gov_civil', label: '💼 مدني حكومي', action: 'مدني حكومي' },
+              { id: 'military', label: '🎖️ عسكري', action: 'عسكري' },
+              { id: 'companies_private', label: '🏢 قطاع خاص', action: 'قطاع خاص' },
+              { id: 'retired', label: '📅 متقاعد', action: 'متقاعد' }
+            ]
+          }
+        };
+      }
+
+      // 3. الراتب (directNetSalary)
+      if (!parsed.directNetSalary) {
+        return {
+          response: "أقدر أحسبها لك بدقة، لكن أحتاج معرفة صافي راتبك الشهري المستلم أولاً لتحديد المعايير المالية. كم يبلغ صافي راتبك؟",
+          newState: {
+            ...state,
+            inputs: parsed,
+            conversationMode: 'collecting_data',
+            currentAskField: 'directNetSalary'
+          }
+        };
+      }
+
+      // 4. الالتزامات (obligations)
+      if (parsed.obligations === undefined) {
+        return {
+          response: "أدخلت بيانات هامة! للحساب بدقة، هل لديك أي قروض أو التزامات شهرية قائمة حالياً؟ (اكتب مبلغ القسط الشهري بالريال، أو اكتب لا يوجد).",
+          newState: {
+            ...state,
+            inputs: parsed,
+            conversationMode: 'collecting_data',
+            currentAskField: 'obligations'
+          }
+        };
+      }
+
+      // 5. العمر أو تاريخ الميلاد (birthYear)
+      if (!parsed.birthYear) {
+        return {
+          response: "أحتاج تاريخ ميلادك الكامل (اليوم/الشهر/السنة) لنتمكن من معرفة مدة السداد المسموح بها حسب سن التقاعد لدى البنوك.",
+          newState: {
+            ...state,
+            inputs: parsed,
+            conversationMode: 'collecting_data',
+            currentAskField: 'birthYear'
+          }
+        };
+      }
+
+      // 6. تاريخ التعيين أو مدة الخدمة (appointmentYear)
+      if (parsed.sectorId !== 'retired' && !parsed.appointmentYear) {
+        return {
+          response: "يرجى تزويدي بتاريخ التعيين أو مباشرة العمل باليوم والشهر والسنة بدقة لحساب مدة خدمتك لتفادي موانع التمويل المألوفة.",
+          newState: {
+            ...state,
+            inputs: parsed,
+            conversationMode: 'collecting_data',
+            currentAskField: 'appointmentYear'
+          }
+        };
+      }
+
+      // 7. الدعم (supportType)
+      if (!parsed.supportType) {
+        return {
+          response: "بقي خطوة أخيرة؛ ما هو برنامج الدعم السكني الذي تفضله لإضافته وتأثيره على الحسبة؟",
+          newState: {
+            ...state,
+            inputs: parsed,
+            conversationMode: 'collecting_data',
+            currentAskField: 'supportType'
+          },
+          richContent: {
+            type: 'buttons',
+            buttons: [
+              { id: 'monthly_support', label: '🏠 دعم شهري ثابت', action: 'دعم شهري ثابت' },
+              { id: 'lump_sum_support', label: '💰 باقة دفعة مسبقة (100ألف/150ألف)', action: 'دعم دفعة مسبقة' },
+              { id: 'no_support', label: '❌ بدون دعم سكني', action: 'بدون دعم' }
+            ]
+          }
+        };
+      }
+    }
+
+    // Did they provide any new fields? (Standard processing)
+    const hasNewData = 
+      parsed.sectorId !== undefined || 
+      parsed.directNetSalary !== undefined || 
+      parsed.birthYear !== undefined ||
+      parsed.obligations !== undefined ||
+      parsed.productId !== undefined ||
+      parsed.appointmentYear !== undefined ||
+      parsed.rankId !== undefined ||
+      parsed.supportType !== undefined;
+    if (hasNewData) {
+      const missing = getMissingFields(parsed);
+      if (missing.length === 0) {
+        const validation = validateAssistantInput(parsed);
+        if (validation.isValid) {
+          const salaryText = (parsed.salaryMode === 'details')
+            ? `الأساسي: ${parsed.basicSalary}، السكن: ${parsed.housingAllowance}`
+            : `${parsed.directNetSalary?.toLocaleString('ar-SA')} ريال`;
+
+          const summary = `**📋 مراجعة وتأكيد بيانات التمويل:**\n\n` +
+            `• قطاع العمل: ${parsed.sectorId === 'military' ? `عسكري (${ranksListFindAr(parsed.rankId)})` : parsed.sectorId === 'gov_civil' ? 'مدني حكومي' : parsed.sectorId === 'retired' ? 'متقاعد' : 'قطاع خاص'}\n` +
+            `• تاريخ الميلاد: ${parsed.birthDay}/${parsed.birthMonth}/${parsed.birthYear} (${parsed.birthCalendar === 'hijri' ? 'هجري' : 'ميلادي'})\n` +
+            (parsed.sectorId !== 'retired' ? `• تاريخ التعيين: ${parsed.appointmentDay}/${parsed.appointmentMonth}/${parsed.appointmentYear}\n` : '') +
+            `• صافي الدخل: ${salaryText}\n` +
+            `• الالتزامات لسمة: ${(parsed.obligations ?? 0).toLocaleString('ar-SA')} ريال شهرياً\n` +
+            `• برنامج الدعم: ${parsed.supportType === 'monthly' ? 'دعم شهري ثابت' : parsed.supportType === 'downpayment' ? 'دعم دفعة مسبقة' : 'بدون دعم'}\n\n` +
+            `**هل ترغب في إجراء الحسبة وبدء مقارنة عروض البنوك بهذه البيانات؟**`;
+
+          return {
+            response: `أهلاً بك؛ قمت بتلقي البيانات التمويلية المدخلة وبدء الحسبة فوراً:\n\n${summary}`,
+            newState: {
+              ...state,
+              inputs: parsed,
+              conversationMode: 'ready_to_calculate',
+              currentAskField: 'confirm_calc'
+            },
+            richContent: {
+              type: 'data_summary',
+              summaryData: parsed,
+              buttons: [
+                { id: 'calc_start', label: '🚀 نعم، قارن واحسب فوراً', action: 'نعم، ابدأ الحسبة' },
+                { id: 'calc_edit', label: '✏️ تعديل الراتب والالتزامات', action: 'تعديل البيانات' }
+              ]
+            }
+          };
+        }
+      } else {
+        const firstMissing = missing[0];
+        const promptObj = getPromptForMissingField(firstMissing, parsed);
+        
+        let parsedProgressText = "";
+        if (parsed.sectorId) {
+          parsedProgressText += `قطاع العمل: ${parsed.sectorId === 'military' ? 'عسكري' : parsed.sectorId === 'gov_civil' ? 'مدني حكومي' : parsed.sectorId === 'retired' ? 'متقاعد' : 'قطاع خاص'}. `;
+        }
+        if (parsed.directNetSalary) {
+          parsedProgressText += `صافي الراتب: ${parsed.directNetSalary.toLocaleString('ar-SA')} ريال. `;
+        }
+        if (parsed.obligations !== undefined) {
+          parsedProgressText += `الالتزامات: ${parsed.obligations.toLocaleString('ar-SA')} ريال. `;
+        }
+        if (parsed.productId) {
+          parsedProgressText += `المنتج: ${parsed.productId === 'personal_only' ? 'تمويل شخصي فقط' : 'تمويل عقاري'}. `;
+        }
+        
+        const responseWithProgress = `أهلاً بك! لقد استوعبت المدخلات التالية وبدأت حسبتك المالية بمساعد حسبة الذكي للتمويل:\n- **${parsedProgressText}**\n\n${promptObj.response}`;
+        return {
+          response: responseWithProgress,
+          newState: {
+            ...state,
+            inputs: parsed,
+            conversationMode: 'collecting_data',
+            currentAskField: firstMissing
+          },
+          richContent: promptObj.richContent
         };
       }
     }
@@ -1108,129 +1451,13 @@ export function handleAssistantTurn(
   // 6. Stateful Gradual Data Collection (Step-by-step Wizard flow inside Assistant)
   if (state.conversationMode === 'collecting_data') {
     let parsedInputs = parseFieldsFromMessage(messageText, state.inputs);
-    const currentField = state.currentAskField;
     
-    if (currentField === 'sectorId') {
-      if (parsedInputs.sectorId) {
-        if (parsedInputs.sectorId === 'military') {
-          return {
-            response: "عظيم، قطاع عسكري. ما هي رتبتك العسكرية الحالية لتحديد سن التقاعد وخطة الأقساط بدقة؟ (مثلاً جندي، عريف، رقيب، عميد، لواء، إلخ..)",
-            newState: { ...state, inputs: parsedInputs, currentAskField: 'rankId' }
-          };
-        } else {
-          return {
-            response: "فهمت قطاع عملك. الآن، ما هو تاريخ ميلادك الكامل؟\n(مثلاً: 12/10/1990 ميلادي أو 15/05/1412 هجري)",
-            newState: { ...state, inputs: parsedInputs, currentAskField: 'birthYear' }
-          };
-        }
-      } else {
-        return {
-          response: "لم أستطع تمييز قطاع العمل المختار. فضلاً اختر أحد القطاعات التالية:\n- عسكري\n- مدني حكومي\n- قطاع خاص\n- شركات كبرى معتمدة\n- متقاعد",
-          newState: state,
-          richContent: {
-            type: 'buttons',
-            buttons: [
-              { id: 'gov_civil', label: '💼 مدني حكومي', action: 'مدني حكومي' },
-              { id: 'military', label: '🎖️ عسكري', action: 'عسكري' },
-              { id: 'companies_private', label: '🏢 قطاع خاص', action: 'قطاع خاص' },
-              { id: 'retired', label: '📅 متقاعد', action: 'متقاعد' }
-            ]
-          }
-        };
-      }
-    }
-
-    if (currentField === 'rankId') {
-      if (parsedInputs.rankId) {
-        return {
-          response: `تم تحديد الرتبة: **${ranksListFindAr(parsedInputs.rankId)}**.\n\nالآن، ما هو تاريخ ميلادك الكامل لتحديد سن التقاعد والأمد التمويلي المتاح؟ (مثال: 12/10/1990 م أو 15/05/1410 هـ)`,
-          newState: { ...state, inputs: parsedInputs, currentAskField: 'birthYear' }
-        };
-      } else {
-        return {
-          response: "يرجى تحديد رتبتك العسكرية المعتمدة بشكل صحيح (مثال: جندي، عريف، وكيل رقيب، رقيب، رئيس رقباء، ملازم، نقيب، رائد، مقدم، عقيد، عميد، لواء) لتطبيق نظام التقاعد والخصم المناسب.",
-          newState: state
-        };
-      }
-    }
-
-    if (currentField === 'birthYear') {
-      if (parsedInputs.birthYear && parsedInputs.birthMonth && parsedInputs.birthDay) {
-        if (parsedInputs.sectorId === 'retired') {
-          return {
-            response: `تم حفظ تاريخ الميلاد: **${parsedInputs.birthDay}/${parsedInputs.birthMonth}/${parsedInputs.birthYear}**.\n\nالآن، ما هو صافي راتبك الشهري الذي ينزل متاحاً في حساب البنك؟`,
-            newState: { ...state, inputs: parsedInputs, currentAskField: 'directNetSalary' }
-          };
-        } else {
-          return {
-            response: `تم تحديد تاريخ الميلاد: **${parsedInputs.birthDay}/${parsedInputs.birthMonth}/${parsedInputs.birthYear}** (${parsedInputs.birthCalendar === 'hijri' ? 'هجري' : 'ميلادي'}).\n\nخطوتنا التالية: ما هو **تاريخ التعيين** في الخدمة بالنسبة لوظيفتك؟ (مثلاً: 18/06/2015 ميلادي أو 20/12/1435 هجري)`,
-            newState: { ...state, inputs: parsedInputs, currentAskField: 'appointmentYear' }
-          };
-        }
-      } else {
-        return {
-          response: "يرجى كتابة تاريخ ميلادك كاملاً بشكل صحيح، متضمناً اليوم والشهر والسنة بدقة (مثال: 14/08/1993 ميلادي).",
-          newState: state
-        };
-      }
-    }
-
-    if (currentField === 'appointmentYear') {
-      if (parsedInputs.appointmentYear && parsedInputs.appointmentMonth && parsedInputs.appointmentDay) {
-        if (parsedInputs.birthCalendar !== parsedInputs.appointmentCalendar) {
-          return {
-            response: "يرجى توحيد نوع التقويم لمطابقة تاريخ الميلاد والتعيين (كلاهما ميلادي أو كلاهما هجري) لضمان دقة دبلوم الحسبة.",
-            newState: state
-          };
-        }
-        return {
-          response: `تم تسجيل تاريخ التعيين: **${parsedInputs.appointmentDay}/${parsedInputs.appointmentMonth}/${parsedInputs.appointmentYear}**.\n\nالآن، كم يبلغ **صافي راتبك الشهري** بعد خصم التقاعد؟ (مثلاً: 12500 ريال)`,
-          newState: { ...state, inputs: parsedInputs, currentAskField: 'directNetSalary' }
-        };
-      } else {
-        return {
-          response: "يرجى تزويدي بتاريخ التعيين في العمل كاملاً باليوم والشهر والسنة (مثال: 01/02/2016 م) لنحسب مدد الاستقطاع والخدمة.",
-          newState: state
-        };
-      }
-    }
-
-    if (currentField === 'directNetSalary') {
-      if (parsedInputs.directNetSalary && parsedInputs.directNetSalary > 1000) {
-        return {
-          response: `تم تسجيل راتبك الشهري: **${parsedInputs.directNetSalary.toLocaleString('ar-SA')} ريال**.\n\nهل لديك حالياً أي التزامات مالية أو أقساط يتم خصمها من حسابك مصنفة في سمة؟ (كم قيمتها الإجمالية شهرياً؟ اكتب 0 أو القيمة بالريال، مثال: قسط 1200 ريال)`,
-          newState: { ...state, inputs: parsedInputs, currentAskField: 'obligations' }
-        };
-      } else {
-        return {
-          response: "عذراً، يرجى كتابة مبلغ صافي الراتب الشهري برقم حقيقي صالح للتمويل السكني.",
-          newState: state
-        };
-      }
-    }
-
-    if (currentField === 'obligations') {
-      if (norm.includes('لا يوجد') || norm.includes('صفر') || norm.includes('ما عندي') || norm.includes('بدون') || norm === '0') {
-        parsedInputs.obligations = 0;
-      }
-      
-      return {
-        response: `تم تسجيل التزاماتك الحالية: **${(parsedInputs.obligations ?? 0).toLocaleString('ar-SA')} ريال**.\n\nما هو خيار الدعم السكني المطلوب؟\n- دعم شهري (مستمر يخصم الأرباح شهرياً) 🏠\n- باقة دفعة مسبقة (بديل الدعم المالي دفعة مقطوعة لخفض الدفعة الأولى) 💰\n- غير مستحق أو بدون دعم (الحسبة العقارية المجردة) ❌`,
-        newState: { ...state, inputs: parsedInputs, currentAskField: 'supportType' },
-        richContent: {
-          type: 'buttons',
-          buttons: [
-            { id: 'monthly_support', label: '🏠 دعم شهري ثابت', action: 'دعم شهري ثابت' },
-            { id: 'lump_sum_support', label: '💰 باقة دفعة مسبقة (100ألف/150ألف)', action: 'دعم دفعة مسبقة' },
-            { id: 'no_support', label: '❌ غير مستحق أو بدون دعم', action: 'بدون دعم' }
-          ]
-        }
-      };
-    }
-
-    if (currentField === 'supportType') {
+    // Check missing fields
+    const missing = getMissingFields(parsedInputs);
+    
+    if (missing.length === 0) {
+      // Validate inputs
       const validation = validateAssistantInput(parsedInputs);
-      
       if (validation.isValid) {
         const salaryText = (parsedInputs.salaryMode === 'details')
           ? `الأساسي: ${parsedInputs.basicSalary}، السكن: ${parsedInputs.housingAllowance}`
@@ -1264,7 +1491,7 @@ export function handleAssistantTurn(
         };
       } else {
         return {
-          response: `عذراً، تبين وجود تضارب أو بيانات خاطئة تمنع إكمال الحسبة منطقياً:\n\n${validation.errors.join('\n')}\n\nدعنا نصلح ذلك. ما هو صافي راتبك الشهري الصحيح؟`,
+          response: `عذراً، تبين وجود تضارب يمنع الحسبة منطقياً:\n\n${validation.errors.join('\n')}\n\nيرجى إعادة كتابة صافي راتبك الشهري الصحيح لتجاوز هذا المانع.`,
           newState: {
             ...state,
             inputs: parsedInputs,
@@ -1272,6 +1499,89 @@ export function handleAssistantTurn(
           }
         };
       }
+    } else {
+      const askedField = state.currentAskField;
+      if (askedField === 'obligations' && (norm.includes('لا يوجد') || norm.includes('صفر') || norm.includes('ما عندي') || norm.includes('بدون') || norm === '0' || norm.includes('لا') || norm.includes('كلا'))) {
+        parsedInputs.obligations = 0;
+      }
+      
+      const nextMissing = getMissingFields(parsedInputs);
+      if (nextMissing.length === 0) {
+        const validation = validateAssistantInput(parsedInputs);
+        if (validation.isValid) {
+          const salaryText = (parsedInputs.salaryMode === 'details')
+            ? `الأساسي: ${parsedInputs.basicSalary}، السكن: ${parsedInputs.housingAllowance}`
+            : `${parsedInputs.directNetSalary?.toLocaleString('ar-SA')} ريال`;
+
+          const summary = `**📋 مراجعة وتأكيد بيانات التمويل:**\n\n` +
+            `• قطاع العمل: ${parsedInputs.sectorId === 'military' ? `عسكري (${ranksListFindAr(parsedInputs.rankId)})` : parsedInputs.sectorId === 'gov_civil' ? 'مدني حكومي' : parsedInputs.sectorId === 'retired' ? 'متقاعد' : 'قطاع خاص'}\n` +
+            `• تاريخ الميلاد: ${parsedInputs.birthDay}/${parsedInputs.birthMonth}/${parsedInputs.birthYear} (${parsedInputs.birthCalendar === 'hijri' ? 'هجري' : 'ميلادي'})\n` +
+            (parsedInputs.sectorId !== 'retired' ? `• تاريخ التعيين: ${parsedInputs.appointmentDay}/${parsedInputs.appointmentMonth}/${parsedInputs.appointmentYear}\n` : '') +
+            `• صافي الدخل: ${salaryText}\n` +
+            `• الالتزامات لسمة: ${(parsedInputs.obligations ?? 0).toLocaleString('ar-SA')} ريال شهرياً\n` +
+            `• برنامج الدعم: ${parsedInputs.supportType === 'monthly' ? 'دعم شهري ثابت' : parsedInputs.supportType === 'downpayment' ? 'دعم دفعة مسبقة' : 'بدون دعم'}\n\n` +
+            `**هل ترغب في إجراء الحسبة وبدء مقارنة عروض البنوك بهذه البيانات؟**`;
+
+          return {
+            response: summary,
+            newState: {
+              ...state,
+              inputs: parsedInputs,
+              conversationMode: 'ready_to_calculate',
+              currentAskField: 'confirm_calc'
+            },
+            richContent: {
+              type: 'data_summary',
+              summaryData: parsedInputs,
+              buttons: [
+                { id: 'calc_start', label: '🚀 نعم، قارن واحسب فوراً', action: 'نعم، ابدأ الحسبة' },
+                { id: 'calc_edit', label: '✏️ تعديل الراتب والالتزامات', action: 'تعديل البيانات' }
+              ]
+            }
+          };
+        } else {
+          return {
+            response: `عذراً، تبين وجود تضارب يمنع الحسبة منطقياً:\n\n${validation.errors.join('\n')}\n\nيرجى إعادة كتابة صافي راتبك الشهري الصحيح لتجاوز هذا المانع.`,
+            newState: {
+              ...state,
+              inputs: parsedInputs,
+              currentAskField: 'directNetSalary'
+            }
+          };
+        }
+      }
+      
+      const firstMissing = nextMissing[0];
+      const promptObj = getPromptForMissingField(firstMissing, parsedInputs);
+      
+      let responseWithProgress = promptObj.response;
+      let parsedProgressText = "";
+      if (parsedInputs.sectorId && parsedInputs.sectorId !== state.inputs.sectorId) {
+        parsedProgressText += `جهة العمل: ${parsedInputs.sectorId === 'military' ? 'عسكري' : parsedInputs.sectorId === 'gov_civil' ? 'مدني حكومي' : parsedInputs.sectorId === 'retired' ? 'متقاعد' : 'قطاع خاص'}. `;
+      }
+      if (parsedInputs.directNetSalary && parsedInputs.directNetSalary !== state.inputs.directNetSalary) {
+        parsedProgressText += `صافي الراتب: ${parsedInputs.directNetSalary.toLocaleString('ar-SA')} ريال. `;
+      }
+      if (parsedInputs.obligations !== undefined && parsedInputs.obligations !== state.inputs.obligations) {
+        parsedProgressText += `الالتزامات: ${parsedInputs.obligations.toLocaleString('ar-SA')} ريال. `;
+      }
+      if (parsedInputs.productId !== state.inputs.productId) {
+        parsedProgressText += `المنتج: ${parsedInputs.productId === 'personal_only' ? 'تمويل شخصي فقط' : 'تمويل عقاري'}. `;
+      }
+      
+      if (parsedProgressText) {
+        responseWithProgress = `فهمت البيانات التالية: **${parsedProgressText}**\n\n${promptObj.response}`;
+      }
+
+      return {
+        response: responseWithProgress,
+        newState: {
+          ...state,
+          inputs: parsedInputs,
+          currentAskField: firstMissing
+        },
+        richContent: promptObj.richContent
+      };
     }
   }
 
@@ -1324,4 +1634,86 @@ function ranksListFindAr(rankId?: string): string {
     liwa: 'لواء'
   };
   return ranksMap[rankId] || rankId;
+}
+
+function getMissingFields(inputs: AssistantCalculationInput): (keyof AssistantCalculationInput)[] {
+  const missing: (keyof AssistantCalculationInput)[] = [];
+  
+  if (!inputs.sectorId) {
+    missing.push('sectorId');
+  }
+  if (inputs.sectorId === 'military' && !inputs.rankId) {
+    missing.push('rankId');
+  }
+  if (!inputs.birthYear) {
+    missing.push('birthYear');
+  }
+  if (inputs.sectorId !== 'retired' && !inputs.appointmentYear) {
+    missing.push('appointmentYear');
+  }
+  if (!inputs.directNetSalary) {
+    missing.push('directNetSalary');
+  }
+  if (inputs.obligations === undefined) {
+    missing.push('obligations');
+  }
+  if (!inputs.supportType) {
+    missing.push('supportType');
+  }
+  
+  return missing;
+}
+
+function getPromptForMissingField(field: keyof AssistantCalculationInput, inputs: AssistantCalculationInput): { response: string; richContent?: any } {
+  switch (field) {
+    case 'sectorId':
+      return {
+        response: "ما هو قطاع عملك المعتمد حالياً لتطبيق معايير البنوك بدقة؟\n- مدني حكومي 💼\n- عسكري 🎖️\n- قطاع خاص 🏢\n- شركات كبرى (أرامكو، سابك، إلخ) 🏭\n- متقاعد 📅",
+        richContent: {
+          type: 'buttons',
+          buttons: [
+            { id: 'gov_civil', label: '💼 مدني حكومي', action: 'مدني حكومي' },
+            { id: 'military', label: '🎖️ عسكري', action: 'عسكري' },
+            { id: 'companies_private', label: '🏢 قطاع خاص', action: 'قطاع خاص' },
+            { id: 'retired', label: '📅 متقاعد', action: 'متقاعد' }
+          ]
+        }
+      };
+    case 'rankId':
+      return {
+        response: "يرجى تحديد رتبتك العسكرية الحالية لتحديد حد التقاعد وخطة الأقساط الأنسب لقطاع الدفاع والأمن (مثال: جندي، عريف، رقيب، عميد...)",
+      };
+    case 'birthYear':
+      return {
+        response: "تاريخ ميلادك بالكامل (اليوم/الشهر/السنة) أمر حاسم لمعرفة عمرك الأقصى للتسديد لدى البنوك المختلفة. فضلاً اكتبه على النحو التالي (مثلاً: 15/06/1991 ميلادي أو 20/08/1411 هجري).",
+      };
+    case 'appointmentYear':
+      return {
+        response: "تاريخ مباشرتك العمل أو التعيين باليوم والشهر والسنة (مثال: 05/01/2018 ميلادي) لحساب مدة الخدمة المحتسبة وصافي المستحقات.",
+      };
+    case 'directNetSalary':
+      return {
+        response: "كم يبلغ صافي راتبك الشهري الفعلي الذي يتم إيداعه في حسابك البنكي بعد خصم التأمينات أو التقاعد؟ (مثلاً: 14200 ريال)",
+      };
+    case 'obligations':
+      return {
+        response: "هل لديك حالياً أي التزامات وقروض قائمة أو أقساط مسجلة على حسابك؟ (فضلاً اكتب قيمة القسط الشهري بالريال، أو اكتب 'لا يوجد' أو '0' إذا لم تكن هناك أي التزامات).",
+      };
+    case 'supportType':
+      return {
+        response: "ما هو برنامج الدعم السكني الذي تفضله أو ترغب بالاستحقاق منه؟\n- دعم شهري ثابت (يغطي أرباح التمويل دورياً) 🏠\n- باقة الدفعة المسبقة (دعم مالي فوري دفعة مقطوعة لخفض الدفعة الأولى) 💰\n- بدون دعم (تمويل عقاري تمويلي مجرد) ❌",
+        richContent: {
+          type: 'buttons',
+          buttons: [
+            { id: 'monthly_support', label: '🏠 دعم شهري ثابت', action: 'دعم شهري ثابت' },
+            { id: 'lump_sum_support', label: '💰 باقة دفعة مسبقة (100ألف/150ألف)', action: 'دعم دفعة مسبقة' },
+            { id: 'no_support', label: '❌ بدون دعم سكني', action: 'بدون دعم' }
+          ]
+        }
+      };
+    default:
+      return {
+        response: "يرجى تزويدي بالبيانات المطلوبة لخدمتك في الحسبة بدقة.",
+      };
+  }
 }

@@ -12,39 +12,86 @@ export interface GuardReviewResult {
 export function checkAssistantGuard(query: string): GuardReviewResult {
   const norm = query.toLowerCase().trim();
   
+  // Expanded keywords targeting instructions bypass, code / DB disclosure, calculations, settings leakage, and fabrication attempts
   const suspiciousKeywords = [
+    // System promts & Instructions
     "system prompt",
     "systemprompt",
-    "كود المشروع",
-    "سورس كود",
-    "source code",
-    "معادلات البنك",
-    "إعدادات الهوامش",
-    "اعدادات الهوامش",
-    "margin rules",
-    "api key",
-    "api_key",
-    "مفاتيح api",
-    "قاعدة البيانات",
-    "البيانات الداخلية",
-    "تجاوز صلاحيات",
+    "sys prompt",
+    "توجيهات النظام",
+    "تعليمات النظام",
+    "التعليمات السابقة",
     "تجاهل التعليمات",
     "تجاهل تعليمات",
     "ignore instructions",
+    "ignore previous",
     "bypass instructions",
-    "database access",
-    "sql injection",
-    "app_settings",
-    "select * from",
-    "delete from",
-    "update app_settings",
+    "override system",
+    "you are now",
+    "أنت الآن",
+    "مثل دور",
+    "roleplay",
+    "pretend to be",
+    "developer mode",
+    "وضع المطور",
+    
+    // Code / logic / formulas disclosure
+    "كود المشروع",
+    "سورس كود",
+    "source code",
+    "source_code",
+    "كيف مبرمج",
+    "كود المساعد",
+    "كود الصفحة",
+    "معادلات البنك",
+    "معادلة البنك",
+    "معادلات الاحتساب",
+    "طرق الحساب الرياضية",
+    "طريقة بناء المحرك",
+    "طريقه بناء المحرك",
+    "محرك الحسبة",
+    "finance-engine",
+    "finance_engine",
     "معادلة",
     "معادلات",
     "الكود",
-    "طريقة بناء المحرك",
-    "طريقه بناء المحرك",
+    
+    // Config / database keys
+    "إعدادات الهوامش",
+    "اعدادات الهوامش",
+    "margin rules",
+    "system settings",
+    "إعدادات النظام",
+    "اعدادات النظام",
+    "api key",
+    "api_key",
+    "مفاتيح api",
     "مفاتيح النظام",
-    "مفاتيح"
+    "مفاتيح",
+    "قاعدة البيانات",
+    "البيانات الداخلية",
+    "database access",
+    "sql injection",
+    "app_settings",
+    "system_settings",
+    "select * from",
+    "delete from",
+    "update app_settings",
+    "drop table",
+
+    // Financial fabrication and force-making-up data
+    "اخترع نسبة",
+    "افترض نسبة ربح",
+    "حدد هامش من عندك",
+    "حط فايدة من رأسك",
+    "توقع الفائدة",
+    "تنبأ بالهيكل المالي",
+    "أعطني نسبة عشوائية",
+    "توقع من عندك",
+    "تخمين نسبة الربح",
+    "تخمين الفائدة",
+    "تأليف أرقام مالية",
+    "تأليف هامش"
   ];
 
   const matchesViolation = suspiciousKeywords.some(keyword => norm.includes(keyword));
@@ -52,7 +99,7 @@ export function checkAssistantGuard(query: string): GuardReviewResult {
   if (matchesViolation) {
     return {
       isBlocked: true,
-      rejectMessage: "لا أستطيع عرض تفاصيل النظام الداخلية أو إعداداته، لكن يمكنني مساعدتك في فهم الأرقام والنتائج الظاهرة لك."
+      rejectMessage: "لا أستطيع عرض القواعد أو الإعدادات الداخلية للنظام، أو توقع وتخمين نسب الربح والأرقام خارج البيانات الفعلية. يمكنني فقط مساعدتك في فهم الأرقام الناتجة عن حسبتك الفعلية بدقة."
     };
   }
 

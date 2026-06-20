@@ -92,3 +92,7 @@ CREATE POLICY admin_select_api_results ON public.api_calculation_results
   FOR SELECT
   TO authenticated
   USING (public.is_admin(auth.uid()));
+
+-- Constraint on daily limit to be between 1 and 10000
+ALTER TABLE public.api_keys DROP CONSTRAINT IF EXISTS api_keys_daily_limit_check;
+ALTER TABLE public.api_keys ADD CONSTRAINT api_keys_daily_limit_check CHECK (daily_limit >= 1 AND daily_limit <= 10000);

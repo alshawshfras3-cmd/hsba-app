@@ -183,6 +183,10 @@ export default function IntegrationsSection() {
 
   const handleCreateApiKey = async () => {
     if (!selectedClientId) return;
+    if (isNaN(dailyLimit) || dailyLimit < 1 || dailyLimit > 10000) {
+      alert('الرجاء إدخال حد يومي صحيح بين 1 و 10000 استدعاء.');
+      return;
+    }
     setSubmittingKey(true);
     try {
       const result = await createApiKey(selectedClientId, dailyLimit, user?.id);
@@ -540,6 +544,8 @@ export default function IntegrationsSection() {
                         <input
                           type="number"
                           value={dailyLimit}
+                          min={1}
+                          max={10000}
                           onChange={(e) => setDailyLimit(Number(e.target.value))}
                           className="w-14 text-xs font-mono font-bold bg-transparent border-none text-slate-900 dark:text-white focus:outline-none"
                         />

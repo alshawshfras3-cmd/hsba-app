@@ -7,6 +7,53 @@ import { mapPayloadToEngineInput } from '../_shared/calculateAdapter.ts';
 import { calculateBanksFinancing } from '../_shared/financeEngine.ts';
 import { sanitizeBankResponse } from '../_shared/calculateResponseSanitizer.ts';
 
+function sanitizeRequestPayloadForLog(payload: any) {
+  if (!payload || typeof payload !== 'object') {
+    return payload;
+  }
+  
+  const sanitized: any = {};
+  
+  if (payload.requestId !== undefined) sanitized.requestId = payload.requestId;
+  
+  if (payload.customer && typeof payload.customer === 'object') {
+    sanitized.customer = {
+      employmentSector: payload.customer.employmentSector,
+      employmentDate: payload.customer.employmentDate,
+    };
+    
+    // Detailed birthDate, fine allowances, exact net salary and obligations are sensitive PII / financial data.
+    // We only preserve rounded or range-indicative representations in logs.
+    const rawSalary = Number(payload.customer.salary);
+    if (!isNaN(rawSalary)) {
+      sanitized.customer.salaryRounded = Math.round(rawSalary / 1000) * 1000;
+    }
+    
+    const rawBasic = Number(payload.customer.basicSalary);
+    if (payload.customer.basicSalary !== undefined && !isNaN(rawBasic)) {
+      sanitized.customer.basicSalaryRounded = Math.round(rawBasic / 1000) * 1000;
+    }
+
+    const rawObligations = Number(payload.customer.obligations);
+    if (payload.customer.obligations !== undefined && !isNaN(rawObligations)) {
+      sanitized.customer.obligationsRounded = Math.round(rawObligations / 100) * 100;
+    }
+  }
+  
+  if (payload.finance && typeof payload.finance === 'object') {
+    sanitized.finance = {
+      type: payload.finance.type,
+      propertyPrice: payload.finance.propertyPrice,
+      downPayment: payload.finance.downPayment,
+      supportType: payload.finance.supportType,
+      preferredBank: payload.finance.preferredBank,
+      termYears: payload.finance.termYears,
+    };
+  }
+  
+  return sanitized;
+}
+
 Deno.serve(async (req) => {
   const startTime = Date.now();
 
@@ -124,7 +171,7 @@ Deno.serve(async (req) => {
         client_id: clientId,
         api_key_id: apiKeyId,
         external_request_id: extReqId,
-        request_payload: body,
+        request_payload: sanitizeRequestPayloadForLog(body),
         status: 'validation_error',
         error_message: firstErrorMessage,
         duration_ms: duration
@@ -154,7 +201,7 @@ Deno.serve(async (req) => {
         client_id: clientId,
         api_key_id: apiKeyId,
         external_request_id: extReqId,
-        request_payload: validation.normalizedData,
+        request_payload: sanitizeRequestPayloadForLog(validation.normalizedData),
         status: 'received',
         duration_ms: 0
       })
@@ -174,7 +221,31 @@ Deno.serve(async (req) => {
   try {
     appSettings = await loadAppSettings();
     if (!appSettings) {
-      throw new Error('No configuration resolved in system_settings.');
+      throw new Error('CONFIG_ERROR_MISSING_SETTINGS');
+    }
+
+    const requiredKeys = [
+      'banks',
+      'products',
+      'marginRules',
+      'dsrRules',
+      'salaryRules',
+      'pensionRules',
+      'personalRules',
+      'termRules',
+      'supportSettings'
+    ];
+
+    const missingKeys = requiredKeys.filter(k => {
+      const val = appSettings[k];
+      if (val === null || val === undefined) return true;
+      if (Array.isArray(val) && val.length === 0) return true;
+      if (typeof val === 'object' && Object.keys(val).length === 0) return true;
+      return false;
+    });
+
+    if (missingKeys.length > 0) {
+      throw new Error(`CONFIG_ERROR_INCOMPLETE_${missingKeys.join('_').toUpperCase()}`);
     }
   } catch (err: any) {
     console.error('[API CALCULATE] Failed to load configurations:', err);
@@ -194,7 +265,7 @@ Deno.serve(async (req) => {
         success: false,
         error: {
           code: 'CONFIGURATION_ERROR',
-          message: 'فشل تحميل إعدادات وقواعد النظام من السيرفر.'
+          message: 'إعدادات الحسبة غير مكتملة في لوحة التحكم.'
         }
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -296,11 +367,18 @@ Deno.serve(async (req) => {
   } catch (err: any) {
     console.error('[API CALCULATE] Core engine execution failed:', err);
     const duration = Date.now() - startTime;
+    
+    const isConfigError = err?.message?.startsWith('CONFIG_ERROR_');
+    const errCode = isConfigError ? 'CONFIGURATION_ERROR' : 'ENGINE_CALCULATION_ERROR';
+    const errMsg = isConfigError
+      ? 'إعدادات الحسبة غير مكتملة في لوحة التحكم.'
+      : 'عذراً، حدث خطأ أثناء حساب المعادلة المالية الخاصة بك. يرجى مراجعة المعطيات وتهيئتها.';
+
     if (reqId) {
       await supabase
         .from('api_calculation_requests')
         .update({
-          status: 'calculation_error',
+          status: isConfigError ? 'configuration_error' : 'calculation_error',
           error_message: err?.message || 'Calculation core exception',
           duration_ms: duration
         })
@@ -311,11 +389,11 @@ Deno.serve(async (req) => {
       JSON.stringify({
         success: false,
         error: {
-          code: 'ENGINE_CALCULATION_ERROR',
-          message: 'عذراً، حدث خطأ أثناء حساب المعادلة المالية الخاصة بك. يرجى مراجعة المعطيات وتهيئتها.'
+          code: errCode,
+          message: errMsg
         }
       }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: isConfigError ? 400 : 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });

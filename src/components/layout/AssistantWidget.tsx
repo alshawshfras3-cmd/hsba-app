@@ -13,7 +13,10 @@ import {
   ArrowLeft,
   RefreshCw,
   PlusCircle,
-  HelpCircle as QuestionIcon
+  HelpCircle as QuestionIcon,
+  Mic,
+  MicOff,
+  Image
 } from 'lucide-react';
 import { useAppState } from '../../context/AppContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -27,6 +30,8 @@ import {
   handleAssistantTurn,
   parseFieldsFromMessage
 } from '../../lib/assistantService';
+import { AssistantCalculationInput } from '../../lib/assistantCalculationAdapter';
+import { checkAssistantGuard } from '../../lib/assistantGuard';
 
 interface AssistantWidgetProps {
   mode: 'customer' | 'admin';
@@ -37,6 +42,76 @@ export default function AssistantWidget({ mode }: AssistantWidgetProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [speechError, setSpeechError] = useState<string | null>(null);
+  const recognitionRef = useRef<any>(null);
+
+
+
+  useEffect(() => {
+    const SpeechRecognitionClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (SpeechRecognitionClass) {
+      const rec = new SpeechRecognitionClass();
+      rec.continuous = false;
+      rec.interimResults = false;
+      rec.lang = 'ar-SA';
+
+      rec.onstart = () => {
+        setIsListening(true);
+        setSpeechError(null);
+      };
+
+      rec.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        if (transcript) {
+          const guardResult = checkAssistantGuard(transcript);
+          if (guardResult.isBlocked) {
+            setSpeechError(guardResult.rejectMessage);
+          } else {
+            setInputValue(transcript);
+          }
+        }
+      };
+
+      rec.onerror = (event: any) => {
+        console.warn('[SpeechRecognition] error:', event.error);
+        if (event.error === 'not-allowed') {
+          setSpeechError('لم يتم السماح باستخدام المايكروفون. يمكنك كتابة رسالتك يدويًا.');
+        } else if (event.error === 'no-speech') {
+          setSpeechError('لم يتم التقاط أي صوت، يرجى المحاولة والتحدث مجدداً.');
+        } else {
+          setSpeechError(`حدث خطأ أثناء التعرف على الصوت: ${event.error}`);
+        }
+        setIsListening(false);
+      };
+
+      rec.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = rec;
+    }
+  }, []);
+
+  const toggleListening = () => {
+    if (!recognitionRef.current) {
+      setSpeechError('المتصفح الحالي لا يدعم الإدخال الصوتي. يمكنك كتابة رسالتك يدويًا.');
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current.stop();
+    } else {
+      setSpeechError(null);
+      try {
+        recognitionRef.current.start();
+      } catch (err: any) {
+        console.error('[SpeechRecognition] failed to start:', err);
+        setSpeechError('فشل تشغيل مسجل الصوت، يرجى المحاولة مجدداً.');
+      }
+    }
+  };
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
 
@@ -159,10 +234,31 @@ export default function AssistantWidget({ mode }: AssistantWidgetProps) {
     };
   }, [mode]);
 
-  const handleSendMessage = (text: string) => {
+  const handleSendMessage = async (text: string) => {
     if (!text.trim()) return;
 
-    // Add user message
+    // Check security guard
+    const guardResult = checkAssistantGuard(text);
+    if (guardResult.isBlocked) {
+      const userMessage: Message = {
+        id: `user-${Date.now()}`,
+        sender: 'user',
+        text: text,
+        timestamp: new Date()
+      };
+      const blockMessage: Message = {
+        id: `assistant-blocked-${Date.now()}`,
+        sender: 'assistant',
+        text: guardResult.rejectMessage || "عذرًا، لا يمكنني الاستجابة لهذا الاستفسار لمخالفته شروط الحارس الأمني لمنصة حسبة.",
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, userMessage, blockMessage]);
+      setInputValue('');
+      setIsTyping(false);
+      return;
+    }
+
+    // Add user message immediately
     const userMessage: Message = {
       id: `user-${Date.now()}`,
       sender: 'user',
@@ -193,10 +289,10 @@ export default function AssistantWidget({ mode }: AssistantWidgetProps) {
       results: sysContext.results
     };
 
-    // Simulate smart thinking/delay
-    setTimeout(() => {
+    try {
+      // Step 1: Use the rule-based assistant only
       const outcome = handleAssistantTurn(text, assistantState, contextObj);
-      
+
       const assistantMessage: Message = {
         id: `assistant-${Date.now()}`,
         sender: 'assistant',
@@ -210,8 +306,24 @@ export default function AssistantWidget({ mode }: AssistantWidgetProps) {
 
       setAssistantState(outcome.newState);
       setMessages(prev => [...prev, assistantMessage]);
+
+    } catch (error) {
+      console.warn('[AssistantWidget] Fallback to robust rule-based model on error:', error);
+      const outcome = handleAssistantTurn(text, assistantState, contextObj);
+      const assistantMessage: Message = {
+        id: `assistant-${Date.now()}`,
+        sender: 'assistant',
+        text: outcome.response,
+        timestamp: new Date()
+      };
+      if (outcome.richContent) {
+        assistantMessage.richContent = outcome.richContent;
+      }
+      setAssistantState(outcome.newState);
+      setMessages(prev => [...prev, assistantMessage]);
+    } finally {
       setIsTyping(false);
-    }, 600);
+    }
   };
 
   const handleSuggestionClick = (suggestion: Suggestion) => {
@@ -594,11 +706,38 @@ export default function AssistantWidget({ mode }: AssistantWidgetProps) {
                 </div>
               </div>
             )}
+
             <div ref={messagesEndRef} />
           </div>
 
           {/* Starting Guideline Helpers (Only visible at first) */}
           {renderActiveModeHelpers()}
+
+          {/* Speech Status indicator and Speech errors */}
+          {(isListening || speechError) && (
+            <div className="px-4 py-2.5 bg-slate-100 border-t border-slate-200/50 flex items-center justify-between text-[11.5px] font-sans">
+              {isListening && (
+                <div className="flex items-center gap-1.5 text-[#0057B8] dark:text-blue-400 font-bold animate-pulse">
+                  <span className="w-2 h-2 rounded-full bg-[#0057B8] animate-ping"></span>
+                  <span>جاري الاستماع... تحدّث الآن باللغة العربية</span>
+                </div>
+              )}
+              {speechError && (
+                <div className="text-rose-600 dark:text-rose-450 font-bold flex-1 text-right border-l-0 pl-1">
+                  {speechError}
+                </div>
+              )}
+              {speechError && (
+                <button 
+                  type="button"
+                  onClick={() => setSpeechError(null)}
+                  className="text-slate-400 hover:text-slate-650 mr-2 p-0.5 rounded cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Text Input area */}
           <form
@@ -615,6 +754,18 @@ export default function AssistantWidget({ mode }: AssistantWidgetProps) {
               placeholder="اكتب سؤالك، أو قسطك الحالي، أو حدِّث حساب راتبك..."
               className="flex-1 px-4 py-3 bg-white border border-slate-200/80 rounded-2xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0057B8] focus:ring-1 focus:ring-[#0057B8] font-sans shadow-2xs"
             />
+            <button
+              type="button"
+              onClick={toggleListening}
+              title={isListening ? "إيقاف الاستماع" : "الإدخال الصوتي باللغة العربية"}
+              className={`p-3 rounded-2xl transition-all cursor-pointer flex items-center justify-center shrink-0 border ${
+                isListening 
+                  ? 'bg-rose-500 text-white border-rose-500 shadow-sm animate-pulse' 
+                  : 'bg-white hover:bg-slate-100 text-slate-600 border-slate-200/80'
+              }`}
+            >
+              {isListening ? <MicOff className="w-4.5 h-4.5" /> : <Mic className="w-4.5 h-4.5" />}
+            </button>
             <button
               type="submit"
               disabled={!inputValue.trim()}

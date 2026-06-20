@@ -48,11 +48,17 @@ export function mapPayloadToEngineInput(payload: any, appSettings: any) {
   if (resolvedSupportType === 'etizaz') {
     resolvedSupportType = 'none';
     const etizazConfig = appSettings?.supportSettings?.etizaz;
-    if (etizazConfig?.enabled !== false) {
-      const allowedSectors = etizazConfig?.eligibleSectors || ['military'];
+    if (etizazConfig && etizazConfig.enabled !== false) {
+      const allowedSectors = etizazConfig.eligibleSectors || ['military'];
       if (allowedSectors.includes(mappedSectorId)) {
-        etizazAmount = Number(etizazConfig?.amount ?? 160000);
+        const amt = Number(etizazConfig.amount);
+        if (isNaN(amt) || amt <= 0) {
+          throw new Error('CONFIG_ERROR_ETIZAZ_AMOUNT');
+        }
+        etizazAmount = amt;
       }
+    } else {
+      throw new Error('CONFIG_ERROR_ETIZAZ_DISABLED_OR_MISSING');
     }
   } else if (resolvedSupportType === 'none' || resolvedSupportType === 'monthly' || resolvedSupportType === 'downpayment') {
     // Valid support types
@@ -61,8 +67,9 @@ export function mapPayloadToEngineInput(payload: any, appSettings: any) {
   }
 
   // 4. Term Mode & length
-  const termMode = finance.termYears ? 'custom' : 'auto';
-  const manualTermMonths = finance.termYears ? Number(finance.termYears) * 12 : 300;
+  const hasCustomTerm = typeof finance.termYears === 'number' && finance.termYears > 0;
+  const termMode = hasCustomTerm ? 'custom' : 'auto';
+  const manualTermMonths = hasCustomTerm ? Number(finance.termYears) * 12 : undefined;
 
   // Assemble full engine-compliant inputs
   return {

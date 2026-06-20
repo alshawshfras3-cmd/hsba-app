@@ -66,6 +66,20 @@ Deno.serve(async (req) => {
       );
     }
 
+    const limitNum = Number(dailyLimit);
+    if (isNaN(limitNum) || !Number.isInteger(limitNum) || limitNum < 1 || limitNum > 10000) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: {
+            code: 'BAD_REQUEST',
+            message: 'حد الطلبات اليومي يجب أن يكون رقماً صحيحاً بين 1 و 10000 استدعاء.'
+          }
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const supabase = getSupabaseAdmin();
 
     // 3. Confirm that the client exists
@@ -100,7 +114,7 @@ Deno.serve(async (req) => {
         client_id: clientId,
         key_prefix: prefix,
         key_hash: hash,
-        daily_limit: Number(dailyLimit) || 100,
+        daily_limit: limitNum,
         status: 'active',
         created_by: userId
       })

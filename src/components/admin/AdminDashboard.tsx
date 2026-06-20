@@ -6,7 +6,7 @@ import {
   Building2, Briefcase, Percent, Calendar, Hourglass, HelpCircle,
   Coins, ToggleLeft, ToggleRight, Trash2, Plus, RefreshCw, 
   Map, UserPlus, ListOrdered, CheckCircle2, ChevronRight, Calculator,
-  Lock, Settings, ShieldAlert, Award, FileSpreadsheet, Users, Edit, Loader2, Sparkles, Cpu
+  Lock, Settings, ShieldAlert, Award, FileSpreadsheet, Users, Edit, Loader2, Sparkles, Cpu, ClipboardList
 } from 'lucide-react';
 
 import { BanksSection } from './sections/BanksSection';
@@ -22,6 +22,7 @@ import { UsersSection } from './sections/UsersSection';
 import { DiagnosticsSection } from './sections/DiagnosticsSection';
 import { SecuritySection } from './sections/SecuritySection';
 import IntegrationsSection from './sections/IntegrationsSection';
+import { ConfirmedCasesSection } from './sections/ConfirmedCasesSection';
 import { Bank, ProductAcceptance, SectorId, ProductId, MilitaryRank, MarginRule, DsrRule, CalculationStatus, PersonalFinanceRules, SupportType, TermRule } from '../../types';
 import NumericInput from '../calculator/NumericInput';
 import { 
@@ -150,6 +151,7 @@ export default function AdminDashboard() {
     { id: 'advanced', label: 'صفحة القواعد المتقدمة', icon: ShieldAlert },
     { id: 'diagnostics', label: 'تشخيص الحساب التفصيلي', icon: HelpCircle },
     { id: 'integrations', label: 'التكاملات والربط / API', icon: Cpu },
+    { id: 'confirmed_cases', label: 'الحالات المؤكدة', icon: ClipboardList },
     { id: 'users', label: 'المستخدمون والاشتراكات', icon: UserPlus },
     { id: 'security', label: 'الأمان ورقم المرور', icon: Lock }
   ];
@@ -5209,6 +5211,10 @@ export default function AdminDashboard() {
 
         {adminSubPage === 'integrations' && (
           <IntegrationsSection />
+        )}
+
+        {adminSubPage === 'confirmed_cases' && (
+          <ConfirmedCasesSection banks={banks} showToast={showToast} />
         )}
 
         {/* Modal 1: Copy Settings Modal */}

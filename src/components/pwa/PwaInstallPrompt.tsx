@@ -36,7 +36,7 @@ export default function PwaInstallPrompt() {
     if (shouldShowPrompt && !isExcluded) {
       const timer = setTimeout(() => {
         setVisible(true);
-      }, 2000); // 2 seconds delay
+      }, 3000); // 3 seconds delay
       return () => clearTimeout(timer);
     } else {
       setVisible(false);
