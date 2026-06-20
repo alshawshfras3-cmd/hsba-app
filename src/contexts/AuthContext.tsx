@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase, hasSupabaseKeys, SUPABASE_TIMEOUT_MS, cleanStaleSupabaseSession } from '../lib/supabase';
 import { Shield } from 'lucide-react';
-import { createBillingProfile, createTrialSubscription, testBillingProfileUniquePhone } from '../lib/subscriptionService';
+import { createBillingProfile, createTrialSubscription, testBillingProfileUniquePhone, normalizePhone } from '../lib/subscriptionService';
 
 export type UserRole = 'admin' | 'user';
 
@@ -32,6 +32,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
   setProfile: React.Dispatch<React.SetStateAction<UserProfile | null>>;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -503,10 +504,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error('إعداد اتصال قاعدة السحابية (Supabase) غير مكتمل. يرجى تهيئة متغيرات البيئة أولاً.');
     }
 
+    // Normalize phone number to +9665xxxxxxxx format
+    const normalizedPhone = normalizePhone(phone);
+
     // 1. Enforce unique phone check
-    const isUnique = await testBillingProfileUniquePhone(phone.trim());
+    const isUnique = await testBillingProfileUniquePhone(normalizedPhone);
     if (!isUnique) {
-      throw new Error('رقم الجوال المدخل مسجل بالفعل لحساب آخر. يرجى محاولة رقم آخر أو تسجيل الدخول.');
+      throw new Error('رقم الجوال مستخدم مسبقًا. يرجى تسجيل الدخول أو استخدام رقم آخر.');
     }
 
     // 2. Perform register
@@ -514,7 +518,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       email,
       password,
       options: { 
-        data: { full_name: fullName, phone: phone.trim() },
+        data: { full_name: fullName, phone: normalizedPhone },
         emailRedirectTo: `${window.location.origin}/auth/callback`
       }
     });
@@ -529,7 +533,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             id: data.user.id,
             email: data.user.email?.toLowerCase().trim() || email.toLowerCase().trim(),
             full_name: fullName || data.user.user_metadata?.full_name || '',
-            phone: phone.trim() || data.user.user_metadata?.phone || '',
+            phone: normalizedPhone,
             is_blocked: false,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
@@ -544,7 +548,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // 4. Create billing profile (phone locked inside)
         await createBillingProfile({
           user_id: data.user.id,
-          phone_number: phone.trim(),
+          phone_number: normalizedPhone,
           full_name: fullName,
           email: email
         });
@@ -585,6 +589,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     clearLocalAuthState();
   }
 
+  async function refreshProfile() {
+    if (user) {
+      await fetchProfile(user.id, user.email, user.user_metadata);
+    }
+  }
+
   const compoundLoading = loading || (!!session?.user && !isAdminVerified);
 
   return (
@@ -593,7 +603,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isOwner, isAdmin: legacyIsAdmin, isStaff, isCustomer, isManager: legacyIsManager,
       canAccessDashboard,
       signInWithGoogle, signInWithEmail, signUpWithEmail, signOut,
-      setUser, setProfile
+      setUser, setProfile, refreshProfile
     }}>
       {isSuspendedUser && user && !isAdmin ? (
         <div className="fixed inset-0 bg-[#F8FAFC] z-[99999] flex items-center justify-center p-6 select-none" dir="rtl">

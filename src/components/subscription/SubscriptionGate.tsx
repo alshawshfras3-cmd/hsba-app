@@ -52,7 +52,7 @@ export function SubscriptionGate({ children, fullPage = false }: SubscriptionGat
           title: 'انتهت الفترة التجريبية لحسابك',
           desc: 'لقد انقضت فترة التجربة المجانية الممنوحة. يرجى المبادرة بالاشتراك في إحدى باقات حسبة المعتمدة لمواصلة مقارنة وعرض العمليات الائتمانية والتمويلية لعملائك.',
           icon: <Clock className="w-10 h-10 text-rose-500 animate-pulse" />,
-          buttonText: 'تفعيل واشتراك الآن',
+          buttonText: 'عرض الباقات',
           badgeText: 'انتهاء فترة التجربة'
         };
       case 'daily_limit_reached':
@@ -60,7 +60,7 @@ export function SubscriptionGate({ children, fullPage = false }: SubscriptionGat
           title: `وصلت إلى الحد اليومي الأقصى للعمليات (${dailyLimit} عملية)`,
           desc: `لقد استنفدت حد العمليات المجاني أو المخصص لليوم (${usedToday} من أصل ${dailyLimit}). لتجنب تعطل مقارناتك، يمكنك الانتظار لمطلع الغد أو الترقية فوراً لباقة حسبة العقارية اللانهاية.`,
           icon: <ShieldAlert className="w-10 h-10 text-amber-500" />,
-          buttonText: 'ترقية وحسابات غير محدودة',
+          buttonText: 'عرض الباقات',
           badgeText: 'الحد اليومي المستهلك'
         };
       case 'cancelled':
@@ -68,7 +68,7 @@ export function SubscriptionGate({ children, fullPage = false }: SubscriptionGat
           title: 'تم إيقاف الاشتراك المالي لشريك حسبة',
           desc: 'نحيطكم علماً بأن باقة المزايا العقارية المسجلة لحسابكم قد تم إلغاؤها بناء على طلبات الإدارة أو لم تنته تسويتها الفوترية التلقائية. يرجى الاستعلام ومراجعة الاشتراك.',
           icon: <Lock className="w-10 h-10 text-gray-500" />,
-          buttonText: 'مراجعة خيارات الاشتراك',
+          buttonText: 'عرض الباقات',
           badgeText: 'باقة ملغاة'
         };
       case 'no_subscription':
@@ -77,7 +77,7 @@ export function SubscriptionGate({ children, fullPage = false }: SubscriptionGat
           title: 'يتطلب حسابك تسجيل باقة نشطة',
           desc: 'عذراً، لم نتمكن من العثور على أي باقة اشتراك سارية مرتبطة بهويتك الفوترية. يرجى تفعيل فترة التجربة المجانية الفورية للاستفادة التامة من حاسبة حسبة الذكية.',
           icon: <Lock className="w-10 h-10 text-indigo-500" />,
-          buttonText: 'تنشيط الباقة التجريبية مجاناً',
+          buttonText: 'عرض الباقات',
           badgeText: 'لا يوجد خطة اشتراك'
         };
     }

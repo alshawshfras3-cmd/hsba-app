@@ -15,7 +15,8 @@ import {
   CalculationLog,
   UserSubscription,
   HousingSupportTier,
-  AdvancePaymentTier
+  AdvancePaymentTier,
+  SubscriptionSettings
 } from '../types';
 
 import {
@@ -68,6 +69,8 @@ interface AppContextType {
   setDsrRules: React.Dispatch<React.SetStateAction<DsrRule[]>>;
   supportSettings: SupportSettings;
   setSupportSettings: React.Dispatch<React.SetStateAction<SupportSettings>>;
+  subscriptionSettings: SubscriptionSettings;
+  setSubscriptionSettings: React.Dispatch<React.SetStateAction<SubscriptionSettings>>;
 
   approvedSalaryRules: any[];
   setApprovedSalaryRules: React.Dispatch<React.SetStateAction<any[]>>;
@@ -143,6 +146,7 @@ interface AdminSettings {
   marginRules: MarginRule[];
   dsrRules: DsrRule[];
   supportSettings: SupportSettings;
+  subscriptionSettings?: SubscriptionSettings;
   housingSupportTiers: HousingSupportTier[];
   advancePaymentTiers: AdvancePaymentTier[];
   personalRules: PersonalFinanceRules[];
@@ -428,6 +432,11 @@ export const ensureBankSectorPensionRules = (allBanks: Bank[], currentRules: Ban
   return finalRules;
 };
 
+const defaultSubscriptionSettings: SubscriptionSettings = {
+  activationWhatsappNumber: '966551234567',
+  activationWhatsappMessage: 'مرحبًا، أريد تفعيل اشتراك حسبة.'
+};
+
 const getInitialSettings = (): AdminSettings => {
   return {
     banks: initialBanks,
@@ -439,6 +448,7 @@ const getInitialSettings = (): AdminSettings => {
     marginRules: [],
     dsrRules: initialDsrRules,
     supportSettings: initialSupportSettings,
+    subscriptionSettings: defaultSubscriptionSettings,
     housingSupportTiers: [...DEFAULT_HOUSING_SUPPORT_TIERS],
     advancePaymentTiers: [...DEFAULT_ADVANCE_PAYMENT_TIERS],
     personalRules: initialPersonalFinanceRules,
@@ -532,6 +542,15 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [supportSettings, setSupportSettingsState] = useState<SupportSettings>(initialData.supportSettings);
   const setSupportSettings = React.useCallback((val: SupportSettings | ((prev: SupportSettings) => SupportSettings)) => {
     setSupportSettingsState(prev => {
+      const next = typeof val === 'function' ? val(prev) : val;
+      if (isEqual(prev, next)) return prev;
+      return next;
+    });
+  }, []);
+
+  const [subscriptionSettings, setSubscriptionSettingsState] = useState<SubscriptionSettings>(initialData.subscriptionSettings || defaultSubscriptionSettings);
+  const setSubscriptionSettings = React.useCallback((val: SubscriptionSettings | ((prev: SubscriptionSettings) => SubscriptionSettings)) => {
+    setSubscriptionSettingsState(prev => {
       const next = typeof val === 'function' ? val(prev) : val;
       if (isEqual(prev, next)) return prev;
       return next;
@@ -675,6 +694,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     }
     if (clonedData.dsrRules) setDsrRules(clonedData.dsrRules);
     if (clonedData.supportSettings) setSupportSettings(clonedData.supportSettings);
+    if (clonedData.subscriptionSettings) setSubscriptionSettings(clonedData.subscriptionSettings);
     if (clonedData.housingSupportTiers) setHousingSupportTiers(clonedData.housingSupportTiers);
     if (clonedData.advancePaymentTiers) setAdvancePaymentTiers(clonedData.advancePaymentTiers);
     if (clonedData.personalRules) setPersonalRules(clonedData.personalRules);
@@ -703,6 +723,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       })(),
       dsrRules: clonedData.dsrRules ?? deepClone(initialData.dsrRules),
       supportSettings: clonedData.supportSettings ?? deepClone(initialData.supportSettings),
+      subscriptionSettings: clonedData.subscriptionSettings ?? deepClone(initialData.subscriptionSettings),
       housingSupportTiers: clonedData.housingSupportTiers ?? deepClone(initialData.housingSupportTiers),
       advancePaymentTiers: clonedData.advancePaymentTiers ?? deepClone(initialData.advancePaymentTiers),
       personalRules: clonedData.personalRules ?? deepClone(initialData.personalRules),
@@ -846,6 +867,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         personalRules: (settings.personal_finance_rules !== undefined && settings.personal_finance_rules !== null) ? settings.personal_finance_rules : initialData.personalRules,
         advancedRules: (settings.advanced_rules !== undefined && settings.advanced_rules !== null) ? settings.advanced_rules : initialData.advancedRules,
         userSubscriptions: (settings.user_subscriptions !== undefined && settings.user_subscriptions !== null) ? settings.user_subscriptions : initialData.userSubscriptions,
+        subscriptionSettings: settings.subscription_settings ?? settings.subscriptionSettings ?? initialData.subscriptionSettings,
         customSectors: (settings.hasba_custom_sectors !== undefined && settings.hasba_custom_sectors !== null) ? settings.hasba_custom_sectors : defaultSectorsList,
         bankSectorRules: ensureBankSectorPensionRules(
           (settings.banks !== undefined && settings.banks !== null) ? settings.banks : initialData.banks,
@@ -901,6 +923,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     marginRules,
     dsrRules,
     supportSettings,
+    subscriptionSettings,
     housingSupportTiers,
     advancePaymentTiers,
     personalRules,
@@ -1033,6 +1056,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           marginRules: overrideMarginRules || marginRules,
           dsrRules,
           supportSettings,
+          subscriptionSettings,
           housingSupportTiers,
           advancePaymentTiers,
           personalRules,
@@ -1131,6 +1155,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         setDsrRules,
         supportSettings,
         setSupportSettings,
+        subscriptionSettings,
+        setSubscriptionSettings,
         approvedSalaryRules,
         setApprovedSalaryRules,
         pensionDbRules,

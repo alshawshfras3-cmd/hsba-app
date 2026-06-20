@@ -14,6 +14,7 @@ import { Calculator, ShieldCheck, Mail, Phone, ExternalLink, ShieldAlert, Loader
 import { supabase, hasSupabaseKeys, cleanStaleSupabaseSession } from './lib/supabase';
 import AssistantWidget from './components/layout/AssistantWidget';
 import { LegalLayout } from './components/layout/LegalLayout';
+import PwaInstallPrompt from './components/pwa/PwaInstallPrompt';
 
 // Lazy loading heavy pages to reduce initial bundle size
 const AboutPage = React.lazy(() => import('./pages/AboutPage').then(module => ({ default: module.AboutPage })));
@@ -269,6 +270,7 @@ function AppContent() {
       <DashboardOrWizard />
       <BottomNavigation />
       <AssistantWidget mode="customer" />
+      <PwaInstallPrompt />
     </div>
   );
 }

@@ -6,8 +6,10 @@ import {
   incrementDailyUsage, 
   DbSubscription,
   getBillingProfile,
-  UserBillingProfile
+  UserBillingProfile,
+  createTrialSubscription
 } from '../lib/subscriptionService';
+import { hasSupabaseKeys } from '../lib/supabase';
 
 export function useSubscriptionStatus() {
   const { user, isAdmin } = useAuth();
@@ -27,11 +29,24 @@ export function useSubscriptionStatus() {
 
     setLoading(true);
     try {
-      const [sub, profile, usage] = await Promise.all([
+      let [sub, profile, usage] = await Promise.all([
         getCurrentSubscription(user.id),
         getBillingProfile(user.id),
         getDailyUsage(user.id)
       ]);
+
+      // Dynamic automatic self-healing for any user without any subscription record in Supabase
+      if (!sub && hasSupabaseKeys) {
+        try {
+          console.log(`[SUBSCRIPTION SELF-HEAL] No subscription found for user ${user.id}. Creating trial plan default...`);
+          const newSub = await createTrialSubscription(user.id);
+          if (newSub) {
+            sub = newSub;
+          }
+        } catch (healErr) {
+          console.error('[SUBSCRIPTION SELF-HEAL] Failed to auto-create trial plan:', healErr);
+        }
+      }
 
       setSubscription(sub);
       setBillingProfile(profile);

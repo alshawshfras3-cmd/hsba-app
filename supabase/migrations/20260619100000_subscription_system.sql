@@ -156,7 +156,7 @@ CREATE POLICY admin_all_transactions ON public.payment_transactions
 -- Seed Default Subscription Plans
 INSERT INTO public.subscription_plans (code, name, description, price_sar, duration_days, daily_calculation_limit, is_active, sort_order)
 VALUES 
-  ('trial', 'تجربة مجانية', 'فترة تجريبية لمدة 7 أيام - حد 10 عمليات يومية', 0.00, 7, 10, true, 0),
+  ('trial', 'باقة مجانية', 'باقة مجانية - صلاحية 30 يوماً مع سقف حسابات يومي مرن', 0.00, 30, null, true, 0),
   ('monthly', 'اشتراك شهري', 'اشتراك شهري - وصول كامل غير محدود', 24.99, 30, null, true, 1),
   ('six_months', 'اشتراك 6 أشهر', 'اشتراك نصف سنوي - وفر أكثر مع الوصول الكامل', 140.00, 180, null, true, 2)
 ON CONFLICT (code) DO UPDATE SET 

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import ResultsGrid from '../results/ResultsGrid';
 import NumericInput from './NumericInput';
+import CenteredValidationAlert from './CenteredValidationAlert';
 import { 
   fetchApprovedSalaryRules, 
   fetchPensionCalculationRules, 
@@ -222,6 +223,32 @@ export default function StepWizard() {
 
   // Validation errors
   const [errors, setErrors] = useState<string[]>([]);
+  const [alertOpen, setAlertOpen] = useState(false);
+  const [alertMessage, setAlertMessage] = useState('');
+
+  // Helper to focus & highlight invalid fields smoothly
+  const focusAndHighlightElement = (elementId: string) => {
+    const el = document.getElementById(elementId);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      
+      // Highlight element/card temporarily
+      el.classList.add('ring-4', 'ring-red-500/30', 'border-red-500', 'transition-all', 'duration-300');
+      
+      // Auto-focus if it is an input or select
+      if (el.tagName === 'INPUT' || el.tagName === 'SELECT') {
+        try {
+          (el as HTMLElement).focus();
+        } catch (e) {
+          console.warn('Could not focus element:', elementId, e);
+        }
+      }
+      
+      setTimeout(() => {
+        el.classList.remove('ring-4', 'ring-red-500/30', 'border-red-500');
+      }, 3000);
+    }
+  };
 
   // Compute live local calculated Net salary to aid real-time UI display
   const [localCalculatedNet, setLocalCalculatedNet] = useState(0);
@@ -608,63 +635,108 @@ export default function StepWizard() {
 
   // Handle Step validations
   const validateStep = (stepNumber: number): boolean => {
-    const stepErrors: string[] = [];
+    const errorMap: { message: string; fieldId?: string }[] = [];
     const stepId = flow[stepNumber - 1];
 
     if (stepId === 'main_type') {
       if (!mainFinanceType) {
-        stepErrors.push('يرجى تحديد نوع الحسبة المطلوبة للمتابعة.');
+        errorMap.push({
+          message: 'يرجى اختيار نوع الحسبة للبدء.',
+          fieldId: 're-type-card'
+        });
       }
     }
 
     if (stepId === 'personal_info' || stepId === 'personal_info_and_salary') {
       if (!sectorId) {
-        stepErrors.push('يرجى اختيار القطاع المهني لجهة العمل.');
+        errorMap.push({
+          message: 'يرجى اختيار القطاع المهني لجهة العمل.',
+          fieldId: 'sector-card-gov_civil'
+        });
       } else if (sectorId === 'military' && !militaryType) {
-        stepErrors.push('حدد نوع العسكري لأن بعض البنوك تختلف بين الضباط والأفراد.');
+        errorMap.push({
+          message: 'يرجى اختيار تصنيف الخدمة العسكرية (ضباط أو أفراد).',
+          fieldId: 'military-rank-selector-wrapper'
+        });
       }
 
       if (sectorId && sectorId !== 'retired' && !salaryBankId) {
-        stepErrors.push('يرجى تحديد البنك المحول عليه راتبك للمتابعة.');
+        errorMap.push({
+          message: 'يرجى اختيار البنك المحول عليه الراتب.',
+          fieldId: 'salary-bank-select'
+        });
       }
 
-      const today = new Date();
-      const currentYear = today.getFullYear();
-
-      // Validate birth month & year ranges
-      if (!birthMonth || birthMonth < 1 || birthMonth > 12) {
-        stepErrors.push('يرجى إدخال شهر ميلاد صحيح بين 1 و 12.');
-      }
-      const minBirthYear = birthCalendar === 'gregorian' ? 1940 : 1360;
-      const maxBirthYear = birthCalendar === 'gregorian' ? 2008 : 1429;
-      if (!birthYear || birthYear < minBirthYear || birthYear > maxBirthYear) {
-        stepErrors.push(`يرجى إدخال سنة ميلاد صحيحة بين ${minBirthYear} و ${maxBirthYear} للتقويم المختار.`);
-      }
-
-      // Check age only if birthYear is in range
-      if (birthYear && birthYear >= minBirthYear && birthYear <= maxBirthYear) {
-        const ageYears = currentYear - hijriToGreg(birthYear, birthCalendar);
-        if (ageYears < 18) {
-          stepErrors.push('يجب ألا يقل عمر طالب التمويل عن 18 عاماً.');
+      // Birth Month and Year
+      if (!birthMonth || !birthYear) {
+        errorMap.push({
+          message: 'يرجى إدخال تاريخ الميلاد.',
+          fieldId: !birthMonth ? 'birth-month-input-fields' : 'birth-year-input-fields'
+        });
+      } else {
+        if (birthMonth < 1 || birthMonth > 12) {
+          errorMap.push({
+            message: 'صيغة التاريخ غير صحيحة للولادة (الشهر يجب أن يكون بين 1 و 12).',
+            fieldId: 'birth-month-input-fields'
+          });
         }
-      }
-
-      if (mainFinanceType !== 'personal_only' && effectiveSectorId !== 'retired') {
-        if (!appointmentMonth || appointmentMonth < 1 || appointmentMonth > 12) {
-          stepErrors.push('يرجى إدخال شهر تعيين صحيح بين 1 و 12.');
-        }
-        const minAppYear = appointmentCalendar === 'gregorian' ? 1970 : 1390;
-        const maxAppYear = appointmentCalendar === 'gregorian' ? currentYear : 1447;
-        if (!appointmentYear || appointmentYear < minAppYear || appointmentYear > maxAppYear) {
-          stepErrors.push(`يرجى إدخال سنة تعيين صحيحة بين ${minAppYear} و ${maxAppYear} للتقويم المختار.`);
-        }
-
-        if (appointmentYear && birthYear) {
-          if (hijriToGreg(appointmentYear, appointmentCalendar) < hijriToGreg(birthYear, birthCalendar) + 15) {
-            stepErrors.push('تاريخ التعيين لا يمكن أن يسبق السن القانوني للعمل من تاريخ الميلاد.');
+        const minBirthYear = birthCalendar === 'gregorian' ? 1940 : 1360;
+        const maxBirthYear = birthCalendar === 'gregorian' ? 2008 : 1429;
+        if (birthYear < minBirthYear || birthYear > maxBirthYear) {
+          errorMap.push({
+            message: `صيغة التاريخ غير صحيحة للولادة (السنة يجب أن تكون بين ${minBirthYear} و ${maxBirthYear}).`,
+            fieldId: 'birth-year-input-fields'
+          });
+        } else {
+          // Check age
+          const currentYear = new Date().getFullYear();
+          const ageYears = currentYear - hijriToGreg(birthYear, birthCalendar);
+          if (ageYears < 18) {
+            errorMap.push({
+              message: 'يجب ألا يقل عمر طالب التمويل عن 18 عاماً.',
+              fieldId: 'birth-year-input-fields'
+            });
           }
-          if (appointmentYear > currentYear && appointmentCalendar === 'gregorian') {
-            stepErrors.push('تاريخ التعيين لا يمكن أن يكون وتاريخاً مستقبلياً من اليوم.');
+        }
+      }
+
+      // Appointment Month and Year (only for non-retired, non-personal_only)
+      if (mainFinanceType !== 'personal_only' && effectiveSectorId !== 'retired') {
+        if (!appointmentMonth || !appointmentYear) {
+          errorMap.push({
+            message: 'يرجى إدخال تاريخ التعيين.',
+            fieldId: !appointmentMonth ? 'appointment-month-input-fields' : 'appointment-year-input-fields'
+          });
+        } else {
+          if (appointmentMonth < 1 || appointmentMonth > 12) {
+            errorMap.push({
+              message: 'صيغة التاريخ غير صحيحة للتعيين (الشهر يجب أن يكون بين 1 و 12).',
+              fieldId: 'appointment-month-input-fields'
+            });
+          }
+          const minAppYear = appointmentCalendar === 'gregorian' ? 1970 : 1390;
+          const currentYear = new Date().getFullYear();
+          const maxAppYear = appointmentCalendar === 'gregorian' ? currentYear : 1447;
+          if (appointmentYear < minAppYear || appointmentYear > maxAppYear) {
+            errorMap.push({
+              message: `صيغة التاريخ غير صحيحة للتعيين (السنة يجب أن تكون بين ${minAppYear} و ${maxAppYear}).`,
+              fieldId: 'appointment-year-input-fields'
+            });
+          } else {
+            if (birthYear) {
+              if (hijriToGreg(appointmentYear, appointmentCalendar) < hijriToGreg(birthYear, birthCalendar) + 15) {
+                errorMap.push({
+                  message: 'تاريخ التعيين لا يمكن أن يسبق السن القانوني للعمل من تاريخ الميلاد.',
+                  fieldId: 'appointment-year-input-fields'
+                });
+              }
+              if (appointmentYear > currentYear && appointmentCalendar === 'gregorian') {
+                errorMap.push({
+                  message: 'تاريخ التعيين لا يمكن أن يكون تاريخاً مستقبلياً من اليوم.',
+                  fieldId: 'appointment-year-input-fields'
+                });
+              }
+            }
           }
         }
       }
@@ -672,29 +744,47 @@ export default function StepWizard() {
 
     if (stepId === 'salary' || stepId === 'personal_info_and_salary') {
       if (salaryMode === 'direct' || effectiveSectorId === 'retired') {
-        if (effectiveSectorId === 'retired' && directPensionSalary <= 0) {
-          stepErrors.push('يرجى إدخال الراتب التقاعدي الصافي المستلم صحيح أكبر من الصفر.');
-        } else if (effectiveSectorId !== 'retired' && directNetSalary <= 0) {
-          stepErrors.push('يرجى إدخال مبلغ الراتب الصافي الكلي صحيح أكبر من الصفر.');
+        if (effectiveSectorId === 'retired' && (!directPensionSalary || Number(directPensionSalary) <= 0)) {
+          errorMap.push({
+            message: 'يرجى إدخال الراتب التقاعدي.',
+            fieldId: 'retired-salary-input-fields'
+          });
+        } else if (effectiveSectorId !== 'retired' && (!directNetSalary || Number(directNetSalary) <= 0)) {
+          errorMap.push({
+            message: 'يرجى إدخال الراتب الصافي.',
+            fieldId: 'direct-salary-input-fields'
+          });
         }
       } else {
-        if (basicSalary <= 0) {
-          stepErrors.push('يرجى إدخال الراتب الأساسي الخاص بك بدقة.');
+        if (!basicSalary || Number(basicSalary) <= 0) {
+          errorMap.push({
+            message: 'يرجى إدخال الراتب الأساسي.',
+            fieldId: 'basic-salary-input-fields'
+          });
         }
       }
 
       if (mainFinanceType === 'personal_only') {
-        if (!selectedBankId) {
-          stepErrors.push('يرجى اختيار جهة التمويل المفضلة أو مقارنة جميع الجهات.');
+        if (!selectedBankId || selectedBankId === '') {
+          errorMap.push({
+            message: 'يرجى اختيار البنك للمتابعة.',
+            fieldId: 'personal-bank-filter-select'
+          });
         }
         if (personalTenorSelectionMode === 'custom') {
           if (!requestedPersonalTenorMonths || Number(requestedPersonalTenorMonths) < 1) {
-            stepErrors.push('يرجى إدخال عدد أشهر التمويل الشخصي المطلوبة (صحيح أكبر من الصفر).');
+            errorMap.push({
+              message: 'يرجى إدخال عدد أشهر التمويل الشخصي المطلوبة (صحيح أكبر من الصفر).',
+              fieldId: 'personal-bank-filter-select'
+            });
           } else {
             const requestedVal = Number(requestedPersonalTenorMonths);
             const absoluteMax = getSelectedBankPersonalMaxTenor();
             if (requestedVal > absoluteMax) {
-              stepErrors.push(`المدة المطلوبة للتمويل الشخصي (${requestedVal} شهرًا) تتجاوز الحد الأقصى المسموح به للجهة المختارة البالغ ${absoluteMax} شهرًا.`);
+              errorMap.push({
+                message: `المدة المطلوبة للتمويل الشخصي (${requestedVal} شهرًا) تتجاوز الحد الأقصى المسموح به للجهة المختارة البالغ ${absoluteMax} شهرًا.`,
+                fieldId: 'personal-bank-filter-select'
+              });
             }
           }
         }
@@ -702,26 +792,60 @@ export default function StepWizard() {
     }
 
     if (stepId === 'finance_options') {
-      if (!selectedBankId) {
-        stepErrors.push('يرجى اختيار جهة التمويل المفضلة أو مقارنة جميع الجهات.');
+      if (!selectedBankId || selectedBankId === '') {
+        errorMap.push({
+          message: 'يرجى اختيار البنك للمتابعة.',
+          fieldId: 'bank-filter-select'
+        });
       }
       if (mainFinanceType !== 'personal_only') {
         if (!productId) {
-          stepErrors.push('يرجى تحديد نوع منتج التمويل العقاري المطلوب.');
+          errorMap.push({
+            message: 'يرجى اختيار نوع المنتج.',
+            fieldId: 'bank-filter-select'
+          });
+        }
+        if (productId === 'real_estate_with_existing_personal') {
+          if (existingMonthlyObligations === '') {
+            errorMap.push({
+              message: 'يرجى إدخال الالتزامات أو تركها صفرًا.',
+              fieldId: 'existing-monthly-obligations-input-direct'
+            });
+          }
         }
         if (!supportType) {
-          stepErrors.push('يرجى تحديد نوع الدعم السكني المطلوب (مستحق أو غير مدعوم).');
+          errorMap.push({
+            message: 'يرجى إدخال تفاصيل الدعم السكني أو تحديد غير مدعوم.',
+            fieldId: 'bank-filter-select'
+          });
         }
       }
       if (termMode === 'manual') {
-        if (!manualTermYears || manualTermYears < 1 || manualTermYears > 30) {
-          stepErrors.push('يرجى إدخال مدة تمويل مستهدفة صحيحة بين 1 و 30 سنة.');
+        if (!manualTermYears || Number(manualTermYears) < 1 || Number(manualTermYears) > 30) {
+          errorMap.push({
+            message: 'يرجى إدخال مدة تمويل مستهدفة صحيحة بين 1 و 30 سنة.',
+            fieldId: 'manual-term-years-input-desktop'
+          });
         }
       }
     }
 
+    const stepErrors = errorMap.map(e => e.message);
     setErrors(stepErrors);
-    return stepErrors.length === 0;
+
+    if (errorMap.length > 0) {
+      const firstError = errorMap[0];
+      setAlertMessage(firstError.message);
+      setAlertOpen(true);
+
+      if (firstError.fieldId) {
+        setTimeout(() => {
+          focusAndHighlightElement(firstError.fieldId!);
+        }, 150);
+      }
+    }
+
+    return errorMap.length === 0;
   };
 
   const handleNext = () => {
@@ -1523,6 +1647,11 @@ export default function StepWizard() {
 
   return (
     <div className="w-full bg-[#F8FAFC] dark:bg-[#0B0F19] min-h-[calc(100vh-64px)] flex flex-col">
+      <CenteredValidationAlert
+        isOpen={alertOpen}
+        onClose={() => setAlertOpen(false)}
+        message={alertMessage}
+      />
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 flex flex-col w-full">
         
         {/* Step Wizard visual Progress stepper indicators */}

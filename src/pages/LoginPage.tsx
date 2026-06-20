@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { normalizePhone } from '../lib/subscriptionService';
 import { supabase, hasSupabaseKeys } from '../lib/supabase';
 import { Mail, Lock, User, ShieldCheck, Sparkles, AlertCircle, Loader2, AlertTriangle, Building2, TrendingUp, CheckCircle2, Phone } from 'lucide-react';
 
@@ -88,16 +89,11 @@ export function LoginPage() {
       }
 
       // Normalization and Saudi validation
-      let normalizedPhone = phone.trim().replace(/\s+/g, '');
-      if (normalizedPhone.startsWith('+9665')) {
-        normalizedPhone = '05' + normalizedPhone.substring(5);
-      } else if (normalizedPhone.startsWith('9665')) {
-        normalizedPhone = '05' + normalizedPhone.substring(4);
-      }
+      const normalizedPhone = normalizePhone(phone);
+      const saudiRegex = /^\+9665\d{8}$/;
 
-      const saudiRegex = /^05\d{8}$/;
       if (!saudiRegex.test(normalizedPhone)) {
-        setErrorMsg('يرجى إدخال رقم جوال سعودي صحيح يبدأ بـ 05 ويتكون من 10 أرقام (مثال: 0512345678)');
+        setErrorMsg('يرجى إدخال رقم جوال سعودي صحيح (مثال: 0551234567 أو 966551234567)');
         return;
       }
 
@@ -109,9 +105,9 @@ export function LoginPage() {
       try {
         const data = await signUpWithEmail(email.trim(), password, fullName.trim(), normalizedPhone);
         if (hasSupabaseKeys && (!data || !data.session)) {
-          setSuccessMsg('تم إنشاء الحساب وتفعيل الباقة التجريبية بنجاح 7 أيام مجانية. تحقق من بريدك لتأكيد حسابك.');
+          setSuccessMsg('تم إنشاء الحساب وتفعيل الباقة المجانية بنجاح 30 يوماً مجانية. تحقق من بريدك لتأكيد حسابك.');
         } else {
-          setSuccessMsg('تم إنشاء العضوية وتأكيد الحساب وتفعيل الباقة التجريبية 7 أيام بنجاح!');
+          setSuccessMsg('تم إنشاء العضوية وتأكيد الحساب وتفعيل الباقة المجانية 30 يوماً بنجاح!');
         }
       } catch (e: any) {
         setErrorMsg(translateError(e));
@@ -315,7 +311,7 @@ export function LoginPage() {
 
             {mode === 'signup' && (
               <div className="space-y-1.5 text-right">
-                <label className="text-[11px] font-bold text-gray-600 dark:text-slate-300 block">رقم الجوال (مطلوب ولن يمكن تعديله)</label>
+                <label className="text-[11px] font-bold text-gray-600 dark:text-slate-300 block">رقم الجوال (مطلوب ويجب ألا يكون مستخدمًا في حساب آخر.)</label>
                 <div className="relative">
                   <input
                     type="text"

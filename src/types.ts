@@ -455,3 +455,8 @@ export interface AdvancePaymentTier {
   amount: number;
 }
 
+export interface SubscriptionSettings {
+  activationWhatsappNumber: string;
+  activationWhatsappMessage: string;
+}
+

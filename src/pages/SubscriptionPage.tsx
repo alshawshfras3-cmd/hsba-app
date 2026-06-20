@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSubscriptionStatus } from '../hooks/useSubscriptionStatus';
+import { getSubscriptionPlans, recordActivationRequest } from '../lib/subscriptionService';
 import { useAuth } from '../contexts/AuthContext';
+import { useAppState } from '../context/AppContext';
 import { motion } from 'motion/react';
 import { 
   Sparkles, 
@@ -26,6 +28,7 @@ import { useLocation } from '../hooks/useLocation';
 export function SubscriptionPage() {
   const { navigate } = useLocation();
   const { user } = useAuth();
+  const { subscriptionSettings } = useAppState();
   const { 
     loading, 
     subscription, 
@@ -41,12 +44,98 @@ export function SubscriptionPage() {
     refresh 
   } = useSubscriptionStatus();
 
+  // Normalizing phone for display as local format
+  const displayPhone = billingProfile?.phone_number || '—';
+
+  const handleActivateViaWhatsapp = async (plan: any) => {
+    const rawPlan = dbPlans.find(dp => dp.code === plan.code) || {};
+    const rawNumber = subscriptionSettings?.activationWhatsappNumber || '';
+    const normalizedNumber = rawNumber.replace(/\D/g, '');
+
+    if (!normalizedNumber) {
+      alert('رقم واتساب التفعيل غير مضاف حاليًا. يرجى المحاولة لاحقًا.');
+      return;
+    }
+
+    const defaultMsg = subscriptionSettings?.activationWhatsappMessage || 'مرحبًا، أريد تفعيل اشتراك حسبة.';
+    
+    // Construct details list
+    const planName = plan.name || '';
+    const planPrice = plan.price || '';
+    const planDuration = plan.duration || '';
+    const planLimit = plan.limit || '';
+    const userEmail = user?.email || 'غير متوفر';
+    const userPhone = displayPhone !== '—' ? displayPhone : (user?.user_metadata?.phone || 'غير متوفر');
+
+    // Record activation request in DB (fire-and-forget style to not block redirection)
+    if (user?.id) {
+      try {
+        await recordActivationRequest(
+          user.id,
+          rawPlan.id || rawPlan.code || plan.code
+        );
+      } catch (err) {
+        console.error('Error recording activation request in database:', err);
+      }
+    }
+
+    const messageText = `${defaultMsg}
+
+الباقة: ${planName}
+السعر: ${planPrice}
+المدة: ${planDuration}
+الحد اليومي: ${planLimit}
+البريد: ${userEmail}
+الجوال: ${userPhone}`;
+
+    const encodedMessage = encodeURIComponent(messageText);
+    const whatsappUrl = `https://wa.me/${normalizedNumber}?text=${encodedMessage}`;
+    window.open(whatsappUrl, '_blank');
+  };
+
   const [selectedPlanCode, setSelectedPlanCode] = useState<'monthly' | 'six_months' | null>(null);
   const [showBillingModal, setShowBillingModal] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [dbPlans, setDbPlans] = useState<any[]>([
+    {
+      code: 'trial',
+      name: 'باقة مجانية',
+      price_sar: 0,
+      duration_days: 30,
+      daily_calculation_limit: null,
+      is_active: true
+    },
+    {
+      code: 'monthly',
+      name: 'الباقة العقارية الشهرية',
+      price_sar: 24.99,
+      duration_days: 30,
+      daily_calculation_limit: null,
+      is_active: true
+    },
+    {
+      code: 'six_months',
+      name: 'الباقة الاحترافية (6 أشهر)',
+      price_sar: 140.00,
+      duration_days: 180,
+      daily_calculation_limit: null,
+      is_active: true
+    }
+  ]);
 
-  // Normalizing phone for display as local format
-  const displayPhone = billingProfile?.phone_number || '—';
+  useEffect(() => {
+    async function loadPlans() {
+      try {
+        const list = await getSubscriptionPlans();
+        if (list && list.length > 0) {
+          setDbPlans(list);
+        }
+      } catch (err) {
+        console.error('Error loading plans in subscription page:', err);
+      }
+    }
+    loadPlans();
+  }, []);
 
   const handleRefreshStatus = async () => {
     setRefreshing(true);
@@ -59,61 +148,74 @@ export function SubscriptionPage() {
     setShowBillingModal(true);
   };
 
-  const plansList = [
-    {
-      code: 'trial',
-      name: 'التجربة المجانية',
-      price: '0.00 ر.س',
-      period: 'لمرة واحدة',
-      duration: '7 أيام',
-      limit: '10 علميات / يوميًا',
-      features: [
-        'ولوج كامل إلى حاسبة حسبة المتقدمة',
-        'مقارنة 5 جهات تمويلية أساسية',
-        'تتبع مؤشر الدعم السكني للمستفيدين',
-        'حسبة نسبة الاستقطاع الدقيقة DSR'
-      ],
-      isTrial: true,
-      color: 'border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900',
-      tagColor: 'bg-gray-100 text-gray-700 dark:bg-slate-800 dark:text-slate-300'
-    },
-    {
-      code: 'monthly',
-      name: 'الباقة العقارية الشهرية',
-      price: '24.99 ر.س',
-      period: 'شهريًا',
-      duration: '30 يومًا',
-      limit: 'عمليات غير محدودة',
-      features: [
-        'عدد لا نهائي من العمليات الحسابية',
-        'فتح كافة جهات التمويل والبنوك المعتمدة',
-        'حسابات الدعم السكني الفوري والمؤجل',
-        'صلاحيات الوصول إلى حاسبة التقاعد العسكري والمدني',
-        'دعم فني خاص وإصدار تقارير مخصصة للعملاء'
-      ],
-      isPopular: true,
-      color: 'border-sky-500 shadow-md ring-2 ring-sky-500/20 bg-white dark:bg-[#0f172a]',
-      tagColor: 'bg-sky-500 text-white'
-    },
-    {
-      code: 'six_months',
-      name: 'الباقة الاحترافية (6 أشهر)',
-      price: '140.00 ر.س',
-      period: 'نصف سنوي',
-      duration: '180 يومًا',
-      limit: 'عمليات غير محدودة',
-      features: [
-        'وفر ما يقارب 10٪ مقارنة بالاشتراك الشهري',
-        'عدد غير محدود من العمليات والاستعلامات اليومية',
-        'دعم كامل لخيارات الجمع بين التمويل العقاري والشخصي',
-        'خيارات الربط البرمجي السحابي والـ API API Sandbox',
-        'تقارير تحليل ذكي مهيأة للطباعة والمشاركة المباشرة'
-      ],
-      isPopular: false,
-      color: 'border-emerald-500 bg-white dark:bg-slate-900',
-      tagColor: 'bg-emerald-500 text-white'
-    }
-  ];
+  const plansList = dbPlans
+    .filter(plan => plan.is_active || subscription?.plan?.code === plan.code)
+    .map(plan => {
+      const isTrial = plan.is_free_plan || plan.code === 'trial';
+      const isMonthly = plan.code === 'monthly';
+      const isSixMonths = plan.code === 'six_months';
+      
+      let durationText = `${plan.duration_days} يوم`;
+      if (plan.duration_days === 30) durationText = '30 يوماً';
+      if (plan.duration_days === 180 || plan.duration_days === 182) durationText = '6 أشهر';
+      
+      const limitText = plan.daily_calculation_limit 
+        ? `${plan.daily_calculation_limit} عمليات / يومياً` 
+        : 'عمليات غير محدودة';
+
+      // Load features dynamically if present in DB, fallback to legacy if missing
+      let features: string[] = Array.isArray(plan.features) && plan.features.length > 0
+        ? plan.features
+        : (isTrial 
+            ? [
+                'ولوج كامل إلى حاسبة حسبة المتقدمة',
+                'مقارنة 5 جهات تمويلية أساسية',
+                'تتبع مؤشر الدعم السكني للمستفيدين',
+                'حسبة نسبة الاستقطاع الدقيقة DSR'
+              ]
+            : (isMonthly 
+                ? [
+                    'عدد لا نهائي من العمليات الحسابية',
+                    'فتح كافة جهات التمويل والبنوك المعتمدة',
+                    'حسابات الدعم السكني الفوري والمؤجل',
+                    'صلاحيات الوصول إلى حاسبة التقاعد العسكري والمدني',
+                    'دعم فني خاص وإصدار تقارير مخصصة للعملاء'
+                  ]
+                : [
+                    'وفر ما يقارب 10٪ مقارنة بالاشتراك الشهري',
+                    'عدد غير محدود من العمليات والاستعلامات اليومية',
+                    'دعم كامل لخيارات الجمع بين التمويل العقاري والشخصي',
+                    'خيارات الربط البرمجي السحابي والـ API API Sandbox',
+                    'تقارير تحليل ذكي مهيأة للطباعة والمشاركة المباشرة'
+                  ]
+              )
+          );
+
+      // Determine colors & dynamic attributes from DB
+      const color = plan.card_color 
+        ? plan.card_color 
+        : (isMonthly 
+            ? 'border-sky-500 shadow-md ring-2 ring-sky-500/20 bg-white dark:bg-[#0f172a]' 
+            : (isSixMonths ? 'border-emerald-500 bg-white dark:bg-slate-900' : 'border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900'));
+
+      const tagColor = plan.badge_color || (isMonthly ? 'bg-sky-500 text-white' : (isSixMonths ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-700 dark:bg-slate-800 dark:text-slate-300'));
+      const badgeText = plan.badge_text || '';
+
+      return {
+        code: plan.code,
+        name: plan.name,
+        price: `${Number(plan.price_sar).toFixed(2)} ر.س`,
+        period: isTrial ? 'لمرة واحدة' : (plan.duration_days <= 30 ? 'شهرياً' : 'دوري الكلفة'),
+        duration: durationText,
+        limit: limitText,
+        features,
+        isTrial,
+        isPopular: isMonthly,
+        color,
+        tagColor,
+        badgeText
+      };
+    });
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 sm:px-6 lg:px-8 text-right font-sans" dir="rtl">
@@ -280,16 +382,15 @@ export function SubscriptionPage() {
               </div>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-gray-500 dark:text-slate-400 font-semibold">تعديل الهاتف:</span>
-                <span className="text-xs text-red-500 font-bold flex items-center gap-1 select-none">
-                  <Lock className="w-3 h-3" />
-                  <span>غير مسموح بالتعديل</span>
+                <span className="text-xs text-blue-600 dark:text-[#38BDF8] font-bold flex items-center gap-1 select-none">
+                  <span>قابل للتعديل</span>
                 </span>
               </div>
             </div>
 
             <div className="border-t border-gray-105/80 dark:border-slate-800 pt-3">
               <p className="text-[10px] text-gray-400 dark:text-slate-500 leading-normal font-sans">
-                * لأغراض الحوكمة والتدقيق المالي ولمنع استخدام الحساب من عدة جهات، يتم قفل رقم الجوال وتثبيته في النظام فور التسجيل، ويمكنك تعديل البريد الإلكتروني أو الاسم عن طريق التواصل مع الدعم.
+                * يُستخدم رقم الجوال لمنع تكرار الحسابات المجانية، ويمكنك تحديثه من إعدادات الحساب بشرط عدم استخدامه في حساب آخر.
               </p>
             </div>
           </div>
@@ -324,7 +425,7 @@ export function SubscriptionPage() {
 
               <div>
                 <span className={`inline-block px-3 py-1 rounded-lg text-[9px] font-extrabold mb-4 ${p.tagColor}`}>
-                  {p.code === 'trial' ? 'بداية فورية' : p.code === 'monthly' ? 'الأكثر طلبًا' : 'التوفير الأقصى'}
+                  {p.badgeText || (p.code === 'trial' ? 'بداية فورية' : p.code === 'monthly' ? 'الأكثر طلبًا' : 'التوفير الأقصى')}
                 </span>
                 <h3 className="text-base font-extrabold text-gray-900 dark:text-white block mb-1">{p.name}</h3>
                 
@@ -357,7 +458,7 @@ export function SubscriptionPage() {
                     disabled
                     className="w-full py-3 bg-gray-50 dark:bg-slate-800/40 text-gray-400 dark:text-slate-500 text-xs font-bold rounded-2xl border border-gray-200 dark:border-slate-800 cursor-not-allowed text-center select-none"
                   >
-                    باقة غير قابلة للتجديد تفعيل آلي
+                    الباقة المجانية مفعلة تلقائيًا
                   </button>
                 ) : isSelected ? (
                   <button 
@@ -368,10 +469,10 @@ export function SubscriptionPage() {
                   </button>
                 ) : (
                   <button 
-                    onClick={() => handleUpgradeClick(p.code as 'monthly' | 'six_months')}
+                    onClick={() => handleActivateViaWhatsapp(p)}
                     className="w-full py-3 bg-[#0057B8] text-white hover:bg-[#00479b] dark:bg-[#0ea5a4] dark:hover:bg-[#0c8e8d] text-xs font-extrabold rounded-2xl transition-all shadow-md active:scale-98 cursor-pointer"
                   >
-                    اشترك الآن ورقّي حسابك
+                    طلب تفعيل الاشتراك
                   </button>
                 )}
               </div>
@@ -387,21 +488,12 @@ export function SubscriptionPage() {
             <Coins className="w-5 h-5" />
           </span>
           <div className="text-right">
-            <h4 className="text-xs font-extrabold text-gray-900 dark:text-white">بوابات الدفع والتحصيل الإلكتروني الآمن</h4>
+            <h4 className="text-xs font-extrabold text-gray-900 dark:text-white">بوابات الدفع والتحصيل الإلكتروني المباشر</h4>
             <p className="text-[11px] text-gray-500 dark:text-slate-400 font-semibold leading-relaxed mt-1">
-              لقد تمت تهيئة البنية التحتية البرمجية لقواعد حسبة لاستقبال المدفوعات من خلال بوابات الدفع السعودية المعتمدة (مدى، سداد، فيزا، ماستركارد)، وجاري العمل على تفعيل الربط التلقائي في القريب العاجل. يمكنك الآن تفعيل الاشتراك يدويًا عن طريق الـ WhatsApp.
+              الدفع الإلكتروني عبر بطاقات مدى وفيزا سيتم توفيره قريباً. لتفعيل اشتراكك وتنشيط صلاحية حسابك، يرجى النقر على زر <span className="text-indigo-650 dark:text-indigo-400 font-extrabold">"طلب تفعيل الاشتراك"</span> المسجل على بطاقة الباقة أعلاه للتواصل المباشر مع وكيل التفعيل عبر الواتساب.
             </p>
           </div>
         </div>
-        <button 
-          onClick={() => {
-            window.open('https://wa.me/966506612761?text=مرحباً%20بكم%20في%20حسبة،%20أريد%20تفعيل%20باقة%20الاشتراك%20الخاصة%20بي%25', '_blank');
-          }}
-          className="px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-2xl transition-all shadow-md active:scale-98 cursor-pointer flex items-center gap-2"
-        >
-          <MessageCircle className="w-4 h-4" />
-          <span>تواصل تفعيل واتساب الفوري</span>
-        </button>
       </div>
 
       {/* BILLING / GATEWAY MODAL SIMULATOR */}
