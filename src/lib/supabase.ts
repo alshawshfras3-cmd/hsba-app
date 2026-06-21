@@ -83,20 +83,21 @@ export function clearAppSettingsCache() {
   } catch {}
 }
 
-export async function fetchAppSettingsShared(timeoutMs: number = 10000): Promise<any> {
-  if (cachedAppSettings) {
+export async function fetchAppSettingsShared(timeoutMs: number = 10000, options?: { forceFresh?: boolean }): Promise<any> {
+  const forceFresh = options?.forceFresh === true;
+  if (!forceFresh && cachedAppSettings) {
     return cachedAppSettings;
   }
-  if (inFlightAppSettingsPromise) {
+  if (!forceFresh && inFlightAppSettingsPromise) {
     return inFlightAppSettingsPromise;
   }
 
-  inFlightAppSettingsPromise = (async () => {
+  const runPromise = async () => {
     if (!hasSupabaseKeys) {
       return null;
     }
     try {
-      console.log('[SUPABASE LOAD SHARED] Fetching app_settings from Supabase with timeout:', timeoutMs);
+      console.log('[SUPABASE LOAD SHARED] Fetching app_settings from Supabase with timeout:', timeoutMs, { forceFresh });
       const { data, error } = await Promise.race([
         supabase
           .from('system_settings')
@@ -124,15 +125,17 @@ export async function fetchAppSettingsShared(timeoutMs: number = 10000): Promise
       const isTimeout = err?.message === 'timeout' || String(err).includes('مهلة') || String(err).includes('timeout');
       console.warn('[SUPABASE LOAD SHARED] Error fetching app_settings:', err?.message || err);
       
-      // Try to recover from sessionStorage
-      try {
-        const stored = sessionStorage.getItem('hesba_cached_app_settings');
-        if (stored) {
-          console.log('[SUPABASE LOAD SHARED] Recovered from secondary sessionStorage cache');
-          cachedAppSettings = JSON.parse(stored);
-          return cachedAppSettings;
-        }
-      } catch {}
+      // Try to recover from sessionStorage ONLY if not forcing fresh
+      if (!forceFresh) {
+        try {
+          const stored = sessionStorage.getItem('hesba_cached_app_settings');
+          if (stored) {
+            console.log('[SUPABASE LOAD SHARED] Recovered from secondary sessionStorage cache');
+            cachedAppSettings = JSON.parse(stored);
+            return cachedAppSettings;
+          }
+        } catch {}
+      }
 
       // If it's a timeout, we throw a specific error so the caller knows it is a timeout
       if (isTimeout) {
@@ -141,10 +144,15 @@ export async function fetchAppSettingsShared(timeoutMs: number = 10000): Promise
         throw tErr;
       }
       throw err;
-    } finally {
-      inFlightAppSettingsPromise = null;
     }
-  })();
+  };
 
-  return inFlightAppSettingsPromise;
+  if (forceFresh) {
+    return runPromise();
+  } else {
+    inFlightAppSettingsPromise = runPromise().finally(() => {
+      inFlightAppSettingsPromise = null;
+    });
+    return inFlightAppSettingsPromise;
+  }
 }

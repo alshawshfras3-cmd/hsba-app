@@ -116,17 +116,8 @@ export default function AdminDashboard() {
     customSectors: sectors, setCustomSectors: setSectors,
     bankSectorRules, setBankSectorRules,
     pensionRulesLibrary: libraryRules, setPensionRulesLibrary: setLibraryRules,
-    supabaseLoadStatus, supabaseLoadError
+    supabaseLoadStatus, supabaseLoadError, isTemporaryFallback
   } = useAppState();
-
-  if (isSettingsLoading) {
-    return (
-      <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center space-y-4" dir="rtl">
-        <Loader2 className="w-10 h-10 animate-spin text-[#0057B8]" />
-        <span className="text-xs text-slate-500 font-bold font-sans">جاري تحميل إعدادات لوحة التحكم...</span>
-      </div>
-    );
-  }
 
   const formBanksList = banks.map(b => ({ id: b.id, nameAr: b.nameAr }));
 
@@ -1048,6 +1039,15 @@ export default function AdminDashboard() {
   const [filterActiveStatus, setFilterActiveStatus] = useState('all');
   const [filterSupport, setFilterSupport] = useState('all');
 
+  if (isSettingsLoading) {
+    return (
+      <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center space-y-4" dir="rtl">
+        <Loader2 className="w-10 h-10 animate-spin text-[#0057B8]" />
+        <span className="text-xs text-slate-500 font-bold font-sans">جاري تحميل إعدادات لوحة التحكم...</span>
+      </div>
+    );
+  }
+
   const openAddProductModal = () => {
     try {
       setEditingProduct(null);
@@ -1667,14 +1667,6 @@ export default function AdminDashboard() {
     setProducts(prev => prev.map(p => p.id === id ? { ...p, isActive: !p.isActive } : p));
   };
 
-  /*
-  const parsedPfTerm = parseFloat(parseArabicAndEnglishNumber(formPfTerm)) || 0;
-  const parsedPfMargin = parseFloat(parseArabicAndEnglishNumber(formPfMargin)) || 0;
-  const calcPfTermYears = parsedPfTerm / 12;
-  const calcPfProfitFactor = 1 + ((parsedPfMargin / 100) * calcPfTermYears);
-  const calcPfEffectiveMultiplier = calcPfProfitFactor > 0 ? (parsedPfTerm / calcPfProfitFactor).toFixed(2) : '0';
-  */
-
   return (
     <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col lg:flex-row gap-8 ${hasUnsavedChanges ? 'pb-32' : ''}`}>
       
@@ -1714,58 +1706,21 @@ export default function AdminDashboard() {
                     setIsMobileNavOpen(false);
                   }
                 }}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-right text-xs font-semibold cursor-pointer transition-all min-h-[44px] ${
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-bold transition-all border shrink-0 ${
                   adminSubPage === item.id
-                    ? 'bg-[#0057B8]/5 text-[#0057B8] font-bold border-r-4 border-[#0057B8]'
-                    : 'text-[#6B7280] hover:bg-slate-50 hover:text-[#111827]'
+                    ? 'bg-[#0057B8]/10 text-[#0057B8] border-[#0057B8]/20 font-extrabold'
+                    : 'text-slate-600 border-transparent hover:bg-slate-50 hover:text-[#0057B8]'
                 }`}
               >
-                <Icon className="w-4 h-4 shrink-0" />
-                <span>{item.label}</span>
+                <div className="flex items-center gap-3">
+                  <Icon className={`w-4 h-4 shrink-0 transition-colors ${adminSubPage === item.id ? 'text-[#0057B8]' : 'text-slate-400'}`} />
+                  <span>{item.label}</span>
+                </div>
+                {adminSubPage === item.id && <ChevronRight className="w-3.5 h-3.5 shrink-0" />}
               </button>
             );
           })}
         </nav>
-        
-        <div className="mt-6 pt-4 border-t border-slate-100 px-2">
-          <button
-            type="button"
-            onClick={() => {
-              window.dispatchEvent(new CustomEvent('open-admin-assistant'));
-            }}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 mb-2 bg-gradient-to-tr from-indigo-50 to-violet-50 hover:from-indigo-100 hover:to-violet-100 dark:from-indigo-950/10 dark:to-violet-950/10 text-indigo-700 dark:text-indigo-450 border border-indigo-200/40 dark:border-indigo-900/30 rounded-xl text-xs font-bold transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-indigo-500 shrink-0 animate-pulse" />
-            <span>مساعد الإدارة الذكي</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              const confirmOut = window.confirm("هل ترغب في تسجيل الخروج الآمن من لوحة تحكم معايير الحسبة؟");
-              if (confirmOut) {
-                signOut().then(() => {
-                  window.location.href = '/admin';
-                }).catch(() => {
-                  window.location.href = '/admin';
-                });
-              }
-            }}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all border border-slate-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-500/50"
-          >
-            <Lock className="w-3.5 h-3.5 shrink-0" />
-            <span>تسجيل الخروج الآمن</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={restoreLastBackup}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 mt-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold transition-all border border-rose-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-rose-500/50"
-          >
-            <RefreshCw className="w-3.5 h-3.5 shrink-0 text-rose-500" />
-            <span>استرجاع آخر نسخة</span>
-          </button>
-        </div>
       </aside>
 
       {/* 2. MAIN SUB-PAGE VIEWPORT */}
@@ -1780,36 +1735,21 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {supabaseLoadStatus === 'slow_connection' && (
-          <div className="mb-6 p-4 border border-amber-300 bg-amber-50 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 text-xs font-bold text-amber-900 border-dashed animate-pulse">
+        {isTemporaryFallback && (
+          <div className="mb-6 p-4 border border-red-300 bg-red-50 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 text-xs font-bold text-red-900 border-dashed animate-pulse">
             <div className="flex items-start gap-3">
               <span className="text-xl shrink-0">⚠️</span>
               <div className="space-y-1 text-right">
-                <p className="font-extrabold text-sm text-amber-800">الاتصال بقاعدة البيانات بطيء، سيتم إعادة المحاولة في الخلفية.</p>
-                <p className="text-amber-700 font-medium leading-relaxed">
-                  تم فتح لوحة التحكم بنجاح باستخدام كاش الإعدادات المحلي مؤقتاً لتجنب تعطيل العمل. يمكنك تصفح الإعدادات وتعديلها وسيقوم النظام بتحديثها في الخلفية حال استقرار شبكة الاتصال.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {supabaseLoadStatus === 'failed' && (
-          <div className="mb-6 p-4 border border-red-350 bg-red-50 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 text-xs font-bold text-red-900 border-dashed">
-            <div className="flex items-start gap-3">
-              <span className="text-xl shrink-0">⚠️</span>
-              <div className="space-y-1 text-right">
-                <p className="font-extrabold text-sm text-red-700">خطأ حرج: فشل تحميل الإعدادات من قاعدة بيانات Supabase!</p>
-                <p className="text-red-700 font-medium leading-relaxed">
-                  تفاصيل الخطأ: {supabaseLoadError || 'انقطع الاتصال بالخادم'}.
-                  لتجنب مسح أو تصفير أي هوامش أو إعدادات مسجلة مسبقاً، تم قفل ميزة حفظ التعديلات وإلغاء تفعيلها مؤقتاً لضمان بقاء البيانات سليمة.
+                <p className="font-extrabold text-sm text-red-700 font-sans">تم تحميل نسخة مؤقتة. الحفظ معطل حتى يتم التحقق من Supabase.</p>
+                <p className="text-red-700 font-medium leading-relaxed font-sans">
+                  يعمل النظام حالياً بنظام الحماية الاحترازي لوجود عائق مؤقت في الاتصال بقاعدة البيانات. تم قفل الحفظ لمنع طمس هوامش أو إعدادات مسجلة مسبقاً.
                 </p>
               </div>
             </div>
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="px-4 py-1.5 bg-red-600 border border-transparent hover:bg-red-700 text-white rounded-lg select-none cursor-pointer text-[11px] font-black shrink-0 transition-all shadow-md shadow-red-600/10"
+              className="px-4 py-1.5 bg-red-600 border border-transparent hover:bg-red-700 text-white rounded-lg select-none cursor-pointer text-[11px] font-black shrink-0 transition-all shadow-md shadow-red-600/10 font-sans"
             >
               🔄 إعادة الاتصال بالخادم وتحميل الصفحة
             </button>
@@ -1839,9 +1779,9 @@ export default function AdminDashboard() {
                 <button
                   type="button"
                   id="admin-save-btn"
-                  disabled={supabaseLoadStatus === 'failed'}
+                  disabled={supabaseLoadStatus !== 'success' || isTemporaryFallback}
                   onClick={async () => {
-                    if (supabaseLoadStatus === 'failed') {
+                    if (supabaseLoadStatus !== 'success' || isTemporaryFallback) {
                       showToast('فشل في حفظ التغييرات: تم تعطيل الكتابة لحماية الهوامش والإعدادات.', 'refuse');
                       return;
                     }
@@ -1855,7 +1795,7 @@ export default function AdminDashboard() {
                     }
                   }}
                   className={`px-5 py-2 text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer border ${
-                    supabaseLoadStatus === 'failed'
+                    (supabaseLoadStatus !== 'success' || isTemporaryFallback)
                       ? 'bg-slate-350 text-slate-500 border-slate-300 cursor-not-allowed opacity-50'
                       : 'bg-[#0057B8] hover:bg-[#004bb0] text-white border-[#0057B8]'
                   }`}

@@ -54,6 +54,7 @@ self.addEventListener("fetch", (event) => {
     url.hostname.includes("supabase.co") || 
     url.pathname.includes("/api/") ||
     url.pathname.includes("/auth/") ||
+    url.pathname.includes("/admin") ||
     event.request.url.startsWith("chrome-extension:") ||
     event.request.url.startsWith("android-app:")
   ) {
@@ -62,6 +63,9 @@ self.addEventListener("fetch", (event) => {
 
   // Handle Navigation Requests (Network First with Cache Fallback)
   if (event.request.mode === "navigate") {
+    if (url.pathname.includes("/admin")) {
+      return;
+    }
     event.respondWith(
       fetch(event.request)
         .then((networkResponse) => {

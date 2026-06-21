@@ -38,12 +38,14 @@ export function useSettings() {
   const [supabaseFetched, setSupabaseFetched] = useState(!hasSupabaseKeys);
   const [supabaseLoadStatus, setSupabaseLoadStatus] = useState<'loading' | 'success' | 'failed' | 'empty_db' | 'read_only_protected' | 'slow_connection'>(hasSupabaseKeys ? 'loading' : 'success');
   const [supabaseLoadError, setSupabaseLoadError] = useState<string | null>(null);
+  const [isTemporaryFallback, setIsTemporaryFallback] = useState(hasSupabaseKeys ? true : false);
 
   // Fetch all system settings from Supabase
-  const fetchSettings = useCallback(async () => {
+  const fetchSettings = useCallback(async (options?: { forceFresh?: boolean }) => {
     if (!hasSupabaseKeys) {
       setSupabaseFetched(true);
       setSupabaseLoadStatus('success');
+      setIsTemporaryFallback(false);
       return;
     }
 
@@ -51,12 +53,22 @@ export function useSettings() {
     let appSettingsObj: any = null;
     let didTimeoutOrSlow = false;
 
+    // Check if we are in admin dashboard URL to force-fresh!
+    const isAdminDashboard = typeof window !== 'undefined' && window.location.pathname === '/admin/dashboard';
+    const forceFresh = options?.forceFresh === true || isAdminDashboard;
+
     try {
-      console.log('[SUPABASE LOAD] Fetching app_settings (via shared cached loader with 10s timeout)');
+      console.log('[SUPABASE LOAD] Fetching app_settings (forceFresh:', forceFresh, ')');
       
       // Call with 10s timeout
-      appSettingsObj = await fetchAppSettingsShared(10000);
-      setSupabaseLoadStatus('success');
+      appSettingsObj = await fetchAppSettingsShared(10000, { forceFresh });
+      if (appSettingsObj) {
+        setSupabaseLoadStatus('success');
+        setIsTemporaryFallback(false);
+      } else {
+        setSupabaseLoadStatus('empty_db');
+        setIsTemporaryFallback(true);
+      }
     } catch (err: any) {
       const errMsg = err?.message || String(err);
       const isTimeout = err?.isTimeout || errMsg.includes('timeout') || errMsg.includes('مهلة') || errMsg.includes('delay') || errMsg.includes('slow');
@@ -64,23 +76,38 @@ export function useSettings() {
       console.warn('[SUPABASE LOAD WARNING] Could not fetch settings directly:', errMsg);
       
       // Attempt to salvage from sync cache (sessionStorage/memory)
-      const cached = getCachedAppSettingsSync();
-      if (cached) {
-        console.log('[SUPABASE LOAD] Salvaged app_settings from local cache. Setting status to slow_connection.');
-        appSettingsObj = cached;
-        // Mark as slow_connection so the dashboard is functional with local cache but friendly alert is shown
-        setSupabaseLoadStatus('slow_connection');
-        didTimeoutOrSlow = true;
-      } else {
-        // Absolutely no cache and no database response
-        if (isTimeout) {
+      if (!forceFresh) {
+        const cached = getCachedAppSettingsSync();
+        if (cached) {
+          console.log('[SUPABASE LOAD] Salvaged app_settings from local cache. Setting status to slow_connection.');
+          appSettingsObj = cached;
+          setSupabaseLoadStatus('slow_connection');
+          setIsTemporaryFallback(true);
           didTimeoutOrSlow = true;
-          console.warn('[SUPABASE LOAD TIME-OUT] Slow database response and no local cache either. Setting slow_connection.');
-          setSupabaseLoadStatus('slow_connection'); // do NOT mark as failed so save is not permanently locked
         } else {
-          // Real database query failure
+          // Absolutely no cache and no database response
+          if (isTimeout) {
+            didTimeoutOrSlow = true;
+            console.warn('[SUPABASE LOAD TIME-OUT] Slow database response and no local cache either. Setting slow_connection.');
+            setSupabaseLoadStatus('slow_connection');
+            setIsTemporaryFallback(true);
+          } else {
+            setSupabaseLoadStatus('failed');
+            setSupabaseLoadError(errMsg);
+            setIsTemporaryFallback(true);
+          }
+        }
+      } else {
+        // If forceFresh failed in admin, try cached anyway as read-only safeguard
+        const cached = getCachedAppSettingsSync();
+        if (cached) {
+          appSettingsObj = cached;
+          setSupabaseLoadStatus('slow_connection');
+          setIsTemporaryFallback(true);
+        } else {
           setSupabaseLoadStatus('failed');
           setSupabaseLoadError(errMsg);
+          setIsTemporaryFallback(true);
         }
       }
     }
@@ -117,7 +144,7 @@ export function useSettings() {
       }
     }
 
-    if (didTimeoutOrSlow) {
+    if (didTimeoutOrSlow && !forceFresh) {
       // If we timed out or have a slow connection status, start an asynchronous quiet retry loop in the background!
       console.log('[SUPABASE LOAD RETRY] Starting silent background retries...');
       setTimeout(async () => {
@@ -126,6 +153,7 @@ export function useSettings() {
           if (value) {
             console.log('[SUPABASE LOAD RETRY SUCCESS] Successfully loaded app_settings in background. Upgrading status to success!');
             setSupabaseLoadStatus('success');
+            setIsTemporaryFallback(false);
             const settingsMap: Record<string, any> = {
               banks: value.banks ?? [],
               product_acceptance: value.products ?? value.product_acceptance ?? [],
@@ -235,6 +263,7 @@ export function useSettings() {
     supabaseLoadStatus,
     setSupabaseLoadStatus,
     supabaseLoadError,
+    isTemporaryFallback,
     fetchSettings,
     saveSetting,
     banks: settings.banks ?? [],
