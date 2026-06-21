@@ -61,7 +61,7 @@ export default function ResultsGrid({
     const isWarn = offer.status === 'warning';
     const isRej = offer.status === 'rejected';
 
-    const statusAr = isApp ? 'مقبول' : isWarn ? 'مقبول بتحفظ' : 'غير مقبول';
+    const statusAr = isApp ? 'مقبول' : isWarn ? 'مقبول بحذر' : 'غير مقبول';
 
     const termText = mainFinanceType === 'personal_only' 
       ? 'مدة التمويل الشخصي: 5 سنوات (60 شهراً)' 
@@ -87,8 +87,12 @@ export default function ResultsGrid({
     if (productId !== 'personal_only') {
       lines.push(`القرض العقاري: ${formatNum(offer.realEstateAmount)} ريال`);
     }
-    if (productId !== 'real_estate_only' && mainFinanceType !== 'real_estate_with_existing_personal' && offer.supportsPersonal !== false) {
-      lines.push(`القرض الشخصي: ${formatNum(offer.personalAmount)} ريال`);
+    if (productId !== 'real_estate_only' && mainFinanceType !== 'real_estate_with_existing_personal') {
+      if (offer.supportsPersonal === false) {
+        lines.push(`القرض الشخصي: غير متوفر لدى هذه الجهة`);
+      } else {
+        lines.push(`القرض الشخصي: ${formatNum(offer.personalAmount)} ريال`);
+      }
     }
 
     // --- الدعم بعد مبالغ التمويل وقبل الأقساط ---
@@ -134,7 +138,7 @@ export default function ResultsGrid({
     } else if (productId === 'real_estate_with_new_personal') {
       lines.push(`القسط الشهري الإجمالي: ${formatNum(offer.monthlyInstallmentBeforeRetirement)} ريال`);
       lines.push(`├─ قسط العقاري: ${formatNum(offer.realEstateInstallmentOnly || 0)} ريال`);
-      lines.push(`└─ قسط الشخصي: ${offer.supportsPersonal === false ? "غير متوفر" : `${formatNum(offer.personalInstallmentAmount || 0)} ريال`}`);
+      lines.push(`└─ قسط الشخصي: ${offer.supportsPersonal === false ? "غير متوفر لدى هذه الجهة (تم احتساب العقاري فقط)" : `${formatNum(offer.personalInstallmentAmount || 0)} ريال`}`);
     } else {
       lines.push(`قسط التمويل العقاري: ${formatNum(offer.monthlyInstallmentBeforeRetirement)} ريال`);
     }
@@ -222,7 +226,7 @@ export default function ResultsGrid({
     const isWarn = offer.status === 'warning';
     const isRej = offer.status === 'rejected';
 
-    const statusAr = isApp ? 'مقبول' : isWarn ? 'مقبول بتحفظ' : 'غير مقبول';
+    const statusAr = isApp ? 'مقبول' : isWarn ? 'مقبول بحذر' : 'غير مقبول';
 
     const termText = mainFinanceType === 'personal_only' 
       ? 'مدة التمويل الشخصي: 5 سنوات (60 شهراً)' 
@@ -248,8 +252,12 @@ export default function ResultsGrid({
     if (productId !== 'personal_only') {
       lines.push(`القرض العقاري: ${formatNum(offer.realEstateAmount)} ريال`);
     }
-    if (productId !== 'real_estate_only' && mainFinanceType !== 'real_estate_with_existing_personal' && offer.supportsPersonal !== false) {
-      lines.push(`القرض الشخصي: ${formatNum(offer.personalAmount)} ريال`);
+    if (productId !== 'real_estate_only' && mainFinanceType !== 'real_estate_with_existing_personal') {
+      if (offer.supportsPersonal === false) {
+        lines.push(`القرض الشخصي: غير متوفر لدى هذه الجهة`);
+      } else {
+        lines.push(`القرض الشخصي: ${formatNum(offer.personalAmount)} ريال`);
+      }
     }
 
     // --- الدعم بعد مبالغ التمويل وقبل الأقساط ---
@@ -295,7 +303,7 @@ export default function ResultsGrid({
     } else if (productId === 'real_estate_with_new_personal') {
       lines.push(`القسط الشهري الإجمالي: ${formatNum(offer.monthlyInstallmentBeforeRetirement)} ريال`);
       lines.push(`├─ قسط العقاري: ${formatNum(offer.realEstateInstallmentOnly || 0)} ريال`);
-      lines.push(`└─ قسط الشخصي: ${offer.supportsPersonal === false ? "غير متوفر" : `${formatNum(offer.personalInstallmentAmount || 0)} ريال`}`);
+      lines.push(`└─ قسط الشخصي: ${offer.supportsPersonal === false ? "غير متوفر لدى هذه الجهة (تم احتساب العقاري فقط)" : `${formatNum(offer.personalInstallmentAmount || 0)} ريال`}`);
     } else {
       lines.push(`قسط التمويل العقاري: ${formatNum(offer.monthlyInstallmentBeforeRetirement)} ريال`);
     }
@@ -554,7 +562,7 @@ export default function ResultsGrid({
                   {isWarn && (
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-450 border border-amber-200 dark:border-amber-900/40">
                       <AlertTriangle className="w-3.5 h-3.5" />
-                      <span>مقبول بتحفظ</span>
+                      <span>مقبول بحذر</span>
                     </span>
                   )}
                   {isRej && (
@@ -772,7 +780,7 @@ export default function ResultsGrid({
                             </div>
                             <div className="flex justify-between items-center text-xs pl-2 text-[#4B5563] dark:text-slate-400">
                               <span>└─ قسط الشخصي:</span>
-                              <span>{offer.supportsPersonal === false ? "غير متوفر" : `${Math.round(offer.personalInstallmentAmount || 0).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال`}</span>
+                              <span>{offer.supportsPersonal === false ? "غير متوفر لدى هذه الجهة (تم احتساب العقاري فقط)" : `${Math.round(offer.personalInstallmentAmount || 0).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال`}</span>
                             </div>
                             {offer.monthlyInstallmentAfterPersonal !== undefined && offer.monthlyInstallmentAfterPersonal > 0 && (
                               <div className="flex justify-between items-center text-xs border-t border-dashed border-[#E5E7EB] dark:border-slate-800 pt-1.5 text-[#1F2937] dark:text-slate-300">
@@ -1010,10 +1018,16 @@ export default function ResultsGrid({
                 <div className="w-full md:w-auto flex justify-end">
                   <span className={`px-4 py-2 rounded-xl text-xs font-black shadow-xs ${
                     selectedOffer.isEligible 
-                      ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 dark:bg-emerald-950/20 dark:border-emerald-900/40 dark:text-emerald-400' 
+                      ? selectedOffer.status === 'warning'
+                        ? 'bg-amber-500/10 text-amber-600 border border-amber-500/20 dark:bg-amber-950/20 dark:border-amber-900/40 dark:text-amber-400'
+                        : 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 dark:bg-emerald-950/20 dark:border-emerald-900/40 dark:text-emerald-400' 
                       : 'bg-rose-500/10 text-rose-600 border border-rose-500/20 dark:bg-rose-950/20 dark:border-rose-900/40 dark:text-rose-400'
                   }`}>
-                    {selectedOffer.isEligible ? 'مؤهل ومطابق مبدئياً' : 'غير مطابق للاشتراطات'}
+                    {selectedOffer.isEligible 
+                      ? selectedOffer.status === 'warning'
+                        ? 'مقبول بحذر'
+                        : 'مؤهل ومطابق مبدئياً' 
+                      : 'غير مطابق للاشتراطات'}
                   </span>
                 </div>
               </div>
@@ -1047,7 +1061,7 @@ export default function ResultsGrid({
                     <span className="text-[10px] text-slate-400 dark:text-slate-500 block mb-1">التمويل الشخصي</span>
                     <span className="font-bold text-slate-800 dark:text-slate-100 text-sm">
                       {selectedOffer.supportsPersonal === false 
-                        ? 'غير متوفر' 
+                        ? 'غير متوفر لدى هذه الجهة' 
                         : `${Math.round(selectedOffer.personalAmount).toLocaleString('ar-SA')} ريال`}
                     </span>
                   </div>
@@ -1077,11 +1091,13 @@ export default function ResultsGrid({
                   </div>
 
                   {/* 6. قسط الشخصي */}
-                  {selectedOffer.supportsPersonal !== false && (selectedOffer.personalAmount || 0) > 0 && (
+                  {(selectedOffer.supportsPersonal === false || (selectedOffer.personalAmount || 0) > 0) && (
                     <div className="bg-slate-50/50 dark:bg-[#0F172A] hover:bg-slate-50 dark:hover:bg-slate-800 p-3.5 rounded-xl border border-slate-100/80 dark:border-slate-800/60 transition-all">
                       <span className="text-[10px] text-slate-400 dark:text-slate-500 block mb-1">قسط التمويل الشخصي</span>
                       <span className="font-bold text-slate-800 dark:text-slate-100 text-sm">
-                        {Math.round(selectedOffer.personalInstallmentAmount || 0).toLocaleString('ar-SA')} ريال
+                        {selectedOffer.supportsPersonal === false 
+                          ? 'غير متوفر لدى هذه الجهة (تم احتساب العقاري فقط)' 
+                          : `${Math.round(selectedOffer.personalInstallmentAmount || 0).toLocaleString('ar-SA')} ريال`}
                       </span>
                     </div>
                   )}
@@ -1097,12 +1113,29 @@ export default function ResultsGrid({
                   )}
 
                   {/* 8. نسبة الاستقطاع */}
-                  <div className="bg-slate-50/50 dark:bg-[#0F172A] hover:bg-slate-50 dark:hover:bg-slate-800 p-3.5 rounded-xl border border-slate-100/80 dark:border-slate-800/60 transition-all">
-                    <span className="text-[10px] text-slate-400 dark:text-slate-500 block mb-1">نسبة الاستقطاع (DSR)</span>
-                    <span className="font-bold text-slate-800 dark:text-slate-100 text-sm">
-                      {selectedOffer.dsrUsed}%
-                    </span>
-                  </div>
+                  {selectedOffer.personalDiagnostics?.dsr !== undefined ? (
+                    <>
+                      <div className="bg-slate-50/50 dark:bg-[#0F172A] hover:bg-slate-50 dark:hover:bg-slate-800 p-3.5 rounded-xl border border-slate-100/80 dark:border-slate-800/60 transition-all">
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500 block mb-1">نسبة الاستقطاع العقاري (DSR)</span>
+                        <span className="font-bold text-slate-800 dark:text-slate-100 text-sm">
+                          {selectedOffer.dsrUsed}%
+                        </span>
+                      </div>
+                      <div className="bg-slate-50/50 dark:bg-[#0F172A] hover:bg-slate-50 dark:hover:bg-slate-800 p-3.5 rounded-xl border border-slate-100/80 dark:border-slate-800/60 transition-all">
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500 block mb-1">نسبة الاستقطاع الشخصي (DSR)</span>
+                        <span className="font-bold text-slate-800 dark:text-slate-100 text-sm">
+                          {selectedOffer.personalDiagnostics.dsr}%
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="bg-slate-50/50 dark:bg-[#0F172A] hover:bg-slate-50 dark:hover:bg-slate-800 p-3.5 rounded-xl border border-slate-100/80 dark:border-slate-800/60 transition-all">
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500 block mb-1">نسبة الاستقطاع (DSR)</span>
+                      <span className="font-bold text-slate-800 dark:text-slate-100 text-sm">
+                        {selectedOffer.dsrUsed}%
+                      </span>
+                    </div>
+                  )}
 
                   {/* 9. هامش الربح */}
                   <div className="bg-slate-50/50 dark:bg-[#0F172A] hover:bg-slate-50 dark:hover:bg-slate-800 p-3.5 rounded-xl border border-slate-100/80 dark:border-slate-800/60 transition-all">

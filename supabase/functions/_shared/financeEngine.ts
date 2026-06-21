@@ -2,7 +2,7 @@
 
 // src/lib/finance-engine/salary.ts
 function calculateNetSalary(params) {
-  const { sectorId, basicSalary = 0, housingAllowance = 0, otherAllowances = 0, method, directNetSalary = 0, directPensionSalary = 0, rules: rules2 } = params;
+  const { sectorId, basicSalary = 0, housingAllowance = 0, otherAllowances = 0, method, directNetSalary = 0, directPensionSalary = 0, rules: rules3 } = params;
   if (sectorId === "retired") {
     const pension = Number(directPensionSalary ?? 0);
     return {
@@ -51,7 +51,7 @@ function calculateNetSalary(params) {
       calculationMethod: "direct"
     };
   }
-  const rule = rules2.find((r) => r.sectorId === sectorId && r.isActive) || {
+  const rule = rules3.find((r) => r.sectorId === sectorId && r.isActive) || {
     deductionPercentage: 9,
     deductionBase: "basic_housing",
     roundResult: true
@@ -199,13 +199,13 @@ var getSectorRetirementAge = (sectorId, defaultValue = 60, customSectors) => {
   return defaultValue;
 };
 function getBankRetirementRule(params) {
-  const { bankId, sectorId, rules: rules2, sectorMappings } = params;
+  const { bankId, sectorId, rules: rules3, sectorMappings } = params;
   const normalized = normalizeSectorId(sectorId);
   const mapping = sectorMappings.find(
     (m) => m.bankId === bankId && m.sectorId === normalized
   );
   const resolvedSector = mapping ? mapping.bankSectorId : normalized;
-  const matchedRule = rules2.find((r) => r.bankId === bankId && r.sectorId === resolvedSector) || rules2.find((r) => r.bankId === bankId && r.sectorId === normalized) || rules2.find((r) => r.bankId === bankId && r.sectorId === "default") || rules2.find((r) => r.sectorId === "default") || rules2[0];
+  const matchedRule = rules3.find((r) => r.bankId === bankId && r.sectorId === resolvedSector) || rules3.find((r) => r.bankId === bankId && r.sectorId === normalized) || rules3.find((r) => r.bankId === bankId && r.sectorId === "default") || rules3.find((r) => r.sectorId === "default") || rules3[0];
   return matchedRule;
 }
 function calculateApprovedBase(params) {
@@ -1306,7 +1306,7 @@ function calculateMargin(params) {
   }
   let selectedMarginYear = Math.round(termMonths / 12);
   selectedMarginYear = Math.min(Math.max(selectedMarginYear, 5), 30);
-  const rules2 = resolveMatchingRules({
+  const rules3 = resolveMatchingRules({
     bankId,
     productId,
     supportType,
@@ -1318,7 +1318,7 @@ function calculateMargin(params) {
   const bankNameAr = bankId === "rajhi" ? "\u0645\u0635\u0631\u0641 \u0627\u0644\u0631\u0627\u062C\u062D\u064A" : bankId === "alahli" ? "\u0627\u0644\u0628\u0646\u0643 \u0627\u0644\u0623\u0647\u0644\u064A \u0627\u0644\u0633\u0639\u0648\u062F\u064A" : bankId === "alinma" ? "\u0645\u0635\u0631\u0641 \u0627\u0644\u0625\u0646\u0645\u0627\u0621" : bankId;
   const productNameAr = normProduct === "real_estate_only" ? "\u0639\u0642\u0627\u0631\u064A \u0641\u0642\u0637" : normProduct === "real_estate_with_new_personal" ? "\u0639\u0642\u0627\u0631\u064A + \u0634\u062E\u0635\u064A \u062C\u062F\u064A\u062F" : "\u0639\u0642\u0627\u0631\u064A \u0645\u0639 \u0634\u062E\u0635\u064A \u0642\u0627\u0626\u0645";
   const supportNameAr = normSupport === "none" ? "\u0628\u062F\u0648\u0646 \u062F\u0639\u0645" : normSupport === "monthly" ? "\u062F\u0639\u0645 \u0634\u0647\u0631\u064A" : "\u062F\u0639\u0645 \u062F\u0641\u0639\u0629";
-  if (rules2.length === 0) {
+  if (rules3.length === 0) {
     return {
       annualMargin: 0,
       marginType: "fixed",
@@ -1334,7 +1334,7 @@ function calculateMargin(params) {
     };
   }
   const getMarginForExactMonths = (targetMonths) => {
-    const matchedRule = rules2.find(
+    const matchedRule = rules3.find(
       (r) => targetMonths >= r.fromTermMonths && targetMonths <= r.toTermMonths
     );
     if (!matchedRule) {
@@ -1360,7 +1360,7 @@ function calculateMargin(params) {
   const activeInputMode = calculationMode;
   switch (activeInputMode) {
     case "duration_tiers": {
-      const tierRules = rules2.filter((r) => r.fromMonth !== void 0 && r.toMonth !== void 0);
+      const tierRules = rules3.filter((r) => r.fromMonth !== void 0 && r.toMonth !== void 0);
       const matchedTier = tierRules.find((r) => termMonths >= r.fromMonth && termMonths <= r.toMonth);
       if (matchedTier) {
         annualMargin = matchedTier.marginRate ?? 0;
@@ -1467,7 +1467,7 @@ function calculateMargin(params) {
   }
   const baseMarginPercent = Number(annualMargin.toFixed(3));
   const isRealEstate = normProduct !== "personal" && normProduct !== "personal_only";
-  const matchedExceptionRule = rules2.find(
+  const matchedExceptionRule = rules3.find(
     (r) => r.bankId === bankId && r.sectorId === sectorId && r.productId === normProduct && r.isActive !== false && r.exceptionBps !== void 0
   );
   const exceptionBps = isRealEstate && matchedExceptionRule ? matchedExceptionRule.exceptionBps ?? 0 : 0;
@@ -1491,41 +1491,97 @@ function calculateMargin(params) {
   };
 }
 
+// src/seeds/personal-finance-rules.ts
+var banksList2 = ["all", "alahli", "rajhi", "alinma", "fransi", "bidaya", "albilad", "alarabi"];
+var rules2 = [];
+banksList2.forEach((bankId) => {
+  const marginValue = bankId === "rajhi" ? 4.59 : bankId === "alahli" ? 5 : 4.8;
+  rules2.push({
+    id: `rule-${bankId}-personal-active`,
+    bankId,
+    sectorId: "all",
+    dsrPercentage: 33,
+    termMonths: 60,
+    financeCoefficient: 50.42,
+    annualMargin: marginValue,
+    minSalary: 4e3,
+    minAge: 18,
+    maxAge: 65,
+    retireeDsrPercentage: 25,
+    isActive: true,
+    calculationMethod: "multiplier",
+    pathType: "personal_only",
+    customerStatus: "active_employee"
+  });
+  rules2.push({
+    id: `rule-${bankId}-personal-retired`,
+    bankId,
+    sectorId: "retired",
+    dsrPercentage: 25,
+    termMonths: 60,
+    financeCoefficient: 50.42,
+    annualMargin: marginValue,
+    minSalary: 4e3,
+    minAge: 18,
+    maxAge: 65,
+    retireeDsrPercentage: 25,
+    isActive: true,
+    calculationMethod: "multiplier",
+    pathType: "personal_only",
+    customerStatus: "retired"
+  });
+  rules2.push({
+    id: `rule-${bankId}-realestate-active`,
+    bankId,
+    sectorId: "all",
+    dsrPercentage: 33,
+    termMonths: 60,
+    financeCoefficient: 50.42,
+    annualMargin: marginValue,
+    minSalary: 4e3,
+    minAge: 18,
+    maxAge: 65,
+    retireeDsrPercentage: 25,
+    isActive: true,
+    calculationMethod: "multiplier",
+    pathType: "real_estate_with_new_personal",
+    customerStatus: "active_employee"
+  });
+  rules2.push({
+    id: `rule-${bankId}-realestate-retired`,
+    bankId,
+    sectorId: "retired",
+    dsrPercentage: 25,
+    termMonths: 60,
+    financeCoefficient: 50.42,
+    annualMargin: marginValue,
+    minSalary: 4e3,
+    minAge: 18,
+    maxAge: 65,
+    retireeDsrPercentage: 25,
+    isActive: true,
+    calculationMethod: "multiplier",
+    pathType: "real_estate_with_new_personal",
+    customerStatus: "retired"
+  });
+});
+var initialPersonalFinanceRules = rules2;
+
 // src/lib/finance-engine/personal-finance.ts
 function hasLoadedPersonalRules(personalRules) {
   return Array.isArray(personalRules) && personalRules.length > 0;
 }
 function getPersonalFinanceRule(params) {
-  const { bankId, pathType, customerStatus, rules: rules2, sectorId, netSalary, termMonths } = params;
+  const { bankId, pathType, customerStatus, rules: rules3, sectorId, netSalary, termMonths } = params;
   const isRetired = customerStatus === "retired" || sectorId === "retired";
   const targetStatus = isRetired ? "retired" : "active_employee";
   let targetPathType = "personal_only";
   if (pathType === "real_estate_with_new_personal") {
     targetPathType = "real_estate_with_new_personal";
   }
-  if (!hasLoadedPersonalRules(rules2)) {
-    const isAlahli = bankId === "alahli";
-    const isRajhi = bankId === "rajhi";
-    return {
-      id: "dev_fallback_personal",
-      bankId,
-      sectorId: "all",
-      dsrPercentage: targetStatus === "retired" ? 25 : 33.33,
-      termMonths: 60,
-      financeCoefficient: isRajhi || isAlahli ? 0 : 50.42,
-      annualMargin: isRajhi ? 4.59 : isAlahli ? 5 : 4.8,
-      minSalary: 1e3,
-      minAge: 18,
-      maxAge: targetStatus === "retired" ? 75 : 65,
-      retireeDsrPercentage: 25,
-      isActive: true,
-      calculationMethod: isRajhi || isAlahli ? "flat_rate" : "multiplier",
-      pathType: targetPathType,
-      customerStatus: targetStatus
-    };
-  }
+  const rulesList = hasLoadedPersonalRules(rules3) ? rules3 : initialPersonalFinanceRules;
   const findMatching = (targetBank) => {
-    return rules2.filter((r) => {
+    return rulesList.filter((r) => {
       if (!r.isActive) return false;
       if (r.bankId !== targetBank) return false;
       if (r.pathType && r.pathType !== targetPathType) return false;
@@ -1561,7 +1617,7 @@ function getPersonalFinanceRule(params) {
   return null;
 }
 function calculatePersonalFinance(params) {
-  const { netSalary, obligations, sectorId, bankId, rules: rules2, productId, monthsBeforeRetirement, remainingMonthsToMaxAge, personalTenorSelectionMode, requestedPersonalTenorMonths } = params;
+  const { netSalary, obligations, sectorId, bankId, rules: rules3, productId, monthsBeforeRetirement, remainingMonthsToMaxAge, personalTenorSelectionMode, requestedPersonalTenorMonths } = params;
   const customerStatus = sectorId === "retired" ? "retired" : "active";
   let pathType = "personal_only";
   if (productId === "both" || productId === "real_estate_with_new_personal") {
@@ -1569,14 +1625,14 @@ function calculatePersonalFinance(params) {
   } else if (productId === "real_estate_with_personal_existing" || productId === "real_estate_with_existing_personal") {
     pathType = "real_estate_with_existing_personal";
   }
-  if (!hasLoadedPersonalRules(rules2)) {
+  if (!hasLoadedPersonalRules(rules3)) {
     console.warn("[HESBA FALLBACK] Using fallback personal finance rules because personalRules are unavailable");
   }
   const rule = getPersonalFinanceRule({
     bankId,
     pathType,
     customerStatus,
-    rules: rules2,
+    rules: rules3,
     sectorId,
     netSalary
   });
@@ -1587,21 +1643,7 @@ function calculatePersonalFinance(params) {
   if (rule) {
     source = rule.id === "dev_fallback_personal" ? "fallback" : rule.bankId === bankId ? "bank_specific" : "default_bank";
   } else {
-    if (hasLoadedPersonalRules(rules2)) {
-      const anyRuleForBank = rules2.some((r) => r.bankId === bankId);
-      if (anyRuleForBank) {
-        const activeRuleForBank = rules2.some((r) => r.bankId === bankId && r.isActive);
-        if (!activeRuleForBank) {
-          matchError = "\u0642\u0627\u0639\u062F\u0629 \u0627\u0644\u062A\u0645\u0648\u064A\u0644 \u0627\u0644\u0634\u062E\u0635\u064A \u0644\u0647\u0630\u0627 \u0627\u0644\u0628\u0646\u0643 \u063A\u064A\u0631 \u0645\u0641\u0639\u0644\u0629 \u0641\u064A \u0644\u0648\u062D\u0629 \u0627\u0644\u062A\u062D\u0643\u0645";
-        } else {
-          matchError = "\u0644\u0627 \u062A\u0648\u062C\u062F \u0642\u0627\u0639\u062F\u0629 \u062A\u0645\u0648\u064A\u0644 \u0634\u062E\u0635\u064A \u0645\u0641\u0639\u0644\u0629 \u0644\u0647\u0630\u0627 \u0627\u0644\u0628\u0646\u0643/\u0627\u0644\u0642\u0637\u0627\u0639 \u0641\u064A \u0644\u0648\u062D\u0629 \u0627\u0644\u062A\u062D\u0643\u0645";
-        }
-      } else {
-        matchError = "\u0644\u0627 \u062A\u0648\u062C\u062F \u0642\u0627\u0639\u062F\u0629 \u062A\u0645\u0648\u064A\u0644 \u0634\u062E\u0635\u064A \u0645\u0641\u0639\u0644\u0629 \u0644\u0647\u0630\u0627 \u0627\u0644\u0628\u0646\u0643/\u0627\u0644\u0642\u0637\u0627\u0639 \u0641\u064A \u0644\u0648\u062D\u0629 \u0627\u0644\u062A\u062D\u0643\u0645";
-      }
-    } else {
-      matchError = "\u0644\u0627 \u062A\u0648\u062C\u062F \u0642\u0627\u0639\u062F\u0629 \u062A\u0645\u0648\u064A\u0644 \u0634\u062E\u0635\u064A \u0645\u0641\u0639\u0644\u0629 \u0644\u0647\u0630\u0627 \u0627\u0644\u0628\u0646\u0643/\u0627\u0644\u0642\u0637\u0627\u0639 \u0641\u064A \u0644\u0648\u062D\u0629 \u0627\u0644\u062A\u062D\u0643\u0645";
-    }
+    matchError = "\u0644\u0627 \u062A\u0648\u062C\u062F \u0642\u0627\u0639\u062F\u0629 \u062A\u0645\u0648\u064A\u0644 \u0634\u062E\u0635\u064A \u0645\u0641\u0639\u0644\u0629 \u0644\u0647\u0630\u0627 \u0627\u0644\u0628\u0646\u0643/\u0627\u0644\u0645\u0633\u0627\u0631/\u062D\u0627\u0644\u0629 \u0627\u0644\u0639\u0645\u064A\u0644 \u0641\u064A \u0644\u0648\u062D\u0629 \u0627\u0644\u062A\u062D\u0643\u0645";
   }
   if (finalRule && !matchError) {
     const minSal = Number(finalRule.minSalary) || 0;
@@ -1623,14 +1665,14 @@ function calculatePersonalFinance(params) {
       calculationMethod: void 0,
       multiplier: void 0,
       diagnostics: {
-        ruleId: void 0,
+        ruleId: finalRule ? finalRule.id : void 0,
         bankId,
         customerStatus: targetStatus,
         pathType,
         dsr: 0,
         termMonths: 0,
         calculationMethod: "none",
-        source: "fallback",
+        source,
         error: matchError
       }
     };
@@ -1657,20 +1699,6 @@ function calculatePersonalFinance(params) {
       dsrPercent = Number(matchingBracket.dsrPercentage) || 0;
       ruleTermMonths = Number(matchingBracket.termMonths) || 0;
       annualMargin = Number(matchingBracket.annualMargin) || 0;
-    }
-  }
-  if (finalRule.id === "dev_fallback_personal") {
-    if (finalRule.bankId === "alahli") {
-      annualMargin = 5;
-      ruleTermMonths = 60;
-      dsrPercent = customerStatus === "retired" ? 25 : 33.33;
-      coeff = 0;
-    } else if (finalRule.bankId === "rajhi") {
-      annualMargin = 4.59;
-      ruleTermMonths = 60;
-      dsrPercent = customerStatus === "retired" ? 25 : 33.33;
-      coeff = 0;
-      calculationMethod = "flat_rate";
     }
   }
   let maxAllowedPersonalTenor = ruleTermMonths;
@@ -2041,21 +2069,66 @@ function normalizeProductId(productId) {
   }
   return p;
 }
-function isProductEnabledForBank(bank, prodId, activeProducts) {
-  const normId = normalizeProductId(prodId);
-  const acceptanceProductId = normId === "personal_only" || normId === "personal" ? "personal_only" : "real_estate_only";
-  if (activeProducts && Array.isArray(activeProducts)) {
-    const matchedAcceptance = activeProducts.find(
-      (p) => p.bankId === bank.id && normalizeProductId(p.productId) === acceptanceProductId
-    );
-    if (matchedAcceptance) {
-      return matchedAcceptance.isActive !== false;
+function ruleSupportsSupportType(rule, supportType) {
+  if (Array.isArray(rule.allowedSupportTypes) && rule.allowedSupportTypes.length > 0) {
+    if (supportType === "none") {
+      return rule.allowedSupportTypes.includes("none");
     }
+    if (supportType === "monthly") {
+      return rule.allowedSupportTypes.includes("monthly");
+    }
+    if (supportType === "downpayment" || supportType === "down_payment") {
+      return rule.allowedSupportTypes.includes("down_payment") || rule.allowedSupportTypes.includes("downpayment");
+    }
+    return false;
   }
-  if (acceptanceProductId === "personal_only") {
+  if (supportType === "none") return rule.allowUnsupported !== false;
+  if (supportType === "monthly") return rule.allowMonthlySupport !== false;
+  if (supportType === "downpayment" || supportType === "down_payment") return rule.allowDownpaymentSupport !== false;
+  return false;
+}
+function isProductEnabledForBank(bank, prodId, activeProducts, supportType) {
+  const normId = normalizeProductId(prodId);
+  const isRealEstateAccepted = activeProducts && Array.isArray(activeProducts) ? activeProducts.find((p) => p.bankId === bank.id && normalizeProductId(p.productId) === "real_estate_only")?.isActive !== false : true;
+  const isPersonalAccepted = activeProducts && Array.isArray(activeProducts) ? activeProducts.find((p) => p.bankId === bank.id && normalizeProductId(p.productId) === "personal_only")?.isActive !== false : true;
+  if (normId === "real_estate_only") {
+    const rule = activeProducts && Array.isArray(activeProducts) ? activeProducts.find((p) => p.bankId === bank.id && normalizeProductId(p.productId) === "real_estate_only") : void 0;
+    if (!rule || rule.isActive === false) return false;
+    if (supportType) {
+      if (!ruleSupportsSupportType(rule, supportType)) return false;
+    }
+    return bank.realEstateFinanceEnabled !== false;
+  }
+  if (normId === "personal_only") {
+    const rule = activeProducts && Array.isArray(activeProducts) ? activeProducts.find((p) => p.bankId === bank.id && normalizeProductId(p.productId) === "personal_only") : void 0;
+    if (!rule || rule.isActive === false) return false;
     return bank.personalFinanceEnabled !== false;
   }
-  return bank.realEstateFinanceEnabled !== false;
+  if (normId === "real_estate_with_new_personal") {
+    const combinedRule = activeProducts && Array.isArray(activeProducts) ? activeProducts.find((p) => p.bankId === bank.id && normalizeProductId(p.productId) === "real_estate_with_new_personal" && p.isActive !== false) : void 0;
+    const bankSupportsCombined = bank.combinedFinanceEnabled !== false && !!combinedRule;
+    if (bankSupportsCombined) {
+      if (supportType) {
+        if (!ruleSupportsSupportType(combinedRule, supportType)) return false;
+      }
+      return true;
+    }
+    const reOnlyRule = activeProducts && Array.isArray(activeProducts) ? activeProducts.find((p) => p.bankId === bank.id && normalizeProductId(p.productId) === "real_estate_only" && p.isActive !== false) : void 0;
+    const bankSupportsREOnly = bank.realEstateFinanceEnabled !== false && !!reOnlyRule;
+    if (bankSupportsREOnly) {
+      if (supportType && reOnlyRule) {
+        if (!ruleSupportsSupportType(reOnlyRule, supportType)) return false;
+      }
+      return true;
+    }
+    return false;
+  }
+  if (normId === "real_estate_with_existing_personal") {
+    return bank.realEstateFinanceEnabled !== false && isRealEstateAccepted;
+  }
+  const reSupported = bank.realEstateFinanceEnabled !== false && isRealEstateAccepted;
+  const pfSupported = bank.personalFinanceEnabled !== false && isPersonalAccepted;
+  return reSupported || pfSupported;
 }
 function getMatchedTermRule(params) {
   const { bankId, sectorId, rankId = "all", productId, supportType, termRules = [], militarySubType } = params;
@@ -2203,7 +2276,7 @@ function calculateBanksFinancing(params) {
       "gregorian"
     );
   }
-  const targetBanks = selectedBankId === "all" ? banks.filter((b) => b.isActive && isProductEnabledForBank(b, normalizedProductId, products)) : banks.filter((b) => b.id === selectedBankId && b.isActive);
+  const targetBanks = selectedBankId === "all" ? banks.filter((b) => b.isActive && isProductEnabledForBank(b, normalizedProductId, products, supportType)) : banks.filter((b) => b.id === selectedBankId && b.isActive);
   const results = [];
   for (const bank of targetBanks) {
     const netSalaryResult = calculateNetSalary({
@@ -2399,7 +2472,7 @@ function calculateBanksFinancing(params) {
         realEstateInstallmentOnly: 0,
         termMonths: isEligible2 ? personalMonths2 : 0,
         annualMargin: isEligible2 && personalCalcResult2 ? personalCalcResult2.diagnostics?.flatRate ?? 4.8 : personalRule ? Number(personalRule.annualMargin) : 4.8,
-        dsrUsed: isEligible2 && personalCalcResult2 ? personalCalcResult2.diagnostics?.dsr ?? (sectorId === "retired" ? 25 : 33.33) : personalRule ? Number(personalRule.dsrPercentage) : 33.33,
+        dsrUsed: isEligible2 && personalCalcResult2 ? personalCalcResult2.diagnostics?.dsr ?? (personalRule ? Number(personalRule.dsrPercentage) : 0) : personalRule ? Number(personalRule.dsrPercentage) : 0,
         personalCoefficient: isEligible2 && personalCalcResult2 ? personalCalcResult2.multiplier : void 0,
         personalTotalRepayment: isEligible2 && personalCalcResult2 ? personalCalcResult2.totalRepayment : void 0,
         personalProfitAmount: isEligible2 && personalCalcResult2 ? personalCalcResult2.profitAmount : void 0,
@@ -2437,6 +2510,18 @@ function calculateBanksFinancing(params) {
       });
       continue;
     }
+    let isCombinedFallbackToRealEstateOnly = false;
+    if (normalizedProductId === "real_estate_with_new_personal") {
+      const combinedRule = products && Array.isArray(products) ? products.find((p) => p.bankId === bank.id && normalizeProductId(p.productId) === "real_estate_with_new_personal" && p.isActive !== false) : void 0;
+      const bankSupportsCombined2 = bank.combinedFinanceEnabled !== false && !!combinedRule;
+      if (!bankSupportsCombined2) {
+        const reOnlyRule = products && Array.isArray(products) ? products.find((p) => p.bankId === bank.id && normalizeProductId(p.productId) === "real_estate_only" && p.isActive !== false) : void 0;
+        const bankSupportsREOnly = bank.realEstateFinanceEnabled !== false && !!reOnlyRule;
+        if (bankSupportsREOnly) {
+          isCombinedFallbackToRealEstateOnly = true;
+        }
+      }
+    }
     const acceptanceProductId = "real_estate_only";
     const acceptance = products.find(
       (p) => p.bankId === bank.id && normalizeProductId(p.productId) === acceptanceProductId
@@ -2446,7 +2531,7 @@ function calculateBanksFinancing(params) {
       sectorId,
       militarySubType,
       rankId: rankId || "all",
-      productId: normalizedProductId,
+      productId: isCombinedFallbackToRealEstateOnly ? "real_estate_only" : normalizedProductId,
       supportType,
       termRules
     });
@@ -2493,7 +2578,7 @@ function calculateBanksFinancing(params) {
     });
     const dsrBeforeResult = calculateDSR({
       bankId: bank.id,
-      productId: normalizedProductId,
+      productId: isCombinedFallbackToRealEstateOnly ? "real_estate_only" : normalizedProductId,
       sectorId,
       supportType,
       phase: sectorId === "retired" ? "retired" : "before_retirement",
@@ -2502,7 +2587,7 @@ function calculateBanksFinancing(params) {
     });
     const dsrAfterResult = calculateDSR({
       bankId: bank.id,
-      productId: normalizedProductId,
+      productId: isCombinedFallbackToRealEstateOnly ? "real_estate_only" : normalizedProductId,
       sectorId,
       supportType,
       phase: sectorId === "retired" ? "retired" : "after_retirement",
@@ -2513,7 +2598,7 @@ function calculateBanksFinancing(params) {
     if (hasRealEstate) {
       const marginMode = resolveConfiguredMarginMode({
         bankId: bank.id,
-        productId: normalizedProductId,
+        productId: isCombinedFallbackToRealEstateOnly ? "real_estate_only" : normalizedProductId,
         supportType,
         sectorId,
         marginRules,
@@ -2522,7 +2607,7 @@ function calculateBanksFinancing(params) {
       });
       marginResult = calculateMargin({
         bankId: bank.id,
-        productId: normalizedProductId,
+        productId: isCombinedFallbackToRealEstateOnly ? "real_estate_only" : normalizedProductId,
         supportType,
         sectorId,
         termMonths: termResult.totalMonths,
@@ -2552,9 +2637,14 @@ function calculateBanksFinancing(params) {
     let personalProfit = 0;
     let personalCalcMethod = void 0;
     let personalCalcResult = null;
-    const bankSupportsPersonal = bank.personalFinanceEnabled !== false;
-    if (normalizedProductId === "both" || normalizedProductId === "real_estate_with_new_personal") {
-      if (bankSupportsPersonal) {
+    const wantsNewPersonal = (normalizedProductId === "both" || normalizedProductId === "real_estate_with_new_personal") && !isCombinedFallbackToRealEstateOnly;
+    const isPersonalProductAccepted = products && Array.isArray(products) ? products.find((p) => p.bankId === bank.id && normalizeProductId(p.productId) === "personal_only")?.isActive !== false : true;
+    const bankSupportsPersonal = bank.personalFinanceEnabled !== false && isPersonalProductAccepted;
+    const bankSupportsCombined = bank.combinedFinanceEnabled !== false;
+    const shouldCalculatePersonal = wantsNewPersonal && bankSupportsPersonal && bankSupportsCombined;
+    const personalUnavailableForThisBank = wantsNewPersonal && (!bankSupportsPersonal || !bankSupportsCombined);
+    if (wantsNewPersonal) {
+      if (shouldCalculatePersonal) {
         const personalObls = dsrBeforeResult?.deductExistingObligations !== false ? obligations : 0;
         const personalCalc = calculatePersonalFinance({
           netSalary: solvedNetSalary,
@@ -2585,8 +2675,8 @@ function calculateBanksFinancing(params) {
           calculationMethod: void 0,
           multiplier: void 0,
           diagnostics: {
-            error: "\u0627\u0644\u062A\u0645\u0648\u064A\u0644 \u0627\u0644\u0634\u062E\u0635\u064A \u063A\u064A\u0631 \u0645\u062A\u0648\u0641\u0631 \u0644\u062F\u0649 \u0647\u0630\u0647 \u0627\u0644\u062C\u0647\u0629",
-            isEligible: false
+            warning: "\u0627\u0644\u062A\u0645\u0648\u064A\u0644 \u0627\u0644\u0634\u062E\u0635\u064A \u063A\u064A\u0631 \u0645\u062A\u0648\u0641\u0631 \u0644\u062F\u0649 \u0647\u0630\u0647 \u0627\u0644\u062C\u0647\u0629\u060C \u062A\u0645 \u0627\u062D\u062A\u0633\u0627\u0628 \u0627\u0644\u062A\u0645\u0648\u064A\u0644 \u0627\u0644\u0639\u0642\u0627\u0631\u064A \u0641\u0642\u0637.",
+            isEligible: true
           }
         };
         personalLoanAmount = 0;
@@ -2613,8 +2703,9 @@ function calculateBanksFinancing(params) {
     let realEstateStage3 = 0;
     const extObligations = normalizedProductId === "real_estate_with_personal_existing" || normalizedProductId === "real_estate_with_existing_personal" ? existingMonthlyObligations ?? 0 : 0;
     const extObligationMonths = normalizedProductId === "real_estate_with_personal_existing" || normalizedProductId === "real_estate_with_existing_personal" ? obligationRemainingMonths ?? 0 : 0;
+    const isExistingPersonalSupported = bank.existingPersonalFinanceEnabled !== false;
     if (normalizedProductId === "real_estate" || normalizedProductId === "real_estate_only" || normalizedProductId === "real_estate_with_personal_existing" || normalizedProductId === "real_estate_with_existing_personal" || normalizedProductId === "both" || normalizedProductId === "real_estate_with_new_personal") {
-      if (normalizedProductId === "real_estate_with_personal_existing" || normalizedProductId === "real_estate_with_existing_personal") {
+      if (isExistingPersonalSupported && (normalizedProductId === "real_estate_with_personal_existing" || normalizedProductId === "real_estate_with_existing_personal")) {
         const totalAllowedInstallment = solvedNetSalary * dsrBeforeResult.dsrPercentage / 100;
         const blockingInstallment = extObligations;
         stage1Months = Math.min(
@@ -2648,7 +2739,8 @@ function calculateBanksFinancing(params) {
         personalInstallmentDisplay = extObligations;
       } else {
         const effectiveObligationsBefore = dsrBeforeResult?.deductExistingObligations !== false ? obligations : 0;
-        const adjustedObligationsBeforeVal = normalizedProductId === "real_estate" || normalizedProductId === "real_estate_only" ? 0 : effectiveObligationsBefore + (normalizedProductId === "both" || normalizedProductId === "real_estate_with_new_personal" ? personalInstallment : 0);
+        const adjustedProductIdForObligations = isCombinedFallbackToRealEstateOnly ? "real_estate_only" : normalizedProductId;
+        const adjustedObligationsBeforeVal = adjustedProductIdForObligations === "real_estate" || adjustedProductIdForObligations === "real_estate_only" ? 0 : effectiveObligationsBefore + (adjustedProductIdForObligations === "both" || adjustedProductIdForObligations === "real_estate_with_new_personal" ? personalInstallment : 0);
         const reCalc = calculateRealEstateFinance({
           netSalaryBefore: solvedNetSalary,
           pensionSalaryAfter: correctedPensionSalary,
@@ -2662,7 +2754,7 @@ function calculateBanksFinancing(params) {
           obligations: adjustedObligationsBeforeVal,
           supportType
         });
-        if (normalizedProductId === "both" || normalizedProductId === "real_estate_with_new_personal") {
+        if ((normalizedProductId === "both" || normalizedProductId === "real_estate_with_new_personal") && !isCombinedFallbackToRealEstateOnly) {
           const monthsInPersonal = personalMonths;
           const monthsOutsidePersonal = Math.max(0, termResult.monthsBeforeRetirement - personalMonths);
           const monthsAfterRetirementAdjusted = Math.max(0, termResult.totalMonths - Math.max(termResult.monthsBeforeRetirement, personalMonths));
@@ -2718,7 +2810,8 @@ function calculateBanksFinancing(params) {
       }
       totalInstallmentStage2 = installmentAfter;
     }
-    if (hasPersonal && personalLoanAmount > maxPF) {
+    const shouldApplyPersonalLimits = isPersonalOnly || shouldCalculatePersonal && personalLoanAmount > 0;
+    if (shouldApplyPersonalLimits && personalLoanAmount > maxPF) {
       const pRatio = maxPF / personalLoanAmount;
       personalLoanAmount = maxPF;
       personalInstallment = Math.round(personalInstallment * pRatio);
@@ -2752,11 +2845,49 @@ function calculateBanksFinancing(params) {
       diag.messages.unshift(marginResult.error);
     }
     const hasNewPersonal = normalizedProductId === "both" || normalizedProductId === "real_estate_with_new_personal";
-    if ((isPersonalOnly || hasNewPersonal) && personalCalcResult?.diagnostics?.error) {
+    if (isPersonalOnly && personalCalcResult?.diagnostics?.error) {
       diag.status = "rejected";
       diag.messages.unshift(personalCalcResult.diagnostics.error);
+    } else if (hasNewPersonal) {
+      if (isCombinedFallbackToRealEstateOnly) {
+        diag.messages.push("\u0647\u0630\u0647 \u0627\u0644\u062C\u0647\u0629 \u0644\u0627 \u062A\u062F\u0639\u0645 \u0627\u0644\u062A\u0645\u0648\u064A\u0644 \u0627\u0644\u0634\u062E\u0635\u064A\u060C \u0648\u062A\u0645 \u0627\u062D\u062A\u0633\u0627\u0628 \u0627\u0644\u0639\u0642\u0627\u0631\u064A \u0641\u0642\u0637.");
+        if (diag.status === "approved") {
+          diag.status = "warning";
+        }
+      } else if (personalUnavailableForThisBank) {
+        diag.messages.push("\u0647\u0630\u0647 \u0627\u0644\u062C\u0647\u0629 \u0644\u0627 \u062A\u0648\u0641\u0631 \u0627\u0644\u062A\u0645\u0648\u064A\u0644 \u0627\u0644\u0634\u062E\u0635\u064A\u060C \u0648\u062A\u0645 \u0627\u062D\u062A\u0633\u0627\u0628 \u0627\u0644\u062A\u0645\u0648\u064A\u0644 \u0627\u0644\u0639\u0642\u0627\u0631\u064A \u0641\u0642\u0637.");
+        if (diag.status === "approved") {
+          diag.status = "warning";
+        }
+      } else if (personalCalcResult?.diagnostics?.error) {
+        if (diag.status === "approved") {
+          diag.status = "warning";
+          diag.messages.push(`\u062A\u0646\u0628\u064A\u0647 \u0641\u064A \u0627\u0644\u062A\u0645\u0648\u064A\u0644 \u0627\u0644\u0634\u062E\u0635\u064A: ${personalCalcResult.diagnostics.error}`);
+        } else {
+          diag.status = "rejected";
+          diag.messages.unshift(personalCalcResult.diagnostics.error);
+        }
+      }
     }
-    const isProductSupported = isProductEnabledForBank(bank, normalizedProductId, products);
+    const isExistingPersonalPath = normalizedProductId === "real_estate_with_existing_personal" || normalizedProductId === "real_estate_with_personal_existing";
+    const existingPersonalUnavailableForThisBank = isExistingPersonalPath && bank.existingPersonalFinanceEnabled === false;
+    if (existingPersonalUnavailableForThisBank) {
+      diag.messages.push("\u0647\u0630\u0647 \u0627\u0644\u062C\u0647\u0629 \u0644\u0627 \u062A\u062F\u0639\u0645 \u0645\u0633\u0627\u0631 \u0627\u0644\u0639\u0642\u0627\u0631\u064A \u0645\u0639 \u0634\u062E\u0635\u064A \u0642\u0627\u0626\u0645\u060C \u0648\u062A\u0645 \u0627\u062D\u062A\u0633\u0627\u0628 \u0627\u0644\u0639\u0642\u0627\u0631\u064A \u0641\u0642\u0637 \u0628\u062F\u0648\u0646 \u0647\u0630\u0627 \u0627\u0644\u0645\u0633\u0627\u0631.");
+      if (diag.status === "approved") {
+        diag.status = "warning";
+      }
+    }
+    const activeRuleForCheckingEtizaz = products && Array.isArray(products) ? products.find((p) => p.bankId === bank.id && normalizeProductId(p.productId) === (isCombinedFallbackToRealEstateOnly ? "real_estate_only" : normalizedProductId) && p.isActive !== false) : void 0;
+    const ruleSupportsEtizaz = activeRuleForCheckingEtizaz && Array.isArray(activeRuleForCheckingEtizaz.allowedSupportTypes) ? activeRuleForCheckingEtizaz.allowedSupportTypes.includes("etizaz") : false;
+    const bankSupportsEtizaz = bank.etizazSupportEnabled !== false && ruleSupportsEtizaz;
+    const effectiveEtizazAmount = bankSupportsEtizaz ? etizazAmount : 0;
+    if (etizazAmount > 0 && !bankSupportsEtizaz) {
+      if (diag.status === "approved") {
+        diag.status = "warning";
+      }
+      diag.messages.push("\u0647\u0630\u0647 \u0627\u0644\u062C\u0647\u0629 \u0644\u0627 \u062A\u062F\u0639\u0645 \u0627\u0639\u062A\u0632\u0627\u0632\u060C \u0648\u062A\u0645 \u0627\u062D\u062A\u0633\u0627\u0628 \u0627\u0644\u062A\u0645\u0648\u064A\u0644 \u0628\u062F\u0648\u0646 \u062F\u0639\u0645 \u0627\u0639\u062A\u0632\u0627\u0632.");
+    }
+    const isProductSupported = isProductEnabledForBank(bank, normalizedProductId, products, supportType);
     if (!isProductSupported) {
       diag.status = "rejected";
       diag.messages.unshift("\u0627\u0644\u0645\u0646\u062A\u062C \u0627\u0644\u0645\u0637\u0644\u0648\u0628 \u063A\u064A\u0631 \u0645\u0641\u0639\u0651\u0644 \u0644\u062F\u0649 \u0647\u0630\u0647 \u0627\u0644\u062C\u0647\u0629.");
@@ -2765,7 +2896,7 @@ function calculateBanksFinancing(params) {
       if (hasRealEstate && reLoanAmount < minRE) {
         diag.status = "rejected";
         diag.messages.unshift(`\u0645\u0631\u0641\u0648\u0636 \u2014 \u0627\u0644\u062D\u062F \u0627\u0644\u0623\u062F\u0646\u0649 \u0644\u0644\u062A\u0645\u0648\u064A\u0644 ${minRE.toLocaleString("ar-SA")} \u0631\u064A\u0627\u0644`);
-      } else if (hasPersonal && personalLoanAmount < minPF) {
+      } else if (shouldApplyPersonalLimits && personalLoanAmount < minPF) {
         diag.status = "rejected";
         diag.messages.unshift(`\u0645\u0631\u0641\u0648\u0636 \u2014 \u0627\u0644\u062D\u062F \u0627\u0644\u0623\u062F\u0646\u0649 \u0644\u0644\u062A\u0645\u0648\u064A\u0644 ${minPF.toLocaleString("ar-SA")} \u0631\u064A\u0627\u0644`);
       }
@@ -2803,8 +2934,8 @@ function calculateBanksFinancing(params) {
       personalAmount: isEligible ? personalLoanAmount : 0,
       housingSupportAmount: isEligible ? supportType === "downpayment" ? supportResult.downPaymentSupport : supportResult.monthlySupport : 0,
       supportType,
-      totalPurchasingPower: isEligible ? isPersonalOnly ? personalLoanAmount : purchasingPower + personalLoanAmount + etizazAmount : 0,
-      etizazAmount: isEligible ? etizazAmount : 0,
+      totalPurchasingPower: isEligible ? isPersonalOnly ? personalLoanAmount : purchasingPower + personalLoanAmount + effectiveEtizazAmount : 0,
+      etizazAmount: isEligible ? effectiveEtizazAmount : 0,
       monthlyInstallmentBeforeRetirement: totalInstallmentStage1,
       monthlyInstallmentAfterRetirement: isEligible ? isPersonalOnly ? 0 : installmentAfter : 0,
       monthlyInstallmentAfterPersonal: totalInstallmentStage2,
@@ -2812,7 +2943,7 @@ function calculateBanksFinancing(params) {
       realEstateInstallmentOnly: isEligible ? isPersonalOnly ? 0 : installmentBefore : 0,
       termMonths: isPersonalOnly ? personalMonths : termResult.totalMonths,
       annualMargin: isPersonalOnly ? personalCalcResult?.diagnostics?.flatRate ?? 4.8 : marginResult?.annualMargin || 0,
-      dsrUsed: isPersonalOnly ? personalCalcResult?.diagnostics?.dsr ?? (sectorId === "retired" ? 25 : 33.33) : dsrBeforeResult.dsrPercentage,
+      dsrUsed: isPersonalOnly ? personalCalcResult?.diagnostics?.dsr ?? 0 : dsrBeforeResult.dsrPercentage,
       personalCoefficient: personalCalcResult ? personalCalcResult.multiplier : void 0,
       personalTotalRepayment: personalCalcResult ? personalCalcResult.totalRepayment : void 0,
       personalProfitAmount: personalCalcResult ? personalCalcResult.profitAmount : void 0,
@@ -2851,8 +2982,8 @@ function calculateBanksFinancing(params) {
         ...diag.messages
       ],
       isAgeLimitingFactor: termResult.isAgeLimitingFactor,
-      personalEligible: isEligible && bankSupportsPersonal,
-      supportsPersonal: bankSupportsPersonal,
+      personalEligible: isEligible && bankSupportsPersonal && !isCombinedFallbackToRealEstateOnly,
+      supportsPersonal: bankSupportsPersonal && !isCombinedFallbackToRealEstateOnly,
       diagnosticSteps: [
         ...supportType !== "none" && supportResult.appliedRule ? [supportResult.appliedRule] : [],
         `[\u0642\u0627\u0639\u062F\u0629 \u0645\u062F\u0629 \u0627\u0644\u062A\u0645\u0648\u064A\u0644]: \u062A\u0645 \u062A\u0637\u0628\u064A\u0642 ${isRuleApplied ? `\u0642\u0627\u0639\u062F\u0629 \u0645\u062E\u0635\u0635\u0629 \u0644\u062A\u0645\u0648\u064A\u0644 \u062C\u0647\u0629 \u0627\u0644\u0627\u0633\u062A\u0642\u0637\u0627\u0639` : "\u0645\u0639\u0627\u064A\u064A\u0631 \u062C\u0647\u0629 \u0627\u0633\u062A\u0642\u0637\u0627\u0639 \u0627\u0641\u062A\u0631\u0627\u0636\u064A\u0629 (Bank Fallback)"}.`,

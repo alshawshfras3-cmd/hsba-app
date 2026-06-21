@@ -29,6 +29,7 @@ export interface Bank {
   personalFinanceEnabled?: boolean;
   combinedFinanceEnabled?: boolean;
   existingPersonalFinanceEnabled?: boolean;
+  etizazSupportEnabled?: boolean;
   minRealEstateAmount?: number;
   maxRealEstateAmount?: number;
   minPersonalAmount?: number;
@@ -54,6 +55,7 @@ export interface ProductAcceptance {
   supportsRealEstate?: boolean;
   supportsPersonal?: boolean;
   existingPersonal?: boolean;
+  allowedSupportTypes?: ('none' | 'monthly' | 'down_payment' | 'etizaz')[];
 }
 
 export interface Sector {

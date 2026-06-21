@@ -221,6 +221,17 @@ export default function StepWizard() {
   const [personalTenorSelectionMode, setPersonalTenorSelectionMode] = useState<'auto' | 'custom'>(() => getDraftValue<'auto' | 'custom'>('personalTenorSelectionMode', 'auto'));
   const [requestedPersonalTenorMonths, setRequestedPersonalTenorMonths] = useState<number | ''>(() => getDraftValue<number | ''>('requestedPersonalTenorMonths', ''));
 
+  const isPersonalOnlyFlow = mainFinanceType === 'personal_only';
+
+  const shouldShowSalaryBankField =
+    !isPersonalOnlyFlow &&
+    !!sectorId &&
+    sectorId !== 'retired';
+
+  const shouldShowEtizazField =
+    !isPersonalOnlyFlow &&
+    supportSettings.etizaz?.enabled !== false;
+
   // Validation errors
   const [errors, setErrors] = useState<string[]>([]);
   const [alertOpen, setAlertOpen] = useState(false);
@@ -563,6 +574,13 @@ export default function StepWizard() {
   }, [mainFinanceType, realEstateSubType]);
 
   useEffect(() => {
+    if (mainFinanceType === 'personal_only') {
+      setSalaryBankId('');
+      setIsEtizazEligible('no');
+    }
+  }, [mainFinanceType]);
+
+  useEffect(() => {
     if (effectiveSectorId === 'retired') {
       setLocalCalculatedNet(Number(directPensionSalary || 0));
       return;
@@ -660,7 +678,7 @@ export default function StepWizard() {
         });
       }
 
-      if (sectorId && sectorId !== 'retired' && !salaryBankId) {
+      if (shouldShowSalaryBankField && !salaryBankId) {
         errorMap.push({
           message: 'يرجى اختيار البنك المحول عليه الراتب.',
           fieldId: 'salary-bank-select'
@@ -867,7 +885,9 @@ export default function StepWizard() {
     const calcParams = {
       sectorId: effectiveSectorId,
       militarySubType: ((effectiveSectorId === 'military' || sectorId === 'military') ? ((militarySubtype === 'officer' || militaryType === 'officer') ? 'military_officer' : 'military_individual') : undefined) as 'military_officer' | 'military_individual' | undefined,
-      etizazAmount: (((supportSettings.etizaz?.eligibleSectors || ['military']).includes(effectiveSectorId)) && isEtizazEligible === 'yes' && supportSettings.etizaz?.enabled !== false) ? (supportSettings.etizaz?.amount ?? 160000) : 0,
+      etizazAmount: (mainFinanceType === 'personal_only')
+        ? 0
+        : ((((supportSettings.etizaz?.eligibleSectors || ['military']).includes(effectiveSectorId)) && isEtizazEligible === 'yes' && supportSettings.etizaz?.enabled !== false) ? (supportSettings.etizaz?.amount ?? 160000) : 0),
       productId,
       birthYear: Number(birthYear) || 1990,
       birthMonth: Number(birthMonth) || 1,
@@ -1034,7 +1054,7 @@ export default function StepWizard() {
         </div>
 
         {/* Salary Bank Input */}
-        {sectorId && sectorId !== 'retired' && (
+        {shouldShowSalaryBankField && (
           <div id="salary-bank-selector-wrapper" className="space-y-2 animate-fade-in">
             <label className="block text-xs font-bold text-gray-700 dark:text-slate-300">راتبك على أي بنك؟ <span className="text-rose-500">*</span></label>
             <select
@@ -1132,7 +1152,7 @@ export default function StepWizard() {
             </div>
 
             {/* هل العميل مؤهل لدعم اعتزاز؟ */}
-            {supportSettings.etizaz?.enabled !== false && (
+            {shouldShowEtizazField && (
               <div className="border-t border-gray-150 dark:border-slate-800 pt-4 space-y-2">
                 <label className="block text-xs font-bold text-gray-700 dark:text-slate-300">هل العميل مؤهل لدعم اعتزاز؟</label>
                 <div className="flex gap-3 max-w-xs">
@@ -1155,6 +1175,11 @@ export default function StepWizard() {
                     </button>
                   ))}
                 </div>
+                {mainFinanceType === 'personal_only' && (
+                  <p className="text-[11px] text-amber-600 dark:text-amber-500 font-sans font-semibold mt-1.5 leading-normal">
+                    دعم اعتزاز لا يدخل في حساب التمويل الشخصي، ويُستخدم فقط عند حساب التمويل العقاري.
+                  </p>
+                )}
               </div>
             )}
 
@@ -1166,7 +1191,7 @@ export default function StepWizard() {
         )}
 
         {/* Standalone Etizaz Selector for non-military eligible sectors */}
-        {sectorId !== 'military' && sectorId && (supportSettings.etizaz?.eligibleSectors || ['military']).includes(sectorId) && supportSettings.etizaz?.enabled !== false && (
+        {sectorId !== 'military' && sectorId && (supportSettings.etizaz?.eligibleSectors || ['military']).includes(sectorId) && shouldShowEtizazField && (
           <div id="etizaz-non-military-selector-wrapper" className="bg-gray-50 dark:bg-slate-900 rounded-2xl p-6 border border-gray-200 dark:border-slate-800 animate-fade-in text-right space-y-4">
             <div className="space-y-2">
               <label className="block text-xs font-bold text-gray-700 dark:text-slate-300">هل العميل مؤهل لدعم اعتزاز؟</label>
@@ -1190,6 +1215,11 @@ export default function StepWizard() {
                   </button>
                 ))}
               </div>
+              {mainFinanceType === 'personal_only' && (
+                <p className="text-[11px] text-amber-600 dark:text-amber-500 font-sans font-semibold mt-1.5 leading-normal">
+                  دعم اعتزاز لا يدخل في حساب التمويل الشخصي، ويُستخدم فقط عند حساب التمويل العقاري.
+                </p>
+              )}
             </div>
           </div>
         )}

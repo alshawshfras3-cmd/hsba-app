@@ -178,6 +178,7 @@ export function AccountPage() {
     const normalizedPhone = phoneInput.trim() ? normalizeSaudiPhone(phoneInput) : null;
     const newEmail = emailInput.trim().toLowerCase();
     const newName = fullNameInput.trim();
+    const currentEmail = user?.email || '';
 
     try {
       if (hasSupabaseKeys && user) {
@@ -189,31 +190,25 @@ export function AccountPage() {
           }
         }
 
-        // Check if we are updating email
-        let emailChanged = false;
-        if (newEmail !== user.email?.toLowerCase()) {
-          const { error: emailError } = await supabase.auth.updateUser({ email: newEmail });
-          if (emailError) {
-            console.error('Email update error:', emailError);
-            throw new Error('email_error');
-          }
-          emailChanged = true;
-        }
-
-        // Update app_users
+        // 1. Update app_users
         const { error: appUserErr } = await supabase
           .from('app_users')
           .upsert({
             id: user.id,
-            email: newEmail,
+            email: currentEmail, // keep current email
             full_name: newName,
             phone: normalizedPhone,
             updated_at: new Date().toISOString()
           }, { onConflict: 'id' });
 
-        if (appUserErr) throw appUserErr;
+        if (appUserErr) {
+          if (appUserErr.code === '23505' || appUserErr.message?.includes('unique_billing_normalized_phone')) {
+            throw new Error('phone_duplicate');
+          }
+          throw appUserErr;
+        }
 
-        // Update or create user_billing_profiles
+        // 2. Update or create user_billing_profiles
         const { data: existingBp, error: fetchBpErr } = await supabase
           .from('user_billing_profiles')
           .select('id')
@@ -227,11 +222,16 @@ export function AccountPage() {
               phone_number: normalizedPhone,
               normalized_phone: normalizedPhone,
               full_name: newName,
-              email: newEmail,
+              email: currentEmail, // keep current email
               updated_at: new Date().toISOString()
             })
             .eq('user_id', user.id);
-          if (bpErr) throw bpErr;
+          if (bpErr) {
+            if (bpErr.code === '23505' || bpErr.message?.includes('unique_billing_normalized_phone')) {
+              throw new Error('phone_duplicate');
+            }
+            throw bpErr;
+          }
         } else {
           const { error: bpErr } = await supabase
             .from('user_billing_profiles')
@@ -241,20 +241,40 @@ export function AccountPage() {
               normalized_phone: normalizedPhone,
               phone_locked: false,
               full_name: newName,
-              email: newEmail,
+              email: currentEmail, // keep current email
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString()
             });
-          if (bpErr) throw bpErr;
+          if (bpErr) {
+            if (bpErr.code === '23505' || bpErr.message?.includes('unique_billing_normalized_phone')) {
+              throw new Error('phone_duplicate');
+            }
+            throw bpErr;
+          }
         }
 
-        // Update user metadata
-        await supabase.auth.updateUser({
+        // 3. Update user metadata
+        const { error: metadataErr } = await supabase.auth.updateUser({
           data: { 
             full_name: newName,
             phone: normalizedPhone
           }
         });
+        if (metadataErr) throw metadataErr;
+
+        // 4. Update Email step separately if changing
+        let emailChanged = false;
+        let emailUpdateError = null;
+
+        if (newEmail !== currentEmail.toLowerCase()) {
+          const { error: emailErr } = await supabase.auth.updateUser({ email: newEmail });
+          if (emailErr) {
+            console.error('Email update error:', emailErr);
+            emailUpdateError = emailErr;
+          } else {
+            emailChanged = true;
+          }
+        }
 
         // Refresh AuthContext Profile
         if (refreshProfile) {
@@ -266,8 +286,13 @@ export function AccountPage() {
         setBillingProfile(updatedBp);
 
         setShowEditNameModal(false);
-        if (emailChanged) {
-          showToast('تم تحديث بيانات الحساب بنجاح. تم إرسال رابط تأكيد إلى بريدك الجديد.', 'success');
+
+        if (emailUpdateError) {
+          const warnMsg = 'تم حفظ الاسم ورقم الجوال، ولكن فشل تحديث البريد الإلكتروني. يرجى التحقق من بريدك الجديد أو إعدادات التأكيد.';
+          setProfileMessage({ type: 'error', text: warnMsg });
+          showToast(warnMsg, 'error');
+        } else if (emailChanged) {
+          showToast('تم تحديث بيانات الحساب بنجاح. تم إرسال رابط تأكيد إلى بريدك الجديد لإتمام التغيير.', 'success');
         } else {
           showToast('تم تحديث بيانات الحساب بنجاح.', 'success');
         }
@@ -279,10 +304,8 @@ export function AccountPage() {
     } catch (err: any) {
       console.error(err);
       let errorMessage = 'تعذر تحديث البيانات حاليًا. حاول مرة أخرى.';
-      if (err.message === 'phone_duplicate') {
+      if (err.message === 'phone_duplicate' || err.code === '23505' || err.message?.includes('unique_billing_normalized_phone')) {
         errorMessage = 'رقم الجوال مستخدم مسبقًا.';
-      } else if (err.message === 'email_error') {
-        errorMessage = 'تعذر تحديث البريد الإلكتروني. تحقق من البريد أو استخدم بريدًا آخر.';
       } else if (err.message) {
         errorMessage = err.message;
       }
@@ -1142,7 +1165,6 @@ export function AccountPage() {
                     <Phone className="w-4 h-4 text-slate-400 absolute right-3 top-3.5" />
                     <input
                       type="tel"
-                      required
                       value={phoneInput}
                       onChange={e => setPhoneInput(e.target.value)}
                       placeholder="05xxxxxxx"

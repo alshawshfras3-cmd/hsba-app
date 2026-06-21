@@ -55,6 +55,12 @@ export const BanksSection: React.FC<BanksSectionProps> = ({
   const [instEmployeeWhatsApp, setInstEmployeeWhatsApp] = useState('');
   const [instModalError, setInstModalError] = useState('');
 
+  const [instRealEstateFinanceEnabled, setInstRealEstateFinanceEnabled] = useState(true);
+  const [instPersonalFinanceEnabled, setInstPersonalFinanceEnabled] = useState(true);
+  const [instCombinedFinanceEnabled, setInstCombinedFinanceEnabled] = useState(true);
+  const [instExistingPersonalFinanceEnabled, setInstExistingPersonalFinanceEnabled] = useState(true);
+  const [instEtizazSupportEnabled, setInstEtizazSupportEnabled] = useState(true);
+
   const openAddInstitution = () => {
     setEditingInstitution(null);
     setInstId('');
@@ -72,6 +78,11 @@ export const BanksSection: React.FC<BanksSectionProps> = ({
     setInstInternalNotes('');
     setInstEmployeeWhatsApp('');
     setInstModalError('');
+    setInstRealEstateFinanceEnabled(true);
+    setInstPersonalFinanceEnabled(true);
+    setInstCombinedFinanceEnabled(true);
+    setInstExistingPersonalFinanceEnabled(true);
+    setInstEtizazSupportEnabled(true);
     setIsInstitutionModalOpen(true);
   };
 
@@ -92,6 +103,11 @@ export const BanksSection: React.FC<BanksSectionProps> = ({
     setInstInternalNotes(bank.internalNotes || '');
     setInstEmployeeWhatsApp(bank.employeeWhatsApp || '');
     setInstModalError('');
+    setInstRealEstateFinanceEnabled(bank.realEstateFinanceEnabled !== false);
+    setInstPersonalFinanceEnabled(bank.personalFinanceEnabled !== false);
+    setInstCombinedFinanceEnabled(bank.combinedFinanceEnabled !== false);
+    setInstExistingPersonalFinanceEnabled(bank.existingPersonalFinanceEnabled !== false);
+    setInstEtizazSupportEnabled(bank.etizazSupportEnabled !== false);
     setIsInstitutionModalOpen(true);
   };
 
@@ -113,6 +129,7 @@ export const BanksSection: React.FC<BanksSectionProps> = ({
     const finalLogoText = instLogoText.trim() || instNameAr.trim().substring(0, 4);
 
     const updatedBank: Bank = {
+      ...(editingInstitution || {}),
       id: cleanId,
       institutionType: instType,
       nameAr: instNameAr.trim(),
@@ -126,7 +143,12 @@ export const BanksSection: React.FC<BanksSectionProps> = ({
       monthsAfterRetirement: instAllowAfterRetirement ? (Number(instMonthsAfterRetirement) || 0) : 0,
       allowAfterRetirement: instAllowAfterRetirement,
       displayOrder: editingInstitution ? (editingInstitution.displayOrder || 1) : (banks.length + 1),
-      employeeWhatsApp: instEmployeeWhatsApp.trim() || undefined
+      employeeWhatsApp: instEmployeeWhatsApp.trim() || undefined,
+      realEstateFinanceEnabled: instRealEstateFinanceEnabled,
+      personalFinanceEnabled: instPersonalFinanceEnabled,
+      combinedFinanceEnabled: instCombinedFinanceEnabled,
+      existingPersonalFinanceEnabled: instExistingPersonalFinanceEnabled,
+      etizazSupportEnabled: instEtizazSupportEnabled
     };
 
     if (instInternalNotes.trim()) {
@@ -655,9 +677,19 @@ export const BanksSection: React.FC<BanksSectionProps> = ({
                       if (newType === 'finance_company') {
                         setInstMaxTermMonths(240);
                         setInstMaxAgeAtEnd(65);
+                        setInstRealEstateFinanceEnabled(true);
+                        setInstPersonalFinanceEnabled(false);
+                        setInstCombinedFinanceEnabled(false);
+                        setInstExistingPersonalFinanceEnabled(true);
+                        setInstEtizazSupportEnabled(false);
                       } else {
                         setInstMaxTermMonths(360);
                         setInstMaxAgeAtEnd(75);
+                        setInstRealEstateFinanceEnabled(true);
+                        setInstPersonalFinanceEnabled(true);
+                        setInstCombinedFinanceEnabled(true);
+                        setInstExistingPersonalFinanceEnabled(true);
+                        setInstEtizazSupportEnabled(true);
                       }
                     }}
                     className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-right"
@@ -708,6 +740,41 @@ export const BanksSection: React.FC<BanksSectionProps> = ({
                       <span className="text-white text-[9px] font-bold leading-none">{instLogoText || 'جهة'}</span>
                     </button>
                   ))}
+                </div>
+              </div>
+
+              <div className="border-t border-gray-100 pt-3 space-y-3">
+                <span className="block text-xs font-bold text-gray-700">تفعيل المنتجات والدعم للجهة:</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-bold text-gray-700">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={instRealEstateFinanceEnabled}
+                      onChange={(e) => setInstRealEstateFinanceEnabled(e.target.checked)}
+                      className="w-4 h-4 rounded text-[#0057B8] focus:ring-[#0057B8]"
+                    />
+                    <span>تفعيل التمويل العقاري</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={instPersonalFinanceEnabled}
+                      onChange={(e) => setInstPersonalFinanceEnabled(e.target.checked)}
+                      className="w-4 h-4 rounded text-[#0057B8] focus:ring-[#0057B8]"
+                    />
+                    <span>تفعيل التمويل الشخصي</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={instCombinedFinanceEnabled}
+                      onChange={(e) => setInstCombinedFinanceEnabled(e.target.checked)}
+                      className="w-4 h-4 rounded text-[#0057B8] focus:ring-[#0057B8]"
+                    />
+                    <span>تفعيل عقاري + شخصي جديد</span>
+                  </label>
                 </div>
               </div>
 

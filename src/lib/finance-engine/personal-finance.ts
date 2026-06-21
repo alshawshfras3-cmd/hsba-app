@@ -1,4 +1,5 @@
 import { PersonalFinanceOutput, PersonalFinanceRules, SectorId } from '../../types';
+import { initialPersonalFinanceRules } from '../../seeds/personal-finance-rules';
 
 export function hasLoadedPersonalRules(personalRules?: PersonalFinanceRules[]): boolean {
   return Array.isArray(personalRules) && personalRules.length > 0;
@@ -25,32 +26,12 @@ export function getPersonalFinanceRule(params: {
     targetPathType = 'real_estate_with_new_personal';
   }
 
-  // Development fallback ONLY if no rules are loaded in the entire app_settings
-  if (!hasLoadedPersonalRules(rules)) {
-    const isAlahli = bankId === 'alahli';
-    const isRajhi = bankId === 'rajhi';
-    return {
-      id: 'dev_fallback_personal',
-      bankId: bankId,
-      sectorId: 'all',
-      dsrPercentage: targetStatus === 'retired' ? 25 : 33.33,
-      termMonths: 60,
-      financeCoefficient: isRajhi || isAlahli ? 0 : 50.42,
-      annualMargin: isRajhi ? 4.59 : (isAlahli ? 5.00 : 4.80),
-      minSalary: 1000,
-      minAge: 18,
-      maxAge: targetStatus === 'retired' ? 75 : 65,
-      retireeDsrPercentage: 25,
-      isActive: true,
-      calculationMethod: (isRajhi || isAlahli) ? 'flat_rate' : 'multiplier',
-      pathType: targetPathType,
-      customerStatus: targetStatus
-    };
-  }
+  // Use initialPersonalFinanceRules if rules are empty / not loaded
+  const rulesList = hasLoadedPersonalRules(rules) ? rules : initialPersonalFinanceRules;
 
   // Find rules matching the requirements
   const findMatching = (targetBank: string) => {
-    return rules.filter(r => {
+    return rulesList.filter(r => {
       // 1. check isActive
       if (!r.isActive) return false;
 
@@ -156,22 +137,7 @@ export function calculatePersonalFinance(params: {
   if (rule) {
     source = rule.id === 'dev_fallback_personal' ? 'fallback' : (rule.bankId === bankId ? 'bank_specific' : 'default_bank');
   } else {
-    if (hasLoadedPersonalRules(rules)) {
-      // Check if any rule for this bank exists in the configuration
-      const anyRuleForBank = rules.some(r => r.bankId === bankId);
-      if (anyRuleForBank) {
-        const activeRuleForBank = rules.some(r => r.bankId === bankId && r.isActive);
-        if (!activeRuleForBank) {
-          matchError = "قاعدة التمويل الشخصي لهذا البنك غير مفعلة في لوحة التحكم";
-        } else {
-          matchError = "لا توجد قاعدة تمويل شخصي مفعلة لهذا البنك/القطاع في لوحة التحكم";
-        }
-      } else {
-        matchError = "لا توجد قاعدة تمويل شخصي مفعلة لهذا البنك/القطاع في لوحة التحكم";
-      }
-    } else {
-      matchError = "لا توجد قاعدة تمويل شخصي مفعلة لهذا البنك/القطاع في لوحة التحكم";
-    }
+    matchError = "لا توجد قاعدة تمويل شخصي مفعلة لهذا البنك/المسار/حالة العميل في لوحة التحكم";
   }
 
   // Validate salary limits if rule is available and no previous error
@@ -197,14 +163,14 @@ export function calculatePersonalFinance(params: {
       calculationMethod: undefined,
       multiplier: undefined,
       diagnostics: {
-        ruleId: undefined,
+        ruleId: finalRule ? finalRule.id : undefined,
         bankId: bankId,
         customerStatus: targetStatus,
         pathType: pathType,
         dsr: 0,
         termMonths: 0,
         calculationMethod: 'none',
-        source: 'fallback',
+        source: source,
         error: matchError
       }
     };
@@ -236,22 +202,6 @@ export function calculatePersonalFinance(params: {
       dsrPercent = Number(matchingBracket.dsrPercentage) || 0;
       ruleTermMonths = Number(matchingBracket.termMonths) || 0;
       annualMargin = Number(matchingBracket.annualMargin) || 0;
-    }
-  }
-
-  // Only apply strict hardcoded defaults if it is a fallback rule from the calculator in development environment
-  if (finalRule.id === 'dev_fallback_personal') {
-    if (finalRule.bankId === 'alahli') {
-      annualMargin = 5.00;
-      ruleTermMonths = 60;
-      dsrPercent = customerStatus === 'retired' ? 25 : 33.33;
-      coeff = 0;
-    } else if (finalRule.bankId === 'rajhi') {
-      annualMargin = 4.59;
-      ruleTermMonths = 60;
-      dsrPercent = customerStatus === 'retired' ? 25 : 33.33;
-      coeff = 0;
-      calculationMethod = 'flat_rate';
     }
   }
 

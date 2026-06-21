@@ -395,9 +395,9 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-sm font-bold text-[#D97706] flex items-center gap-1.5">
-              ⚙️ اختبارات محرك الحساب المرجعية (Engine Verification & Test Suites)
+              ⚙️ أمثلة مرجعية قياسية لمعايرة واختبار المحرك الرياضي (Standard Baseline & Engine Verification)
             </h3>
-            <p className="text-[11px] text-gray-500 font-medium">التحقق اللحظي التلقائي من دقة محاكاة القوانين الرياضية للتمويل الشخصي وتطابق مخرجات التمويل للموظف والمتقاعد.</p>
+            <p className="text-[11px] text-gray-500 font-medium">أمثلة رياضية ثابتة مصممة خصيصاً للتثبت اللحظي التلقائي من صحة ودقة خوارزميات المحرك المالي وضمان سلامتها.</p>
           </div>
           <span className="bg-[#10B981]/15 text-[#059669] text-[10px] font-bold px-2 py-0.5 rounded-full">محرك نشط ومختبر (Verified)</span>
         </div>
@@ -406,7 +406,7 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
           {/* Case 1: Active Employee with Profit Rate & Effective Multiplier */}
           <div className="bg-white rounded-xl border border-gray-100 p-4 space-y-3 shadow-xs">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-[#0057B8]">1. موظف نشط (نسبة ربح 4.59%)</span>
+              <span className="text-[11px] font-bold text-[#0057B8]">1. مثال مرجعي: موظف نشط (استقطاع معياري 33.33%)</span>
               <span className="bg-emerald-50 text-emerald-700 text-[9px] font-bold px-1.5 py-0.2 rounded">مطابق ومجتاز ✓</span>
             </div>
             <div className="text-[11px] space-y-1 text-gray-600 font-sans leading-relaxed">
@@ -423,7 +423,7 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
           {/* Case 2: Retired with Profit Rate & Effective Multiplier */}
           <div className="bg-white rounded-xl border border-gray-100 p-4 space-y-3 shadow-xs">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-[#E28743]">2. متقاعد (نسبة ربح 4.59%)</span>
+              <span className="text-[11px] font-bold text-[#E28743]">2. مثال مرجعي: متقاعد (استقطاع معياري 25%)</span>
               <span className="bg-emerald-50 text-emerald-700 text-[9px] font-bold px-1.5 py-0.2 rounded">مطابق ومجتاز ✓</span>
             </div>
             <div className="text-[11px] space-y-1 text-gray-600 font-sans leading-relaxed">
@@ -440,7 +440,7 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
           {/* Case 3: Manual Multiplier */}
           <div className="bg-white rounded-xl border border-gray-100 p-4 space-y-3 shadow-xs">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-teal-700">3. معامل تمويل يدوي (50.42)</span>
+              <span className="text-[11px] font-bold text-teal-700">3. مثال مرجعي: معامل تمويل يدوي (استقطاع معياري 33.33%)</span>
               <span className="bg-emerald-50 text-emerald-700 text-[9px] font-bold px-1.5 py-0.2 rounded">مطابق ومجتاز ✓</span>
             </div>
             <div className="text-[11px] space-y-1 text-gray-600 font-sans leading-relaxed">

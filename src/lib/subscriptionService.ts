@@ -531,6 +531,21 @@ export async function testBillingProfileUniquePhone(phone: string, excludeUserId
   try {
     const normalized = normalizePhone(phone);
     if (!normalized) return true; // Empty is allowed for existing users
+
+    // Try utilizing the database RPC if available
+    try {
+      const { data: rpcData, error: rpcError } = await supabase.rpc('is_phone_available', {
+        p_normalized_phone: normalized,
+        p_exclude_user_id: excludeUserId || null
+      });
+      // is_phone_available typically returns true if available (unique), false if already taken.
+      if (!rpcError && typeof rpcData === 'boolean') {
+        return rpcData;
+      }
+    } catch (rpcErr) {
+      console.warn('RPC is_phone_available failed, falling back to query:', rpcErr);
+    }
+
     const { data, error } = await supabase
       .from('user_billing_profiles')
       .select('id, user_id')

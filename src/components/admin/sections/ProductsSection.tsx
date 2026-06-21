@@ -67,6 +67,7 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
   const [formAllowUnsupported, setFormAllowUnsupported] = useState(true);
   const [formAllowMonthlySupport, setFormAllowMonthlySupport] = useState(true);
   const [formAllowDownpaymentSupport, setFormAllowDownpaymentSupport] = useState(true);
+  const [formAllowedSupportTypes, setFormAllowedSupportTypes] = useState<('none' | 'monthly' | 'down_payment' | 'etizaz')[]>(['none', 'monthly', 'down_payment']);
   const [formAllowedSectors, setFormAllowedSectors] = useState<SectorId[]>(['gov_civil', 'semi_gov', 'companies', 'military', 'retired']);
   const [formRejectionMessage, setFormRejectionMessage] = useState('');
   const [formIsActive, setFormIsActive] = useState(true);
@@ -100,6 +101,7 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
       setFormAllowUnsupported(true);
       setFormAllowMonthlySupport(true);
       setFormAllowDownpaymentSupport(true);
+      setFormAllowedSupportTypes(['none', 'monthly', 'down_payment']);
       setFormAllowedSectors(['gov_civil', 'semi_gov', 'companies', 'military', 'retired']);
       setFormRejectionMessage('');
       setFormIsActive(true);
@@ -146,6 +148,16 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
       setFormAllowUnsupported(selectedRule.allowUnsupported !== false);
       setFormAllowMonthlySupport(selectedRule.allowMonthlySupport !== false);
       setFormAllowDownpaymentSupport(selectedRule.allowDownpaymentSupport !== false);
+      let allowedSupportTypes: ('none' | 'monthly' | 'down_payment' | 'etizaz')[] = [];
+      if (Array.isArray(selectedRule.allowedSupportTypes)) {
+        allowedSupportTypes = [...selectedRule.allowedSupportTypes];
+      } else {
+        if (selectedRule.allowUnsupported !== false) allowedSupportTypes.push('none');
+        if (selectedRule.allowMonthlySupport) allowedSupportTypes.push('monthly');
+        if (selectedRule.allowDownpaymentSupport) allowedSupportTypes.push('down_payment');
+      }
+
+      setFormAllowedSupportTypes(allowedSupportTypes);
       setFormAllowedSectors(allowedSectors);
       setFormRejectionMessage(rejectionMessage);
       setFormIsActive(active);
@@ -163,10 +175,31 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
     setIsProductModalOpen(false);
   };
 
+  const syncBanksWithProducts = (allProducts: ProductAcceptance[]) => {
+    setBanks(prevBanks => prevBanks.map(bk => {
+      const activeBkRules = allProducts.filter(p => p.bankId === bk.id && p.isActive !== false);
+      const supportsEtizaz = activeBkRules.some(r => {
+        if (Array.isArray(r.allowedSupportTypes)) {
+          return r.allowedSupportTypes.includes('etizaz');
+        }
+        return false;
+      });
+      return {
+        ...bk,
+        etizazSupportEnabled: supportsEtizaz
+      };
+    }));
+  };
+
   const deleteProduct = (id: string) => {
     try {
       if (window.confirm('هل أنت متأكد من رغبتك في حذف هذه قاعدة؟')) {
-        setProducts(prev => prev.filter(p => p.id !== id));
+        setProducts(prev => {
+          const arr = Array.isArray(prev) ? prev : [];
+          const next = arr.filter(p => p.id !== id);
+          syncBanksWithProducts(next);
+          return next;
+        });
         showToast('تم حذف قاعدة القبول بنجاح!', 'success');
       }
     } catch (e) {
@@ -228,6 +261,10 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
         setFormError('رسالة الرفض لا يمكن أن تكون فارغة.');
         return;
       }
+      if (formAllowedSupportTypes.length === 0) {
+        setFormError('يرجى اختيار نوع دعم مسموح به واحد على الأقل.');
+        return;
+      }
 
       const payload: ProductAcceptance = {
         id: editingProduct ? editingProduct.id : `prod_rule_${Date.now()}`,
@@ -236,9 +273,10 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
         minSalary: salaryNum,
         minAge: minAgeNum,
         minServiceMonths: serviceNum,
-        allowUnsupported: formAllowUnsupported,
-        allowMonthlySupport: formAllowMonthlySupport,
-        allowDownpaymentSupport: formAllowDownpaymentSupport,
+        allowUnsupported: formAllowedSupportTypes.includes('none'),
+        allowMonthlySupport: formAllowedSupportTypes.includes('monthly'),
+        allowDownpaymentSupport: formAllowedSupportTypes.includes('down_payment'),
+        allowedSupportTypes: formAllowedSupportTypes,
         allowedSectors: safeAllowedSectors,
         defaultRejectionMessage: formRejectionMessage,
         isActive: formIsActive,
@@ -251,13 +289,17 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
       if (editingProduct) {
         setProducts(prev => {
           const arr = Array.isArray(prev) ? prev : [];
-          return arr.map(p => p.id === editingProduct.id ? payload : p);
+          const next = arr.map(p => p.id === editingProduct.id ? payload : p);
+          syncBanksWithProducts(next);
+          return next;
         });
         showToast('تم تعديل قاعدة القبول بنجاح!', 'success');
       } else {
         setProducts(prev => {
           const arr = Array.isArray(prev) ? prev : [];
-          return [payload, ...arr];
+          const next = [payload, ...arr];
+          syncBanksWithProducts(next);
+          return next;
         });
         showToast('تم إضافة قاعدة القبول بنجاح!', 'success');
       }
@@ -271,7 +313,12 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
   };
 
   const toggleProductActive = (id: string) => {
-    setProducts(prev => prev.map(p => p.id === id ? { ...p, isActive: !p.isActive } : p));
+    setProducts(prev => {
+      const arr = Array.isArray(prev) ? prev : [];
+      const next = arr.map(p => p.id === id ? { ...p, isActive: !p.isActive } : p);
+      syncBanksWithProducts(next);
+      return next;
+    });
   };
 
   return (
@@ -403,6 +450,7 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
                 <option value="none">غير مدعوم متاح</option>
                 <option value="monthly">دعم شهري متاح</option>
                 <option value="downpayment">دعم دفعة متاح</option>
+                <option value="etizaz">اعتزاز متاح</option>
               </select>
             </div>
           </div>
@@ -431,9 +479,22 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
                   if (filterProductType !== 'all' && p.productId !== filterProductType) return false;
                   if (filterActiveStatus === 'active' && !p.isActive) return false;
                   if (filterActiveStatus === 'inactive' && p.isActive) return false;
-                  if (filterSupport === 'none' && !p.allowUnsupported) return false;
-                  if (filterSupport === 'monthly' && !p.allowMonthlySupport) return false;
-                  if (filterSupport === 'downpayment' && !p.allowDownpaymentSupport) return false;
+                  if (filterSupport === 'none') {
+                    const ruleAllowsNone = p.allowedSupportTypes ? p.allowedSupportTypes.includes('none') : p.allowUnsupported;
+                    if (!ruleAllowsNone) return false;
+                  }
+                  if (filterSupport === 'monthly') {
+                    const ruleAllowsMonthly = p.allowedSupportTypes ? p.allowedSupportTypes.includes('monthly') : p.allowMonthlySupport;
+                    if (!ruleAllowsMonthly) return false;
+                  }
+                  if (filterSupport === 'downpayment') {
+                    const ruleAllowsDown = p.allowedSupportTypes ? (p.allowedSupportTypes.includes('down_payment') || p.allowedSupportTypes.includes('downpayment' as any)) : p.allowDownpaymentSupport;
+                    if (!ruleAllowsDown) return false;
+                  }
+                  if (filterSupport === 'etizaz') {
+                    const ruleAllowsEtizaz = p.allowedSupportTypes ? p.allowedSupportTypes.includes('etizaz') : false;
+                    if (!ruleAllowsEtizaz) return false;
+                  }
                   return true;
                 });
 
@@ -451,10 +512,26 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
                   const matchedBank = banks.find(b => b.id === prod.bankId);
                   const displayProduct = productTypesList.find(pt => pt.id === prod.productId)?.nameAr || prod.productId;
                   
-                  const supports: string[] = [];
-                  if (prod.allowUnsupported !== false) supports.push('غير مدعوم');
-                  if (prod.allowMonthlySupport) supports.push('دعم شهري');
-                  if (prod.allowDownpaymentSupport) supports.push('دعم دفعة');
+                  let supportsToRender: { text: string; bg: string; textCol: string }[] = [];
+                  const rawSupports = prod.allowedSupportTypes && Array.isArray(prod.allowedSupportTypes)
+                    ? prod.allowedSupportTypes
+                    : [
+                        ...(prod.allowUnsupported !== false ? ['none'] : []),
+                        ...(prod.allowMonthlySupport ? ['monthly'] : []),
+                        ...(prod.allowDownpaymentSupport ? ['down_payment'] : [])
+                      ];
+
+                  rawSupports.forEach(t => {
+                    if (t === 'none') {
+                      supportsToRender.push({ text: 'غير مدعوم', bg: 'bg-slate-100', textCol: 'text-slate-700' });
+                    } else if (t === 'monthly') {
+                      supportsToRender.push({ text: 'دعم شهري', bg: 'bg-sky-100', textCol: 'text-sky-700 font-bold' });
+                    } else if (t === 'down_payment' || t === 'downpayment' as any) {
+                      supportsToRender.push({ text: 'دعم دفعة', bg: 'bg-indigo-100', textCol: 'text-indigo-700 font-bold' });
+                    } else if (t === 'etizaz') {
+                      supportsToRender.push({ text: 'اعتزاز', bg: 'bg-emerald-100', textCol: 'text-emerald-700 font-extrabold border border-emerald-200 shadow-sm' });
+                    }
+                  });
 
                   return (
                     <tr key={prod.id} className="hover:bg-slate-50/40 transition-colors">
@@ -475,12 +552,12 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
                       </td>
                       <td className="p-4">
                         <div className="flex flex-wrap gap-1">
-                          {supports.map((s, idx) => (
-                            <span key={idx} className="bg-blue-50 text-blue-700 text-[9px] px-1.5 py-0.5 rounded font-bold">
-                              {s}
+                          {supportsToRender.map((s, idx) => (
+                            <span key={idx} className={`${s.bg} ${s.textCol} text-[9px] px-1.5 py-0.5 rounded font-bold`}>
+                              {s.text}
                             </span>
                           ))}
-                          {supports.length === 0 && (
+                          {supportsToRender.length === 0 && (
                             <span className="text-red-500 text-[9px] font-bold">لا يوجد دعم متاح</span>
                           )}
                         </div>
@@ -995,41 +1072,71 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
 
               {/* Allowed Support Choices (Checks) */}
               <div className="space-y-2 border border-gray-100 bg-gray-50/50 p-4 rounded-2xl">
-                <label className="block text-xs font-bold text-gray-800">أنواع الدعم المسكوني المسموحة:</label>
+                <label className="block text-xs font-bold text-gray-800">أنواع الدعم المسموحة لهذا المنتج عند الجهة: *</label>
                 <div className="flex flex-wrap gap-x-6 gap-y-2">
                   <label className="inline-flex items-center gap-2 cursor-pointer text-xs font-semibold text-gray-700">
                     <input
                       type="checkbox"
-                      checked={formAllowUnsupported}
-                      onChange={(e) => setFormAllowUnsupported(e.target.checked)}
+                      checked={formAllowedSupportTypes.includes('none')}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setFormAllowedSupportTypes(prev => [...prev, 'none']);
+                        } else {
+                          setFormAllowedSupportTypes(prev => prev.filter(v => v !== 'none'));
+                        }
+                      }}
                       className="rounded border-gray-300 text-[#0057B8] focus:ring-[#0057B8]"
                     />
-                    <span>غير مدعوم متاح</span>
+                    <span>غير مدعوم</span>
                   </label>
 
-                  {formProductId !== 'personal_only' && formProductId !== 'personal' && (
-                    <>
-                      <label className="inline-flex items-center gap-2 cursor-pointer text-xs font-semibold text-gray-700">
-                        <input
-                          type="checkbox"
-                          checked={formAllowMonthlySupport}
-                          onChange={(e) => setFormAllowMonthlySupport(e.target.checked)}
-                          className="rounded border-gray-300 text-[#0057B8] focus:ring-[#0057B8]"
-                        />
-                        <span>دعم شهري متاح</span>
-                      </label>
+                  <label className="inline-flex items-center gap-2 cursor-pointer text-xs font-semibold text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={formAllowedSupportTypes.includes('monthly')}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setFormAllowedSupportTypes(prev => [...prev, 'monthly']);
+                        } else {
+                          setFormAllowedSupportTypes(prev => prev.filter(v => v !== 'monthly'));
+                        }
+                      }}
+                      className="rounded border-gray-300 text-[#0057B8] focus:ring-[#0057B8]"
+                    />
+                    <span>دعم شهري</span>
+                  </label>
 
-                      <label className="inline-flex items-center gap-2 cursor-pointer text-xs font-semibold text-gray-700">
-                        <input
-                          type="checkbox"
-                          checked={formAllowDownpaymentSupport}
-                          onChange={(e) => setFormAllowDownpaymentSupport(e.target.checked)}
-                          className="rounded border-gray-300 text-[#0057B8] focus:ring-[#0057B8]"
-                        />
-                        <span>دعم دفعة متاح</span>
-                      </label>
-                    </>
-                  )}
+                  <label className="inline-flex items-center gap-2 cursor-pointer text-xs font-semibold text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={formAllowedSupportTypes.includes('down_payment')}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setFormAllowedSupportTypes(prev => [...prev, 'down_payment']);
+                        } else {
+                          setFormAllowedSupportTypes(prev => prev.filter(v => v !== 'down_payment' && v !== 'downpayment' as any));
+                        }
+                      }}
+                      className="rounded border-gray-300 text-[#0057B8] focus:ring-[#0057B8]"
+                    />
+                    <span>دعم دفعة</span>
+                  </label>
+
+                  <label className="inline-flex items-center gap-2 cursor-pointer text-xs font-semibold text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={formAllowedSupportTypes.includes('etizaz')}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setFormAllowedSupportTypes(prev => [...prev, 'etizaz']);
+                        } else {
+                          setFormAllowedSupportTypes(prev => prev.filter(v => v !== 'etizaz'));
+                        }
+                      }}
+                      className="rounded border-gray-300 text-[#0057B8] focus:ring-[#0057B8]"
+                    />
+                    <span>اعتزاز</span>
+                  </label>
                 </div>
                 {formProductId === 'personal_only' && (
                   <p className="text-[10px] text-amber-600 font-semibold mt-1">
