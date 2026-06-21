@@ -497,7 +497,10 @@ export const BanksSection: React.FC<BanksSectionProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-[#F1F5F9] pb-4">
         <div>
           <h2 className="text-xl font-bold text-[#111827]">جهات التمويل والشركات المرخصة</h2>
-          <p className="text-xs text-[#6B7280]">إدارة البنوك وشركات التمويل النشطة، الحدود القصوى للتمويل، ومعايير القبول.</p>
+          <p className="text-xs text-[#6B7280]">
+            إدارة البنوك وشركات التمويل النشطة، الحدود القصوى للتمويل، ومعايير القبول. 
+            <span className="text-amber-600 font-bold mr-1 block sm:inline">⚠️ تفعيل المنتجات والقبول يُدار من صفحة "المنتجات والقبول".</span>
+          </p>
         </div>
         <button
           type="button"
@@ -743,39 +746,11 @@ export const BanksSection: React.FC<BanksSectionProps> = ({
                 </div>
               </div>
 
-              <div className="border-t border-gray-100 pt-3 space-y-3">
-                <span className="block text-xs font-bold text-gray-700">تفعيل المنتجات والدعم للجهة:</span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-bold text-gray-700">
-                  <label className="flex items-center gap-2 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={instRealEstateFinanceEnabled}
-                      onChange={(e) => setInstRealEstateFinanceEnabled(e.target.checked)}
-                      className="w-4 h-4 rounded text-[#0057B8] focus:ring-[#0057B8]"
-                    />
-                    <span>تفعيل التمويل العقاري</span>
-                  </label>
-
-                  <label className="flex items-center gap-2 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={instPersonalFinanceEnabled}
-                      onChange={(e) => setInstPersonalFinanceEnabled(e.target.checked)}
-                      className="w-4 h-4 rounded text-[#0057B8] focus:ring-[#0057B8]"
-                    />
-                    <span>تفعيل التمويل الشخصي</span>
-                  </label>
-
-                  <label className="flex items-center gap-2 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={instCombinedFinanceEnabled}
-                      onChange={(e) => setInstCombinedFinanceEnabled(e.target.checked)}
-                      className="w-4 h-4 rounded text-[#0057B8] focus:ring-[#0057B8]"
-                    />
-                    <span>تفعيل عقاري + شخصي جديد</span>
-                  </label>
-                </div>
+              <div className="border-t border-amber-100 bg-amber-50/50 p-4 rounded-2xl border border-dashed space-y-1 text-right">
+                <span className="block text-xs font-black text-amber-800">💡 التحكم بالمنتجات والقبول</span>
+                <p className="text-[11px] font-bold text-amber-700 leading-relaxed">
+                  تفعيل التمويل العقاري، التمويل الشخصي، أو التمويل المشترك (عقاري + شخصي) يُدار بالكامل وبشكل مستقل من خلال تبويب <strong>"المنتجات والقبول"</strong>.
+                </p>
               </div>
 
               <div className="border-t border-gray-100 pt-3 flex items-center justify-between">
