@@ -498,6 +498,69 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  useEffect(() => {
+    setBanksState(prevBanks => {
+      let changed = false;
+      const nextBanks = prevBanks.map(bk => {
+        const realEstateOnlyRule = products.find(p => p.bankId === bk.id && p.productId === 'real_estate_only');
+        const personalOnlyRule = products.find(p => p.bankId === bk.id && p.productId === 'personal_only');
+        const combinedRule = products.find(p => p.bankId === bk.id && p.productId === 'real_estate_with_new_personal');
+        const existingCombinedRule = products.find(p => p.bankId === bk.id && p.productId === 'real_estate_with_existing_personal');
+
+        const reEnabled = realEstateOnlyRule ? realEstateOnlyRule.isActive !== false : bk.realEstateFinanceEnabled;
+        const peEnabled = personalOnlyRule ? personalOnlyRule.isActive !== false : bk.personalFinanceEnabled;
+        const combEnabled = combinedRule ? combinedRule.isActive !== false : bk.combinedFinanceEnabled;
+        const existCombEnabled = existingCombinedRule ? existingCombinedRule.isActive !== false : bk.existingPersonalFinanceEnabled;
+
+        const activeBkRules = products.filter(p => p.bankId === bk.id && p.isActive !== false);
+        const supportsEtizaz = activeBkRules.some(r => {
+          if (Array.isArray(r.allowedSupportTypes)) {
+            return r.allowedSupportTypes.includes('etizaz');
+          }
+          return false;
+        });
+
+        const minRE = realEstateOnlyRule?.minRealEstateAmount !== undefined ? realEstateOnlyRule.minRealEstateAmount : bk.minRealEstateAmount;
+        const maxRE = realEstateOnlyRule?.maxRealEstateAmount !== undefined ? realEstateOnlyRule.maxRealEstateAmount : bk.maxRealEstateAmount;
+        const minPE = personalOnlyRule?.minPersonalAmount !== undefined ? personalOnlyRule.minPersonalAmount : bk.minPersonalAmount;
+        const maxPE = personalOnlyRule?.maxPersonalAmount !== undefined ? personalOnlyRule.maxPersonalAmount : bk.maxPersonalAmount;
+
+        const isDifferent = 
+          bk.realEstateFinanceEnabled !== reEnabled ||
+          bk.personalFinanceEnabled !== peEnabled ||
+          bk.combinedFinanceEnabled !== combEnabled ||
+          bk.existingPersonalFinanceEnabled !== existCombEnabled ||
+          bk.etizazSupportEnabled !== supportsEtizaz ||
+          bk.minRealEstateAmount !== minRE ||
+          bk.maxRealEstateAmount !== maxRE ||
+          bk.minPersonalAmount !== minPE ||
+          bk.maxPersonalAmount !== maxPE;
+
+        if (isDifferent) {
+          changed = true;
+          return {
+            ...bk,
+            realEstateFinanceEnabled: reEnabled,
+            personalFinanceEnabled: peEnabled,
+            combinedFinanceEnabled: combEnabled,
+            existingPersonalFinanceEnabled: existCombEnabled,
+            etizazSupportEnabled: supportsEtizaz,
+            minRealEstateAmount: minRE,
+            maxRealEstateAmount: maxRE,
+            minPersonalAmount: minPE,
+            maxPersonalAmount: maxPE
+          };
+        }
+        return bk;
+      });
+
+      if (changed) {
+        return nextBanks;
+      }
+      return prevBanks;
+    });
+  }, [products]);
+
   const [militaryRanks, setMilitaryRanksState] = useState<MilitaryRank[]>(initialData.militaryRanks);
   const setMilitaryRanks = React.useCallback((val: MilitaryRank[] | ((prev: MilitaryRank[]) => MilitaryRank[])) => {
     setMilitaryRanksState(prev => {

@@ -20,7 +20,6 @@ const sectorsList = [
 
 interface ProductsSectionProps {
   banks: Bank[];
-  setBanks: React.Dispatch<React.SetStateAction<Bank[]>>;
   products: ProductAcceptance[];
   setProducts: React.Dispatch<React.SetStateAction<ProductAcceptance[]>>;
   showToast: (msg: string, type: 'success' | 'refuse') => void;
@@ -28,24 +27,113 @@ interface ProductsSectionProps {
 
 export const ProductsSection: React.FC<ProductsSectionProps> = ({
   banks,
-  setBanks,
   products,
   setProducts,
   showToast
 }) => {
+  const getProductActiveStatus = (bankId: string, field: 'realEstateFinanceEnabled' | 'personalFinanceEnabled' | 'combinedFinanceEnabled' | 'existingPersonalFinanceEnabled'): boolean => {
+    let mapping: ProductId = 'real_estate_only';
+    if (field === 'personalFinanceEnabled') mapping = 'personal_only';
+    if (field === 'combinedFinanceEnabled') mapping = 'real_estate_with_new_personal';
+    if (field === 'existingPersonalFinanceEnabled') mapping = 'real_estate_with_existing_personal';
+
+    const rule = products.find(p => p.bankId === bankId && p.productId === mapping);
+    return rule ? rule.isActive !== false : true;
+  };
+
+  const getProductLimit = (bankId: string, field: 'minRealEstateAmount' | 'maxRealEstateAmount' | 'minPersonalAmount' | 'maxPersonalAmount'): number | undefined => {
+    const mapping: ProductId = (field === 'minRealEstateAmount' || field === 'maxRealEstateAmount') 
+      ? 'real_estate_only' 
+      : 'personal_only';
+
+    const rule = products.find(p => p.bankId === bankId && p.productId === mapping);
+    if (rule && rule[field] !== undefined) {
+      return rule[field];
+    }
+    const bank = banks.find(b => b.id === bankId);
+    return bank ? bank[field] : undefined;
+  };
+
   const updateBankLimit = (bankId: string, field: 'minRealEstateAmount' | 'maxRealEstateAmount' | 'minPersonalAmount' | 'maxPersonalAmount', valStr: string) => {
     const clean = normalizeNumberInput(valStr);
     const parsed = clean === '' ? undefined : parseNumberInput(clean);
-    setBanks(prev => prev.map(b => b.id === bankId ? { ...b, [field]: parsed } : b));
+    
+    const mapping: ProductId = (field === 'minRealEstateAmount' || field === 'maxRealEstateAmount') 
+      ? 'real_estate_only' 
+      : 'personal_only';
+
+    setProducts(prev => {
+      const arr = Array.isArray(prev) ? prev : [];
+      const ruleExists = arr.some(p => p.bankId === bankId && p.productId === mapping);
+      if (!ruleExists) {
+        const newRule: ProductAcceptance = {
+          id: `prod_rule_gen_${bankId}_${mapping}_${Date.now()}`,
+          bankId,
+          productId: mapping,
+          isActive: true,
+          allowedSectors: ['gov_civil', 'semi_gov', 'companies', 'military', 'retired'],
+          minAge: 18,
+          minSalary: 1000,
+          minServiceMonths: 1,
+          allowMonthlySupport: true,
+          allowDownpaymentSupport: true,
+          allowUnsupported: true,
+          allowAfterRetirement: true,
+          defaultRejectionMessage: 'لا تطابق شروط جهة التمويل للمنتج المختار.',
+          allowedSupportTypes: ['none', 'monthly', 'down_payment'],
+          [field]: parsed
+        };
+        return [newRule, ...arr];
+      } else {
+        return arr.map(p => {
+          if (p.bankId === bankId && p.productId === mapping) {
+            return { ...p, [field]: parsed };
+          }
+          return p;
+        });
+      }
+    });
   };
 
   const toggleBankProduct = (
     bankId: string,
     field: 'realEstateFinanceEnabled' | 'personalFinanceEnabled' | 'combinedFinanceEnabled' | 'existingPersonalFinanceEnabled'
   ) => {
-    setBanks(prev => prev.map(b =>
-      b.id === bankId ? { ...b, [field]: !(b[field] !== false) } : b
-    ));
+    let mapping: ProductId = 'real_estate_only';
+    if (field === 'personalFinanceEnabled') mapping = 'personal_only';
+    if (field === 'combinedFinanceEnabled') mapping = 'real_estate_with_new_personal';
+    if (field === 'existingPersonalFinanceEnabled') mapping = 'real_estate_with_existing_personal';
+
+    setProducts(prev => {
+      const arr = Array.isArray(prev) ? prev : [];
+      const ruleExists = arr.some(p => p.bankId === bankId && p.productId === mapping);
+      if (!ruleExists) {
+        const newRule: ProductAcceptance = {
+          id: `prod_rule_gen_${bankId}_${mapping}_${Date.now()}`,
+          bankId,
+          productId: mapping,
+          isActive: false,
+          allowedSectors: ['gov_civil', 'semi_gov', 'companies', 'military', 'retired'],
+          minAge: 18,
+          minSalary: 1000,
+          minServiceMonths: 1,
+          allowMonthlySupport: true,
+          allowDownpaymentSupport: true,
+          allowUnsupported: true,
+          allowAfterRetirement: true,
+          defaultRejectionMessage: 'لا تطابق شروط جهة التمويل للمنتج المختار.',
+          allowedSupportTypes: ['none', 'monthly', 'down_payment']
+        };
+        return [newRule, ...arr];
+      } else {
+        return arr.map(p => {
+          if (p.bankId === bankId && p.productId === mapping) {
+            return { ...p, isActive: p.isActive === false ? true : false };
+          }
+          return p;
+        });
+      }
+    });
   };
 
   const [activeSubTab, setActiveSubTab] = useState<'rules' | 'limits'>('rules');
@@ -175,29 +263,12 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
     setIsProductModalOpen(false);
   };
 
-  const syncBanksWithProducts = (allProducts: ProductAcceptance[]) => {
-    setBanks(prevBanks => prevBanks.map(bk => {
-      const activeBkRules = allProducts.filter(p => p.bankId === bk.id && p.isActive !== false);
-      const supportsEtizaz = activeBkRules.some(r => {
-        if (Array.isArray(r.allowedSupportTypes)) {
-          return r.allowedSupportTypes.includes('etizaz');
-        }
-        return false;
-      });
-      return {
-        ...bk,
-        etizazSupportEnabled: supportsEtizaz
-      };
-    }));
-  };
-
   const deleteProduct = (id: string) => {
     try {
       if (window.confirm('هل أنت متأكد من رغبتك في حذف هذه قاعدة؟')) {
         setProducts(prev => {
           const arr = Array.isArray(prev) ? prev : [];
           const next = arr.filter(p => p.id !== id);
-          syncBanksWithProducts(next);
           return next;
         });
         showToast('تم حذف قاعدة القبول بنجاح!', 'success');
@@ -290,7 +361,6 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
         setProducts(prev => {
           const arr = Array.isArray(prev) ? prev : [];
           const next = arr.map(p => p.id === editingProduct.id ? payload : p);
-          syncBanksWithProducts(next);
           return next;
         });
         showToast('تم تعديل قاعدة القبول بنجاح!', 'success');
@@ -298,7 +368,6 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
         setProducts(prev => {
           const arr = Array.isArray(prev) ? prev : [];
           const next = [payload, ...arr];
-          syncBanksWithProducts(next);
           return next;
         });
         showToast('تم إضافة قاعدة القبول بنجاح!', 'success');
@@ -316,7 +385,6 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
     setProducts(prev => {
       const arr = Array.isArray(prev) ? prev : [];
       const next = arr.map(p => p.id === id ? { ...p, isActive: !p.isActive } : p);
-      syncBanksWithProducts(next);
       return next;
     });
   };
@@ -330,6 +398,9 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
           <h2 className="text-xl font-bold text-gray-900">المنتجات والقبول</h2>
           <p className="text-xs text-gray-500">
             إدارة منتجات البنوك وشروط قبول العملاء حسب الراتب والعمر والخدمة والدعم.
+          </p>
+          <p className="text-xs font-bold text-[#0057B8] mt-1 bg-blue-50/50 px-3 py-1.5 rounded-lg border border-blue-100 inline-block">
+            ℹ️ هذه الصفحة مخصصة لتفعيل المنتجات وشروط القبول وحدود التمويل. بيانات البنك الأساسية تُدار من صفحة البنوك المرخصة.
           </p>
         </div>
         {activeSubTab === 'rules' && (
@@ -657,12 +728,12 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
                         <button
                           onClick={() => toggleBankProduct(b.id, 'realEstateFinanceEnabled')}
                           className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${
-                            b.realEstateFinanceEnabled !== false
+                            getProductActiveStatus(b.id, 'realEstateFinanceEnabled')
                               ? 'bg-emerald-100 text-emerald-700'
                               : 'bg-red-100 text-red-600'
                           }`}
                         >
-                          {b.realEstateFinanceEnabled !== false ? 'مفعّل' : 'معطّل'}
+                          {getProductActiveStatus(b.id, 'realEstateFinanceEnabled') ? 'مفعّل' : 'معطّل'}
                         </button>
                       </td>
 
@@ -671,12 +742,12 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
                         <button
                           onClick={() => toggleBankProduct(b.id, 'personalFinanceEnabled')}
                           className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${
-                            b.personalFinanceEnabled !== false
+                            getProductActiveStatus(b.id, 'personalFinanceEnabled')
                               ? 'bg-emerald-100 text-emerald-700'
                               : 'bg-red-100 text-red-600'
                           }`}
                         >
-                          {b.personalFinanceEnabled !== false ? 'مفعّل' : 'معطّل'}
+                          {getProductActiveStatus(b.id, 'personalFinanceEnabled') ? 'مفعّل' : 'معطّل'}
                         </button>
                       </td>
 
@@ -685,12 +756,12 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
                         <button
                           onClick={() => toggleBankProduct(b.id, 'combinedFinanceEnabled')}
                           className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${
-                            b.combinedFinanceEnabled !== false
+                            getProductActiveStatus(b.id, 'combinedFinanceEnabled')
                               ? 'bg-emerald-100 text-emerald-700'
                               : 'bg-red-100 text-red-600'
                           }`}
                         >
-                          {b.combinedFinanceEnabled !== false ? 'مفعّل' : 'معطّل'}
+                          {getProductActiveStatus(b.id, 'combinedFinanceEnabled') ? 'مفعّل' : 'معطّل'}
                         </button>
                       </td>
 
@@ -699,12 +770,12 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
                         <button
                           onClick={() => toggleBankProduct(b.id, 'existingPersonalFinanceEnabled')}
                           className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${
-                            b.existingPersonalFinanceEnabled !== false
+                            getProductActiveStatus(b.id, 'existingPersonalFinanceEnabled')
                               ? 'bg-emerald-100 text-emerald-700'
                               : 'bg-red-100 text-red-600'
                           }`}
                         >
-                          {b.existingPersonalFinanceEnabled !== false ? 'مفعّل' : 'معطّل'}
+                          {getProductActiveStatus(b.id, 'existingPersonalFinanceEnabled') ? 'مفعّل' : 'معطّل'}
                         </button>
                       </td>
                     </tr>
@@ -741,8 +812,12 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {banks.map((b) => {
-                      const reEnabled = b.realEstateFinanceEnabled !== false;
-                      const peEnabled = b.personalFinanceEnabled !== false;
+                      const reEnabled = getProductActiveStatus(b.id, 'realEstateFinanceEnabled');
+                      const peEnabled = getProductActiveStatus(b.id, 'personalFinanceEnabled');
+                      const minREVal = getProductLimit(b.id, 'minRealEstateAmount');
+                      const maxREVal = getProductLimit(b.id, 'maxRealEstateAmount');
+                      const minPEVal = getProductLimit(b.id, 'minPersonalAmount');
+                      const maxPEVal = getProductLimit(b.id, 'maxPersonalAmount');
                       return (
                         <tr key={b.id} className="hover:bg-slate-50/30 transition-colors">
                           <td className="p-4 font-bold whitespace-nowrap">
@@ -761,14 +836,14 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
                               <input
                                 type="text"
                                 disabled={!reEnabled}
-                                value={b.minRealEstateAmount !== undefined ? b.minRealEstateAmount : ''}
+                                value={minREVal !== undefined ? minREVal : ''}
                                 placeholder={reEnabled ? "مثال: 300000" : "المنتج غير مفعل"}
                                 onChange={(e) => updateBankLimit(b.id, 'minRealEstateAmount', e.target.value)}
                                 className="w-full text-center bg-gray-50/50 border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold font-mono focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#0057B8] disabled:opacity-50"
                               />
-                              {reEnabled && b.minRealEstateAmount ? (
+                              {reEnabled && minREVal ? (
                                 <div className="text-[10px] text-emerald-600 font-extrabold block text-center">
-                                  {(b.minRealEstateAmount).toLocaleString('ar-SA')} ريال
+                                  {Number(minREVal).toLocaleString('ar-SA')} ريال
                                 </div>
                               ) : null}
                             </div>
@@ -780,14 +855,14 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
                               <input
                                 type="text"
                                 disabled={!reEnabled}
-                                value={b.maxRealEstateAmount !== undefined ? b.maxRealEstateAmount : ''}
+                                value={maxREVal !== undefined ? maxREVal : ''}
                                 placeholder={reEnabled ? "مثال: 5000000" : "المنتج غير مفعل"}
                                 onChange={(e) => updateBankLimit(b.id, 'maxRealEstateAmount', e.target.value)}
                                 className="w-full text-center bg-gray-50/50 border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold font-mono focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#0057B8] disabled:opacity-50"
                               />
-                              {reEnabled && b.maxRealEstateAmount ? (
+                              {reEnabled && maxREVal ? (
                                 <div className="text-[10px] text-indigo-600 font-extrabold block text-center">
-                                  {(b.maxRealEstateAmount).toLocaleString('ar-SA')} ريال
+                                  {Number(maxREVal).toLocaleString('ar-SA')} ريال
                                 </div>
                               ) : null}
                             </div>
@@ -799,14 +874,14 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
                               <input
                                 type="text"
                                 disabled={!peEnabled}
-                                value={b.minPersonalAmount !== undefined ? b.minPersonalAmount : ''}
+                                value={minPEVal !== undefined ? minPEVal : ''}
                                 placeholder={peEnabled ? "مثال: 10000" : "المنتج غير مفعل"}
                                 onChange={(e) => updateBankLimit(b.id, 'minPersonalAmount', e.target.value)}
                                 className="w-full text-center bg-gray-50/50 border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold font-mono focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#0057B8] disabled:opacity-50"
                               />
-                              {peEnabled && b.minPersonalAmount ? (
+                              {peEnabled && minPEVal ? (
                                 <div className="text-[10px] text-emerald-600 font-extrabold block text-center">
-                                  {(b.minPersonalAmount).toLocaleString('ar-SA')} ريال
+                                  {Number(minPEVal).toLocaleString('ar-SA')} ريال
                                 </div>
                               ) : null}
                             </div>
@@ -818,14 +893,14 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
                               <input
                                 type="text"
                                 disabled={!peEnabled}
-                                value={b.maxPersonalAmount !== undefined ? b.maxPersonalAmount : ''}
+                                value={maxPEVal !== undefined ? maxPEVal : ''}
                                 placeholder={peEnabled ? "مثال: 2000000" : "المنتج غير مفعل"}
                                 onChange={(e) => updateBankLimit(b.id, 'maxPersonalAmount', e.target.value)}
                                 className="w-full text-center bg-gray-50/50 border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold font-mono focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#0057B8] disabled:opacity-50"
                               />
-                              {peEnabled && b.maxPersonalAmount ? (
+                              {peEnabled && maxPEVal ? (
                                 <div className="text-[10px] text-indigo-600 font-extrabold block text-center">
-                                  {(b.maxPersonalAmount).toLocaleString('ar-SA')} ريال
+                                  {Number(maxPEVal).toLocaleString('ar-SA')} ريال
                                 </div>
                               ) : null}
                             </div>
@@ -842,8 +917,12 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
             (() => {
               const bankObj = banks.find(b => b.id === filterBank);
               if (!bankObj) return null;
-              const reEnabled = bankObj.realEstateFinanceEnabled !== false;
-              const peEnabled = bankObj.personalFinanceEnabled !== false;
+              const reEnabled = getProductActiveStatus(bankObj.id, 'realEstateFinanceEnabled');
+              const peEnabled = getProductActiveStatus(bankObj.id, 'personalFinanceEnabled');
+              const minREVal = getProductLimit(bankObj.id, 'minRealEstateAmount');
+              const maxREVal = getProductLimit(bankObj.id, 'maxRealEstateAmount');
+              const minPEVal = getProductLimit(bankObj.id, 'minPersonalAmount');
+              const maxPEVal = getProductLimit(bankObj.id, 'maxPersonalAmount');
               return (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 leading-relaxed">
                   {/* Real Estate bounds card */}
@@ -866,14 +945,14 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
                           <input
                             type="text"
                             disabled={!reEnabled}
-                            value={bankObj.minRealEstateAmount !== undefined ? bankObj.minRealEstateAmount : ''}
+                            value={minREVal !== undefined ? minREVal : ''}
                             onChange={(e) => updateBankLimit(bankObj.id, 'minRealEstateAmount', e.target.value)}
                             placeholder={reEnabled ? "مثال: 300000" : "المنتج غير مفعل لـ هذه الجهة"}
                             className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-bold font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0057B8] disabled:opacity-50 text-center"
                           />
-                          {reEnabled && bankObj.minRealEstateAmount ? (
+                          {reEnabled && minREVal ? (
                             <span className="text-[10px] text-emerald-600 font-extrabold block text-center mt-1">
-                              {(bankObj.minRealEstateAmount).toLocaleString('ar-SA')} ريال
+                              {Number(minREVal).toLocaleString('ar-SA')} ريال
                             </span>
                           ) : null}
                         </div>
@@ -883,14 +962,14 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
                           <input
                             type="text"
                             disabled={!reEnabled}
-                            value={bankObj.maxRealEstateAmount !== undefined ? bankObj.maxRealEstateAmount : ''}
+                            value={maxREVal !== undefined ? maxREVal : ''}
                             onChange={(e) => updateBankLimit(bankObj.id, 'maxRealEstateAmount', e.target.value)}
                             placeholder={reEnabled ? "مثال: 5000000" : "المنتج غير مفعل لـ هذه الجهة"}
                             className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-bold font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0057B8] disabled:opacity-50 text-center"
                           />
-                          {reEnabled && bankObj.maxRealEstateAmount ? (
+                          {reEnabled && maxREVal ? (
                             <span className="text-[10px] text-indigo-600 font-extrabold block text-center mt-1">
-                              {(bankObj.maxRealEstateAmount).toLocaleString('ar-SA')} ريال
+                              {Number(maxREVal).toLocaleString('ar-SA')} ريال
                             </span>
                           ) : null}
                         </div>
@@ -918,14 +997,14 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
                           <input
                             type="text"
                             disabled={!peEnabled}
-                            value={bankObj.minPersonalAmount !== undefined ? bankObj.minPersonalAmount : ''}
+                            value={minPEVal !== undefined ? minPEVal : ''}
                             onChange={(e) => updateBankLimit(bankObj.id, 'minPersonalAmount', e.target.value)}
                             placeholder={peEnabled ? "مثال: 10000" : "المنتج غير مفعل لـ هذه الجهة"}
                             className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-bold font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0057B8] disabled:opacity-50 text-center"
                           />
-                          {peEnabled && bankObj.minPersonalAmount ? (
+                          {peEnabled && minPEVal ? (
                             <span className="text-[10px] text-emerald-600 font-extrabold block text-center mt-1">
-                              {(bankObj.minPersonalAmount).toLocaleString('ar-SA')} ريال
+                              {Number(minPEVal).toLocaleString('ar-SA')} ريال
                             </span>
                           ) : null}
                         </div>
@@ -935,14 +1014,14 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
                           <input
                             type="text"
                             disabled={!peEnabled}
-                            value={bankObj.maxPersonalAmount !== undefined ? bankObj.maxPersonalAmount : ''}
+                            value={maxPEVal !== undefined ? maxPEVal : ''}
                             onChange={(e) => updateBankLimit(bankObj.id, 'maxPersonalAmount', e.target.value)}
                             placeholder={peEnabled ? "مثال: 2000000" : "المنتج غير مفعل لـ هذه الجهة"}
                             className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-bold font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0057B8] disabled:opacity-50 text-center"
                           />
-                          {peEnabled && bankObj.maxPersonalAmount ? (
+                          {peEnabled && maxPEVal ? (
                             <span className="text-[10px] text-indigo-600 font-extrabold block text-center mt-1">
-                              {(bankObj.maxPersonalAmount).toLocaleString('ar-SA')} ريال
+                              {Number(maxPEVal).toLocaleString('ar-SA')} ريال
                             </span>
                           ) : null}
                         </div>

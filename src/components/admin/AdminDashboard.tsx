@@ -1812,11 +1812,6 @@ export default function AdminDashboard() {
           <BanksSection
             banks={banks}
             setBanks={setBanks}
-            setProducts={setProducts}
-            setTermRules={setTermRules}
-            setPersonalRules={setPersonalRules}
-            setDsrRules={setDsrRules}
-            setMarginRules={setMarginRules}
             showToast={showToast}
           />
         )}
@@ -1825,7 +1820,6 @@ export default function AdminDashboard() {
         {adminSubPage === 'products' && (
           <ProductsSection
             banks={banks}
-            setBanks={setBanks}
             products={products}
             setProducts={setProducts}
             showToast={showToast}

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, ToggleRight, ToggleLeft, Edit, Trash2 } from 'lucide-react';
-import { Bank, ProductAcceptance, TermRule, PersonalFinanceRules, DsrRule, MarginRule } from '../../../types';
+import { Bank } from '../../../types';
 
 const LOGO_COLOR_PRESETS = [
   { value: 'from-emerald-700 to-emerald-950', name: 'أخضر داكن (الأهلي)' },
@@ -18,22 +18,12 @@ const LOGO_COLOR_PRESETS = [
 interface BanksSectionProps {
   banks: Bank[];
   setBanks: React.Dispatch<React.SetStateAction<Bank[]>>;
-  setProducts: React.Dispatch<React.SetStateAction<ProductAcceptance[]>>;
-  setTermRules: React.Dispatch<React.SetStateAction<TermRule[]>>;
-  setPersonalRules: React.Dispatch<React.SetStateAction<PersonalFinanceRules[]>>;
-  setDsrRules: React.Dispatch<React.SetStateAction<DsrRule[]>>;
-  setMarginRules: React.Dispatch<React.SetStateAction<MarginRule[]>>;
   showToast: (msg: string, type: 'success' | 'refuse') => void;
 }
 
 export const BanksSection: React.FC<BanksSectionProps> = ({
   banks,
   setBanks,
-  setProducts,
-  setTermRules,
-  setPersonalRules,
-  setDsrRules,
-  setMarginRules,
   showToast
 }) => {
   const [isInstitutionModalOpen, setIsInstitutionModalOpen] = useState(false);
@@ -45,21 +35,11 @@ export const BanksSection: React.FC<BanksSectionProps> = ({
   const [instType, setInstType] = useState<'bank' | 'finance_company'>('bank');
   const [instLogoColor, setInstLogoColor] = useState('from-emerald-700 to-emerald-950');
   const [instLogoText, setInstLogoText] = useState('');
-  const [instMaxTermMonths, setInstMaxTermMonths] = useState(360);
-  const [instMaxAgeAtEnd, setInstMaxAgeAtEnd] = useState(75);
-  const [instAllowAfterRetirement, setInstAllowAfterRetirement] = useState(true);
-  const [instMonthsAfterRetirement, setInstMonthsAfterRetirement] = useState(120);
   const [instIsActive, setInstIsActive] = useState(true);
   const [instCalendarType, setInstCalendarType] = useState<'hijri' | 'gregorian'>('gregorian');
   const [instInternalNotes, setInstInternalNotes] = useState('');
   const [instEmployeeWhatsApp, setInstEmployeeWhatsApp] = useState('');
   const [instModalError, setInstModalError] = useState('');
-
-  const [instRealEstateFinanceEnabled, setInstRealEstateFinanceEnabled] = useState(true);
-  const [instPersonalFinanceEnabled, setInstPersonalFinanceEnabled] = useState(true);
-  const [instCombinedFinanceEnabled, setInstCombinedFinanceEnabled] = useState(true);
-  const [instExistingPersonalFinanceEnabled, setInstExistingPersonalFinanceEnabled] = useState(true);
-  const [instEtizazSupportEnabled, setInstEtizazSupportEnabled] = useState(true);
 
   const openAddInstitution = () => {
     setEditingInstitution(null);
@@ -69,20 +49,11 @@ export const BanksSection: React.FC<BanksSectionProps> = ({
     setInstType('bank');
     setInstLogoColor('from-[#0057B8] to-blue-900');
     setInstLogoText('');
-    setInstMaxTermMonths(360);
-    setInstMaxAgeAtEnd(75);
-    setInstAllowAfterRetirement(true);
-    setInstMonthsAfterRetirement(120);
     setInstIsActive(true);
     setInstCalendarType('gregorian');
     setInstInternalNotes('');
     setInstEmployeeWhatsApp('');
     setInstModalError('');
-    setInstRealEstateFinanceEnabled(true);
-    setInstPersonalFinanceEnabled(true);
-    setInstCombinedFinanceEnabled(true);
-    setInstExistingPersonalFinanceEnabled(true);
-    setInstEtizazSupportEnabled(true);
     setIsInstitutionModalOpen(true);
   };
 
@@ -94,20 +65,11 @@ export const BanksSection: React.FC<BanksSectionProps> = ({
     setInstType(bank.institutionType || 'bank');
     setInstLogoColor(bank.logoColor || 'from-[#0057B8] to-blue-900');
     setInstLogoText(bank.logoText || '');
-    setInstMaxTermMonths(bank.maxTermMonths || 360);
-    setInstMaxAgeAtEnd(bank.maxAgeAtEnd || 75);
-    setInstAllowAfterRetirement(bank.allowAfterRetirement || false);
-    setInstMonthsAfterRetirement(bank.monthsAfterRetirement || 0);
     setInstIsActive(bank.isActive !== false);
     setInstCalendarType(bank.calendarType || 'gregorian');
     setInstInternalNotes(bank.internalNotes || '');
     setInstEmployeeWhatsApp(bank.employeeWhatsApp || '');
     setInstModalError('');
-    setInstRealEstateFinanceEnabled(bank.realEstateFinanceEnabled !== false);
-    setInstPersonalFinanceEnabled(bank.personalFinanceEnabled !== false);
-    setInstCombinedFinanceEnabled(bank.combinedFinanceEnabled !== false);
-    setInstExistingPersonalFinanceEnabled(bank.existingPersonalFinanceEnabled !== false);
-    setInstEtizazSupportEnabled(bank.etizazSupportEnabled !== false);
     setIsInstitutionModalOpen(true);
   };
 
@@ -138,21 +100,14 @@ export const BanksSection: React.FC<BanksSectionProps> = ({
       logoText: finalLogoText,
       isActive: instIsActive,
       calendarType: instCalendarType,
-      maxTermMonths: Number(instMaxTermMonths) || (instType === 'finance_company' ? 240 : 360),
-      maxAgeAtEnd: Number(instMaxAgeAtEnd) || 75,
-      monthsAfterRetirement: instAllowAfterRetirement ? (Number(instMonthsAfterRetirement) || 0) : 0,
-      allowAfterRetirement: instAllowAfterRetirement,
       displayOrder: editingInstitution ? (editingInstitution.displayOrder || 1) : (banks.length + 1),
       employeeWhatsApp: instEmployeeWhatsApp.trim() || undefined,
-      realEstateFinanceEnabled: instRealEstateFinanceEnabled,
-      personalFinanceEnabled: instPersonalFinanceEnabled,
-      combinedFinanceEnabled: instCombinedFinanceEnabled,
-      existingPersonalFinanceEnabled: instExistingPersonalFinanceEnabled,
-      etizazSupportEnabled: instEtizazSupportEnabled
     };
 
     if (instInternalNotes.trim()) {
       updatedBank.internalNotes = instInternalNotes.trim();
+    } else if (updatedBank.internalNotes) {
+      delete updatedBank.internalNotes;
     }
 
     if (editingInstitution) {
@@ -161,312 +116,7 @@ export const BanksSection: React.FC<BanksSectionProps> = ({
       showToast(`تم تعديل بيانات جهة التمويل "${instNameAr}" بنجاح في المسودة.`, "success");
     } else {
       setBanks(prev => [...prev, updatedBank]);
-
-      // 1. PRODUCTS & ACCEPTANCE
-      const newProducts: ProductAcceptance[] = [
-        {
-          id: `${cleanId}_re_only`,
-          bankId: cleanId,
-          productId: 'real_estate_only',
-          allowedSectors: ['gov_civil', 'semi_gov', 'companies', 'military'],
-          minAge: 18,
-          maxAge: updatedBank.maxAgeAtEnd - 5,
-          minSalary: instType === 'finance_company' ? 4000 : 5000,
-          minServiceMonths: 3,
-          allowMonthlySupport: true,
-          allowDownpaymentSupport: true,
-          allowUnsupported: true,
-          allowAfterRetirement: updatedBank.allowAfterRetirement,
-          isActive: true,
-          defaultRejectionMessage: `${updatedBank.nameAr}: يتطلب راتب لا يقل عن ${instType === 'finance_company' ? '4,000' : '5,000'} وعمر مناسب ومطابقة الحد الأقصى للمدة والسن.`
-        },
-        {
-          id: `${cleanId}_pf_only`,
-          bankId: cleanId,
-          productId: 'personal_only',
-          allowedSectors: ['gov_civil', 'semi_gov', 'companies', 'military', 'retired'],
-          minAge: 18,
-          maxAge: 65,
-          minSalary: instType === 'finance_company' ? 3000 : 4000,
-          minServiceMonths: 1,
-          allowMonthlySupport: false,
-          allowDownpaymentSupport: false,
-          allowUnsupported: true,
-          allowAfterRetirement: updatedBank.allowAfterRetirement,
-          isActive: true,
-          defaultRejectionMessage: `${updatedBank.nameAr}: التمويل الشخصي يتطلب مطابقة السن وجودة السجل الائتماني والخدمة.`
-        },
-        {
-          id: `${cleanId}_re_new_pf`,
-          bankId: cleanId,
-          productId: 'real_estate_with_new_personal',
-          allowedSectors: ['gov_civil', 'semi_gov', 'companies', 'military'],
-          minAge: 21,
-          maxAge: 60,
-          minSalary: instType === 'finance_company' ? 6000 : 8000,
-          minServiceMonths: 6,
-          allowMonthlySupport: true,
-          allowDownpaymentSupport: true,
-          allowUnsupported: true,
-          allowAfterRetirement: false,
-          isActive: true,
-          defaultRejectionMessage: `${updatedBank.nameAr}: التمويل المشترك يتطلب حد أدنى للراتب ومطابقة السن قبل التقاعد والحدود المعتمدة.`
-        },
-        {
-          id: `${cleanId}_re_existing_pf`,
-          bankId: cleanId,
-          productId: 'real_estate_with_existing_personal',
-          allowedSectors: ['gov_civil', 'semi_gov', 'companies', 'military'],
-          minAge: 21,
-          maxAge: updatedBank.maxAgeAtEnd - 5,
-          minSalary: instType === 'finance_company' ? 5000 : 6000,
-          minServiceMonths: 3,
-          allowMonthlySupport: true,
-          allowDownpaymentSupport: true,
-          allowUnsupported: true,
-          allowAfterRetirement: updatedBank.allowAfterRetirement,
-          isActive: true,
-          defaultRejectionMessage: `${updatedBank.nameAr}: يتطلب كفاية الدخل وتوفر مستندات القرض القائم وانسجام حدود الالتزام.`
-        }
-      ];
-      setProducts(prev => {
-        const currentProducts = Array.isArray(prev) ? prev : [];
-        return [...currentProducts, ...newProducts];
-      });
-
-      // 2. TERM RULES
-      const newTermRules: TermRule[] = [
-        {
-          bankId: cleanId,
-          sectorId: 'gov_civil',
-          rankId: 'all',
-          productId: 'all',
-          supportType: 'all',
-          maxTermMonths: updatedBank.maxTermMonths,
-          allowedMonthsAfterRetirement: updatedBank.monthsAfterRetirement,
-          maxAgeAtEnd: updatedBank.maxAgeAtEnd,
-          allowAfterRetirement: updatedBank.allowAfterRetirement,
-          calendarType: updatedBank.calendarType,
-          minTermMonths: 60,
-          defaultTermMode: 'max',
-          isActive: true
-        },
-        {
-          bankId: cleanId,
-          sectorId: 'military',
-          rankId: 'all',
-          productId: 'all',
-          supportType: 'all',
-          maxTermMonths: updatedBank.maxTermMonths,
-          allowedMonthsAfterRetirement: updatedBank.monthsAfterRetirement,
-          maxAgeAtEnd: updatedBank.maxAgeAtEnd,
-          allowAfterRetirement: updatedBank.allowAfterRetirement,
-          calendarType: updatedBank.calendarType,
-          minTermMonths: 60,
-          defaultTermMode: 'max',
-          isActive: true
-        },
-        {
-          bankId: cleanId,
-          sectorId: 'companies',
-          rankId: 'all',
-          productId: 'all',
-          supportType: 'all',
-          maxTermMonths: updatedBank.maxTermMonths,
-          allowedMonthsAfterRetirement: updatedBank.monthsAfterRetirement,
-          maxAgeAtEnd: updatedBank.maxAgeAtEnd,
-          allowAfterRetirement: updatedBank.allowAfterRetirement,
-          calendarType: updatedBank.calendarType,
-          minTermMonths: 60,
-          defaultTermMode: 'max',
-          isActive: true
-        }
-      ];
-
-      if (updatedBank.allowAfterRetirement) {
-        newTermRules.push({
-          bankId: cleanId,
-          sectorId: 'retired',
-          rankId: 'all',
-          productId: 'all',
-          supportType: 'all',
-          maxTermMonths: updatedBank.maxTermMonths,
-          allowedMonthsAfterRetirement: updatedBank.monthsAfterRetirement,
-          maxAgeAtEnd: updatedBank.maxAgeAtEnd,
-          allowAfterRetirement: true,
-          calendarType: updatedBank.calendarType,
-          minTermMonths: 60,
-          defaultTermMode: 'max',
-          isActive: true
-        });
-      }
-      setTermRules(prev => {
-        const currentTerms = Array.isArray(prev) ? prev : [];
-        return [...currentTerms, ...newTermRules];
-      });
-
-      // 3. PERSONAL CONTROLLER RULES
-      const newPersonalRules: PersonalFinanceRules[] = [
-        {
-          id: `rule-${cleanId}-personal-active`,
-          bankId: cleanId,
-          sectorId: 'all',
-          dsrPercentage: 33,
-          termMonths: 60,
-          financeCoefficient: 0,
-          annualMargin: 4.80,
-          minSalary: instType === 'finance_company' ? 3000 : 4000,
-          minAge: 18,
-          maxAge: updatedBank.maxAgeAtEnd - 5,
-          retireeDsrPercentage: 25,
-          isActive: true,
-          calculationMethod: 'flat_rate',
-          pathType: 'personal_only',
-          customerStatus: 'active_employee'
-        },
-        {
-          id: `rule-${cleanId}-personal-retired`,
-          bankId: cleanId,
-          sectorId: 'retired',
-          dsrPercentage: 25,
-          termMonths: 60,
-          financeCoefficient: 0,
-          annualMargin: 4.80,
-          minSalary: instType === 'finance_company' ? 3000 : 4000,
-          minAge: 18,
-          maxAge: updatedBank.maxAgeAtEnd - 5,
-          retireeDsrPercentage: 25,
-          isActive: updatedBank.allowAfterRetirement,
-          calculationMethod: 'flat_rate',
-          pathType: 'personal_only',
-          customerStatus: 'retired'
-        },
-        {
-          id: `rule-${cleanId}-combo-active`,
-          bankId: cleanId,
-          sectorId: 'all',
-          dsrPercentage: 40,
-          termMonths: 60,
-          financeCoefficient: 0,
-          annualMargin: 4.80,
-          minSalary: instType === 'finance_company' ? 5000 : 6000,
-          minAge: 21,
-          maxAge: 60,
-          retireeDsrPercentage: 25,
-          isActive: true,
-          calculationMethod: 'flat_rate',
-          pathType: 'real_estate_with_new_personal',
-          customerStatus: 'active_employee'
-        }
-      ];
-      setPersonalRules(prev => {
-        const currentPersonal = Array.isArray(prev) ? prev : [];
-        return [...currentPersonal, ...newPersonalRules];
-      });
-
-      // 4. DSR RULES
-      const newDsrRules: DsrRule[] = [
-        {
-          id: `${cleanId}_re_only_none_before`,
-          bankId: cleanId,
-          productType: 'real_estate_only',
-          supportType: 'none',
-          customerStage: 'active_before_retirement',
-          dsrPercent: 55,
-          deductExistingObligations: true,
-          active: true
-        },
-        {
-          id: `${cleanId}_re_only_monthly_before`,
-          bankId: cleanId,
-          productType: 'real_estate_only',
-          supportType: 'monthly',
-          customerStage: 'active_before_retirement',
-          dsrPercent: instType === 'finance_company' ? 60 : 65,
-          deductExistingObligations: true,
-          active: true
-        },
-        {
-          id: `${cleanId}_re_only_down_before`,
-          bankId: cleanId,
-          productType: 'real_estate_only',
-          supportType: 'downpayment',
-          customerStage: 'active_before_retirement',
-          dsrPercent: 55,
-          deductExistingObligations: true,
-          active: true
-        },
-        {
-          id: `${cleanId}_personal_only_none_before`,
-          bankId: cleanId,
-          productType: 'personal_only',
-          supportType: 'not_applicable',
-          customerStage: 'active_before_retirement',
-          dsrPercent: 33,
-          deductExistingObligations: true,
-          active: true
-        }
-      ];
-
-      if (updatedBank.allowAfterRetirement) {
-        newDsrRules.push(
-          {
-            id: `${cleanId}_re_only_none_after`,
-            bankId: cleanId,
-            productType: 'real_estate_only',
-            supportType: 'none',
-            customerStage: 'retired_after_retirement',
-            dsrPercent: 55,
-            deductExistingObligations: true,
-            active: true
-          },
-          {
-            id: `${cleanId}_re_only_monthly_after`,
-            bankId: cleanId,
-            productType: 'real_estate_only',
-            supportType: 'monthly',
-            customerStage: 'retired_after_retirement',
-            dsrPercent: instType === 'finance_company' ? 60 : 65,
-            deductExistingObligations: true,
-            active: true
-          },
-          {
-            id: `${cleanId}_personal_only_none_after`,
-            bankId: cleanId,
-            productType: 'personal_only',
-            supportType: 'not_applicable',
-            customerStage: 'retired_after_retirement',
-            dsrPercent: 25,
-            deductExistingObligations: true,
-            active: true
-          }
-        );
-      }
-      setDsrRules(prev => {
-        const currentDsr = Array.isArray(prev) ? prev : [];
-        return [...currentDsr, ...newDsrRules];
-      });
-
-      // 5. MARGIN RULES
-      const newMarginRule: MarginRule = {
-        id: `${cleanId}_re_m1`,
-        bankId: cleanId,
-        productId: 'real_estate_only',
-        supportType: 'all',
-        sectorId: 'all',
-        fromTermMonths: 0,
-        toTermMonths: 360,
-        startMargin: 3.50,
-        endMargin: 3.50,
-        calcType: 'fixed',
-        isActive: true
-      };
-      setMarginRules(prev => {
-        const currentMargin = Array.isArray(prev) ? prev : [];
-        return [...currentMargin, newMarginRule];
-      });
-
-      showToast(`تمت إضافة جهة التمويل "${instNameAr}" بنجاح مع تهيئة القواعد الافتراضية. يرجى الضغط على حفظ التغييرات لحفظها دائماً.`, "success");
+      showToast('تم إنشاء جهة التمويل. لإدارة المنتجات والقبول والحدود، انتقل إلى صفحة المنتجات والقبول.', 'success');
     }
 
     setIsInstitutionModalOpen(false);
@@ -477,15 +127,7 @@ export const BanksSection: React.FC<BanksSectionProps> = ({
     if (!bankObj) return;
 
     setBanks(prev => prev.filter(b => b.id !== bankId));
-
-    // Clear related config
-    setProducts(prev => Array.isArray(prev) ? prev.filter(p => p.bankId !== bankId) : []);
-    setTermRules(prev => Array.isArray(prev) ? prev.filter(t => t.bankId !== bankId) : []);
-    setPersonalRules(prev => Array.isArray(prev) ? prev.filter(pr => pr.bankId !== bankId) : []);
-    setDsrRules(prev => Array.isArray(prev) ? prev.filter(d => d.bankId !== bankId) : []);
-    setMarginRules(prev => Array.isArray(prev) ? prev.filter(m => m.bankId !== bankId) : []);
-
-    showToast(`تم حذف جهة التمويل "${bankObj.nameAr}" وجميع الإعدادات التابعة لها من المسودة.`, "success");
+    showToast(`تم حذف جهة التمويل "${bankObj.nameAr}" من المسودة. لإكمال الحذف النهائي، اضغط على حفظ التغييرات.`, "success");
   };
 
   const toggleBankActive = (id: string) => {
@@ -494,6 +136,17 @@ export const BanksSection: React.FC<BanksSectionProps> = ({
 
   return (
     <div className="space-y-6">
+      {/* Notice Banner */}
+      <div className="p-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl flex items-start gap-3 text-xs font-bold leading-relaxed shadow-sm">
+        <span className="text-base shrink-0">💡</span>
+        <div className="space-y-1 text-right">
+          <p className="font-extrabold text-amber-900">ملاحظة تنظيمية هامة لمدير النظام:</p>
+          <p className="font-medium text-amber-800">
+            هذه الصفحة مخصصة فقط لتسجيل وهوية جهات التمويل (الشعار، الاسم، نوع التقويم، والواتساب). لتفعيل أو تعطيل التمويل العقاري أو الشخصي أو المشترك أو حدود القبول والنسب، يرجى الانتقال إلى صفحة <strong>"المنتجات والقبول"</strong>.
+          </p>
+        </div>
+      </div>
+
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-[#F1F5F9] pb-4">
         <div>
           <h2 className="text-xl font-bold text-[#111827]">جهات التمويل والشركات المرخصة</h2>
@@ -675,25 +328,7 @@ export const BanksSection: React.FC<BanksSectionProps> = ({
                   <select
                     value={instType}
                     onChange={(e) => {
-                      const newType = e.target.value as 'bank' | 'finance_company';
-                      setInstType(newType);
-                      if (newType === 'finance_company') {
-                        setInstMaxTermMonths(240);
-                        setInstMaxAgeAtEnd(65);
-                        setInstRealEstateFinanceEnabled(true);
-                        setInstPersonalFinanceEnabled(false);
-                        setInstCombinedFinanceEnabled(false);
-                        setInstExistingPersonalFinanceEnabled(true);
-                        setInstEtizazSupportEnabled(false);
-                      } else {
-                        setInstMaxTermMonths(360);
-                        setInstMaxAgeAtEnd(75);
-                        setInstRealEstateFinanceEnabled(true);
-                        setInstPersonalFinanceEnabled(true);
-                        setInstCombinedFinanceEnabled(true);
-                        setInstExistingPersonalFinanceEnabled(true);
-                        setInstEtizazSupportEnabled(true);
-                      }
+                      setInstType(e.target.value as 'bank' | 'finance_company');
                     }}
                     className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-right"
                   >
