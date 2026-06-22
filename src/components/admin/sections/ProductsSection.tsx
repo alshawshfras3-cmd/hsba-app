@@ -475,6 +475,90 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
 
       {activeSubTab === 'rules' ? (
         <>
+          {/* جدول تفعيل/تعطيل المنتجات */}
+          <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm mb-6">
+            <h4 className="text-sm font-bold text-slate-700 mb-3 font-sans">تفعيل المنتجات لكل بنك</h4>
+            <div className="overflow-x-auto">
+              <table className="w-full text-right text-xs min-w-[700px] border border-gray-200 rounded-xl overflow-hidden">
+                <thead className="bg-slate-50 text-gray-500 font-bold">
+                  <tr>
+                    <th className="p-3 text-right">الجهة التمويلية</th>
+                    <th className="p-3 text-center">عقاري فقط</th>
+                    <th className="p-3 text-center">شخصي فقط</th>
+                    <th className="p-3 text-center">عقاري + شخصي جديد</th>
+                    <th className="p-3 text-center">عقاري مع شخصي قائم</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 bg-white">
+                  {banks.map(b => (
+                    <tr key={b.id} className="hover:bg-slate-50/40">
+                      <td className="p-3 font-bold text-gray-800">{b.nameAr}</td>
+
+                      {/* عقاري فقط */}
+                      <td className="p-3 text-center">
+                        <button
+                          onClick={() => toggleBankProduct(b.id, 'realEstateFinanceEnabled')}
+                          className={`px-3 py-1 rounded-full text-xs font-bold transition-colors cursor-pointer ${
+                            getProductActiveStatus(b.id, 'realEstateFinanceEnabled')
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'bg-red-100 text-red-600'
+                          }`}
+                        >
+                          {getProductActiveStatus(b.id, 'realEstateFinanceEnabled') ? 'مفعّل' : 'معطّل'}
+                        </button>
+                      </td>
+
+                      {/* شخصي فقط */}
+                      <td className="p-3 text-center">
+                        <button
+                          onClick={() => toggleBankProduct(b.id, 'personalFinanceEnabled')}
+                          className={`px-3 py-1 rounded-full text-xs font-bold transition-colors cursor-pointer ${
+                            getProductActiveStatus(b.id, 'personalFinanceEnabled')
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'bg-red-100 text-red-600'
+                          }`}
+                        >
+                          {getProductActiveStatus(b.id, 'personalFinanceEnabled') ? 'مفعّل' : 'معطّل'}
+                        </button>
+                      </td>
+
+                      {/* عقاري + شخصي جديد */}
+                      <td className="p-3 text-center">
+                        <button
+                          onClick={() => toggleBankProduct(b.id, 'combinedFinanceEnabled')}
+                          className={`px-3 py-1 rounded-full text-xs font-bold transition-colors cursor-pointer ${
+                            getProductActiveStatus(b.id, 'combinedFinanceEnabled')
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'bg-red-100 text-red-600'
+                          }`}
+                        >
+                          {getProductActiveStatus(b.id, 'combinedFinanceEnabled') ? 'مفعّل' : 'معطّل'}
+                        </button>
+                      </td>
+
+                      {/* عقاري مع شخصي قائم */}
+                      <td className="p-3 text-center">
+                        <button
+                          onClick={() => toggleBankProduct(b.id, 'existingPersonalFinanceEnabled')}
+                          className={`px-3 py-1 rounded-full text-xs font-bold transition-colors cursor-pointer ${
+                            getProductActiveStatus(b.id, 'existingPersonalFinanceEnabled')
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'bg-red-100 text-red-600'
+                          }`}
+                        >
+                          {getProductActiveStatus(b.id, 'existingPersonalFinanceEnabled') ? 'مفعّل' : 'معطّل'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-xs text-gray-400 mt-2 text-right font-sans">
+              * التغييرات تُحفظ عند الضغط على "حفظ وتطبيق الإعدادات"
+            </p>
+          </div>
+
           {/* Filters Bar */}
           <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm grid grid-cols-1 sm:grid-cols-3 gap-4">
             {/* Filter Product Type */}
@@ -702,90 +786,6 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
                 يتم تقليص التمويل وسقف الدفعات تلقائياً إذا تجاوز المحسوب الحد الأقصى، بينما يتم رفض العملية وإظهار رسالة عدم الأهلية إذا قل المحسوب عن الحد الأدنى. تذكر الضغط على زر حفظ التغييرات من الشريط أسفل الصفحة لاعتماد التغييرات في النظام وسحابة Supabase.
               </p>
             </div>
-          </div>
-
-          {/* جدول تفعيل/تعطيل المنتجات */}
-          <div className="mb-6">
-            <h4 className="text-sm font-bold text-slate-700 mb-3">تفعيل المنتجات لكل بنك</h4>
-            <div className="overflow-x-auto">
-              <table className="w-full text-right text-xs min-w-[700px] border border-gray-200 rounded-xl overflow-hidden">
-                <thead className="bg-slate-50 text-gray-500 font-bold">
-                  <tr>
-                    <th className="p-3 text-right">الجهة التمويلية</th>
-                    <th className="p-3 text-center">عقاري فقط</th>
-                    <th className="p-3 text-center">شخصي فقط</th>
-                    <th className="p-3 text-center">عقاري + شخصي جديد</th>
-                    <th className="p-3 text-center">عقاري مع شخصي قائم</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 bg-white">
-                  {banks.map(b => (
-                    <tr key={b.id} className="hover:bg-slate-50/40">
-                      <td className="p-3 font-bold text-gray-800">{b.nameAr}</td>
-
-                      {/* عقاري فقط */}
-                      <td className="p-3 text-center">
-                        <button
-                          onClick={() => toggleBankProduct(b.id, 'realEstateFinanceEnabled')}
-                          className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${
-                            getProductActiveStatus(b.id, 'realEstateFinanceEnabled')
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : 'bg-red-100 text-red-600'
-                          }`}
-                        >
-                          {getProductActiveStatus(b.id, 'realEstateFinanceEnabled') ? 'مفعّل' : 'معطّل'}
-                        </button>
-                      </td>
-
-                      {/* شخصي فقط */}
-                      <td className="p-3 text-center">
-                        <button
-                          onClick={() => toggleBankProduct(b.id, 'personalFinanceEnabled')}
-                          className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${
-                            getProductActiveStatus(b.id, 'personalFinanceEnabled')
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : 'bg-red-100 text-red-600'
-                          }`}
-                        >
-                          {getProductActiveStatus(b.id, 'personalFinanceEnabled') ? 'مفعّل' : 'معطّل'}
-                        </button>
-                      </td>
-
-                      {/* عقاري + شخصي جديد */}
-                      <td className="p-3 text-center">
-                        <button
-                          onClick={() => toggleBankProduct(b.id, 'combinedFinanceEnabled')}
-                          className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${
-                            getProductActiveStatus(b.id, 'combinedFinanceEnabled')
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : 'bg-red-100 text-red-600'
-                          }`}
-                        >
-                          {getProductActiveStatus(b.id, 'combinedFinanceEnabled') ? 'مفعّل' : 'معطّل'}
-                        </button>
-                      </td>
-
-                      {/* عقاري مع شخصي قائم */}
-                      <td className="p-3 text-center">
-                        <button
-                          onClick={() => toggleBankProduct(b.id, 'existingPersonalFinanceEnabled')}
-                          className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${
-                            getProductActiveStatus(b.id, 'existingPersonalFinanceEnabled')
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : 'bg-red-100 text-red-600'
-                          }`}
-                        >
-                          {getProductActiveStatus(b.id, 'existingPersonalFinanceEnabled') ? 'مفعّل' : 'معطّل'}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <p className="text-xs text-gray-400 mt-2 text-right">
-              * التغييرات تُحفظ عند الضغط على "حفظ وتطبيق الإعدادات"
-            </p>
           </div>
 
           {filterBank === 'all' ? (

@@ -314,7 +314,7 @@ function normalizeBeforeCompare(val: any): any {
     const keys = Object.keys(val).sort();
     
     // Check if this object is a MarginRule or MarginException to apply specific filters
-    const isMarginRule = ('bankId' in val) && (('productId' in val) || ('isExceptionOnly' in val));
+    const isMarginRule = ('bankId' in val) && (('productId' in val) || ('isExceptionOnly' in val)) && !('minSalary' in val || 'allowedSectors' in val || 'defaultRejectionMessage' in val);
 
     for (const key of keys) {
       if ([
