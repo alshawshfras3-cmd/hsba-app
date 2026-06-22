@@ -238,6 +238,29 @@ function deepClone<T>(obj: T): T {
   return JSON.parse(JSON.stringify(obj));
 }
 
+function sanitizeBanksForPersistence(banks: Bank[]): Bank[] {
+  return banks.map(bank => {
+    const {
+      realEstateFinanceEnabled,
+      personalFinanceEnabled,
+      combinedFinanceEnabled,
+      existingPersonalFinanceEnabled,
+      etizazSupportEnabled,
+      minRealEstateAmount,
+      maxRealEstateAmount,
+      minPersonalAmount,
+      maxPersonalAmount,
+      maxTermMonths,
+      maxAgeAtEnd,
+      allowAfterRetirement,
+      monthsAfterRetirement,
+      ...identityBank
+    } = bank as any;
+
+    return identityBank as Bank;
+  });
+}
+
 function normalizeBeforeCompare(val: any): any {
   if (val === null || val === undefined) return null;
   if (Array.isArray(val)) {
@@ -1155,7 +1178,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         // Inject only active subpage sections
         switch (adminSubPage) {
           case 'banks':
-            mergedSettingsObject.banks = deepClone(banks);
+            mergedSettingsObject.banks = sanitizeBanksForPersistence(deepClone(banks));
             break;
           case 'products':
             mergedSettingsObject.products = deepClone(products);
@@ -1237,7 +1260,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
             }
             break;
           default:
-            mergedSettingsObject.banks = deepClone(banks);
+            mergedSettingsObject.banks = sanitizeBanksForPersistence(deepClone(banks));
             mergedSettingsObject.products = deepClone(products);
             mergedSettingsObject.dsrRules = deepClone(dsrRules);
             mergedSettingsObject.supportSettings = deepClone(supportSettings);
