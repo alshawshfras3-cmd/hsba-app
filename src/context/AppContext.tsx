@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useRef, useMemo } from 'react';
 import {
   Bank,
   ProductAcceptance,
@@ -261,35 +261,78 @@ function sanitizeBanksForPersistence(banks: Bank[]): Bank[] {
   });
 }
 
-function normalizeSettingsForDirtyCompare(settings: AdminSettings): AdminSettings {
-  if (!settings) return settings;
-  const cloned = deepClone(settings) as any;
-  
-  const normalized: AdminSettings = {
-    banks: sanitizeBanksForPersistence(cloned.banks || []),
-    products: cloned.products ?? cloned.product_acceptance ?? [],
-    militaryRanks: cloned.militaryRanks ?? cloned.military_ranks ?? [],
-    salaryRules: cloned.salaryRules ?? cloned.salary_rules ?? [],
-    pensionRules: cloned.pensionRules ?? cloned.pension_rules ?? [],
-    termRules: cloned.termRules ?? cloned.term_rules ?? [],
-    marginRules: cloned.marginRules ?? cloned.margin_rules ?? [],
-    dsrRules: cloned.dsrRules ?? cloned.dsr_rules ?? [],
-    supportSettings: cloned.supportSettings ?? cloned.support_settings ?? {},
-    subscriptionSettings: cloned.subscriptionSettings ?? cloned.subscription_settings,
-    housingSupportTiers: cloned.housingSupportTiers ?? cloned.housing_support_tiers ?? [],
-    advancePaymentTiers: cloned.advancePaymentTiers ?? cloned.advance_payment_tiers ?? [],
-    personalRules: cloned.personalRules ?? cloned.personal_finance_rules ?? [],
-    advancedRules: cloned.advancedRules ?? cloned.advanced_rules ?? [],
-    userSubscriptions: cloned.userSubscriptions ?? cloned.user_subscriptions ?? [],
-    customSectors: cloned.customSectors ?? cloned.hasba_custom_sectors ?? [],
-    bankSectorRules: cloned.bankSectorRules ?? cloned.bank_sector_pension_rules ?? [],
-    pensionRulesLibrary: cloned.pensionRulesLibrary ?? cloned.pension_rules_library ?? [],
-    approvedSalaryRules: cloned.approvedSalaryRules ?? cloned.approvedSalaryDbRules ?? cloned.approved_salary_rules ?? cloned.approved_salary_db_rules ?? [],
-    pensionDbRules: cloned.pensionDbRules ?? cloned.pension_db_rules ?? [],
-    sectorMappings: cloned.sectorMappings ?? cloned.sector_mappings ?? [],
-  };
+function removeUndefinedDeep(value: any): any {
+  if (Array.isArray(value)) {
+    return value.map(removeUndefinedDeep);
+  }
 
-  return normalized;
+  if (value && typeof value === 'object') {
+    return Object.keys(value)
+      .sort()
+      .reduce((acc: any, key) => {
+        const cleaned = removeUndefinedDeep(value[key]);
+        if (cleaned !== undefined) {
+          acc[key] = cleaned;
+        }
+        return acc;
+      }, {});
+  }
+
+  return value;
+}
+
+function normalizeSettingsForDirtyCompare(rawSettings: any): AdminSettings {
+  if (!rawSettings) return rawSettings;
+  const settings = deepClone(rawSettings || {});
+
+  // 1. توحيد مفاتيح legacy إلى camelCase إذا كانت camelCase غير موجودة
+  settings.banks = sanitizeBanksForPersistence(settings.banks || []);
+  settings.products = settings.products ?? settings.product_acceptance ?? [];
+  settings.militaryRanks = settings.militaryRanks ?? settings.military_ranks ?? [];
+  settings.salaryRules = settings.salaryRules ?? settings.salary_rules ?? [];
+  settings.pensionRules = settings.pensionRules ?? settings.pension_rules ?? [];
+  settings.termRules = settings.termRules ?? settings.term_rules ?? [];
+  settings.marginRules = settings.marginRules ?? settings.margin_rules ?? [];
+  settings.dsrRules = settings.dsrRules ?? settings.dsr_rules ?? [];
+  settings.supportSettings = settings.supportSettings ?? settings.support_settings ?? {};
+  settings.pensionRulesLibrary = settings.pensionRulesLibrary ?? settings.pension_rules_library ?? [];
+  settings.approvedSalaryRules = settings.approvedSalaryRules ?? settings.approvedSalaryDbRules ?? settings.approved_salary_rules ?? settings.approved_salary_db_rules ?? [];
+  settings.pensionDbRules = settings.pensionDbRules ?? settings.pension_db_rules ?? [];
+  settings.sectorMappings = settings.sectorMappings ?? settings.sector_mappings ?? [];
+  settings.housingSupportTiers = settings.housingSupportTiers ?? settings.housing_support_tiers ?? [];
+  settings.advancePaymentTiers = settings.advancePaymentTiers ?? settings.advance_payment_tiers ?? [];
+  settings.personalRules = settings.personalRules ?? settings.personal_finance_rules ?? [];
+  settings.advancedRules = settings.advancedRules ?? settings.advanced_rules ?? {};
+  settings.userSubscriptions = settings.userSubscriptions ?? settings.user_subscriptions ?? [];
+  settings.subscriptionSettings = settings.subscriptionSettings ?? settings.subscription_settings ?? {};
+  settings.customSectors = settings.customSectors ?? settings.hasba_custom_sectors ?? [];
+  settings.bankSectorRules = settings.bankSectorRules ?? settings.bank_sector_pension_rules ?? [];
+
+  // 2. حذف مفاتيح legacy حتى لا تسبب فرقًا دائمًا
+  delete settings.product_acceptance;
+  delete settings.margin_rules;
+  delete settings.dsr_rules;
+  delete settings.term_rules;
+  delete settings.support_settings;
+  delete settings.personal_finance_rules;
+  delete settings.salary_rules;
+  delete settings.pension_rules;
+  delete settings.advanced_rules;
+  delete settings.user_subscriptions;
+  delete settings.subscription_settings;
+  delete settings.hasba_custom_sectors;
+  delete settings.military_ranks;
+  delete settings.bank_sector_pension_rules;
+  delete settings.pension_rules_library;
+  delete settings.approved_salary_rules;
+  delete settings.approved_salary_db_rules;
+  delete settings.pension_db_rules;
+  delete settings.sector_mappings;
+  delete settings.housing_support_tiers;
+  delete settings.advance_payment_tiers;
+
+  // 3. حذف undefined وترتيب المفاتيح بشكل آمن
+  return removeUndefinedDeep(settings);
 }
 
 function normalizeBeforeCompare(val: any): any {
@@ -803,7 +846,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [savedSettings, setSavedSettingsState] = useState<AdminSettings>(initialData);
   const setSavedSettings = React.useCallback((val: AdminSettings | ((prev: AdminSettings) => AdminSettings)) => {
     setSavedSettingsState(prev => {
-      const next = typeof val === 'function' ? val(prev) : val;
+      const nextRaw = typeof val === 'function' ? val(prev) : val;
+      const next = normalizeSettingsForDirtyCompare(nextRaw);
       if (isEqual(prev, next)) return prev;
       return next;
     });
@@ -1050,7 +1094,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const currentSettings: AdminSettings = {
+  const currentSettings: AdminSettings = useMemo(() => ({
     banks,
     products,
     militaryRanks,
@@ -1072,7 +1116,29 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     approvedSalaryRules,
     pensionDbRules,
     sectorMappings,
-  };
+  }), [
+    banks,
+    products,
+    militaryRanks,
+    salaryRules,
+    pensionRules,
+    termRules,
+    marginRules,
+    dsrRules,
+    supportSettings,
+    subscriptionSettings,
+    housingSupportTiers,
+    advancePaymentTiers,
+    personalRules,
+    advancedRules,
+    userSubscriptions,
+    customSectors,
+    bankSectorRules,
+    pensionRulesLibrary,
+    approvedSalaryRules,
+    pensionDbRules,
+    sectorMappings,
+  ]);
 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
   const baselineSettingsRef = useRef<string | null>(null);
@@ -1363,18 +1429,35 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           localStorage.removeItem("hasba_settings_cache");
         } catch (e) {}
 
-        // Fresh retrieve from Supabase to replace all client states safely
-        await fetchSettings({ forceFresh: true });
+        // Construct a clean normalized snapshot from the newly merged and saved settings
+        const savedSnapshot = normalizeSettingsForDirtyCompare({
+          ...currentSettings,
+          ...mergedSettingsObject
+        });
 
-        // Update local saved state snapshot
-        setSavedSettings(mergedSettingsObject);
+        // Instantly update local saved state snapshot and baseline-compare string before fetching, to clear loading spinner and dirty flag immediately
+        setSavedSettings(savedSnapshot);
+        baselineSettingsRef.current = JSON.stringify(
+          normalizeBeforeCompare(savedSnapshot)
+        );
+        setHasUnsavedChanges(false);
+
+        // Quiet background fetch retrieve from Supabase to replace all client states safely without blocker
+        fetchSettings({ forceFresh: true, background: true }).catch(err => {
+          console.error("Background fresh retrieve failed after save:", err);
+        });
       } catch (err: any) {
         console.error("Failed to save app_settings to Supabase:", err);
         throw err;
       }
     } else {
       // Local setup fallback
-      setSavedSettings(clonedCurrent);
+      const savedSnapshot = normalizeSettingsForDirtyCompare(clonedCurrent);
+      setSavedSettings(savedSnapshot);
+      baselineSettingsRef.current = JSON.stringify(
+        normalizeBeforeCompare(savedSnapshot)
+      );
+      setHasUnsavedChanges(false);
     }
   };
 

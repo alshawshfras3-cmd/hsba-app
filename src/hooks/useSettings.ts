@@ -41,7 +41,7 @@ export function useSettings() {
   const [isTemporaryFallback, setIsTemporaryFallback] = useState(hasSupabaseKeys ? true : false);
 
   // Fetch all system settings from Supabase
-  const fetchSettings = useCallback(async (options?: { forceFresh?: boolean }) => {
+  const fetchSettings = useCallback(async (options?: { forceFresh?: boolean; background?: boolean }) => {
     if (!hasSupabaseKeys) {
       setSupabaseFetched(true);
       setSupabaseLoadStatus('success');
@@ -49,7 +49,9 @@ export function useSettings() {
       return;
     }
 
-    setLoading(true);
+    if (!options?.background) {
+      setLoading(true);
+    }
     let appSettingsObj: any = null;
     let didTimeoutOrSlow = false;
 
