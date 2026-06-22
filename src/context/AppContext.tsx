@@ -262,9 +262,34 @@ function sanitizeBanksForPersistence(banks: Bank[]): Bank[] {
 }
 
 function normalizeSettingsForDirtyCompare(settings: AdminSettings): AdminSettings {
-  const cloned = deepClone(settings);
-  cloned.banks = sanitizeBanksForPersistence(cloned.banks || []);
-  return cloned;
+  if (!settings) return settings;
+  const cloned = deepClone(settings) as any;
+  
+  const normalized: AdminSettings = {
+    banks: sanitizeBanksForPersistence(cloned.banks || []),
+    products: cloned.products ?? cloned.product_acceptance ?? [],
+    militaryRanks: cloned.militaryRanks ?? cloned.military_ranks ?? [],
+    salaryRules: cloned.salaryRules ?? cloned.salary_rules ?? [],
+    pensionRules: cloned.pensionRules ?? cloned.pension_rules ?? [],
+    termRules: cloned.termRules ?? cloned.term_rules ?? [],
+    marginRules: cloned.marginRules ?? cloned.margin_rules ?? [],
+    dsrRules: cloned.dsrRules ?? cloned.dsr_rules ?? [],
+    supportSettings: cloned.supportSettings ?? cloned.support_settings ?? {},
+    subscriptionSettings: cloned.subscriptionSettings ?? cloned.subscription_settings,
+    housingSupportTiers: cloned.housingSupportTiers ?? cloned.housing_support_tiers ?? [],
+    advancePaymentTiers: cloned.advancePaymentTiers ?? cloned.advance_payment_tiers ?? [],
+    personalRules: cloned.personalRules ?? cloned.personal_finance_rules ?? [],
+    advancedRules: cloned.advancedRules ?? cloned.advanced_rules ?? [],
+    userSubscriptions: cloned.userSubscriptions ?? cloned.user_subscriptions ?? [],
+    customSectors: cloned.customSectors ?? cloned.hasba_custom_sectors ?? [],
+    bankSectorRules: cloned.bankSectorRules ?? cloned.bank_sector_pension_rules ?? [],
+    pensionRulesLibrary: cloned.pensionRulesLibrary ?? cloned.pension_rules_library ?? [],
+    approvedSalaryRules: cloned.approvedSalaryRules ?? cloned.approvedSalaryDbRules ?? cloned.approved_salary_rules ?? cloned.approved_salary_db_rules ?? [],
+    pensionDbRules: cloned.pensionDbRules ?? cloned.pension_db_rules ?? [],
+    sectorMappings: cloned.sectorMappings ?? cloned.sector_mappings ?? [],
+  };
+
+  return normalized;
 }
 
 function normalizeBeforeCompare(val: any): any {
