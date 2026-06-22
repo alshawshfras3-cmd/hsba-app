@@ -261,6 +261,12 @@ function sanitizeBanksForPersistence(banks: Bank[]): Bank[] {
   });
 }
 
+function normalizeSettingsForDirtyCompare(settings: AdminSettings): AdminSettings {
+  const cloned = deepClone(settings);
+  cloned.banks = sanitizeBanksForPersistence(cloned.banks || []);
+  return cloned;
+}
+
 function normalizeBeforeCompare(val: any): any {
   if (val === null || val === undefined) return null;
   if (Array.isArray(val)) {
@@ -1052,8 +1058,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       baselineSettingsRef.current = null;
       return;
     }
-    const currentStr = JSON.stringify(normalizeBeforeCompare(currentSettings));
-    const savedStr = JSON.stringify(normalizeBeforeCompare(savedSettings));
+    const currentStr = JSON.stringify(
+      normalizeBeforeCompare(normalizeSettingsForDirtyCompare(currentSettings))
+    );
+    const savedStr = JSON.stringify(
+      normalizeBeforeCompare(normalizeSettingsForDirtyCompare(savedSettings))
+    );
 
     if (!baselineSettingsRef.current || baselineSettingsRef.current !== savedStr) {
       baselineSettingsRef.current = savedStr;
