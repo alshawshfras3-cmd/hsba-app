@@ -34,7 +34,6 @@ import {
 } from 'lucide-react';
 import { 
   adminListSubscribers, 
-  adminManualActivateSubscription, 
   adminCancelSubscription, 
   adminExtendSubscription, 
   adminMarkSubscriptionExpired, 
@@ -133,10 +132,7 @@ export function UsersManagementPage() {
   const [adminUserIds, setAdminUserIds] = useState<string[]>([]);
   const [currentAdminUserId, setCurrentAdminUserId] = useState<string | null>(null);
 
-  // Manual Activation modal state (Grant manually a standard pack)
-  const [showManualPromo, setShowManualPromo] = useState(false);
-  const [manualPromoUserId, setManualPromoUserId] = useState<string>('');
-  const [manualPromoPlanCode, setManualPromoPlanCode] = useState<string>('monthly');
+
 
   // Grant Free access modal state (मनح مدة مجانية)
   const [showFreeGrantModal, setShowFreeGrantModal] = useState(false);
@@ -204,7 +200,7 @@ export function UsersManagementPage() {
     } else if (prioritySub.status === 'trialing') {
       return (
         <span className="inline-block px-2.5 py-1 bg-sky-50 text-sky-800 border border-sky-200 dark:bg-sky-950/20 dark:text-sky-400 rounded-lg text-[10px] font-bold">
-          تجربة ({prioritySub.plan_name})
+          فترة تجربة ({prioritySub.plan_name})
         </span>
       );
     } else if (prioritySub.status === 'expired') {
@@ -564,22 +560,6 @@ export function UsersManagementPage() {
     }
   }
 
-  // Fast manual activation logic
-  async function handleManualActivateSubmit() {
-    if (!manualPromoUserId) return;
-    setActionLoading(true);
-    try {
-      await adminManualActivateSubscription(manualPromoUserId, manualPromoPlanCode);
-      showFlashSuccess('تم تفعيل الاشتراك العقاري المسجل بنجاح.');
-      setShowManualPromo(false);
-      await fetchSubscribers();
-    } catch (err: any) {
-      showFlashError(`فشل التنشيط: ${err.message || err}`);
-    } finally {
-      setActionLoading(false);
-    }
-  }
-
   // Grant Free access submit
   async function handleFreeGrantSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -885,17 +865,7 @@ export function UsersManagementPage() {
             <span>منح مدة مجانية 🚀</span>
           </button>
 
-          <button 
-            onClick={() => {
-              setManualPromoUserId('');
-              setManualPromoPlanCode('monthly');
-              setShowManualPromo(true);
-            }}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
-          >
-            <Plus className="w-4 h-4" />
-            <span>تنشيط باقة يدوية لشريك</span>
-          </button>
+
         </div>
       </div>
 
@@ -1006,7 +976,7 @@ export function UsersManagementPage() {
                 type="button"
                 onClick={handleBackfillUsers}
                 className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold rounded-xl transition-all shadow-sm active:scale-98 cursor-pointer flex items-center gap-1.5"
-                title="تفعيل الباقة المجانية تلقائيًا للمستخدمين الذين لا يمتلكون اشتراكاً نشطاً أو تجريبياً"
+                title="تفعيل الباقة المجانية تلقائيًا للمستخدمين الذين لا يمتلكون اشتراكاً نشطاً أو فترة تجربة"
               >
                 <Sparkles className="w-3.5 h-3.5" />
                 <span>تفعيل الباقة المجانية للمستخدمين الحاليين</span>
@@ -1125,7 +1095,7 @@ export function UsersManagementPage() {
                     className="px-3 py-2.5 bg-gray-50 dark:bg-slate-950 border border-gray-150 dark:border-slate-800 text-gray-900 dark:text-white rounded-xl text-xs font-bold"
                   >
                     <option value="all">كل المشتركين الفعليين</option>
-                    <option value="trialing">باقة تجريبية (Trialing)</option>
+                    <option value="trialing">فترة تجربة (Trialing)</option>
                     <option value="active">اشتراكات مفعلة (Active)</option>
                     <option value="expired">منتهي الصلاحية (Expired)</option>
                     <option value="cancelled">ملغي تمامًا (Cancelled)</option>
@@ -1189,7 +1159,7 @@ export function UsersManagementPage() {
                               'bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-955/20 dark:text-rose-450'
                             }`}>
                               {s.status === 'active' ? 'نشط مدفوع' :
-                               s.status === 'trialing' ? 'فترة تجريبية' :
+                               s.status === 'trialing' ? 'فترة تجربة' :
                                s.status === 'expired' ? 'منتهي الصلاحية' :
                                s.status === 'cancelled' ? 'ملغي نهائياً' : s.status}
                             </span>
@@ -1202,15 +1172,19 @@ export function UsersManagementPage() {
                           </td>
                           <td className="p-4 text-center">
                             <span className={`px-2 py-1 rounded text-[10px] font-bold ${
-                              s.source === 'admin_free' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300' :
-                              s.source === 'manual_paid' ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-300' :
-                              s.source === 'trial' ? 'bg-yellow-100 text-yellow-850 dark:bg-yellow-950/40 dark:text-yellow-300' :
+                              s.source === 'signup_default' ? 'bg-purple-100 text-purple-800 dark:bg-purple-950/40 dark:text-purple-300' :
+                              (s.source === 'admin' || s.source === 'admin_free') ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300' :
+                              (s.source === 'manual' || s.source === 'manual_paid') ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-300' :
+                              s.source === 'system' ? 'bg-teal-100 text-teal-800 dark:bg-teal-950/40 dark:text-teal-300' :
+                              s.source === 'trial' ? 'bg-yellow-105 text-yellow-850 dark:bg-yellow-950/40 dark:text-yellow-300' :
                               s.source === 'payment' ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300' :
                               'bg-gray-105 text-gray-700 dark:bg-slate-800'
                             }`}>
-                              {s.source === 'admin_free' ? '🏷️ منح إداري مجاني' :
-                               s.source === 'manual_paid' ? '💼 تفعيل إداري مدفوع' :
-                               s.source === 'trial' ? '🌱 تجريب النّظام' :
+                              {s.source === 'signup_default' ? '🌱 تسجيل تلقائي' :
+                               (s.source === 'admin' || s.source === 'admin_free') ? '👑 تفعيل إداري' :
+                               (s.source === 'manual' || s.source === 'manual_paid') ? '💼 تفعيل يدوي' :
+                               s.source === 'system' ? '🌐 النظام' :
+                               s.source === 'trial' ? '✨ تفعيل تجربة' :
                                s.source === 'payment' ? '💳 بوابة سداد آلي' : s.source}
                             </span>
                           </td>
@@ -2226,64 +2200,7 @@ export function UsersManagementPage() {
         </div>
       )}
 
-      {/* FAST MANUAL ACTIVATION MODAL */}
-      {showManualPromo && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 backdrop-blur-xs">
-          <div className="bg-white dark:bg-slate-900 border border-gray-150 dark:border-slate-800 w-full max-w-sm rounded-3xl p-6 text-right space-y-4">
-            <div className="flex items-center justify-between border-b border-gray-50 dark:border-slate-800 pb-3 mb-2">
-              <h3 className="font-extrabold text-sm text-gray-900 dark:text-white">🚀 تفعيل اشتراك يدوي لشريك</h3>
-              <button onClick={() => setShowManualPromo(false)} className="text-gray-405 font-bold hover:text-gray-900 dark:hover:text-white">✕</button>
-            </div>
 
-            <div className="space-y-4 font-bold text-xs text-right">
-              <div className="space-y-1.5">
-                <label className="text-gray-550 dark:text-slate-350 block">اسم الشريك المطلوب تنشيطه:</label>
-                <select 
-                  className="w-full px-3 py-2.5 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 text-gray-900 dark:text-white rounded-xl outline-none text-xs text-right font-semibold"
-                  value={manualPromoUserId}
-                  onChange={e => setManualPromoUserId(e.target.value)}
-                >
-                  <option value="">-- اختر المستخدم --</option>
-                  {users.map(u => (
-                    <option key={u.id} value={u.id}>
-                      {u.full_name} ({u.email})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-gray-550 dark:text-slate-350 block">حزمة الاشتراك المراد تنشيطها:</label>
-                <select 
-                  className="w-full px-3 py-2.5 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 text-gray-900 dark:text-white rounded-xl outline-none text-xs text-right font-semibold"
-                  value={manualPromoPlanCode}
-                  onChange={e => setManualPromoPlanCode(e.target.value)}
-                >
-                  <option value="monthly">باقة عقارية شهرية (٣٠ يوماً)</option>
-                  <option value="six_months">باقة احترافية عقارية (١٨٠ يوماً)</option>
-                  <option value="trial">تفعيل مجدداً تجريبي (٧ أيام)</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3.5 pt-4">
-              <button 
-                onClick={handleManualActivateSubmit}
-                disabled={!manualPromoUserId}
-                className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-extrabold text-xs rounded-xl shadow-md cursor-pointer text-center"
-              >
-                تنشيد وتفعيل الباقة
-              </button>
-              <button 
-                onClick={() => setShowManualPromo(false)}
-                className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 text-gray-700 dark:text-slate-200 font-extrabold text-xs rounded-xl cursor-pointer text-center"
-              >
-                رجوع وإلغاء
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* GRANT FREE DURATION MODAL (منح مدة مجانية) */}
       {showFreeGrantModal && (
@@ -2298,7 +2215,7 @@ export function UsersManagementPage() {
             </div>
 
             <p className="text-[11px] text-gray-400 font-semibold leading-normal">
-              يتيح لك هذا المعالج منح دخول آمن ومستمر لأي عضو مسجل بدون ربطه بבاقة مدفوعة مسبقاً، مع تدوين ملاحظات وامتياز تجريبي مخصص.
+              يتيح لك هذا المعالج منح دخول آمن ومستمر لأي عضو مسجل بدون ربطه بבاقة مدفوعة مسبقاً، مع تدوين ملاحظات وامتياز فترة تجربة مخصص.
             </p>
 
             <div className="space-y-3 font-bold text-xs text-right">
@@ -2507,7 +2424,7 @@ export function UsersManagementPage() {
                         value={editSource}
                         onChange={e => setEditSource(e.target.value)}
                       >
-                        <option value="trial">🌱 تجريبي (Trial)</option>
+                        <option value="trial">🌱 باقة تجربة (Trial)</option>
                         <option value="admin_free">👑 منح إداري مجاني</option>
                         <option value="manual_paid">💼 تفعيل إداري مدفوع</option>
                         <option value="payment">💳 بوابة سداد آلي</option>
@@ -2727,7 +2644,7 @@ export function UsersManagementPage() {
                       onChange={() => setActivationStatus('trialing')}
                       className="accent-indigo-500 w-4 h-4 cursor-pointer"
                     />
-                    <span>تجريبي مقيد (trialing)</span>
+                    <span>فترة تجربة (trialing)</span>
                   </label>
                 </div>
               </div>

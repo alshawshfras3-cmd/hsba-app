@@ -283,7 +283,7 @@ export function SubscriptionPage() {
                     isCancelled ? 'bg-gray-100 text-gray-600 border border-gray-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700' :
                     'bg-slate-50 text-slate-400 dark:bg-slate-850 dark:text-slate-500'
                   }`}>
-                    {isTrialing ? 'فترة تجريبية' :
+                    {isTrialing ? 'فترة تجربة' :
                      isActive ? 'نشط مفعل' :
                      isExpired ? 'منتهي الصلاحية' :
                      isCancelled ? 'ملغي' :

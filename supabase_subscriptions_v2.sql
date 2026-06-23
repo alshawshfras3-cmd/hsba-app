@@ -146,8 +146,8 @@ INSERT INTO public.subscription_plans (
   badge_text, features, can_save_results, can_export_results, can_view_advanced_details
 ) VALUES (
   'free', 
-  'باقة مجانية (لتجريب النظام)', 
-  'باقة مجانية افتراضية تُمنح للمستخدم تلقائياً عند التسجيل أول مرة، بحد استعلامات يومي مرن لتجريب الخدمة.',
+  'الباقة المجانية', 
+  'باقة مجانية محدودة للاستخدام الأساسي.',
   0, 
   7, 
   5, 

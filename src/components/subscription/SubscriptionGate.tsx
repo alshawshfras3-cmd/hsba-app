@@ -49,8 +49,8 @@ export function SubscriptionGate({ children, fullPage = false }: SubscriptionGat
     switch (lockReason) {
       case 'expired_trial':
         return {
-          title: 'انتهت الفترة التجريبية لحسابك',
-          desc: 'لقد انقضت فترة التجربة المجانية الممنوحة. يرجى المبادرة بالاشتراك في إحدى باقات حسبة المعتمدة لمواصلة مقارنة وعرض العمليات الائتمانية والتمويلية لعملائك.',
+          title: 'انتهت فترة التجربة لحسابك',
+          desc: 'لقد انقضت فترة التجربة الممنوحة. يرجى المبادرة بالاشتراك في إحدى باقات حسبة المعتمدة لمواصلة مقارنة وعرض العمليات الائتمانية والتمويلية لعملائك.',
           icon: <Clock className="w-10 h-10 text-rose-500 animate-pulse" />,
           buttonText: 'عرض الباقات',
           badgeText: 'انتهاء فترة التجربة'

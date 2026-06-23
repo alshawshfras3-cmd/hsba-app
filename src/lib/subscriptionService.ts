@@ -1228,68 +1228,26 @@ export async function adminUpdatePhoneNumber(userId: string, newPhone: string): 
 export async function ensureTrialPlanExists(): Promise<SubscriptionPlan | null> {
   if (!hasSupabaseKeys) return null;
   try {
-    const { data: existing, error } = await supabase
+    const { data: defaultPlan, error } = await supabase
       .from('subscription_plans')
       .select('*')
-      .eq('code', 'trial')
+      .eq('is_default_on_signup', true)
+      .eq('is_active', true)
       .maybeSingle();
 
     if (error) {
-      console.error('Error fetching trial plan:', error);
-      return null;
+      console.error('Error fetching default active subscription plan:', error);
+      throw new Error(`تعذر جلب الباقة الافتراضية: ${error.message}`);
     }
 
-    if (existing) {
-      const updates: Partial<SubscriptionPlan> = {};
-      if (existing.name !== 'باقة مجانية') updates.name = 'باقة مجانية';
-      if (existing.price_sar === null || existing.price_sar === undefined || existing.price_sar !== 0) {
-        updates.price_sar = 0;
-      }
-      if (existing.duration_days === null || existing.duration_days === undefined) {
-        updates.duration_days = 30;
-      }
-      if (existing.is_active !== true) updates.is_active = true;
-
-      if (Object.keys(updates).length > 0) {
-        const { data: updated, error: updateErr } = await supabase
-          .from('subscription_plans')
-          .update(updates)
-          .eq('id', existing.id)
-          .select()
-          .single();
-        if (updateErr) {
-          console.error('Error updating trial plan:', updateErr);
-          return existing;
-        }
-        return updated as SubscriptionPlan;
-      }
-      return existing as SubscriptionPlan;
-    } else {
-      const { data: inserted, error: insertErr } = await supabase
-        .from('subscription_plans')
-        .insert({
-          code: 'trial',
-          name: 'باقة مجانية',
-          description: 'باقة مجانية - صلاحية 30 يوماً مع سقف حسابات يومي مرن',
-          price_sar: 0,
-          duration_days: 30,
-          daily_calculation_limit: null,
-          is_active: true,
-          sort_order: 0,
-          created_at: new Date().toISOString()
-        })
-        .select()
-        .single();
-      
-      if (insertErr) {
-        console.error('Error inserting trial plan:', insertErr);
-        return null;
-      }
-      return inserted as SubscriptionPlan;
+    if (!defaultPlan) {
+      throw new Error('لا توجد باقة افتراضية مفعلة');
     }
-  } catch (err) {
+
+    return defaultPlan as SubscriptionPlan;
+  } catch (err: any) {
     console.error('Exception in ensureTrialPlanExists:', err);
-    return null;
+    throw new Error(err.message || 'لا توجد باقة افتراضية مفعلة');
   }
 }
 
@@ -1300,9 +1258,9 @@ export async function adminBackfillFreePlanForExistingUsers(): Promise<{ success
   }
 
   try {
-    const trialPlan = await ensureTrialPlanExists();
-    if (!trialPlan) {
-      return { success: false, processed: 0, added: 0, error: 'الباقة المجانية ذات الكود trial غير متوفرة ولا يمكن إنشاؤها.' };
+    const defaultPlan = await ensureTrialPlanExists();
+    if (!defaultPlan) {
+      return { success: false, processed: 0, added: 0, error: 'لا توجد باقة افتراضية مفعلة' };
     }
 
     const { data: users, error: usersErr } = await supabase
@@ -1344,13 +1302,13 @@ export async function adminBackfillFreePlanForExistingUsers(): Promise<{ success
 
       const startDate = new Date();
       const endsDate = new Date();
-      endsDate.setDate(endsDate.getDate() + (trialPlan.duration_days || 30));
+      endsDate.setDate(endsDate.getDate() + (defaultPlan.duration_days || 30));
 
       const { error: insertErr } = await supabase
         .from('user_subscriptions')
         .insert({
           user_id: u.id,
-          plan_id: trialPlan.id,
+          plan_id: defaultPlan.id,
           status: 'trialing',
           source: 'trial',
           started_at: startDate.toISOString(),
