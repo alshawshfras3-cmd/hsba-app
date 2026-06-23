@@ -230,7 +230,7 @@ export function UsersManagementPage() {
         (data || []).map((item: any) => ({
           id: item.id,
           email: item.email || '',
-          full_name: item.full_name || 'عضو مجهول',
+          full_name: item.full_name || 'مستخدم بدون ملف — يحتاج ربط بيانات',
           phone: item.phone || null,
           is_blocked: item.is_blocked === true,
           status: item.status || 'active',
@@ -653,6 +653,30 @@ export function UsersManagementPage() {
   });
 
   const filteredSubscribers = subscribers.filter(s => {
+    const emailStr = (s.email || '').toLowerCase();
+    const nameStr = (s.full_name || '').toLowerCase();
+    const sourceStr = (s.source || '').toLowerCase();
+    const notesStr = (s.notes || '').toLowerCase();
+    
+    const isMock = 
+      emailStr.includes('example.com') ||
+      nameStr.includes('عضو مجهول') ||
+      nameStr.includes('مجهول') ||
+      nameStr.includes('تجربة') ||
+      nameStr.includes('تجريب') ||
+      nameStr.includes('محاكاة') ||
+      sourceStr === 'demo' ||
+      sourceStr === 'mock' ||
+      sourceStr === 'system' ||
+      notesStr.includes('تجربة') ||
+      notesStr.includes('محاكاة');
+
+    const isInvalid = !s.user_id || !s.email || s.email === 'مسجل خارجي' || s.full_name === 'عضو مجهول';
+
+    if (isMock || isInvalid) {
+      return false;
+    }
+
     const matchesSearch = 
       (s.full_name || '').toLowerCase().includes(subsSearch.toLowerCase()) ||
       (s.email || '').toLowerCase().includes(subsSearch.toLowerCase()) ||
@@ -662,6 +686,14 @@ export function UsersManagementPage() {
     if (subsFilter !== 'all') matchesFilter = s.status === subsFilter;
 
     return matchesSearch && matchesFilter;
+  });
+
+  const unlinkedSubs = subscribers.filter(s => {
+    const emailStr = (s.email || '').toLowerCase();
+    const nameStr = (s.full_name || '').toLowerCase();
+    const isMock = emailStr.includes('example.com') || nameStr.includes('تجربة') || nameStr.includes('تجريب') || nameStr.includes('محاكاة') || (s.source || '') === 'demo';
+    const isInvalid = !s.user_id || !s.email || s.email === 'غير متوفر' || s.email === 'مسجل خارجي' || s.full_name === 'عضو مجهول' || s.full_name === 'مستخدم بدون ملف — يحتاج ربط بيانات';
+    return (isMock || isInvalid);
   });
 
   // Days remaining calculation helper
@@ -940,6 +972,18 @@ export function UsersManagementPage() {
                 </div>
               </div>
 
+              {unlinkedSubs.length > 0 && (
+                <div className="p-4 bg-amber-50 hover:bg-amber-100/80 dark:bg-amber-950/20 dark:border-amber-900 border border-amber-200 rounded-2xl flex flex-col gap-2 transition-all">
+                  <div className="flex items-start gap-2.5 text-amber-800 dark:text-amber-400 text-xs font-semibold leading-relaxed">
+                    <span className="w-2 h-2 rounded-full bg-amber-500 mt-1.5 shrink-0 animate-pulse" />
+                    <div>
+                      <p className="font-bold text-amber-900 dark:text-amber-300">تحذير إداري: تم رصد {unlinkedSubs.length} اشتراك معلّق لا يمتلك ملفاً تعريفياً مكتملاً أو بريداً مفعلاً.</p>
+                      <p className="text-[11px] text-amber-700/80 dark:text-amber-400/80 mt-0.5">تم تصفية هذه السجلات وحجبها تلقائياً من قائمة المشتركين الفعليين لضمان دقة وسلامة الإحصائيات وجداول الفوترة.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {loadingSubs ? (
                 <div className="p-12 text-center">
                   <Loader2 className="w-8 h-8 animate-spin mx-auto text-indigo-500 mb-2" />
@@ -948,7 +992,7 @@ export function UsersManagementPage() {
               ) : filteredSubscribers.length === 0 ? (
                 <div className="p-8 text-center bg-white dark:bg-slate-900 rounded-3xl border border-gray-100 dark:border-slate-850">
                   <Crown className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-                  <p className="text-xs text-gray-400 font-bold">لا يوجد مشتركون مطابقون لشروط التصفية النشطة.</p>
+                  <p className="text-xs text-gray-500 dark:text-slate-400 font-extrabold">لا توجد اشتراكات مستخدمين حقيقية حتى الآن.</p>
                 </div>
               ) : (
                 <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-3xl overflow-hidden shadow-sm">

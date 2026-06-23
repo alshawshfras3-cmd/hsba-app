@@ -608,9 +608,9 @@ export async function adminListSubscribers(): Promise<any[]> {
       return {
         id: s.id,
         user_id: s.user_id,
-        email: prof?.email || 'مسجل خارجي',
+        email: prof?.email || 'غير متوفر',
         phone_number: prof?.phone_number || 'غير متوفر',
-        full_name: prof?.full_name || 'عضو مجهول',
+        full_name: prof?.full_name || 'مستخدم بدون ملف — يحتاج ربط بيانات',
         status: s.status,
         plan_name: s.plan?.name || 'غير محدد',
         plan_code: s.plan?.code || 'none',
