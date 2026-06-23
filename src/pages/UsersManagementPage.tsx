@@ -28,7 +28,9 @@ import {
   HelpCircle,
   Trash,
   Copy,
-  Layers
+  Layers,
+  Star,
+  AlertTriangle
 } from 'lucide-react';
 import { 
   adminListSubscribers, 
@@ -48,6 +50,7 @@ import {
   adminSaveUserSubscription,
   adminUpdatePhoneNumber,
   adminBackfillFreePlanForExistingUsers,
+  setDefaultPlan,
   SubscriptionPlan,
   ActivationRequest
 } from '../lib/subscriptionService';
@@ -523,7 +526,12 @@ export function UsersManagementPage() {
         badge_text: editingPlan.badge_text || null,
         badge_color: editingPlan.badge_color || null,
         card_color: editingPlan.card_color || null,
-        is_free_plan: !!editingPlan.is_free_plan
+        is_free_plan: !!editingPlan.is_free_plan,
+        is_default_on_signup: !!editingPlan.is_default_on_signup,
+        saved_results_limit: editingPlan.saved_results_limit === null || editingPlan.saved_results_limit === undefined ? null : Number(editingPlan.saved_results_limit),
+        can_save_results: !!editingPlan.can_save_results,
+        can_export_results: !!editingPlan.can_export_results,
+        can_view_advanced_details: !!editingPlan.can_view_advanced_details
       });
       showFlashSuccess('تم تحديث إعدادات وأسعار وميزات الباقة البرمجية بنجاح.');
       setEditingPlan(null);
@@ -546,8 +554,8 @@ export function UsersManagementPage() {
     setActionLoading(true);
     try {
       const finalFeatures = Array.isArray(newPlan.features) 
-        ? newPlan.features.filter(f => f.trim() !== '') 
-        : [];
+         ? newPlan.features.filter(f => f.trim() !== '') 
+         : [];
 
       await adminCreatePlan({
         code: newPlan.code.trim(),
@@ -562,7 +570,12 @@ export function UsersManagementPage() {
         badge_text: newPlan.badge_text || null,
         badge_color: newPlan.badge_color || null,
         card_color: newPlan.card_color || null,
-        is_free_plan: !!newPlan.is_free_plan
+        is_free_plan: !!newPlan.is_free_plan,
+        is_default_on_signup: !!newPlan.is_default_on_signup,
+        saved_results_limit: newPlan.saved_results_limit === null || newPlan.saved_results_limit === undefined ? null : Number(newPlan.saved_results_limit),
+        can_save_results: !!newPlan.can_save_results,
+        can_export_results: !!newPlan.can_export_results,
+        can_view_advanced_details: !!newPlan.can_view_advanced_details
       });
 
       showFlashSuccess('تم إنشاء باقة الاشتراك الجديدة ومزامنتها بنجاح!');
@@ -580,7 +593,12 @@ export function UsersManagementPage() {
         badge_text: '',
         badge_color: 'bg-indigo-500 text-white',
         card_color: 'border-indigo-500 bg-white dark:bg-slate-900',
-        is_free_plan: false
+        is_free_plan: false,
+        is_default_on_signup: false,
+        saved_results_limit: null,
+        can_save_results: true,
+        can_export_results: true,
+        can_view_advanced_details: true
       });
       await fetchPlans();
     } catch (err: any) {
@@ -886,70 +904,78 @@ export function UsersManagementPage() {
       {/* VIEW: TAB 2 - SUBSCRIBERS */}
       {activeTab === 'subscribers' && (
         <div className="space-y-4">
-          <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800/80 p-4 rounded-3xl shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
-            <div className="relative w-full md:max-w-xs">
-              <input
-                type="text"
-                placeholder="البحث بالاسم الجوال البريد..."
-                value={subsSearch}
-                onChange={e => setSubsSearch(e.target.value)}
-                className="w-full pr-9 pl-3 py-2.5 bg-gray-50 dark:bg-slate-950 border border-gray-150 dark:border-slate-800 text-gray-900 dark:text-white font-sans rounded-xl text-xs font-semibold outline-none"
-              />
-              <Search className="w-4 h-4 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2" />
-            </div>
-
-            <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-              <span className="text-[11px] font-bold text-gray-400 shrink-0">باقة الاشتراك ومستوى الخدمة:</span>
-              <select
-                value={subsFilter}
-                onChange={e => setSubsFilter(e.target.value)}
-                className="px-3 py-2.5 bg-gray-50 dark:bg-slate-950 border border-gray-150 dark:border-slate-800 text-gray-900 dark:text-white rounded-xl text-xs font-bold"
-              >
-                <option value="all">كل المشتركين الفعليين</option>
-                <option value="trialing">باقة تجريبية (Trialing)</option>
-                <option value="active">اشتراكات مفعلة (Active)</option>
-                <option value="expired">منتهي الصلاحية (Expired)</option>
-                <option value="cancelled">ملغي تمامًا (Cancelled)</option>
-              </select>
-            </div>
-          </div>
-
-          {loadingSubs ? (
-            <div className="p-12 text-center">
-              <Loader2 className="w-8 h-8 animate-spin mx-auto text-indigo-500 mb-2" />
-              <span className="text-xs text-gray-400">جاري تحميل سجل المشتركين النشطين...</span>
-            </div>
-          ) : filteredSubscribers.length === 0 ? (
-            <div className="p-8 text-center bg-white dark:bg-slate-900 rounded-3xl border border-gray-100 dark:border-slate-850">
-              <Crown className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-              <p className="text-xs text-gray-400 font-bold">لا يوجد مشتركون مطابقون لشروط التصفية النشطة.</p>
+          {!hasSupabaseKeys ? (
+            <div className="p-12 text-center bg-white dark:bg-slate-900 rounded-3xl border border-dashed border-gray-150 dark:border-slate-800 shadow-sm max-w-md mx-auto my-8">
+              <Crown className="w-12 h-12 text-amber-500 mx-auto mb-4 animate-pulse" />
+              <p className="text-sm text-gray-500 dark:text-slate-400 font-extrabold mb-1">لا يمكن تحميل الاشتراكات لأن Supabase غير مهيأ.</p>
+              <p className="text-[10px] text-gray-400 dark:text-slate-500 leading-relaxed font-semibold">يرجى ربط وتكوين مفاتيح الاتصال بـ Supabase للتمكن من تحميل وفحص وعرض اشتراكات الشركاء الحقيقيين.</p>
             </div>
           ) : (
-            <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-3xl overflow-hidden shadow-sm">
-              <div className="overflow-x-auto">
-                <table className="w-full text-right text-xs">
-                  <thead className="bg-[#F8FAFC] dark:bg-[#0f172a] border-b border-gray-150 dark:border-slate-800 text-gray-550 dark:text-slate-400">
-                    <tr>
-                      <th className="p-4 font-bold">الشريك / جهة العقار</th>
-                      <th className="p-4 font-bold">جوال الفوترة</th>
-                      <th className="p-4 font-bold text-center">تفاصيل الترخيص</th>
-                      <th className="p-4 font-bold text-center">قناة الاشتراك (Source)</th>
-                      <th className="p-4 font-bold text-center">تاريخ الانتهاء</th>
-                      <th className="p-4 font-bold text-center">الأيام المتبقية</th>
-                      <th className="p-4 font-bold text-center">حمل اليوم</th>
-                      <th className="p-4 font-bold text-center">إجراءات المراقبة والمحاسبة</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50 dark:divide-slate-800 font-semibold text-gray-800 dark:text-white">
-                    {filteredSubscribers.map(s => {
-                      const daysRem = getDaysRem(s.ends_at);
-                      return (
-                        <tr key={s.id || s.user_id} className="hover:bg-slate-50/50 dark:hover:bg-slate-810/30 transition-all text-xs font-semibold">
-                          <td className="p-4">
-                            <span className="font-bold block text-sm text-gray-900 dark:text-white">{s.full_name}</span>
-                            <span className="text-[10px] text-gray-400 block font-mono mt-0.5 select-all">{s.email}</span>
-                          </td>
-                          <td className="p-4 font-mono text-[11px] select-all">{s.phone_number || 'غير متوفر'}</td>
+            <>
+              <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800/80 p-4 rounded-3xl shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
+                <div className="relative w-full md:max-w-xs">
+                  <input
+                    type="text"
+                    placeholder="البحث بالاسم الجوال البريد..."
+                    value={subsSearch}
+                    onChange={e => setSubsSearch(e.target.value)}
+                    className="w-full pr-9 pl-3 py-2.5 bg-gray-50 dark:bg-slate-950 border border-gray-150 dark:border-slate-800 text-gray-900 dark:text-white font-sans rounded-xl text-xs font-semibold outline-none"
+                  />
+                  <Search className="w-4 h-4 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2" />
+                </div>
+
+                <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+                  <span className="text-[11px] font-bold text-gray-400 shrink-0">باقة الاشتراك ومستوى الخدمة:</span>
+                  <select
+                    value={subsFilter}
+                    onChange={e => setSubsFilter(e.target.value)}
+                    className="px-3 py-2.5 bg-gray-50 dark:bg-slate-950 border border-gray-150 dark:border-slate-800 text-gray-900 dark:text-white rounded-xl text-xs font-bold"
+                  >
+                    <option value="all">كل المشتركين الفعليين</option>
+                    <option value="trialing">باقة تجريبية (Trialing)</option>
+                    <option value="active">اشتراكات مفعلة (Active)</option>
+                    <option value="expired">منتهي الصلاحية (Expired)</option>
+                    <option value="cancelled">ملغي تمامًا (Cancelled)</option>
+                  </select>
+                </div>
+              </div>
+
+              {loadingSubs ? (
+                <div className="p-12 text-center">
+                  <Loader2 className="w-8 h-8 animate-spin mx-auto text-indigo-500 mb-2" />
+                  <span className="text-xs text-gray-400">جاري تحميل سجل المشتركين النشطين...</span>
+                </div>
+              ) : filteredSubscribers.length === 0 ? (
+                <div className="p-8 text-center bg-white dark:bg-slate-900 rounded-3xl border border-gray-100 dark:border-slate-850">
+                  <Crown className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                  <p className="text-xs text-gray-400 font-bold">لا يوجد مشتركون مطابقون لشروط التصفية النشطة.</p>
+                </div>
+              ) : (
+                <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-3xl overflow-hidden shadow-sm">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-right text-xs">
+                      <thead className="bg-[#F8FAFC] dark:bg-[#0f172a] border-b border-gray-150 dark:border-slate-800 text-gray-550 dark:text-slate-400">
+                        <tr>
+                          <th className="p-4 font-bold">الشريك / جهة العقار</th>
+                          <th className="p-4 font-bold">جوال الفوترة</th>
+                          <th className="p-4 font-bold text-center">تفاصيل الترخيص</th>
+                          <th className="p-4 font-bold text-center">قناة الاشتراك (Source)</th>
+                          <th className="p-4 font-bold text-center">تاريخ الانتهاء</th>
+                          <th className="p-4 font-bold text-center">الأيام المتبقية</th>
+                          <th className="p-4 font-bold text-center">حمل اليوم</th>
+                          <th className="p-4 font-bold text-center">إجراءات المراقبة والمحاسبة</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50 dark:divide-slate-800 font-semibold text-gray-800 dark:text-white">
+                        {filteredSubscribers.map(s => {
+                          const daysRem = getDaysRem(s.ends_at);
+                          return (
+                            <tr key={s.id || s.user_id} className="hover:bg-slate-50/50 dark:hover:bg-slate-810/30 transition-all text-xs font-semibold">
+                              <td className="p-4">
+                                <span className="font-bold block text-sm text-gray-900 dark:text-white">{s.full_name}</span>
+                                <span className="text-[10px] text-gray-400 block font-mono mt-0.5 select-all">{s.email}</span>
+                              </td>
+                              <td className="p-4 font-mono text-[11px] select-all">{s.phone_number || 'غير متوفر'}</td>
                           <td className="p-4 text-center">
                             <span className="font-extrabold text-indigo-650 dark:text-indigo-400 block">{s.plan_name}</span>
                             <span className={`inline-flex items-center text-[9px] px-2 py-0.5 rounded-md font-extrabold mt-1 ${
@@ -1013,6 +1039,8 @@ export function UsersManagementPage() {
               </div>
             </div>
           )}
+            </>
+          )}
         </div>
       )}
 
@@ -1056,6 +1084,23 @@ export function UsersManagementPage() {
             </button>
           </div>
 
+          {/* DEFAULT PLAN ALERT */}
+          {(() => {
+            const hasDefaultPlan = plans.some(p => p.is_default_on_signup && p.is_active);
+            if (!hasDefaultPlan && plans.length > 0) {
+              return (
+                <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-850/40 rounded-2xl flex items-start gap-3 text-amber-850 dark:text-amber-350 text-xs font-semibold leading-relaxed mb-4 shadow-sm">
+                  <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <div>
+                    <h5 className="font-bold text-sm text-amber-900 dark:text-amber-200">الخطة الافتراضية للتسجيل غير محددة!</h5>
+                    <p className="mt-1">لم يتم تفعيل أو تحديد أي باقة كافتراضية أثناء تسجيل مستخدم جديد (is_default_on_signup = true). يرجى تعيين باقة كباقة افتراضية لتسريع تفعيل الحسابات للشركاء والمقاولين تلقائياً.</p>
+                  </div>
+                </div>
+              );
+            }
+            return null;
+          })()}
+
           {loadingPlans ? (
             <div className="p-12 text-center">
               <Loader2 className="w-8 h-8 animate-spin mx-auto text-indigo-500 mb-2" />
@@ -1070,10 +1115,10 @@ export function UsersManagementPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {plans.map(p => (
                 <div 
-                  key={p.id} 
-                  className={`bg-white dark:bg-slate-900 border ${
-                    p.card_color || 'border-gray-150 dark:border-slate-800'
-                  } p-6 rounded-3xl flex flex-col justify-between shadow-sm relative overflow-hidden`}
+                   key={p.id} 
+                   className={`bg-white dark:bg-slate-900 border ${
+                     p.card_color || 'border-gray-150 dark:border-slate-800'
+                   } p-6 rounded-3xl flex flex-col justify-between shadow-sm relative overflow-hidden`}
                 >
                   {p.badge_text && (
                     <div className="absolute top-3 left-4">
@@ -1086,10 +1131,13 @@ export function UsersManagementPage() {
                   <div>
                     <div className="flex justify-between items-start mb-3">
                       <div>
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 wrap-reverse">
                           <h4 className="font-extrabold text-sm text-gray-900 dark:text-white">{p.name}</h4>
                           {p.is_free_plan && (
-                            <span className="px-1.5 py-0.5 text-[8px] font-bold bg-amber-50 text-amber-800 dark:bg-amber-950/20 dark:text-amber-400 rounded">باقة مجانية افتراضية</span>
+                            <span className="px-1.5 py-0.5 text-[8px] font-bold bg-amber-50 text-amber-800 dark:bg-amber-950/20 dark:text-amber-400 rounded">باقة مجانية</span>
+                          )}
+                          {p.is_default_on_signup && (
+                            <span className="px-1.5 py-0.5 text-[8px] font-bold bg-indigo-55 bg-indigo-600 text-white rounded">الافتراضية للشركاء ⭐</span>
                           )}
                         </div>
                         <span className="font-mono text-[9px] text-gray-400 block font-bold mt-0.5">رمز الكود: {p.code} (ترتيب: {p.sort_order || 0})</span>
@@ -1115,11 +1163,55 @@ export function UsersManagementPage() {
                         <span>{p.duration_days} يوم</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-400 text-[11px] font-semibold">سقف العمليات والمقارنات:</span>
+                        <span className="text-gray-400 text-[11px] font-semibold">سقف العمليات اليومية:</span>
                         <span className="text-emerald-600 dark:text-emerald-400 font-bold">
                           {p.daily_calculation_limit === null ? 'وصول مفتوح لا نهائي (∞)' : `${p.daily_calculation_limit} عمليّة يومية`}
                         </span>
                       </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 text-[11px] font-semibold">سقف حفظ البيانات:</span>
+                        <span>
+                          {p.saved_results_limit === null || p.saved_results_limit === undefined ? 'وصول مفتوح لا نهائي (∞)' : `${p.saved_results_limit} حسبة ميزانية`}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-450 text-[11px] font-semibold">الميزات والصلاحيات:</span>
+                        <div className="flex gap-1 text-[9px] font-sans">
+                          {p.can_save_results !== false && <span className="bg-emerald-50 text-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-400 px-1 rounded" title="حفظ المقارنات">حفظ</span>}
+                          {!!p.can_export_results && <span className="bg-sky-50 text-sky-850 dark:bg-sky-955/20 dark:text-sky-400 px-1 rounded" title="تصدير PDF">تصدير PDF</span>}
+                          {!!p.can_view_advanced_details && <span className="bg-indigo-50 text-indigo-805 dark:bg-indigo-955/20 dark:text-indigo-400 px-1 rounded" title="الحسبة المتقدمة">حسبة متقدمة</span>}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Manage default status control */}
+                    <div className="mb-4">
+                      {p.is_default_on_signup ? (
+                        <div className="text-[10px] text-indigo-700 bg-indigo-50/60 dark:bg-indigo-950/10 py-1.5 px-3 rounded-xl border border-indigo-100/30 dark:border-indigo-900/10 flex items-center gap-1.5 font-bold">
+                          <Check className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                          <span>الباقة الافتراضية المعينة عند التسجيل الجديد ✅</span>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={async () => {
+                            setActionLoading(true);
+                            try {
+                              await setDefaultPlan(p.id);
+                              showFlashSuccess('تم تفعيل هذه الباقة كباقة افتراضية عند التسجيل بنجاح!');
+                              await fetchPlans();
+                            } catch (err: any) {
+                              showFlashError(`فشل تعيين الباقة كافتراضية: ${err.message || err}`);
+                            } finally {
+                              setActionLoading(false);
+                            }
+                          }}
+                          disabled={actionLoading}
+                          className="w-full text-center py-1.5 px-3 border border-gray-150 dark:border-slate-800 hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-500 hover:text-gray-900 dark:hover:text-white rounded-xl text-[10px] font-bold cursor-pointer transition-all flex items-center justify-center gap-1.5"
+                        >
+                          <Star className="w-3.5 h-3.5 text-amber-500" />
+                          <span>تعيين كالباقة الافتراضية عند التسجيل الجديد</span>
+                        </button>
+                      )}
                     </div>
 
                     {/* Features list breakdown within app let */}
@@ -1127,10 +1219,10 @@ export function UsersManagementPage() {
                       <div className="border-t border-gray-50 dark:border-slate-800/80 pt-3 mb-5 space-y-1.5">
                         <span className="text-[10px] text-gray-450 block font-bold mb-1">الميزات المدرجة بالباقة:</span>
                         {p.features.map((feat, fidx) => (
-                          <div key={fidx} className="flex items-start gap-1.5 text-[10px] leading-relaxed text-gray-600 dark:text-slate-300">
-                            <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
-                            <span className="font-semibold">{feat}</span>
-                          </div>
+                           <div key={fidx} className="flex items-start gap-1.5 text-[10px] leading-relaxed text-gray-600 dark:text-slate-300">
+                             <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
+                             <span className="font-semibold">{feat}</span>
+                           </div>
                         ))}
                       </div>
                     )}
@@ -1252,15 +1344,57 @@ export function UsersManagementPage() {
                     </div>
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="text-gray-400 text-[11px] block">سقف العمليات اليومي للعميل (أو اتركه خاليًا للوصول المفتوح):</label>
-                    <NumericInput 
-                      allowDecimals={false}
-                      placeholder="مثال: 25 عملية مقارنة تمويل يومية (أو اتركه فارغاً للمفتوح)"
-                      className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 text-gray-900 dark:text-white rounded-xl outline-none text-xs font-mono"
-                      value={newPlan.daily_calculation_limit === null || newPlan.daily_calculation_limit === undefined ? '' : newPlan.daily_calculation_limit}
-                      onChange={val => setNewPlan({ ...newPlan, daily_calculation_limit: val === '' ? null : Number(val) })}
-                    />
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-gray-400 text-[11px] block">سقف العمليات اليومي (أو خالي للمفتوح):</label>
+                      <NumericInput 
+                        allowDecimals={false}
+                        placeholder="للوصول المفتوح غير المحدود اتركه خاليًا"
+                        className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 text-gray-900 dark:text-white rounded-xl outline-none text-xs font-mono"
+                        value={newPlan.daily_calculation_limit === null || newPlan.daily_calculation_limit === undefined ? '' : newPlan.daily_calculation_limit}
+                        onChange={val => setNewPlan({ ...newPlan, daily_calculation_limit: val === '' ? null : Number(val) })}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-gray-400 text-[11px] block">سقف تفويض الحسابات المحفوظة (أو خالي للمفتوح):</label>
+                      <NumericInput 
+                        allowDecimals={false}
+                        placeholder="للحفظ المفتوح غير المحدود اتركه خاليًا"
+                        className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 text-gray-900 dark:text-white rounded-xl outline-none text-xs font-mono"
+                        value={newPlan.saved_results_limit === null || newPlan.saved_results_limit === undefined ? '' : newPlan.saved_results_limit}
+                        onChange={val => setNewPlan({ ...newPlan, saved_results_limit: val === '' ? null : Number(val) })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4 border-t border-gray-50 dark:border-slate-800/80 pt-3">
+                    <div className="flex items-center gap-1.5 font-bold">
+                      <input 
+                        type="checkbox"
+                        id="plan_save_results_chk_add"
+                        checked={newPlan.can_save_results !== false}
+                        onChange={e => setNewPlan({ ...newPlan, can_save_results: e.target.checked })}
+                      />
+                      <label htmlFor="plan_save_results_chk_add" className="cursor-pointer select-none text-[10px] text-gray-700 dark:text-slate-300">تمكين حفظ المقارنات</label>
+                    </div>
+                    <div className="flex items-center gap-1.5 font-bold">
+                      <input 
+                        type="checkbox"
+                        id="plan_export_pdf_chk_add"
+                        checked={!!newPlan.can_export_results}
+                        onChange={e => setNewPlan({ ...newPlan, can_export_results: e.target.checked })}
+                      />
+                      <label htmlFor="plan_export_pdf_chk_add" className="cursor-pointer select-none text-[10px] text-gray-700 dark:text-slate-300">تصدير تقارير PDF</label>
+                    </div>
+                    <div className="flex items-center gap-1.5 font-bold">
+                      <input 
+                        type="checkbox"
+                        id="plan_adv_det_chk_add"
+                        checked={!!newPlan.can_view_advanced_details}
+                        onChange={e => setNewPlan({ ...newPlan, can_view_advanced_details: e.target.checked })}
+                      />
+                      <label htmlFor="plan_adv_det_chk_add" className="cursor-pointer select-none text-[10px] text-gray-700 dark:text-slate-300">الحسبة المتقدمة والهوامش</label>
+                    </div>
                   </div>
 
                   {/* Features list section */}
@@ -1359,6 +1493,16 @@ export function UsersManagementPage() {
                         onChange={e => setNewPlan({ ...newPlan, is_free_plan: e.target.checked })}
                       />
                       <label htmlFor="new_is_free" className="cursor-pointer select-none text-[11px] text-gray-700 dark:text-slate-300">تعيين كباقة مجانية (Free Plan)</label>
+                    </div>
+
+                    <div className="flex items-center gap-2 col-span-2 border-t border-gray-50 dark:border-slate-800/40 pt-2">
+                       <input 
+                        type="checkbox"
+                        id="new_is_default"
+                        checked={!!newPlan.is_default_on_signup}
+                        onChange={e => setNewPlan({ ...newPlan, is_default_on_signup: e.target.checked })}
+                      />
+                      <label htmlFor="new_is_default" className="cursor-pointer select-none text-xs text-indigo-700 dark:text-indigo-400 font-bold">تعيين الباقة الافتراضية الممنوحة تلقائياً عند التسجيل الجديد ⭐</label>
                     </div>
                   </div>
 
@@ -1459,16 +1603,57 @@ export function UsersManagementPage() {
                     </div>
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="text-gray-400 text-[11px] block">سقف العمليات اليومي (أو اتركه فارغًا للمفتوح):</label>
-                    <NumericInput 
-                      allowDecimals={false}
-                      placeholder="للوصول المفتوح غير المحدود اتركه خاليًا"
-                      className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 text-gray-900 dark:text-white rounded-xl outline-none text-xs font-mono"
-                      value={editingPlan.daily_calculation_limit === null || editingPlan.daily_calculation_limit === undefined ? '' : editingPlan.daily_calculation_limit}
-                      onChange={val => setEditingPlan({ ...editingPlan, daily_calculation_limit: val === '' ? null : Number(val) })}
-                    />
-                    <span className="text-[10px] text-gray-400 font-sans block mt-1 leading-normal">* اتركه فارغًا لتعيين حد الحسابات اليومية إلى لا نهائي (مفتوح بالكامل).</span>
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-gray-400 text-[11px] block">سقف العمليات اليومي (أو خالي للمفتوح):</label>
+                      <NumericInput 
+                        allowDecimals={false}
+                        placeholder="للوصول المفتوح غير المحدود اتركه خاليًا"
+                        className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 text-gray-900 dark:text-white rounded-xl outline-none text-xs font-mono"
+                        value={editingPlan.daily_calculation_limit === null || editingPlan.daily_calculation_limit === undefined ? '' : editingPlan.daily_calculation_limit}
+                        onChange={val => setEditingPlan({ ...editingPlan, daily_calculation_limit: val === '' ? null : Number(val) })}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-gray-400 text-[11px] block">سقف تفويض الحسابات المحفوظة (أو خالي للمفتوح):</label>
+                      <NumericInput 
+                        allowDecimals={false}
+                        placeholder="للحفظ المفتوح غير المحدود اتركه خاليًا"
+                        className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 text-gray-900 dark:text-white rounded-xl outline-none text-xs font-mono"
+                        value={editingPlan.saved_results_limit === null || editingPlan.saved_results_limit === undefined ? '' : editingPlan.saved_results_limit}
+                        onChange={val => setEditingPlan({ ...editingPlan, saved_results_limit: val === '' ? null : Number(val) })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4 border-t border-gray-50 dark:border-slate-800/80 pt-3">
+                    <div className="flex items-center gap-1.5 font-bold">
+                      <input 
+                        type="checkbox"
+                        id="plan_save_results_chk_edit"
+                        checked={editingPlan.can_save_results !== false}
+                        onChange={e => setEditingPlan({ ...editingPlan, can_save_results: e.target.checked })}
+                      />
+                      <label htmlFor="plan_save_results_chk_edit" className="cursor-pointer select-none text-[10px] text-gray-700 dark:text-slate-300">تمكين حفظ المقارنات</label>
+                    </div>
+                    <div className="flex items-center gap-1.5 font-bold">
+                      <input 
+                        type="checkbox"
+                        id="plan_export_pdf_chk_edit"
+                        checked={!!editingPlan.can_export_results}
+                        onChange={e => setEditingPlan({ ...editingPlan, can_export_results: e.target.checked })}
+                      />
+                      <label htmlFor="plan_export_pdf_chk_edit" className="cursor-pointer select-none text-[10px] text-gray-700 dark:text-slate-300">تصدير تقارير PDF</label>
+                    </div>
+                    <div className="flex items-center gap-1.5 font-bold">
+                      <input 
+                        type="checkbox"
+                        id="plan_adv_det_chk_edit"
+                        checked={!!editingPlan.can_view_advanced_details}
+                        onChange={e => setEditingPlan({ ...editingPlan, can_view_advanced_details: e.target.checked })}
+                      />
+                      <label htmlFor="plan_adv_det_chk_edit" className="cursor-pointer select-none text-[10px] text-gray-700 dark:text-slate-300">الحسبة المتقدمة والهوامش</label>
+                    </div>
                   </div>
 
                   {/* Features list section */}
@@ -1566,6 +1751,16 @@ export function UsersManagementPage() {
                       />
                       <label htmlFor="plan_is_free_chk_edit" className="cursor-pointer select-none text-xs text-gray-700 dark:text-slate-350">تعيين كباقة مجانية (Free Plan)</label>
                     </div>
+
+                    <div className="flex items-center gap-2 col-span-2 border-t border-gray-50 dark:border-slate-800/40 pt-2">
+                       <input 
+                        type="checkbox"
+                        id="plan_default_chk_edit"
+                        checked={!!editingPlan.is_default_on_signup}
+                        onChange={e => setEditingPlan({ ...editingPlan, is_default_on_signup: e.target.checked })}
+                      />
+                      <label htmlFor="plan_default_chk_edit" className="cursor-pointer select-none text-xs text-indigo-700 dark:text-indigo-400 font-bold">تعيين الباقة الافتراضية الممنوحة تلقائياً عند التسجيل الجديد ⭐</label>
+                    </div>
                   </div>
                 </div>
 
@@ -1592,7 +1787,15 @@ export function UsersManagementPage() {
       {/* VIEW: TAB - ACTIVATION REQUESTS */}
       {activeTab === 'requests' && (
         <div className="space-y-4">
-          <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800/80 p-4 rounded-3xl shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
+          {!hasSupabaseKeys ? (
+            <div className="p-12 text-center bg-white dark:bg-slate-900 rounded-3xl border border-dashed border-gray-150 dark:border-slate-800 shadow-sm max-w-md mx-auto my-8">
+              <Crown className="w-12 h-12 text-amber-500 mx-auto mb-4 animate-pulse" />
+              <p className="text-sm text-gray-500 dark:text-slate-400 font-extrabold mb-1">لا يمكن تحميل الاشتراكات لأن Supabase غير مهيأ.</p>
+              <p className="text-[10px] text-gray-400 dark:text-slate-500 leading-relaxed font-semibold">يرجى ربط وتكوين مفاتيح الاتصال بـ Supabase للتمكن من فحص وقبول ومعالجة طلبات تفعيل الشركاء الحقيقيين.</p>
+            </div>
+          ) : (
+            <>
+              <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800/80 p-4 rounded-3xl shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
             <div className="space-y-1">
               <h4 className="text-xs font-black text-slate-800 dark:text-slate-200">فرز وتتبع طلبات تفعيل الاشتراكات اليدوية والباقية</h4>
               <p className="text-[10px] text-gray-400">تظهر هنا كافة طلبات التفعيل المرسلة من قبل المستخدمين الراغبين بمزايا الحزم المدفوعة، بادر بالمتابعة لتأكيد التحويلات.</p>
@@ -1701,6 +1904,8 @@ export function UsersManagementPage() {
                 </table>
               </div>
             </div>
+          )}
+            </>
           )}
         </div>
       )}

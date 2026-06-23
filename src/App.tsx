@@ -9,7 +9,6 @@ import BottomNavigation from './components/layout/BottomNavigation';
 import StepWizard from './components/calculator/StepWizard';
 import { AdminDashboardGuard } from './components/admin/AdminDashboardGuard';
 import AuthCallbackPage from './pages/AuthCallbackPage';
-import { SubscriptionGate } from './components/subscription/SubscriptionGate';
 import { Calculator, ShieldCheck, Mail, Phone, ExternalLink, ShieldAlert, Loader2 } from 'lucide-react';
 import { supabase, hasSupabaseKeys, cleanStaleSupabaseSession } from './lib/supabase';
 import AssistantWidget from './components/layout/AssistantWidget';
@@ -116,17 +115,9 @@ function DashboardOrWizard() {
     switch (location.pathname) {
       case '/':
       case '/calculator':
-        return (
-          <SubscriptionGate>
-            <StepWizard />
-          </SubscriptionGate>
-        );
+        return <StepWizard />;
       case '/results':
-        return (
-          <SubscriptionGate>
-            <ResultsPage />
-          </SubscriptionGate>
-        );
+        return <ResultsPage />;
       case '/account':
         return <AccountPage />;
       case '/subscription':

@@ -35,6 +35,12 @@ export interface SubscriptionPlan {
   price_sar: number;
   duration_days: number;
   daily_calculation_limit: number | null;
+  saved_results_limit?: number | null;
+  can_save_results?: boolean;
+  can_export_results?: boolean;
+  can_view_advanced_details?: boolean;
+  is_default_on_signup?: boolean;
+  is_free_plan?: boolean;
   is_active: boolean;
   sort_order: number;
   created_at: string;
@@ -43,14 +49,13 @@ export interface SubscriptionPlan {
   badge_text?: string | null;
   badge_color?: string | null;
   card_color?: string | null;
-  is_free_plan?: boolean;
 }
 
 export interface DbSubscription {
   id: string;
   user_id: string;
   plan_id: string;
-  status: 'trialing' | 'active' | 'expired' | 'cancelled' | 'past_due';
+  status: 'trialing' | 'active' | 'expired' | 'cancelled' | 'past_due' | 'suspended';
   started_at: string;
   ends_at: string;
   cancelled_at: string | null;
@@ -58,6 +63,8 @@ export interface DbSubscription {
   notes: string | null;
   custom_daily_limit: number | null;
   plan?: SubscriptionPlan;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface UserBillingProfile {
@@ -95,31 +102,7 @@ export interface PaymentTransaction {
 // 1. Get Current Subscription for a specific user
 export async function getCurrentSubscription(userId: string): Promise<DbSubscription | null> {
   if (!hasSupabaseKeys) {
-    // Simulator fallback
-    return {
-      id: 'mock-sub-id',
-      user_id: userId,
-      plan_id: 'mock-plan-trial',
-      status: 'trialing',
-      started_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-      ends_at: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString(),
-      cancelled_at: null,
-      source: 'system',
-      notes: 'محاكاة الباقة المجانية',
-      custom_daily_limit: null,
-      plan: {
-        id: 'mock-plan-trial',
-        code: 'trial',
-        name: 'باقة مجانية',
-        description: 'باقة مجانية افتراضية 30 يوماً',
-        price_sar: 0,
-        duration_days: 30,
-        daily_calculation_limit: null,
-        is_active: true,
-        sort_order: 0,
-        created_at: new Date().toISOString()
-      }
-    };
+    return null;
   }
 
   try {
@@ -172,99 +155,10 @@ export async function getCurrentSubscription(userId: string): Promise<DbSubscrip
   }
 }
 
-export const DEFAULT_PLANS: SubscriptionPlan[] = [
-  {
-    id: 'mock-plan-trial',
-    code: 'trial',
-    name: 'باقة مجانية',
-    description: 'باقة مجانية - صلاحية 30 يوماً مع سقف حسابات يومي مرن',
-    price_sar: 0,
-    duration_days: 30,
-    daily_calculation_limit: null,
-    is_active: true,
-    sort_order: 0,
-    created_at: new Date().toISOString(),
-    features: [
-      'ولوج كامل إلى حاسبة حسبة المتقدمة',
-      'مقارنة 5 جهات تمويلية أساسية',
-      'تتبع مؤشر الدعم السكني للمستفيدين',
-      'حسبة نسبة الاستقطاع الدقيقة DSR'
-    ],
-    badge_text: 'بداية فورية',
-    badge_color: 'bg-gray-100 text-gray-700 dark:bg-slate-800 dark:text-slate-350',
-    card_color: 'border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900',
-    is_free_plan: true
-  },
-  {
-    id: 'mock-plan-monthly',
-    code: 'monthly',
-    name: 'الباقة العقارية الشهرية',
-    description: 'اشتراك شهري - ليس هناك حدود حسابية وصلاحيات وصول متكاملة وممتدة للعملاء',
-    price_sar: 24.99,
-    duration_days: 30,
-    daily_calculation_limit: null,
-    is_active: true,
-    sort_order: 1,
-    created_at: new Date().toISOString(),
-    features: [
-      'عدد لا نهائي من العمليات الحسابية',
-      'فتح كافة جهات التمويل والبنوك المعتمدة',
-      'حسابات الدعم السكني الفوري والمؤجل',
-      'صلاحيات الوصول إلى حاسبة التقاعد العسكري والمدني',
-      'دعم فني خاص وإصدار تقارير مخصصة للعملاء'
-    ],
-    badge_text: 'الأكثر طلبًا',
-    badge_color: 'bg-sky-500 text-white',
-    card_color: 'border-sky-500 shadow-md ring-2 ring-sky-500/20 bg-white dark:bg-[#0f172a]',
-    is_free_plan: false
-  },
-  {
-    id: 'mock-plan-6months',
-    code: 'six_months',
-    name: 'باقة 6 أشهر الاحترافية',
-    description: 'اشتراك نصف سنوي - أفضل توفير مع عمليات لا نهائية وتقارير حصرية مهيأة للمشاركة',
-    price_sar: 140.00,
-    duration_days: 180,
-    daily_calculation_limit: null,
-    is_active: true,
-    sort_order: 2,
-    created_at: new Date().toISOString(),
-    features: [
-      'وفر ما يقارب 10٪ مقارنة بالاشتراك الشهري',
-      'عدد غير محدود من العمليات والاستعلامات اليومية',
-      'دعم كامل لخيارات الجمع بين التمويل العقاري والشخصي',
-      'خيارات الربط البرمجي السحابي والـ API API Sandbox',
-      'تقارير تحليل ذكي مهيأة للطباعة والمشاركة المباشرة'
-    ],
-    badge_text: 'التوفير الأقصى',
-    badge_color: 'bg-emerald-500 text-white',
-    card_color: 'border-emerald-500 bg-white dark:bg-slate-900',
-    is_free_plan: false
-  }
-];
-
-// Helper to seed localStorage if empty
-function loadLocalPlans(): SubscriptionPlan[] {
-  try {
-    const stored = localStorage.getItem('dynamic_subscription_plans');
-    if (stored) {
-      return JSON.parse(stored);
-    }
-  } catch (e) {
-    console.warn('Error parsing local plans:', e);
-  }
-  try {
-    localStorage.setItem('dynamic_subscription_plans', JSON.stringify(DEFAULT_PLANS));
-  } catch (e) {
-    console.error('Error saving local plans:', e);
-  }
-  return DEFAULT_PLANS;
-}
-
 // 2. Fetch active plans
 export async function getSubscriptionPlans(): Promise<SubscriptionPlan[]> {
   if (!hasSupabaseKeys) {
-    return loadLocalPlans();
+    return [];
   }
 
   try {
@@ -279,7 +173,6 @@ export async function getSubscriptionPlans(): Promise<SubscriptionPlan[]> {
     }
 
     return (data || []).map((item: any) => {
-      const defaultMatch = DEFAULT_PLANS.find(p => p.code === item.code);
       return {
         id: item.id,
         code: item.code || `plan_${Math.random().toString(36).substr(2, 5)}`,
@@ -288,16 +181,19 @@ export async function getSubscriptionPlans(): Promise<SubscriptionPlan[]> {
         price_sar: Number(item.price_sar),
         duration_days: Number(item.duration_days),
         daily_calculation_limit: item.daily_calculation_limit === undefined ? null : item.daily_calculation_limit,
+        saved_results_limit: item.saved_results_limit === undefined ? null : item.saved_results_limit,
+        can_save_results: item.can_save_results !== false,
+        can_export_results: !!item.can_export_results,
+        can_view_advanced_details: !!item.can_view_advanced_details,
+        is_default_on_signup: !!item.is_default_on_signup,
         is_active: item.is_active !== false,
         sort_order: Number(item.sort_order || 0),
         created_at: item.created_at || new Date().toISOString(),
-        features: Array.isArray(item.features) && item.features.length > 0 
-          ? item.features 
-          : (defaultMatch?.features || []),
-        badge_text: item.badge_text !== undefined ? item.badge_text : (defaultMatch?.badge_text || null),
-        badge_color: item.badge_color !== undefined ? item.badge_color : (defaultMatch?.badge_color || null),
-        card_color: item.card_color !== undefined ? item.card_color : (defaultMatch?.card_color || null),
-        is_free_plan: item.is_free_plan !== undefined ? !!item.is_free_plan : !!(defaultMatch?.is_free_plan)
+        features: Array.isArray(item.features) ? item.features : [],
+        badge_text: item.badge_text !== undefined ? item.badge_text : null,
+        badge_color: item.badge_color !== undefined ? item.badge_color : null,
+        card_color: item.card_color !== undefined ? item.card_color : null,
+        is_free_plan: !!item.is_free_plan
       } as SubscriptionPlan;
     });
   } catch (err) {
@@ -306,82 +202,179 @@ export async function getSubscriptionPlans(): Promise<SubscriptionPlan[]> {
   }
 }
 
-// 3. Create Trial Subscription for new user
+// 3. Create Trial/Default Subscription for new user
 export async function createTrialSubscription(userId: string): Promise<DbSubscription | null> {
+  return ensureDefaultSubscriptionForUser(userId);
+}
+
+// Ensure the default signup subscription is allocated for a user
+export async function ensureDefaultSubscriptionForUser(userId: string): Promise<DbSubscription | null> {
   if (!hasSupabaseKeys) {
-    const endsAt = new Date();
-    endsAt.setDate(endsAt.getDate() + 30); // 30 days trial
-    return {
-      id: 'mock-sub-trial-created',
-      user_id: userId,
-      plan_id: 'mock-plan-trial',
-      status: 'trialing',
-      started_at: new Date().toISOString(),
-      ends_at: endsAt.toISOString(),
-      cancelled_at: null,
-      source: 'trial',
-      notes: 'بداية تجربة مجانية جديدة',
-      custom_daily_limit: null,
-      plan: {
-        id: 'mock-plan-trial',
-        code: 'trial',
-        name: 'تجربة مجانية',
-        description: 'تجربة مجانية',
-        price_sar: 0,
-        duration_days: 30,
-        daily_calculation_limit: null,
-        is_active: true,
-        sort_order: 0,
-        created_at: new Date().toISOString()
-      }
-    };
-  }
-
-  // Get active trial plan
-  const { data: planData, error: planErr } = await supabase
-    .from('subscription_plans')
-    .select('*')
-    .eq('code', 'trial')
-    .eq('is_active', true)
-    .maybeSingle();
-
-  if (planErr) {
-    console.error('Error fetching trial plan:', planErr);
-  }
-
-  if (!planData) {
-    console.warn('Active trial plan not found. User created without trial subscription.');
     return null;
   }
 
-  const endsAt = new Date();
-  endsAt.setDate(endsAt.getDate() + planData.duration_days);
+  try {
+    // 1. Check if user already has any subscription record
+    const { data: existing, error: getErr } = await supabase
+      .from('user_subscriptions')
+      .select('*, plan:subscription_plans(*)')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-  const newSub = {
-    user_id: userId,
-    plan_id: planData.id,
-    status: 'trialing' as const,
-    started_at: new Date().toISOString(),
-    ends_at: endsAt.toISOString(),
-    source: 'trial',
-    notes: 'تفعيل تجريبي تلقائي عقيب التسجيل',
-    custom_daily_limit: null,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  };
+    if (getErr) {
+      console.error('Error fetching existing subscription in ensureDefaultSubscriptionForUser:', getErr);
+    }
 
-  const { data, error } = await supabase
-    .from('user_subscriptions')
-    .insert(newSub)
-    .select()
-    .single();
+    if (existing) {
+      return existing as DbSubscription;
+    }
 
-  if (error || !data) {
-    console.error('Error creating trial subscription:', error);
-    throw new Error('فشل تفعيل الاشتراك التجريبي للمستخدم.');
+    // 2. Fetch the plan labeled is_default_on_signup and active
+    const { data: defaultPlan, error: planErr } = await supabase
+      .from('subscription_plans')
+      .select('*')
+      .eq('is_default_on_signup', true)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (planErr) {
+      console.error('Error fetching default plan on signup:', planErr);
+    }
+
+    if (!defaultPlan) {
+      console.warn('⚠️ No default plan on signup is_default_on_signup = true and is_active = true found in Database.');
+      return null;
+    }
+
+    const endsAt = new Date();
+    endsAt.setDate(endsAt.getDate() + defaultPlan.duration_days);
+
+    const newSub = {
+      user_id: userId,
+      plan_id: defaultPlan.id,
+      status: defaultPlan.is_free_plan ? 'trialing' : 'active',
+      started_at: new Date().toISOString(),
+      ends_at: endsAt.toISOString(),
+      source: 'signup_default',
+      notes: 'تفعيل تلقائي عند التسجيل (الباقة الافتراضية)',
+      custom_daily_limit: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    const { data, error } = await supabase
+      .from('user_subscriptions')
+      .insert(newSub)
+      .select('*, plan:subscription_plans(*)')
+      .single();
+
+    if (error || !data) {
+      console.error('Error creating default plan subscription:', error);
+      throw new Error('فشل تفعيل الباقة الافتراضية للمستخدم.');
+    }
+
+    return data as DbSubscription;
+  } catch (err) {
+    console.error('Exception in ensureDefaultSubscriptionForUser:', err);
+    return null;
+  }
+}
+
+// 3.1 Standardized Subscription API wrappers
+export async function listPlans(): Promise<SubscriptionPlan[]> {
+  return getSubscriptionPlans();
+}
+
+export async function createPlan(plan: Omit<SubscriptionPlan, 'id' | 'created_at'>): Promise<SubscriptionPlan> {
+  return adminCreatePlan(plan);
+}
+
+export async function updatePlan(planId: string, updates: Partial<SubscriptionPlan>): Promise<void> {
+  return adminUpdatePlan(planId, updates);
+}
+
+export async function setDefaultPlan(planId: string): Promise<void> {
+  if (!hasSupabaseKeys) {
+    throw new Error('لا يمكن إتمام هذه العملية لأن الاتصال بـ Supabase غير مهيأ.');
   }
 
-  return data as DbSubscription;
+  try {
+    // 1. Set is_default_on_signup = false for everything
+    const { error: err1 } = await supabase
+      .from('subscription_plans')
+      .update({ is_default_on_signup: false, updated_at: new Date().toISOString() })
+      .neq('id', planId);
+
+    if (err1) throw err1;
+
+    // 2. Set is_default_on_signup = true for target
+    const { error: err2 } = await supabase
+      .from('subscription_plans')
+      .update({ is_default_on_signup: true, updated_at: new Date().toISOString() })
+      .eq('id', planId);
+
+    if (err2) throw err2;
+  } catch (err) {
+    console.error('Error in setDefaultPlan:', err);
+    throw err;
+  }
+}
+
+export async function listUserSubscriptions(): Promise<any[]> {
+  return adminListSubscribers();
+}
+
+export async function assignSubscriptionToUser(params: SaveSubscriptionParams): Promise<void> {
+  return adminSaveUserSubscription(params);
+}
+
+export async function extendSubscription(userId: string, days: number): Promise<void> {
+  return adminExtendSubscription(userId, days);
+}
+
+export async function suspendSubscription(userId: string): Promise<void> {
+  if (!hasSupabaseKeys) return;
+  try {
+    const { error } = await supabase
+      .from('user_subscriptions')
+      .update({
+        status: 'suspended',
+        notes: 'تم إيقاف الاشتراك مؤقتاً.',
+        updated_at: new Date().toISOString()
+      })
+      .eq('user_id', userId);
+
+    if (error) throw error;
+  } catch (err) {
+    console.error('Error suspending subscription:', err);
+    throw err;
+  }
+}
+
+export async function cancelSubscription(userId: string): Promise<void> {
+  if (!hasSupabaseKeys) return;
+  try {
+    const { error } = await supabase
+      .from('user_subscriptions')
+      .update({
+        status: 'cancelled',
+        cancelled_at: new Date().toISOString(),
+        notes: 'تم إلغاء الاشتراك نهائياً.',
+        updated_at: new Date().toISOString()
+      })
+      .eq('user_id', userId);
+
+    if (error) throw error;
+  } catch (err) {
+    console.error('Error cancelling subscription:', err);
+    throw err;
+  }
+}
+
+export async function getCurrentUserSubscription(userId: string): Promise<DbSubscription | null> {
+  return getCurrentSubscription(userId);
 }
 
 // 4. Usage limit check and incremental update
@@ -460,14 +453,7 @@ export async function incrementDailyUsage(userId: string, dailyLimit: number | n
 // 5. Billing settings profile
 export async function getBillingProfile(userId: string): Promise<UserBillingProfile | null> {
   if (!hasSupabaseKeys) {
-    return {
-      id: 'mock-billing-profile',
-      user_id: userId,
-      phone_number: '0512345678',
-      phone_locked: true,
-      full_name: 'تجربة محاكاة',
-      email: 'user@example.com'
-    };
+    return null;
   }
 
   try {
@@ -492,15 +478,7 @@ export async function getBillingProfile(userId: string): Promise<UserBillingProf
 export async function createBillingProfile(profile: { user_id: string; phone_number: string; full_name?: string; email?: string }): Promise<UserBillingProfile> {
   const normPhone = normalizePhone(profile.phone_number);
   if (!hasSupabaseKeys) {
-    return {
-      id: 'mock-created-billing',
-      user_id: profile.user_id,
-      phone_number: normPhone,
-      normalized_phone: normPhone,
-      phone_locked: false,
-      full_name: profile.full_name || null,
-      email: profile.email || null
-    };
+    throw new Error('لا يمكن إنشاء ملف شخصي للفوترة لأن الاتصال بـ Supabase غير مهيأ.');
   }
 
   const { data, error } = await supabase
@@ -569,10 +547,10 @@ export async function testBillingProfileUniquePhone(phone: string, excludeUserId
 export async function getSubscriptionStats() {
   if (!hasSupabaseKeys) {
     return {
-      totalSubscribers: 15,
-      activeSubs: 8,
-      trialingSubs: 5,
-      expiredSubs: 2
+      totalSubscribers: 0,
+      activeSubs: 0,
+      trialingSubs: 0,
+      expiredSubs: 0
     };
   }
 
@@ -599,59 +577,7 @@ export async function getSubscriptionStats() {
 
 export async function adminListSubscribers(): Promise<any[]> {
   if (!hasSupabaseKeys) {
-    return [
-      {
-        id: 'sub-1',
-        user_id: 'user-mock-1',
-        email: 'ahmad@example.com',
-        phone_number: '0555555551',
-        full_name: 'أحمد الحربي',
-        status: 'active',
-        plan_name: 'اشتراك شهري',
-        plan_code: 'monthly',
-        plan_id: 'mock-plan-monthly',
-        source: 'manual_paid',
-        custom_daily_limit: null,
-        notes: 'تم تفعيله يدويًا من الإدارة',
-        started_at: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-        ends_at: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString(),
-        usage_today: 4
-      },
-      {
-        id: 'sub-2',
-        user_id: 'user-mock-2',
-        email: 'khaled@example.com',
-        phone_number: '0544444442',
-        full_name: 'خالم المطيري',
-        status: 'trialing',
-        plan_name: 'تجربة مجانية',
-        plan_code: 'trial',
-        plan_id: 'mock-plan-trial',
-        source: 'trial',
-        custom_daily_limit: 10,
-        notes: 'تجربة تلقائية',
-        started_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-        ends_at: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString(),
-        usage_today: 9
-      },
-      {
-        id: 'sub-3',
-        user_id: 'user-mock-3',
-        email: 'sara@example.com',
-        phone_number: '0533333333',
-        full_name: 'سارة العتيبي',
-        status: 'expired',
-        plan_name: 'تجربة مجانية',
-        plan_code: 'trial',
-        plan_id: 'mock-plan-trial',
-        source: 'trial',
-        custom_daily_limit: null,
-        notes: 'منتهي الصلاحية',
-        started_at: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-        ends_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-        usage_today: 0
-      }
-    ];
+    return [];
   }
 
   try {
@@ -843,17 +769,7 @@ export async function adminMarkSubscriptionExpired(userId: string): Promise<void
 
 export async function adminUpdatePlan(planId: string, updates: Partial<SubscriptionPlan>): Promise<void> {
   if (!hasSupabaseKeys) {
-    const plans = loadLocalPlans();
-    const idx = plans.findIndex(p => p.id === planId);
-    if (idx !== -1) {
-      plans[idx] = {
-        ...plans[idx],
-        ...updates,
-        updated_at: new Date().toISOString()
-      };
-      localStorage.setItem('dynamic_subscription_plans', JSON.stringify(plans));
-    }
-    return;
+    throw new Error('لا يمكن إتمام هذه العملية لأن الاتصال بـ Supabase غير مهيأ.');
   }
   try {
     const { error } = await supabase
@@ -865,6 +781,10 @@ export async function adminUpdatePlan(planId: string, updates: Partial<Subscript
       .eq('id', planId);
 
     if (error) throw error;
+
+    if (updates.is_default_on_signup === true) {
+      await setDefaultPlan(planId);
+    }
   } catch (err) {
     console.error('Error updating plan:', err);
     throw err;
@@ -872,19 +792,8 @@ export async function adminUpdatePlan(planId: string, updates: Partial<Subscript
 }
 
 export async function adminCreatePlan(plan: Omit<SubscriptionPlan, "id" | "created_at">): Promise<SubscriptionPlan> {
-  const newId = `plan-${Math.random().toString(36).substr(2, 9)}`;
-  const createdPlan: SubscriptionPlan = {
-    ...plan,
-    id: newId,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  };
-
   if (!hasSupabaseKeys) {
-    const plans = loadLocalPlans();
-    plans.push(createdPlan);
-    localStorage.setItem('dynamic_subscription_plans', JSON.stringify(plans));
-    return createdPlan;
+    throw new Error('لا يمكن إتمام هذه العملية لأن الاتصال بـ Supabase غير مهيأ.');
   }
 
   try {
@@ -899,6 +808,11 @@ export async function adminCreatePlan(plan: Omit<SubscriptionPlan, "id" | "creat
       .single();
 
     if (error) throw error;
+
+    if (plan.is_default_on_signup === true && data) {
+      await setDefaultPlan(data.id);
+    }
+
     return data as SubscriptionPlan;
   } catch (err) {
     console.error('Error creating plan:', err);
@@ -908,10 +822,7 @@ export async function adminCreatePlan(plan: Omit<SubscriptionPlan, "id" | "creat
 
 export async function adminDeletePlan(planId: string): Promise<void> {
   if (!hasSupabaseKeys) {
-    const plans = loadLocalPlans();
-    const filtered = plans.filter(p => p.id !== planId);
-    localStorage.setItem('dynamic_subscription_plans', JSON.stringify(filtered));
-    return;
+    throw new Error('لا يمكن إتمام هذه العملية لأن الاتصال بـ Supabase غير مهيأ.');
   }
 
   try {
@@ -928,22 +839,18 @@ export async function adminDeletePlan(planId: string): Promise<void> {
 }
 
 export async function adminCopyPlan(planId: string): Promise<SubscriptionPlan> {
-  let targetPlan: SubscriptionPlan | null = null;
   if (!hasSupabaseKeys) {
-    const plans = loadLocalPlans();
-    const match = plans.find(p => p.id === planId);
-    if (!match) throw new Error('باقة غير متوفرة للتكرار');
-    targetPlan = match;
-  } else {
-    const { data, error } = await supabase
-      .from('subscription_plans')
-      .select('*')
-      .eq('id', planId)
-      .maybeSingle();
-      
-    if (error || !data) throw new Error('باقة غير متوفرة للتكرار');
-    targetPlan = data as SubscriptionPlan;
+    throw new Error('لا يمكن إتمام هذه العملية لأن الاتصال بـ Supabase غير مهيأ.');
   }
+
+  const { data, error } = await supabase
+    .from('subscription_plans')
+    .select('*')
+    .eq('id', planId)
+    .maybeSingle();
+    
+  if (error || !data) throw new Error('باقة غير متوفرة للتكرار');
+  const targetPlan = data as SubscriptionPlan;
 
   const copied: Omit<SubscriptionPlan, "id" | "created_at"> = {
     code: `${targetPlan.code}_copy_${Math.random().toString(36).substr(2, 3)}`,
@@ -991,20 +898,7 @@ export async function recordActivationRequest(userId: string, planId: string): P
   };
 
   if (!hasSupabaseKeys) {
-    // Save to localStorage
-    let requests: any[] = [];
-    try {
-      const stored = localStorage.getItem('dynamic_activation_requests');
-      if (stored) requests = JSON.parse(stored);
-    } catch {}
-    
-    const requestWithId = {
-      ...newRequest,
-      id: `act-${Math.random().toString(36).substr(2, 9)}`
-    };
-    requests.push(requestWithId);
-    localStorage.setItem('dynamic_activation_requests', JSON.stringify(requests));
-    return requestWithId;
+    throw new Error('لا يمكن إرسال طلب التفعيل لأن الاتصال بـ Supabase غير مهيأ.');
   }
 
   try {
@@ -1027,32 +921,7 @@ export async function recordActivationRequest(userId: string, planId: string): P
 
 export async function adminListActivationRequests(): Promise<ActivationRequest[]> {
   if (!hasSupabaseKeys) {
-    let requests: any[] = [];
-    try {
-      const stored = localStorage.getItem('dynamic_activation_requests');
-      if (stored) requests = JSON.parse(stored);
-    } catch {}
-
-    const plans = loadLocalPlans();
-    
-    // Fallback users for mapping inside mockup
-    const trialSubscribers = [
-      { user_id: 'user-mock-1', email: 'ahmad@example.com', full_name: 'أحمد الحربي' },
-      { user_id: 'user-mock-2', email: 'khaled@example.com', full_name: 'خالد المطيري' },
-      { user_id: 'user-mock-3', email: 'sara@example.com', full_name: 'سارة العتيبي' }
-    ];
-
-    return requests.map(r => {
-      const u = r.user_id ? trialSubscribers.find(usr => usr.user_id === r.user_id) : null;
-      const p = plans.find(pl => pl.id === r.plan_id);
-      return {
-        ...r,
-        user_email: u?.email || 'user@example.com',
-        user_name: u?.full_name || 'شريك مجهول',
-        plan_name: p?.name || 'باقة مجهولة',
-        plan_code: p?.code || 'unknown'
-      };
-    });
+    return [];
   }
 
   try {
@@ -1085,29 +954,8 @@ export async function adminListActivationRequests(): Promise<ActivationRequest[]
 }
 
 export async function adminApproveActivationRequest(requestId: string): Promise<void> {
-  let requestObj: ActivationRequest | null = null;
-  
   if (!hasSupabaseKeys) {
-    let requests: any[] = [];
-    try {
-      const stored = localStorage.getItem('dynamic_activation_requests');
-      if (stored) requests = JSON.parse(stored);
-    } catch {}
-
-    const idx = requests.findIndex(r => r.id === requestId);
-    if (idx === -1) throw new Error('طلب التفعيل غير متاح');
-    
-    requests[idx].status = 'approved';
-    requests[idx].updated_at = new Date().toISOString();
-    localStorage.setItem('dynamic_activation_requests', JSON.stringify(requests));
-    
-    requestObj = requests[idx];
-    
-    // Mock user sub activation locally
-    const plans = loadLocalPlans();
-    const plan = plans.find(p => p.id === requestObj?.plan_id);
-    console.log(`[Local Sync] Approved subscription for ${requestObj?.user_id} with plan ${plan?.code}`);
-    return;
+    throw new Error('لا يمكن إتمام هذه العملية لأن الاتصال بـ Supabase غير مهيأ.');
   }
 
   try {
@@ -1147,19 +995,7 @@ export async function adminApproveActivationRequest(requestId: string): Promise<
 
 export async function adminRejectActivationRequest(requestId: string): Promise<void> {
   if (!hasSupabaseKeys) {
-    let requests: any[] = [];
-    try {
-      const stored = localStorage.getItem('dynamic_activation_requests');
-      if (stored) requests = JSON.parse(stored);
-    } catch {}
-
-    const idx = requests.findIndex(r => r.id === requestId);
-    if (idx !== -1) {
-      requests[idx].status = 'rejected';
-      requests[idx].updated_at = new Date().toISOString();
-      localStorage.setItem('dynamic_activation_requests', JSON.stringify(requests));
-    }
-    return;
+    throw new Error('لا يمكن إتمام هذه العملية لأن الاتصال بـ Supabase غير مهيأ.');
   }
 
   try {
@@ -1177,15 +1013,7 @@ export async function adminRejectActivationRequest(requestId: string): Promise<v
 
 export async function adminDeleteActivationRequest(requestId: string): Promise<void> {
   if (!hasSupabaseKeys) {
-    let requests: any[] = [];
-    try {
-      const stored = localStorage.getItem('dynamic_activation_requests');
-      if (stored) requests = JSON.parse(stored);
-    } catch {}
-
-    const filtered = requests.filter(r => r.id !== requestId);
-    localStorage.setItem('dynamic_activation_requests', JSON.stringify(filtered));
-    return;
+    throw new Error('لا يمكن إتمام هذه العملية لأن الاتصال بـ Supabase غير مهيأ.');
   }
 
   try {
