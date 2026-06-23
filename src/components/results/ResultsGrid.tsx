@@ -56,12 +56,26 @@ export default function ResultsGrid({
 
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'refuse' } | null>(null);
 
+  const cleanPensionSalaryText = (text: string): string => {
+    return text.split('\n').filter(line => {
+      const lowerLine = line.toLowerCase();
+      if (
+        line.includes('الراتب التقاعدي') || 
+        lowerLine.includes('pension salary') || 
+        lowerLine.includes('expected pension')
+      ) {
+        return false;
+      }
+      return true;
+    }).join('\n');
+  };
+
   const getCalculationCopyText = (offer: BankCalculationResult): string => {
     const isApp = offer.status === 'approved';
     const isWarn = offer.status === 'warning';
     const isRej = offer.status === 'rejected';
 
-    const statusAr = isApp ? 'مقبول' : isWarn ? 'مقبول بحذر' : 'غير مقبول';
+    const statusAr = isApp ? 'مقبول' : isWarn ? 'مقبول مبدئيًا' : 'مرفوض';
 
     const termText = mainFinanceType === 'personal_only' 
       ? 'مدة التمويل الشخصي: 5 سنوات (60 شهراً)' 
@@ -155,7 +169,7 @@ export default function ResultsGrid({
   const handleCopyText = async (offer: BankCalculationResult, e: React.MouseEvent) => {
     e.stopPropagation(); // prevent modal opening!
 
-    const textToCopy = getCalculationCopyText(offer);
+    const textToCopy = cleanPensionSalaryText(getCalculationCopyText(offer));
 
     try {
       await navigator.clipboard.writeText(textToCopy);
@@ -226,7 +240,7 @@ export default function ResultsGrid({
     const isWarn = offer.status === 'warning';
     const isRej = offer.status === 'rejected';
 
-    const statusAr = isApp ? 'مقبول' : isWarn ? 'مقبول بحذر' : 'غير مقبول';
+    const statusAr = isApp ? 'مقبول' : isWarn ? 'مقبول مبدئيًا' : 'مرفوض';
 
     const termText = mainFinanceType === 'personal_only' 
       ? 'مدة التمويل الشخصي: 5 سنوات (60 شهراً)' 
@@ -314,7 +328,7 @@ export default function ResultsGrid({
 
     lines.push(`هامش الربح السنوي: ${offer.annualMargin}%`);
 
-    const textToShare = lines.join('\n');
+    const textToShare = cleanPensionSalaryText(lines.join('\n'));
     const shareTitle = `تمويل حسبة - ${offer.bankName}`;
 
     if (navigator.share) {
@@ -562,13 +576,13 @@ export default function ResultsGrid({
                   {isWarn && (
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-450 border border-amber-200 dark:border-amber-900/40">
                       <AlertTriangle className="w-3.5 h-3.5" />
-                      <span>مقبول بحذر</span>
+                      <span>مقبول مبدئيًا</span>
                     </span>
                   )}
                   {isRej && (
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900/45">
                       <XCircle className="w-3.5 h-3.5" />
-                      <span>غير مقبول</span>
+                      <span>مرفوض</span>
                     </span>
                   )}
                 </div>
@@ -1025,9 +1039,9 @@ export default function ResultsGrid({
                   }`}>
                     {selectedOffer.isEligible 
                       ? selectedOffer.status === 'warning'
-                        ? 'مقبول بحذر'
-                        : 'مؤهل ومطابق مبدئياً' 
-                      : 'غير مطابق للاشتراطات'}
+                        ? 'مقبول مبدئيًا'
+                        : 'مقبول' 
+                      : 'مرفوض'}
                   </span>
                 </div>
               </div>
@@ -1159,6 +1173,16 @@ export default function ResultsGrid({
                       <span className="text-[10px] text-amber-600 dark:text-amber-400 block mb-1">القسط التقاعدي اللاحق</span>
                       <span className="font-bold text-amber-700 dark:text-amber-450 text-sm">
                         {Math.round(selectedOffer.monthlyInstallmentAfterRetirement).toLocaleString('ar-SA')} ريال
+                      </span>
+                    </div>
+                  )}
+
+                  {/* الراتب التقاعدي المتوقع */}
+                  {selectedOffer.pensionSalary !== undefined && selectedOffer.pensionSalary > 0 && (
+                    <div className="bg-emerald-50/20 dark:bg-emerald-950/5 hover:bg-emerald-50/35 dark:hover:bg-emerald-900/10 p-3.5 rounded-xl border border-emerald-100/50 dark:border-emerald-900/20 transition-all col-span-2">
+                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 block mb-1">الراتب التقاعدي المتوقع</span>
+                      <span className="font-bold text-emerald-700 dark:text-emerald-350 text-sm">
+                        {Math.round(selectedOffer.pensionSalary).toLocaleString('ar-SA')} ريال
                       </span>
                     </div>
                   )}
