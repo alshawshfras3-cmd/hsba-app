@@ -1892,7 +1892,9 @@ function runDiagnostics(params) {
     originalMaxTerm,
     termReductionReason,
     isDirectSalary,
-    pensionRatioReduced
+    pensionRatioReduced,
+    maxAgeAtApplication,
+    applicationAgeYears
   } = params;
   const messages = [];
   const calculationSteps = [];
@@ -1928,6 +1930,12 @@ function runDiagnostics(params) {
   if (currentAgeYears < acceptance.minAge) {
     status = "rejected";
     messages.push(`\u062A\u0645 \u0631\u0641\u0636 \u0627\u0644\u0637\u0644\u0628: \u0639\u0645\u0631 \u0627\u0644\u0639\u0645\u064A\u0644 (${currentAgeYears} \u0633\u0646\u0629) \u0623\u0642\u0644 \u0645\u0646 \u0627\u0644\u062D\u062F \u0627\u0644\u0623\u062F\u0646\u0649 \u0627\u0644\u0645\u0642\u0628\u0648\u0644 \u0644\u062F\u0649 ${bankName} \u0648\u0627\u0644\u0628\u0627\u0644\u063A ${acceptance.minAge} \u0633\u0646\u0629.`);
+  }
+  if (maxAgeAtApplication !== undefined && maxAgeAtApplication !== null && applicationAgeYears !== undefined) {
+    if (applicationAgeYears > maxAgeAtApplication) {
+      status = "rejected";
+      messages.push("تجاوز العميل أقصى عمر مسموح عند بداية التمويل لدى هذه الجهة.");
+    }
   }
   const normProductId = productId === "personal" || productId === "personal_only" ? "personal_only" : productId;
   if (normProductId !== "personal_only") {
@@ -2820,6 +2828,17 @@ function calculateBanksFinancing(params) {
       }
       personalInstallmentDisplay = personalInstallment;
     }
+    let computedApplicationAge = currentAgeYears;
+    if (matchedTermRule) {
+      const ruleCalendar = matchedTermRule.calendarType || "gregorian";
+      const ageMonths = getAgeInMonths(
+        { year: birthYear, month: birthMonth, day: birthDay, calendar: birthCalendar },
+        now,
+        ruleCalendar
+      );
+      computedApplicationAge = Math.floor(ageMonths / 12);
+    }
+
     const diag = runDiagnostics({
       bankName: bank.nameAr,
       acceptance,
@@ -2833,7 +2852,9 @@ function calculateBanksFinancing(params) {
       originalMaxTerm: maxTermMonths,
       termReductionReason: termResult.reductionReason || void 0,
       isDirectSalary: salaryMode === "direct",
-      pensionRatioReduced: correctedPensionSalary < solvedNetSalary && termResult.monthsAfterRetirement > 0
+      pensionRatioReduced: correctedPensionSalary < solvedNetSalary && termResult.monthsAfterRetirement > 0,
+      maxAgeAtApplication: matchedTermRule?.maxAgeAtApplication,
+      applicationAgeYears: computedApplicationAge
     });
     const dsrError = dsrBeforeResult.error || dsrAfterResult.error;
     if (dsrError) {

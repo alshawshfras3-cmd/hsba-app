@@ -1184,6 +1184,17 @@ export function calculateBanksFinancing(params: {
     }
 
     // 10. Diagnostics analysis and eligibility checks
+    let computedApplicationAge = currentAgeYears;
+    if (matchedTermRule) {
+      const ruleCalendar = matchedTermRule.calendarType || 'gregorian';
+      const ageMonths = getAgeInMonths(
+        { year: birthYear, month: birthMonth, day: birthDay, calendar: birthCalendar },
+        now,
+        ruleCalendar
+      );
+      computedApplicationAge = Math.floor(ageMonths / 12);
+    }
+
     const diag = runDiagnostics({
       bankName: bank.nameAr,
       acceptance,
@@ -1197,7 +1208,9 @@ export function calculateBanksFinancing(params: {
       originalMaxTerm: maxTermMonths,
       termReductionReason: termResult.reductionReason || undefined,
       isDirectSalary: salaryMode === 'direct',
-      pensionRatioReduced: correctedPensionSalary < solvedNetSalary && termResult.monthsAfterRetirement > 0
+      pensionRatioReduced: correctedPensionSalary < solvedNetSalary && termResult.monthsAfterRetirement > 0,
+      maxAgeAtApplication: matchedTermRule?.maxAgeAtApplication,
+      applicationAgeYears: computedApplicationAge
     });
 
     const dsrError = dsrBeforeResult.error || dsrAfterResult.error;

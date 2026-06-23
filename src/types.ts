@@ -117,6 +117,7 @@ export interface TermRule {
   defaultTermMode: TermMode;
   postRetirementMode?: 'dynamic' | 'fixed';
   isActive: boolean;
+  maxAgeAtApplication?: number | null;
 }
 
 export interface MarginRule {

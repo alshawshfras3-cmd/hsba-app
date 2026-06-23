@@ -14,6 +14,8 @@ export function runDiagnostics(params: {
   termReductionReason?: string;
   isDirectSalary: boolean;
   pensionRatioReduced?: boolean;
+  maxAgeAtApplication?: number | null;
+  applicationAgeYears?: number;
 }): DiagnosticResult {
   const {
     bankName,
@@ -28,7 +30,9 @@ export function runDiagnostics(params: {
     originalMaxTerm,
     termReductionReason,
     isDirectSalary,
-    pensionRatioReduced
+    pensionRatioReduced,
+    maxAgeAtApplication,
+    applicationAgeYears
   } = params;
 
   const messages: string[] = [];
@@ -75,6 +79,14 @@ export function runDiagnostics(params: {
   if (currentAgeYears < acceptance.minAge) {
     status = 'rejected';
     messages.push(`تم رفض الطلب: عمر العميل (${currentAgeYears} سنة) أقل من الحد الأدنى المقبول لدى ${bankName} والبالغ ${acceptance.minAge} سنة.`);
+  }
+
+  // Step 5.6: Check max age at application/start of finance
+  if (maxAgeAtApplication !== undefined && maxAgeAtApplication !== null && applicationAgeYears !== undefined) {
+    if (applicationAgeYears > maxAgeAtApplication) {
+      status = 'rejected';
+      messages.push('تجاوز العميل أقصى عمر مسموح عند بداية التمويل لدى هذه الجهة.');
+    }
   }
 
   // Step 5.5: Check support type eligibility

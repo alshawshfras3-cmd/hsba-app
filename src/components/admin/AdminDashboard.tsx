@@ -453,6 +453,7 @@ export default function AdminDashboard() {
   const [termRuleFormSectorId, setTermRuleFormSectorId] = useState<import("../../types").SectorId | 'all'>('gov_civil');
   const [termRuleFormMaxTermMonths, setTermRuleFormMaxTermMonths] = useState('360');
   const [termRuleFormMaxAgeAtEnd, setTermRuleFormMaxAgeAtEnd] = useState('77');
+  const [termRuleFormMaxAgeAtApplication, setTermRuleFormMaxAgeAtApplication] = useState('');
   const [termRuleFormCalendarType, setTermRuleFormCalendarType] = useState<import("../../types").CalendarType>('hijri');
   const [termRuleFormAllowAfterRetirement, setTermRuleFormAllowAfterRetirement] = useState(true);
   const [termRuleFormAllowedMonthsAfterRetirement, setTermRuleFormAllowedMonthsAfterRetirement] = useState('204');
@@ -3621,6 +3622,7 @@ export default function AdminDashboard() {
                   setTermRuleFormSectorId('gov_civil');
                   setTermRuleFormMaxTermMonths('360');
                   setTermRuleFormMaxAgeAtEnd('77');
+                  setTermRuleFormMaxAgeAtApplication('');
                   setTermRuleFormCalendarType(termActiveBankId === 'rajhi' ? 'hijri' : 'gregorian');
                   setTermRuleFormAllowAfterRetirement(true);
                   setTermRuleFormAllowedMonthsAfterRetirement('204');
@@ -3746,6 +3748,7 @@ export default function AdminDashboard() {
                                   setTermRuleFormSectorId(r.sectorId);
                                   setTermRuleFormMaxTermMonths(r.maxTermMonths.toString());
                                   setTermRuleFormMaxAgeAtEnd(r.maxAgeAtEnd.toString());
+                                  setTermRuleFormMaxAgeAtApplication(r.maxAgeAtApplication !== undefined && r.maxAgeAtApplication !== null ? r.maxAgeAtApplication.toString() : '');
                                   setTermRuleFormCalendarType(r.calendarType);
                                   setTermRuleFormAllowAfterRetirement(r.allowAfterRetirement);
                                   setTermRuleFormAllowedMonthsAfterRetirement(r.allowedMonthsAfterRetirement.toString());
@@ -3866,6 +3869,23 @@ export default function AdminDashboard() {
                         placeholder="مثال: 77"
                         className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-right font-mono"
                       />
+                    </div>
+
+                    {/* Max Age At Application */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-gray-700 mb-1">أقصى عمر عند بداية التمويل:</label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={termRuleFormMaxAgeAtApplication}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/[^0-9]/g, '');
+                          setTermRuleFormMaxAgeAtApplication(val);
+                        }}
+                        placeholder="مثال: 64"
+                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] text-right font-mono"
+                      />
+                      <p className="text-[10px] text-gray-500 mt-1">اتركه فارغًا إذا لم يكن لدى البنك شرط لعمر العميل وقت التقديم.</p>
                     </div>
 
                     {/* Calendar Type */}
@@ -4083,6 +4103,10 @@ export default function AdminDashboard() {
                           return;
                         }
 
+                        const maxAgeAppVal = termRuleFormMaxAgeAtApplication.trim() !== '' 
+                          ? parseInt(termRuleFormMaxAgeAtApplication, 10) 
+                          : null;
+
                         if (isAddingTermRule) {
                           // Check duplicate
                           const duplicate = termRules.some(r => 
@@ -4110,7 +4134,8 @@ export default function AdminDashboard() {
                             calendarType: termRuleFormCalendarType,
                             defaultTermMode: 'max',
                             postRetirementMode: termRuleFormSectorId === 'military' ? termRuleFormPostRetirementMode : undefined,
-                            isActive: termRuleFormIsActive
+                            isActive: termRuleFormIsActive,
+                            maxAgeAtApplication: maxAgeAppVal
                           };
 
                           setTermRules([...termRules, newRule]);
@@ -4130,7 +4155,8 @@ export default function AdminDashboard() {
                             allowedMonthsAfterRetirement: termRuleFormSectorId === 'retired' ? 0 : postRetVal,
                             calendarType: termRuleFormCalendarType,
                             postRetirementMode: termRuleFormSectorId === 'military' ? termRuleFormPostRetirementMode : undefined,
-                            isActive: termRuleFormIsActive
+                            isActive: termRuleFormIsActive,
+                            maxAgeAtApplication: maxAgeAppVal
                           };
 
                           setTermRules(updated);
