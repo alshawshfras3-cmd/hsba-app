@@ -123,7 +123,13 @@ export function calculateFinanceTerm(params: {
     const requested = manualTermMonths;
     if (requested > absoluteMaxTerm) {
       totalMonths = absoluteMaxTerm;
-      reductionReason = 'تم تقليص المدة لتتجاوز الضوابط العمرية أو لوائح جهة الإقراض.';
+      const reqYears = Math.round(requested / 12);
+      const absYears = Math.round(absoluteMaxTerm / 12);
+      if (absoluteMaxTerm === maxTermMonths) {
+        reductionReason = `اختار المستخدم ${reqYears} سنة، لكن أقصى مدة لدى البنك ${absYears} سنة، لذلك تم الحساب على ${absYears} سنة.`;
+      } else {
+        reductionReason = `اختار المستخدم ${reqYears} سنة، لكن أقصى مدة مسموحة بعد تطبيق الضوابط العمرية واللوائح هي ${absYears} سنة، لذلك تم الحساب على ${absYears} سنة.`;
+      }
     } else {
       totalMonths = Math.max(minTermMonths, requested);
       isAgeLimitingFactor = false;

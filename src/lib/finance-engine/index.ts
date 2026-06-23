@@ -40,7 +40,7 @@ import {
 import { calculateFinanceTerm } from './term';
 import { calculateHousingSupport } from './support';
 import { calculateDSR } from './dsr';
-import { calculateMargin, resolveConfiguredMarginMode } from './margin';
+import { calculateMargin, resolveConfiguredMarginMode, resolveMatchingRules } from './margin';
 import { calculatePersonalFinance, getPersonalFinanceRule } from './personal-finance';
 import { calculateRealEstateFinance } from './real-estate-finance';
 import { runDiagnostics } from './diagnostics';
@@ -807,7 +807,41 @@ export function calculateBanksFinancing(params: {
       calendarType: bank.calendarType ?? (BANK_DEFAULT_LIMITS[bank.id]?.calendarType ?? 'gregorian' as const)
     };
 
-    const maxTermMonths = isRuleApplied ? matchedTermRule.maxTermMonths : defaultLimits.maxTermMonths;
+    let maxTermMonths = isRuleApplied ? matchedTermRule.maxTermMonths : defaultLimits.maxTermMonths;
+
+    // Dynamically cap maxTermMonths by matching margin rules (tiers or points) to prevent margin mismatch errors
+    if (hasRealEstate) {
+      try {
+        const matchingMarginRules = resolveMatchingRules({
+          bankId: bank.id,
+          productId: isCombinedFallbackToRealEstateOnly ? 'real_estate_only' : normalizedProductId,
+          supportType,
+          sectorId,
+          marginRules,
+          netSalary: solvedNetSalary,
+          salaryBankId
+        });
+        if (matchingMarginRules && matchingMarginRules.length > 0) {
+          let maxFromTiers = 0;
+          let maxFromExact = 0;
+          for (const rule of matchingMarginRules) {
+            if (rule.toMonth !== undefined && rule.toMonth !== null) {
+              if (rule.toMonth > maxFromTiers) maxFromTiers = rule.toMonth;
+            }
+            if (rule.toTermMonths !== undefined && rule.toTermMonths !== null) {
+              if (rule.toTermMonths > maxFromExact) maxFromExact = rule.toTermMonths;
+            }
+          }
+          const maxFromMargin = Math.max(maxFromTiers, maxFromExact);
+          if (maxFromMargin > 0 && maxFromMargin < maxTermMonths) {
+            maxTermMonths = maxFromMargin;
+          }
+        }
+      } catch (err) {
+        console.error("Error resolving matching margin rules for maxTermMonths capping:", err);
+      }
+    }
+
     const maxAgeAtEnd = isRuleApplied ? matchedTermRule.maxAgeAtEnd : defaultLimits.maxAgeAtEnd;
     const allowedMonthsAfterRetirement = isRuleApplied ? matchedTermRule.allowedMonthsAfterRetirement : defaultLimits.monthsAfterRetirement;
     const allowAfterRetirement = isRuleApplied ? matchedTermRule.allowAfterRetirement : defaultLimits.allowAfterRetirement;
@@ -1590,7 +1624,41 @@ export function calculateAll(params: {
     calendarType: liveBank?.calendarType ?? (BANK_DEFAULT_LIMITS[bankId]?.calendarType ?? 'gregorian' as const)
   };
 
-  const maxTermMonths = matchedTermRule ? matchedTermRule.maxTermMonths : defaultLimits.maxTermMonths;
+  let maxTermMonths = matchedTermRule ? matchedTermRule.maxTermMonths : defaultLimits.maxTermMonths;
+
+  // Let's also dynamically cap it based on margin rules to prevent any margin matching error!
+  if (hasRealEstate) {
+    try {
+      const matchingMarginRules = resolveMatchingRules({
+        bankId,
+        productId: normalizedProductId,
+        supportType: 'none',
+        sectorId,
+        marginRules,
+        netSalary: solvedNetSalary,
+        salaryBankId: null
+      });
+      if (matchingMarginRules && matchingMarginRules.length > 0) {
+        let maxFromTiers = 0;
+        let maxFromExact = 0;
+        for (const rule of matchingMarginRules) {
+          if (rule.toMonth !== undefined && rule.toMonth !== null) {
+            if (rule.toMonth > maxFromTiers) maxFromTiers = rule.toMonth;
+          }
+          if (rule.toTermMonths !== undefined && rule.toTermMonths !== null) {
+            if (rule.toTermMonths > maxFromExact) maxFromExact = rule.toTermMonths;
+          }
+        }
+        const maxFromMargin = Math.max(maxFromTiers, maxFromExact);
+        if (maxFromMargin > 0 && maxFromMargin < maxTermMonths) {
+          maxTermMonths = maxFromMargin;
+        }
+      }
+    } catch (err) {
+      console.error("Error resolving matching margin rules for maxTermMonths capping in calculateFinanceResult:", err);
+    }
+  }
+
   const maxAgeAtEnd = matchedTermRule ? matchedTermRule.maxAgeAtEnd : defaultLimits.maxAgeAtEnd;
   const allowedMonthsAfterRetirement = matchedTermRule ? matchedTermRule.allowedMonthsAfterRetirement : defaultLimits.monthsAfterRetirement;
   const allowAfterRetirement = matchedTermRule ? matchedTermRule.allowAfterRetirement : defaultLimits.allowAfterRetirement;
