@@ -52,7 +52,11 @@ import {
   adminBackfillFreePlanForExistingUsers,
   setDefaultPlan,
   SubscriptionPlan,
-  ActivationRequest
+  ActivationRequest,
+  listActivePlans,
+  getUserCurrentSubscription,
+  assignSubscriptionToUser,
+  ensureBillingProfileForUser
 } from '../lib/subscriptionService';
 import { useAppState } from '../context/AppContext';
 
@@ -154,6 +158,152 @@ export function UsersManagementPage() {
   const [editStartedAt, setEditStartedAt] = useState<string>('');
   const [editCustomLimit, setEditCustomLimit] = useState<string>('');
   const [editNotes, setEditNotes] = useState<string>('');
+
+  // Activate Plan Modal States
+  const [showActivatePlanModal, setShowActivatePlanModal] = useState(false);
+  const [selectedUserForActivation, setSelectedUserForActivation] = useState<any | null>(null);
+  const [activePlansOnly, setActivePlansOnly] = useState<SubscriptionPlan[]>([]);
+  const [chosenPlanId, setChosenPlanId] = useState<string>('');
+  const [activationStartDate, setActivationStartDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [activationEndDate, setActivationEndDate] = useState<string>('');
+  const [activationStatus, setActivationStatus] = useState<'active' | 'trialing'>('active');
+  const [activationNotes, setActivationNotes] = useState<string>('');
+  const [existingSubscriptionWarning, setExistingSubscriptionWarning] = useState<string | null>(null);
+
+  // Automatically calculate endsAt when chosen plan or startDate changes
+  useEffect(() => {
+    if (!chosenPlanId || activePlansOnly.length === 0) return;
+    const plan = activePlansOnly.find(p => p.id === chosenPlanId);
+    if (!plan) return;
+    try {
+      const start = new Date(activationStartDate);
+      const end = new Date(start);
+      end.setDate(start.getDate() + (plan.duration_days || 30));
+      setActivationEndDate(end.toISOString().split('T')[0]);
+    } catch (e) {
+      console.error('Error calculating end date:', e);
+    }
+  }, [chosenPlanId, activationStartDate, activePlansOnly]);
+
+  const getUserSubscriptionStatusBadge = (userId: string) => {
+    const userSubs = subscribers.filter(s => s.user_id === userId);
+    if (!userSubs || userSubs.length === 0) {
+      return <span className="inline-block px-2.5 py-1 bg-gray-100 text-gray-600 dark:bg-slate-800 dark:text-slate-400 rounded-lg text-[10px] font-bold">لا يوجد اشتراك</span>;
+    }
+    
+    const activeSub = userSubs.find(s => s.status === 'active');
+    const trialingSub = userSubs.find(s => s.status === 'trialing');
+    const prioritySub = activeSub || trialingSub || userSubs[0];
+
+    if (prioritySub.status === 'active') {
+      return (
+        <span className="inline-block px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400 rounded-lg text-[10px] font-bold">
+          نشط ({prioritySub.plan_name})
+        </span>
+      );
+    } else if (prioritySub.status === 'trialing') {
+      return (
+        <span className="inline-block px-2.5 py-1 bg-sky-50 text-sky-800 border border-sky-200 dark:bg-sky-950/20 dark:text-sky-400 rounded-lg text-[10px] font-bold">
+          تجربة ({prioritySub.plan_name})
+        </span>
+      );
+    } else if (prioritySub.status === 'expired') {
+      return (
+        <span className="inline-block px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 rounded-lg text-[10px] font-bold">
+          منتهي
+        </span>
+      );
+    } else if (prioritySub.status === 'suspended') {
+      return (
+        <span className="inline-block px-2.5 py-1 bg-red-50 text-red-750 border border-red-200 dark:bg-red-950/20 dark:text-red-400 rounded-lg text-[10px] font-bold">
+          موقوف
+        </span>
+      );
+    } else if (prioritySub.status === 'cancelled') {
+      return (
+        <span className="inline-block px-2.5 py-1 bg-gray-150 text-gray-500 border border-gray-200 dark:bg-slate-800/80 dark:text-slate-500 rounded-lg text-[10px] font-bold">
+          ملغي
+        </span>
+      );
+    } else {
+      return (
+        <span className="inline-block px-2.5 py-1 bg-gray-100 text-gray-600 dark:bg-slate-800 dark:text-slate-400 rounded-lg text-[10px] font-bold">
+          {prioritySub.status}
+        </span>
+      );
+    }
+  };
+
+  const handleOpenActivatePlanModal = async (user: any) => {
+    setSelectedUserForActivation(user);
+    setActivationStartDate(new Date().toISOString().split('T')[0]);
+    setActivationStatus('active');
+    setActivationNotes('');
+    
+    // Check for existing active or trialing subscription in the loaded subscribers list
+    const existing = subscribers.find(s => s.user_id === user.id && (s.status === 'active' || s.status === 'trialing'));
+    if (existing) {
+      setExistingSubscriptionWarning(`يوجد اشتراك نشط حاليًا لهذا المستخدم (${existing.plan_name}). هل تريد استبداله؟`);
+    } else {
+      setExistingSubscriptionWarning(null);
+    }
+
+    // Load active plans
+    try {
+      const activePlans = await listActivePlans();
+      setActivePlansOnly(activePlans);
+      if (activePlans.length > 0) {
+        setChosenPlanId(activePlans[0].id);
+        const end = new Date();
+        end.setDate(end.getDate() + (activePlans[0].duration_days || 30));
+        setActivationEndDate(end.toISOString().split('T')[0]);
+      } else {
+        setChosenPlanId('');
+        setActivationEndDate('');
+      }
+    } catch (err) {
+      console.error('Error listing active plans:', err);
+    }
+    
+    setShowActivatePlanModal(true);
+  };
+
+  const handleConfirmActivatePlan = async () => {
+    if (!selectedUserForActivation || !chosenPlanId) return;
+    
+    setActionLoading(true);
+    try {
+      // 1. Ensure billing profile is present in system
+      await ensureBillingProfileForUser({
+        id: selectedUserForActivation.id,
+        email: selectedUserForActivation.email,
+        full_name: selectedUserForActivation.full_name || 'مستخدم بدون ملف',
+        phone: selectedUserForActivation.phone || undefined
+      });
+
+      // 2. Perform the assignment
+      await assignSubscriptionToUser({
+        userId: selectedUserForActivation.id,
+        planId: chosenPlanId,
+        startsAt: new Date(activationStartDate).toISOString(),
+        endsAt: new Date(activationEndDate).toISOString(),
+        status: activationStatus,
+        notes: activationNotes || `تفعيل إداري يدوي بواسطة المشرف`,
+        source: 'admin'
+      });
+
+      showFlashSuccess('تم تفعيل الباقة للمستخدم بنجاح');
+      setShowActivatePlanModal(false);
+      
+      // Update our lists
+      await Promise.all([fetchUsers(), fetchSubscribers()]);
+    } catch (err: any) {
+      console.error('CRITICAL: Manual plan activation error details:', err);
+      showFlashError(`فشل تفعيل الباقة: ${err.message || err}`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   useEffect(() => {
     async function loadAdminContext() {
@@ -884,6 +1034,7 @@ export function UsersManagementPage() {
                       <th className="p-4 font-bold">البريد الإلكتروني</th>
                       <th className="p-4 font-bold text-center">الجوال</th>
                       <th className="p-4 font-bold text-center">تاريخ الالتحاق</th>
+                      <th className="p-4 font-bold text-center">حالة الاشتراك</th>
                       <th className="p-4 font-bold text-center">حالة الحظر</th>
                       <th className="p-4 font-bold text-center">إجراء العمليات</th>
                     </tr>
@@ -905,13 +1056,23 @@ export function UsersManagementPage() {
                           {new Date(u.created_at).toLocaleDateString('ar-SA')}
                         </td>
                         <td className="p-4 text-center">
+                          {getUserSubscriptionStatusBadge(u.id)}
+                        </td>
+                        <td className="p-4 text-center">
                           {u.is_blocked ? (
                             <span className="inline-block px-2.5 py-1 bg-red-50 text-red-700 border border-red-200 dark:bg-red-950/20 dark:text-red-400 rounded-lg text-[10px] font-bold">محظور ومجمد</span>
                           ) : (
                             <span className="inline-block px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400 rounded-lg text-[10px] font-bold">عضو نشط</span>
                           )}
                         </td>
-                        <td className="p-4 text-center flex justify-center gap-1">
+                        <td className="p-4 text-center flex justify-center items-center gap-2">
+                          <button
+                            onClick={() => handleOpenActivatePlanModal(u)}
+                            className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/20 border border-indigo-200 text-indigo-700 dark:text-indigo-400 rounded-lg text-[11px] font-bold cursor-pointer transition-all flex items-center gap-1"
+                          >
+                            <Crown className="w-3.5 h-3.5 text-indigo-500" />
+                            <span>تفعيل باقة</span>
+                          </button>
                           <button
                             onClick={() => handleToggleBlock(u.id, u.email, u.is_blocked)}
                             className={`px-3 py-1.5 border rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
@@ -2450,6 +2611,161 @@ export function UsersManagementPage() {
                 className="w-full py-3 bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 text-gray-700 dark:text-slate-200 font-extrabold text-xs rounded-xl cursor-pointer"
               >
                 إغلاق المعالج والرجوع
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MANUAL PLAN ACTIVATION MODAL */}
+      {showActivatePlanModal && selectedUserForActivation && (
+        <div className="fixed inset-0 bg-black/55 flex items-center justify-center p-4 z-50 backdrop-blur-xs">
+          <div className="bg-white dark:bg-slate-900 border border-gray-150 dark:border-slate-800 w-full max-w-md rounded-3xl p-6 text-right space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-50 dark:border-slate-800/80 pb-3 mb-2">
+              <h3 className="font-extrabold text-sm text-gray-900 dark:text-white flex items-center gap-1.5 text-indigo-600">
+                <Crown className="w-4 h-4 text-indigo-500 animate-pulse" />
+                <span>تفعيل باقة اشتراك جديدة للمستخدم يدوياً</span>
+              </h3>
+              <button 
+                type="button" 
+                onClick={() => setShowActivatePlanModal(false)} 
+                className="text-gray-400 font-bold hover:text-gray-900 dark:hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="bg-indigo-50/50 dark:bg-indigo-950/10 p-3.5 rounded-2xl border border-indigo-100/60 dark:border-indigo-900/40 text-xs font-semibold text-gray-800 dark:text-slate-350 space-y-1.5">
+              <p className="font-bold text-indigo-805 dark:text-indigo-300">📌 بيانات المستخدم المحدد:</p>
+              <div className="grid grid-cols-2 gap-x-2 gap-y-1 font-sans text-[11px] text-gray-600 dark:text-slate-400">
+                <div>الاسم: <span className="font-bold text-gray-900 dark:text-slate-200">{selectedUserForActivation.full_name}</span></div>
+                <div>البريد: <span className="font-bold text-gray-900 dark:text-slate-200">{selectedUserForActivation.email}</span></div>
+                <div className="col-span-2">الجوال: <span className="font-bold text-gray-900 dark:text-slate-200">{selectedUserForActivation.phone || 'غير متوفر'}</span></div>
+              </div>
+            </div>
+
+            {existingSubscriptionWarning && (
+              <div className="p-4 bg-amber-50 hover:bg-amber-100/80 dark:bg-amber-955/20 border border-amber-200 dark:border-amber-900 rounded-2xl flex flex-col gap-1 transition-all">
+                <div className="flex items-start gap-2 text-amber-805 dark:text-amber-400 text-xs font-semibold leading-relaxed">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 mt-1 shrink-0 animate-bounce" />
+                  <div>
+                    <p className="font-bold text-amber-900 dark:text-amber-300">تحذير استبدال الاشتراك:</p>
+                    <p className="text-[11px] text-amber-700/80 dark:text-amber-400/80 mt-0.5">{existingSubscriptionWarning}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-3 font-semibold text-xs text-right">
+              {/* Select Plan */}
+              <div className="space-y-1.5">
+                <label className="text-gray-400 block font-bold">اختيار الباقة البرمجية المرادة:</label>
+                <select 
+                  className="w-full px-3 py-2.5 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 text-gray-900 dark:text-white rounded-xl outline-none font-bold text-right"
+                  required
+                  value={chosenPlanId}
+                  onChange={e => setChosenPlanId(e.target.value)}
+                >
+                  {activePlansOnly.length === 0 ? (
+                    <option value="">لا توجد باقات مفعلة حالياً في النظام</option>
+                  ) : (
+                    activePlansOnly.map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} - سعرها: {p.price_sar} ر.س ({p.duration_days} يوم)
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+
+              {/* Start & End Dates */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-gray-400 block font-bold">تاريخ بداية الصلاحية:</label>
+                  <input 
+                    type="date"
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 text-gray-900 dark:text-white rounded-xl outline-none font-mono text-center font-bold"
+                    required
+                    value={activationStartDate}
+                    onChange={e => setActivationStartDate(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-gray-400 block font-bold">تاريخ نهاية الصلاحية:</label>
+                  <input 
+                    type="date"
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 text-gray-900 dark:text-white rounded-xl outline-none font-mono text-center font-bold"
+                    required
+                    value={activationEndDate}
+                    onChange={e => setActivationEndDate(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Status */}
+              <div className="space-y-1.5">
+                <label className="text-gray-400 block font-bold">حالة الاشتراك الابتدائي:</label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-1.5 cursor-pointer text-gray-800 dark:text-slate-350 select-none">
+                    <input 
+                      type="radio" 
+                      name="activationStatus" 
+                      value="active" 
+                      checked={activationStatus === 'active'} 
+                      onChange={() => setActivationStatus('active')}
+                      className="accent-indigo-500 w-4 h-4 cursor-pointer"
+                    />
+                    <span>نشط وفوري (active)</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer text-gray-800 dark:text-slate-350 select-none">
+                    <input 
+                      type="radio" 
+                      name="activationStatus" 
+                      value="trialing" 
+                      checked={activationStatus === 'trialing'} 
+                      onChange={() => setActivationStatus('trialing')}
+                      className="accent-indigo-500 w-4 h-4 cursor-pointer"
+                    />
+                    <span>تجريبي مقيد (trialing)</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div className="space-y-1.5">
+                <label className="text-gray-400 block font-bold">ملاحظات المشرف الإداري:</label>
+                <textarea 
+                  rows={2}
+                  className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 text-gray-900 dark:text-white rounded-xl outline-none font-semibold text-right"
+                  placeholder="ملاحظات توضيحية (مثال: تم التفعيل بالطلب يدوياً عبر واتساب)..."
+                  value={activationNotes}
+                  onChange={e => setActivationNotes(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Form actions */}
+            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-50 dark:border-slate-800/80">
+              <button 
+                type="button"
+                onClick={handleConfirmActivatePlan}
+                disabled={actionLoading || activePlansOnly.length === 0}
+                className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-extrabold text-xs rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5 active:scale-98"
+              >
+                {actionLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Crown className="w-4 h-4 text-white" />
+                )}
+                <span>{existingSubscriptionWarning ? 'تأكيد واستبدال الباقة' : 'تفعيل الاشتراك الآن'}</span>
+              </button>
+              <button 
+                type="button"
+                onClick={() => setShowActivatePlanModal(false)}
+                className="w-full py-3 bg-gray-150 hover:bg-gray-200 dark:bg-slate-800 text-gray-700 dark:text-slate-350 font-black text-xs rounded-xl cursor-pointer transition-all"
+              >
+                إلغاء وتراجع
               </button>
             </div>
           </div>

@@ -326,8 +326,107 @@ export async function listUserSubscriptions(): Promise<any[]> {
   return adminListSubscribers();
 }
 
-export async function assignSubscriptionToUser(params: SaveSubscriptionParams): Promise<void> {
-  return adminSaveUserSubscription(params);
+export async function listActivePlans(): Promise<SubscriptionPlan[]> {
+  const plans = await getSubscriptionPlans();
+  return plans.filter(p => p.is_active);
+}
+
+export async function getUserCurrentSubscription(userId: string): Promise<DbSubscription | null> {
+  return getCurrentSubscription(userId);
+}
+
+export async function assignSubscriptionToUser(params: {
+  userId: string;
+  planId: string;
+  startsAt: string;
+  endsAt: string;
+  status: 'trialing' | 'active' | 'expired' | 'cancelled' | 'past_due';
+  notes?: string;
+  source?: string;
+}): Promise<void> {
+  if (!hasSupabaseKeys) {
+    throw new Error('لا يمكن إتمام هذه العملية لأن الاتصال بـ Supabase غير مهيأ.');
+  }
+
+  try {
+    // 1. Mark existing active or trialing checkouts/subscriptions as cancelled
+    const { data: existingActive } = await supabase
+      .from('user_subscriptions')
+      .select('id')
+      .eq('user_id', params.userId)
+      .in('status', ['active', 'trialing']);
+
+    if (existingActive && existingActive.length > 0) {
+      const idsToCancel = existingActive.map(sub => sub.id);
+      const { error: cancelError } = await supabase
+        .from('user_subscriptions')
+        .update({
+          status: 'cancelled',
+          cancelled_at: new Date().toISOString(),
+          notes: 'تم إلغاؤه تلقائياً عند تفعيل باقة جديدة يدوياً بواسطة الإدارة.',
+          updated_at: new Date().toISOString()
+        })
+        .in('id', idsToCancel);
+
+      if (cancelError) {
+        console.error('Error cancelling old subscriptions:', cancelError);
+        throw cancelError;
+      }
+    }
+
+    // 2. Insert new user subscription row
+    const { error: insertError } = await supabase
+      .from('user_subscriptions')
+      .insert({
+        user_id: params.userId,
+        plan_id: params.planId,
+        status: params.status,
+        started_at: params.startsAt,
+        ends_at: params.endsAt,
+        source: params.source || 'admin',
+        notes: params.notes || null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+
+    if (insertError) {
+      console.error('Error inserting new subscription:', insertError);
+      throw insertError;
+    }
+  } catch (err) {
+    console.error('Exception in assignSubscriptionToUser:', err);
+    throw err;
+  }
+}
+
+export async function ensureBillingProfileForUser(user: { id: string; email: string; full_name?: string; phone?: string }): Promise<UserBillingProfile> {
+  const profile = await getBillingProfile(user.id);
+  if (profile) {
+    return profile;
+  }
+
+  const normPhone = user.phone ? normalizePhone(user.phone) : '';
+  const { data, error } = await supabase
+    .from('user_billing_profiles')
+    .insert({
+      user_id: user.id,
+      phone_number: normPhone,
+      normalized_phone: normPhone,
+      phone_locked: false,
+      full_name: user.full_name || '',
+      email: user.email || '',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    })
+    .select()
+    .single();
+
+  if (error || !data) {
+    console.error('Error in ensureBillingProfileForUser:', error);
+    throw new Error(error?.message || 'فشل تكوين الهوية الفوترية.');
+  }
+
+  return data as UserBillingProfile;
 }
 
 export async function extendSubscription(userId: string, days: number): Promise<void> {
