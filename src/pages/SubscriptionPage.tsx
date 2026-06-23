@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSubscriptionStatus } from '../hooks/useSubscriptionStatus';
-import { getSubscriptionPlans, recordActivationRequest } from '../lib/subscriptionService';
+import { getSubscriptionPlans } from '../lib/subscriptionService';
 import { useAuth } from '../contexts/AuthContext';
 import { useAppState } from '../context/AppContext';
 import { motion } from 'motion/react';
@@ -134,13 +134,8 @@ export function SubscriptionPage() {
       }
 
       // Determine colors & dynamic attributes from DB
-      const cardColor = plan.card_color 
-        ? plan.card_color 
-        : (plan.code === 'monthly'
-            ? 'border-sky-500 shadow-md ring-2 ring-sky-500/20 bg-white dark:bg-[#0f172a]' 
-            : (plan.code === 'six_months' ? 'border-emerald-500 bg-white dark:bg-slate-900' : 'border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900'));
-
-      const badgeColor = plan.badge_color || (plan.code === 'monthly' ? 'bg-sky-500 text-white' : (plan.code === 'six_months' ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-700 dark:bg-slate-800 dark:text-slate-300'));
+      const cardColor = plan.card_color || 'border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900';
+      const badgeColor = plan.badge_color || 'bg-gray-100 text-gray-700 dark:bg-slate-800 dark:text-slate-300';
       const badgeText = plan.badge_text || '';
 
       return {
@@ -155,7 +150,6 @@ export function SubscriptionPage() {
         limit: limitText,
         features: featuresList,
         is_free_plan,
-        isPopular: plan.code === 'monthly',
         color: cardColor,
         tagColor: badgeColor,
         badgeText,

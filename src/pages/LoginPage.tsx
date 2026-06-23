@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { normalizePhone } from '../lib/subscriptionService';
+import { normalizeSaudiPhone } from '../lib/subscriptionService';
+import { isValidSaudiPhone } from '../lib/phoneUtils';
 import { supabase, hasSupabaseKeys } from '../lib/supabase';
 import { Mail, Lock, User, ShieldCheck, Sparkles, AlertCircle, Loader2, AlertTriangle, Building2, TrendingUp, CheckCircle2, Phone } from 'lucide-react';
 
@@ -92,10 +93,9 @@ export function LoginPage() {
       }
 
       // Normalization and Saudi validation
-      const normalizedPhone = normalizePhone(phone);
-      const saudiRegex = /^\+9665\d{8}$/;
+      const normalizedPhone = normalizeSaudiPhone(phone);
 
-      if (!saudiRegex.test(normalizedPhone)) {
+      if (!isValidSaudiPhone(phone)) {
         setErrorMsg('يرجى إدخال رقم جوال سعودي صحيح (مثال: 0551234567 أو 966551234567)');
         return;
       }

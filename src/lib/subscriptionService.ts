@@ -1,5 +1,29 @@
 import { supabase, hasSupabaseKeys } from './supabase';
 
+export function normalizeSaudiPhone(phone: string): string {
+  if (!phone) return '';
+  let cleaned = phone.trim().replace(/[\s\-\+\(\)]/g, ''); // removes spaces, dashes, +, parentheses
+  if (cleaned.startsWith('009665')) {
+    return cleaned.substring(2);
+  }
+  if (cleaned.startsWith('9665')) {
+    return cleaned;
+  }
+  if (cleaned.startsWith('05')) {
+    return '9665' + cleaned.substring(2);
+  }
+  if (cleaned.startsWith('5') && cleaned.length === 9) {
+    return '966' + cleaned;
+  }
+  if (cleaned.startsWith('0')) {
+    cleaned = cleaned.substring(1);
+  }
+  if (!cleaned.startsWith('966') && cleaned.startsWith('5')) {
+    return '966' + cleaned;
+  }
+  return cleaned;
+}
+
 export function normalizePhone(rawPhone: string): string {
   if (!rawPhone) return '';
   let cleaned = rawPhone.trim().replace(/[\s\-()]/g, '');
@@ -412,7 +436,6 @@ export async function ensureBillingProfileForUser(user: { id: string; email: str
       user_id: user.id,
       phone_number: normPhone,
       normalized_phone: normPhone,
-      phone_locked: false,
       full_name: user.full_name || '',
       email: user.email || '',
       created_at: new Date().toISOString(),
@@ -586,7 +609,6 @@ export async function createBillingProfile(profile: { user_id: string; phone_num
       user_id: profile.user_id,
       phone_number: normPhone,
       normalized_phone: normPhone,
-      phone_locked: false,
       full_name: profile.full_name || '',
       email: profile.email || '',
       created_at: new Date().toISOString(),
@@ -606,38 +628,32 @@ export async function createBillingProfile(profile: { user_id: string; phone_num
 export async function testBillingProfileUniquePhone(phone: string, excludeUserId?: string): Promise<boolean> {
   if (!hasSupabaseKeys) return true;
   try {
-    const normalized = normalizePhone(phone);
+    const normalized = normalizeSaudiPhone(phone);
     if (!normalized) return true; // Empty is allowed for existing users
 
-    // Try utilizing the database RPC if available
-    try {
-      const { data: rpcData, error: rpcError } = await supabase.rpc('is_phone_available', {
-        p_normalized_phone: normalized,
-        p_exclude_user_id: excludeUserId || null
-      });
-      // is_phone_available typically returns true if available (unique), false if already taken.
-      if (!rpcError && typeof rpcData === 'boolean') {
-        return rpcData;
-      }
-    } catch (rpcErr) {
-      console.warn('RPC is_phone_available failed, falling back to query:', rpcErr);
+    const withPlus = '+' + normalized;
+
+    let query = supabase
+      .from('app_users')
+      .select('id, phone')
+      .or(`phone.eq.${normalized},phone.eq.${withPlus}`);
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error checking phone uniqueness in app_users:', error);
+      return true;
     }
-
-    const { data, error } = await supabase
-      .from('user_billing_profiles')
-      .select('id, user_id')
-      .or(`normalized_phone.eq.${normalized},phone_number.eq.${normalized}`);
-
-    if (error) return true;
     if (data && data.length > 0) {
       if (excludeUserId) {
-        const others = data.filter(item => item.user_id !== excludeUserId);
+        const others = data.filter(item => item.id !== excludeUserId);
         return others.length === 0;
       }
       return false;
     }
     return true;
-  } catch {
+  } catch (err) {
+    console.error('Exception checking unique phone in testBillingProfileUniquePhone:', err);
     return true;
   }
 }

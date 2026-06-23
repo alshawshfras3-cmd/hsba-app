@@ -239,7 +239,6 @@ export function AccountPage() {
               user_id: user.id,
               phone_number: normalizedPhone,
               normalized_phone: normalizedPhone,
-              phone_locked: false,
               full_name: newName,
               email: currentEmail, // keep current email
               created_at: new Date().toISOString(),

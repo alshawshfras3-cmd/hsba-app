@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase, hasSupabaseKeys, SUPABASE_TIMEOUT_MS, cleanStaleSupabaseSession } from '../lib/supabase';
 import { Shield } from 'lucide-react';
-import { createBillingProfile, createTrialSubscription, testBillingProfileUniquePhone, normalizePhone } from '../lib/subscriptionService';
+import { createBillingProfile, createTrialSubscription, testBillingProfileUniquePhone, normalizePhone, normalizeSaudiPhone } from '../lib/subscriptionService';
 
 export type UserRole = 'admin' | 'user';
 
@@ -504,13 +504,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error('إعداد اتصال قاعدة السحابية (Supabase) غير مكتمل. يرجى تهيئة متغيرات البيئة أولاً.');
     }
 
-    // Normalize phone number to +9665xxxxxxxx format
-    const normalizedPhone = normalizePhone(phone);
+    // Normalize phone number to 9665xxxxxxxx format
+    const normalizedPhone = normalizeSaudiPhone(phone);
 
     // 1. Enforce unique phone check
     const isUnique = await testBillingProfileUniquePhone(normalizedPhone);
     if (!isUnique) {
-      throw new Error('رقم الجوال مستخدم مسبقًا.');
+      throw new Error('رقم الجوال مستخدم مسبقًا في حساب آخر.');
     }
 
     // 2. Perform register
@@ -545,26 +545,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.error('Failed to create app_users profile:', profileError);
         }
 
-        // 4. Create billing profile (phone locked inside)
-        await createBillingProfile({
-          user_id: data.user.id,
-          phone_number: normalizedPhone,
-          full_name: fullName,
-          email: email
-        });
+        // 4. Create billing profile (no phone_locked)
+        try {
+          await createBillingProfile({
+            user_id: data.user.id,
+            phone_number: normalizedPhone,
+            full_name: fullName,
+            email: email
+          });
+        } catch (billingErr) {
+          console.error('Non-blocking: Failed to create billing profile during signup:', billingErr);
+        }
 
-        // 5. Seeding trial subscription (status: trialing)
-        await createTrialSubscription(data.user.id);
+        // 5. Seeding trial subscription
+        try {
+          await createTrialSubscription(data.user.id);
+        } catch (subErr) {
+          console.error('Non-blocking: Failed to create trial subscription during signup:', subErr);
+        }
 
       } catch (err: any) {
         console.error('Failed to run subscription profiles signup logic:', err);
-        // Fallback cleanup
-        try {
-          await supabase.rpc('delete_current_user');
-        } catch (delErr) {
-          console.error('Failed user signup fallback cleanup:', delErr);
-        }
-        throw new Error(`فشل إعداد باقة الاشتراك: ${err.message || err}`);
       }
     }
     return data;
