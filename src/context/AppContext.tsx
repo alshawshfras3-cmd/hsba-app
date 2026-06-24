@@ -1057,18 +1057,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         sectorMappings: (settings.sectorMappings !== undefined && settings.sectorMappings !== null) ? settings.sectorMappings : [],
       };
 
-      // Guard: لو marginRules فارغ لكن Supabase load نجح → ابقَ على الـ state القديم
-      if (
-        supabaseLoadStatus === 'success' &&
-        Array.isArray(merged.marginRules) &&
-        merged.marginRules.length === 0 &&
-        Array.isArray(marginRules) &&
-        marginRules.length > 0
-      ) {
-        console.warn('[SYNC GUARD] marginRules arrived empty from settings but state has', marginRules.length, 'rules. Keeping existing state.');
-        merged.marginRules = marginRules; // ابقَ على الـ state الحالي
-      }
-
       const computedHash = calculateMarginsHash(merged.marginRules || []);
       setLoadedMarginsHash(computedHash);
 

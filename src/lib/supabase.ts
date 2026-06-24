@@ -64,23 +64,12 @@ let cachedAppSettings: any = null;
 let inFlightAppSettingsPromise: Promise<any> | null = null;
 
 export function getCachedAppSettingsSync(): any {
-  if (cachedAppSettings) return cachedAppSettings;
-  try {
-    const stored = sessionStorage.getItem('hesba_cached_app_settings');
-    if (stored) {
-      cachedAppSettings = JSON.parse(stored);
-      return cachedAppSettings;
-    }
-  } catch {}
   return null;
 }
 
 export function clearAppSettingsCache() {
   cachedAppSettings = null;
   inFlightAppSettingsPromise = null;
-  try {
-    sessionStorage.removeItem('hesba_cached_app_settings');
-  } catch {}
 }
 
 export async function fetchAppSettingsShared(timeoutMs: number = 10000, options?: { forceFresh?: boolean }): Promise<any> {
@@ -115,27 +104,12 @@ export async function fetchAppSettingsShared(timeoutMs: number = 10000, options?
 
       if (data && data.value) {
         cachedAppSettings = data.value;
-        try {
-          sessionStorage.setItem('hesba_cached_app_settings', JSON.stringify(data.value));
-        } catch {}
         return data.value;
       }
       return null;
     } catch (err: any) {
       const isTimeout = err?.message === 'timeout' || String(err).includes('مهلة') || String(err).includes('timeout');
       console.warn('[SUPABASE LOAD SHARED] Error fetching app_settings:', err?.message || err);
-      
-      // Try to recover from sessionStorage ONLY if not forcing fresh
-      if (!forceFresh) {
-        try {
-          const stored = sessionStorage.getItem('hesba_cached_app_settings');
-          if (stored) {
-            console.log('[SUPABASE LOAD SHARED] Recovered from secondary sessionStorage cache');
-            cachedAppSettings = JSON.parse(stored);
-            return cachedAppSettings;
-          }
-        } catch {}
-      }
 
       // If it's a timeout, we throw a specific error so the caller knows it is a timeout
       if (isTimeout) {
