@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppState } from '../../context/AppContext';
 import { calculateAll } from '../../lib/finance-engine';
+import NumericInput from '../calculator/NumericInput';
 import { 
   Building2, Briefcase, Percent, Calendar, Hourglass, HelpCircle,
   Coins, FileText, RefreshCw, Calculator, ShieldAlert,
@@ -61,25 +62,25 @@ export function DiagnosticsPage() {
   const [selectedRankId, setSelectedRankId] = useState('all');
   const [salaryMode, setSalaryMode] = useState<'details' | 'direct'>('details');
 
-  const [basicSalary, setBasicSalary] = useState(9000);
-  const [housingAllowance, setHousingAllowance] = useState(3000);
-  const [otherAllowances, setOtherAllowances] = useState(0);
-  const [directNetSalary, setDirectNetSalary] = useState(11000);
-  const [directPensionSalary, setDirectPensionSalary] = useState(5000);
+  const [basicSalary, setBasicSalary] = useState<number | ''>(9000);
+  const [housingAllowance, setHousingAllowance] = useState<number | ''>(3000);
+  const [otherAllowances, setOtherAllowances] = useState<number | ''>(0);
+  const [directNetSalary, setDirectNetSalary] = useState<number | ''>(11000);
+  const [directPensionSalary, setDirectPensionSalary] = useState<number | ''>(5000);
 
-  const [birthYear, setBirthYear] = useState(1982);
-  const [birthMonth, setBirthMonth] = useState(1);
-  const [birthDay, setBirthDay] = useState(1);
+  const [birthYear, setBirthYear] = useState<number | ''>(1982);
+  const [birthMonth, setBirthMonth] = useState<number | ''>(1);
+  const [birthDay, setBirthDay] = useState<number | ''>(1);
   const [birthCalendar, setBirthCalendar] = useState<'gregorian' | 'hijri'>('gregorian');
 
-  const [appointmentYear, setAppointmentYear] = useState(1999);
-  const [appointmentMonth, setAppointmentMonth] = useState(1);
+  const [appointmentYear, setAppointmentYear] = useState<number | ''>(1999);
+  const [appointmentMonth, setAppointmentMonth] = useState<number | ''>(1);
   const [appointmentCalendar, setAppointmentCalendar] = useState<'gregorian' | 'hijri'>('gregorian');
 
   const [selectedProductId, setSelectedProductId] = useState<ProductId>('personal_only');
   const [termYears, setTermYears] = useState(5);
-  const [obligations, setObligations] = useState(0);
-  const [monthlySupport, setMonthlySupport] = useState(0);
+  const [obligations, setObligations] = useState<number | ''>(0);
+  const [monthlySupport, setMonthlySupport] = useState<number | ''>(0);
 
   // Diagnostics results state
   const [diagnosticsOutput, setDiagnosticsOutput] = useState<any>(null);
@@ -110,22 +111,22 @@ export function DiagnosticsPage() {
       bankId: selectedBankId,
       sectorId: selectedSectorId,
       salaryMode,
-      basicSalary,
-      housingAllowance,
-      otherAllowances,
-      directNetSalary,
-      directPensionSalary,
-      birthYear,
-      birthMonth,
-      birthDay,
+      basicSalary: basicSalary === '' ? 0 : basicSalary,
+      housingAllowance: housingAllowance === '' ? 0 : housingAllowance,
+      otherAllowances: otherAllowances === '' ? 0 : otherAllowances,
+      directNetSalary: directNetSalary === '' ? 0 : directNetSalary,
+      directPensionSalary: directPensionSalary === '' ? 0 : directPensionSalary,
+      birthYear: birthYear === '' ? 1980 : birthYear,
+      birthMonth: birthMonth === '' ? 1 : birthMonth,
+      birthDay: birthDay === '' ? 1 : birthDay,
       birthCalendar,
-      appointmentYear: selectedSectorId === 'retired' ? undefined : appointmentYear,
-      appointmentMonth: selectedSectorId === 'retired' ? undefined : appointmentMonth,
+      appointmentYear: selectedSectorId === 'retired' ? undefined : (appointmentYear === '' ? 2000 : appointmentYear),
+      appointmentMonth: selectedSectorId === 'retired' ? undefined : (appointmentMonth === '' ? 1 : appointmentMonth),
       appointmentDay: 1,
       appointmentCalendar: selectedSectorId === 'retired' ? undefined : appointmentCalendar,
       rankId: selectedSectorId === 'military' ? selectedRankId : undefined,
-      obligations,
-      monthlySupport,
+      obligations: obligations === '' ? 0 : obligations,
+      monthlySupport: monthlySupport === '' ? 0 : monthlySupport,
       productId: selectedProductId,
       termYears,
 
@@ -583,19 +584,17 @@ export function DiagnosticsPage() {
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
                     <label className="text-[9px] font-bold text-gray-500">الراتب الأساسي</label>
-                    <input
-                      type="number"
+                    <NumericInput
                       value={basicSalary}
-                      onChange={(e) => setBasicSalary(Number(e.target.value))}
+                      onChange={setBasicSalary}
                       className="w-full px-2.5 py-1.5 text-xs font-bold bg-white border border-[#E2E8F0] rounded-md"
                     />
                   </div>
                   <div className="space-y-1">
                     <label className="text-[9px] font-bold text-gray-500">بدل السكن</label>
-                    <input
-                      type="number"
+                    <NumericInput
                       value={housingAllowance}
-                      onChange={(e) => setHousingAllowance(Number(e.target.value))}
+                      onChange={setHousingAllowance}
                       className="w-full px-2.5 py-1.5 text-xs font-bold bg-white border border-[#E2E8F0] rounded-md"
                     />
                   </div>
@@ -605,20 +604,18 @@ export function DiagnosticsPage() {
                   {selectedSectorId === 'retired' ? (
                     <div className="space-y-1">
                       <label className="text-[9px] font-bold text-gray-500 font-sans">الراتب التقاعدي المباشر</label>
-                      <input
-                        type="number"
+                      <NumericInput
                         value={directPensionSalary}
-                        onChange={(e) => setDirectPensionSalary(Number(e.target.value))}
+                        onChange={setDirectPensionSalary}
                         className="w-full px-2.5 py-1.5 text-xs font-bold bg-white border border-[#E2E8F0] rounded-md"
                       />
                     </div>
                   ) : (
                     <div className="space-y-1">
                       <label className="text-[9px] font-bold text-gray-500 font-sans">صافي الراتب المعتمد</label>
-                      <input
-                        type="number"
+                      <NumericInput
                         value={directNetSalary}
-                        onChange={(e) => setDirectNetSalary(Number(e.target.value))}
+                        onChange={setDirectNetSalary}
                         className="w-full px-2.5 py-1.5 text-xs font-bold bg-white border border-[#E2E8F0] rounded-md"
                       />
                     </div>
@@ -641,25 +638,25 @@ export function DiagnosticsPage() {
                 </select>
               </div>
               <div className="grid grid-cols-3 gap-2">
-                <input
-                  type="number"
+                <NumericInput
+                  allowDecimals={false}
                   placeholder="سنة"
                   value={birthYear}
-                  onChange={(e) => setBirthYear(Number(e.target.value))}
+                  onChange={setBirthYear}
                   className="px-2 py-1 bg-white text-xs border rounded text-center font-bold"
                 />
-                <input
-                  type="number"
+                <NumericInput
+                  allowDecimals={false}
                   placeholder="شهر"
                   value={birthMonth}
-                  onChange={(e) => setBirthMonth(Number(e.target.value))}
+                  onChange={setBirthMonth}
                   className="px-2 py-1 bg-white text-xs border rounded text-center font-bold"
                 />
-                <input
-                  type="number"
+                <NumericInput
+                  allowDecimals={false}
                   placeholder="يوم"
                   value={birthDay}
-                  onChange={(e) => setBirthDay(Number(e.target.value))}
+                  onChange={setBirthDay}
                   className="px-2 py-1 bg-white text-xs border rounded text-center font-bold"
                 />
               </div>
@@ -680,18 +677,18 @@ export function DiagnosticsPage() {
                   </select>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
-                  <input
-                    type="number"
+                  <NumericInput
+                    allowDecimals={false}
                     placeholder="سنة التعيين"
                     value={appointmentYear}
-                    onChange={(e) => setAppointmentYear(Number(e.target.value))}
+                    onChange={setAppointmentYear}
                     className="px-2 py-1 bg-white text-xs border border-gray-200 rounded text-center font-bold"
                   />
-                  <input
-                    type="number"
+                  <NumericInput
+                    allowDecimals={false}
                     placeholder="شهر التعيين"
                     value={appointmentMonth}
-                    onChange={(e) => setAppointmentMonth(Number(e.target.value))}
+                    onChange={setAppointmentMonth}
                     className="px-2 py-1 bg-white text-xs border border-gray-200 rounded text-center font-bold"
                   />
                 </div>
@@ -716,19 +713,17 @@ export function DiagnosticsPage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-gray-500">الالتزام الشهري (القائم)</label>
-                <input
-                  type="number"
+                <NumericInput
                   value={obligations}
-                  onChange={(e) => setObligations(Number(e.target.value))}
+                  onChange={setObligations}
                   className="w-full px-2.5 py-1.5 text-xs font-bold bg-white border border-[#E2E8F0] rounded-md"
                 />
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-gray-500 font-sans">الدعم السكني (شهري)</label>
-                <input
-                  type="number"
+                <NumericInput
                   value={monthlySupport}
-                  onChange={(e) => setMonthlySupport(Number(e.target.value))}
+                  onChange={setMonthlySupport}
                   className="w-full px-2.5 py-1.5 text-xs font-bold bg-white border border-[#E2E8F0] rounded-md"
                 />
               </div>

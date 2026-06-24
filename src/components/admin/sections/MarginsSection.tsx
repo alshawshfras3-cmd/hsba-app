@@ -165,7 +165,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     salaryBand: string;
     salaryTransferStatus: string;
     durationDistributionType: string;
-    calculationMethod: string;
+    calculationMethod?: string;
   }) => {
     return [
       params.bankId,
@@ -175,7 +175,6 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       params.salaryBand,
       params.salaryTransferStatus,
       params.durationDistributionType,
-      params.calculationMethod
     ].join(':');
   };
 
@@ -499,6 +498,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     const remainingRules = marginRules.filter(r => {
       const rST = r.salaryTransferStatus || 'all';
       const rSB = r.salaryBand || (r.salaryTier === 'below_25000' ? 'below_25000' : r.salaryTier === 'above_or_equal_25000' ? 'from_25000' : 'all');
+      const rInputMode = r.marginInputMode || r.calculationMode || getRuleInputMode(r);
 
       const isBaseComboMatch = r.bankId === targetBank &&
                                r.productId === targetProduct &&
@@ -506,6 +506,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                                normSector(r.sectorId) === normSector(targetSector) &&
                                rST === selectedSalaryTransferStatus &&
                                rSB === targetSalaryBand &&
+                               rInputMode === inputMode &&
                                !r.isExceptionOnly;
 
       if (isBaseComboMatch) {
