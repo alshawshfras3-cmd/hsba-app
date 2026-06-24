@@ -23,6 +23,41 @@ export const getRuleInputMode = (r: MarginRule): 'yearly' | 'key_points' | 'dura
   return 'key_points';
 };
 
+const normalizeMargins = (margins: Record<number, string>) => {
+  const norm: Record<number, string> = {};
+  if (!margins) return norm;
+  for (let y = 5; y <= 30; y++) {
+    const val = margins[y];
+    if (val !== undefined && val !== '' && !isNaN(parseFloat(val))) {
+      norm[y] = parseFloat(val).toFixed(3);
+    }
+  }
+  return norm;
+};
+
+const normalizeTiers = (tiers: any[]) => {
+  return (tiers || [])
+    .filter(t => t.active !== false && t.marginRate !== '' && !isNaN(parseFloat(t.marginRate)))
+    .map(t => ({
+      fromMonth: Number(t.fromMonth) || 0,
+      toMonth: Number(t.toMonth) || 0,
+      marginRate: parseFloat(t.marginRate as string).toFixed(3)
+    }))
+    .sort((a, b) => a.fromMonth - b.fromMonth);
+};
+
+const normalizeExceptions = (exceptions: Record<string, string>) => {
+  const norm: Record<string, string> = {};
+  if (!exceptions) return norm;
+  Object.entries(exceptions).forEach(([k, v]) => {
+    const val = parseInt(v || '0', 10);
+    if (val !== 0) {
+      norm[k] = val.toString();
+    }
+  });
+  return norm;
+};
+
 interface MarginsSectionProps {
   banks: Bank[];
   marginRules: MarginRule[];
@@ -106,6 +141,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
   // Hydration ref to block auto synchronization during table initialization or selection changes
   const isHydratingRef = useRef(false);
   const userChangedTableConfigRef = useRef<boolean>(false);
+  const activeKeyRef = useRef<string>('');
 
   // 1. Isolated drafts state (Draft Store) to track edited margins by their table key
   const [marginDraftsByKey, setMarginDraftsByKey] = useState<Record<string, MarginDraft>>({});
@@ -338,9 +374,19 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     const rSector = normSector(r.sectorId);
     const rInputMode = r.marginInputMode || getRuleInputMode(r);
 
+    let rpId = r.productId as string;
+    if (rpId === 'real_estate') rpId = 'real_estate_only';
+    else if (rpId === 'both') rpId = 'real_estate_with_new_personal';
+    else if (rpId === 'real_estate_with_personal_existing') rpId = 'real_estate_with_existing_personal';
+
+    let kpId = productId;
+    if (kpId === 'real_estate') kpId = 'real_estate_only';
+    else if (kpId === 'both') kpId = 'real_estate_with_new_personal';
+    else if (kpId === 'real_estate_with_personal_existing') kpId = 'real_estate_with_existing_personal';
+
     return (
       r.bankId === bankId &&
-      r.productId === productId &&
+      rpId === kpId &&
       rSupport === normSupport(supportType) &&
       rSector === normSector(sectorId) &&
       rSB === salaryBand &&
@@ -626,9 +672,9 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       baselineRules
     );
 
-    const marginsMatch = JSON.stringify(original.localMargins) === JSON.stringify(currentDraft.localMargins);
-    const tiersMatch = JSON.stringify(original.localTiers) === JSON.stringify(currentDraft.localTiers);
-    const exceptionsMatch = JSON.stringify(original.localSectorExceptions) === JSON.stringify(currentDraft.localSectorExceptions);
+    const marginsMatch = JSON.stringify(normalizeMargins(original.localMargins)) === JSON.stringify(normalizeMargins(currentDraft.localMargins));
+    const tiersMatch = JSON.stringify(normalizeTiers(original.localTiers)) === JSON.stringify(normalizeTiers(currentDraft.localTiers));
+    const exceptionsMatch = JSON.stringify(normalizeExceptions(original.localSectorExceptions)) === JSON.stringify(normalizeExceptions(currentDraft.localSectorExceptions));
     const calcMethodMatch = original.selectedCalcMethod === currentDraft.selectedCalcMethod;
     const yearsModeMatch = original.selectedYearsMode === currentDraft.selectedYearsMode;
 
@@ -764,12 +810,15 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
 
     const oldKey = prevKeyRef.current;
     if (oldKey && oldKey !== newKey) {
+      const parts = oldKey.split(':');
+      const oldYearsMode = parts[6] as any;
+
       const currentDraft = {
         localMargins,
         localTiers,
         localSectorExceptions,
         selectedCalcMethod,
-        selectedYearsMode
+        selectedYearsMode: oldYearsMode
       };
       const dirty = isKeyDirty(oldKey, currentDraft, baselineRulesRef.current);
       
@@ -799,6 +848,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       setSelectedYearsMode(existingDraft.selectedYearsMode);
       setTransferMode(determinedTransferMode);
       setSelectedSalaryTransferStatus(determinedSalaryTransferStatus);
+      activeKeyRef.current = newKey;
       setTimeout(() => { isHydratingRef.current = false; }, 0);
     } else {
       const original = loadInitialDataFromRules(
@@ -819,6 +869,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       setSelectedYearsMode(original.selectedYearsMode);
       setTransferMode(determinedTransferMode);
       setSelectedSalaryTransferStatus(determinedSalaryTransferStatus);
+      activeKeyRef.current = newKey;
       setTimeout(() => { isHydratingRef.current = false; }, 0);
 
       const hasMargins = Object.values(original.localMargins || {}).some(v => v !== undefined && v !== '' && !isNaN(parseFloat(v as string)) && parseFloat(v as string) > 0);
@@ -852,18 +903,11 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     isLoaded
   ]);
 
-  // Keep draft store always updated with active local input edits
+  // Keep draft store always updated with active local input edits (triggered only on input changes)
   useEffect(() => {
     if (!isLoaded || isHydratingRef.current) return;
-    const currentKey = getMarginTableKey({
-      bankId: selectedBank,
-      productId: selectedProduct,
-      supportType: selectedSupport,
-      sectorId: selectedSector,
-      salaryBand: selectedSalaryBand,
-      salaryTransferStatus: selectedSalaryTransferStatus,
-      marginInputMode: selectedYearsMode
-    });
+    const activeKey = activeKeyRef.current;
+    if (!activeKey) return;
 
     const currentDraft = {
       localMargins,
@@ -873,22 +917,23 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       selectedYearsMode
     };
 
-    const dirty = isKeyDirty(currentKey, currentDraft, baselineRulesRef.current);
+    const dirty = isKeyDirty(activeKey, currentDraft, baselineRulesRef.current);
 
     const hasMargins = Object.values(currentDraft.localMargins || {}).some(v => v !== undefined && v !== '' && !isNaN(parseFloat(v as string)) && parseFloat(v as string) > 0);
     const hasTiers = (currentDraft.localTiers || []).some((t: any) => t.active !== false && t.marginRate !== '' && Number(t.marginRate) > 0);
     const isEmpty = !hasMargins && !hasTiers;
-    const hasExistingRules = baselineRulesRef.current.some(r => ruleMatchesKey(r, currentKey));
+    const hasExistingRules = baselineRulesRef.current.some(r => ruleMatchesKey(r, activeKey));
 
     if (isEmpty && !hasExistingRules) {
       setMarginDraftsByKey(prev => {
+        if (!prev[activeKey]) return prev;
         const copy = { ...prev };
-        delete copy[currentKey];
+        delete copy[activeKey];
         return copy;
       });
     } else {
       setMarginDraftsByKey(prev => {
-        const existing = prev[currentKey];
+        const existing = prev[activeKey];
         const nextDraft = {
           ...currentDraft,
           isDirty: dirty
@@ -898,7 +943,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
         }
         return {
           ...prev,
-          [currentKey]: nextDraft
+          [activeKey]: nextDraft
         };
       });
     }
@@ -908,12 +953,6 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     localSectorExceptions,
     selectedCalcMethod,
     selectedYearsMode,
-    selectedBank,
-    selectedProduct,
-    selectedSupport,
-    selectedSector,
-    selectedSalaryBand,
-    selectedSalaryTransferStatus,
     isLoaded
   ]);
 
@@ -923,6 +962,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       baselineRulesRef.current = marginRules;
       setMarginDraftsByKey({});
       prevKeyRef.current = '';
+      activeKeyRef.current = '';
       const original = loadInitialDataFromRules(
         selectedBank,
         selectedProduct,
