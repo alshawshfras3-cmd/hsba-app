@@ -86,6 +86,16 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
   const [initialExceptions, setInitialExceptions] = useState<Record<string, string>>({});
   const [initialCalcMethod, setInitialCalcMethod] = useState<'fixed' | 'linear'>('fixed');
   const [initialYearsMode, setInitialYearsMode] = useState<'yearly' | 'key_points' | 'duration_tiers' | ''>('');
+  const [initialSector, setInitialSector] = useState<string>('');
+  const [initialTransferMode, setInitialTransferMode] = useState<'all_only' | 'split_transfer'>('all_only');
+
+  const isHydratingMarginEditor = useRef<boolean>(false);
+  const prevNavOptionsRef = useRef({
+    bankId: banks[0]?.id || 'alahli',
+    productId: 'real_estate_only' as ProductId,
+    supportType: 'none' as SupportType,
+    salaryBand: 'all' as 'all' | 'below_25000' | 'from_25000',
+  });
 
   const [isLoaded, setIsLoaded] = useState(false);
   const lastBaseSelectionKeyRef = useRef<string>('');
@@ -101,6 +111,8 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       setInitialExceptions(localSectorExceptions);
       setInitialCalcMethod(selectedCalcMethod);
       setInitialYearsMode(selectedYearsMode);
+      setInitialSector(selectedSector);
+      setInitialTransferMode(transferMode);
     }
   }, [hasUnsavedChanges]);
 
@@ -110,14 +122,18 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       JSON.stringify(localTiers) !== JSON.stringify(initialTiers) ||
       JSON.stringify(localSectorExceptions) !== JSON.stringify(initialExceptions) ||
       selectedCalcMethod !== initialCalcMethod ||
-      selectedYearsMode !== initialYearsMode
+      selectedYearsMode !== initialYearsMode ||
+      selectedSector !== initialSector ||
+      transferMode !== initialTransferMode
     );
   }, [
     localMargins, initialMargins,
     localTiers, initialTiers,
     localSectorExceptions, initialExceptions,
     selectedCalcMethod, initialCalcMethod,
-    selectedYearsMode, initialYearsMode
+    selectedYearsMode, initialYearsMode,
+    selectedSector, initialSector,
+    transferMode, initialTransferMode
   ]);
 
   // Auxiliary UI States
@@ -198,6 +214,28 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     if (!selectedBank) return;
 
     const normSupportVal = normSupport(selectedSupport);
+
+    // Detect if navigation options (bank, product, support, salary band) have changed
+    const navOptionsChanged =
+      selectedBank !== prevNavOptionsRef.current.bankId ||
+      selectedProduct !== prevNavOptionsRef.current.productId ||
+      selectedSupport !== prevNavOptionsRef.current.supportType ||
+      selectedSalaryBand !== prevNavOptionsRef.current.salaryBand;
+
+    if (navOptionsChanged) {
+      isHydratingMarginEditor.current = true;
+      prevNavOptionsRef.current = {
+        bankId: selectedBank,
+        productId: selectedProduct,
+        supportType: selectedSupport,
+        salaryBand: selectedSalaryBand,
+      };
+
+      // Auto cleanup hydrating state after 500ms
+      setTimeout(() => {
+        isHydratingMarginEditor.current = false;
+      }, 500);
+    }
 
     // Filter broader and related rules to determine transferMode and selectedSalaryTransferStatus
     const relatedRules = marginRules.filter(r => {
@@ -381,6 +419,13 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       setInitialExceptions(initialExceptions);
       setInitialCalcMethod(activeCalcMethod);
       setInitialYearsMode(activeYearsMode);
+
+      // Only update sector and transferMode baselines when starting fresh navigation loads.
+      // This ensures manual changes inside the context correctly flag the component as dirty!
+      if (navOptionsChanged || !isLoaded) {
+        setInitialSector(selectedSector);
+        setInitialTransferMode(determinedTransferMode);
+      }
     }
 
     setIsLoaded(true);
@@ -651,6 +696,17 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
   useEffect(() => {
     if (!isLoaded) return;
 
+    // Skip if we are currently hydrating/loading the editor from rules (e.g. after bank/product/support navigation)
+    if (isHydratingMarginEditor.current) {
+      isHydratingMarginEditor.current = false;
+      return;
+    }
+
+    // Also skip sync if there are no actual unsaved edits (isDirty is false) to prevent redundant mutations
+    if (!isDirty) {
+      return;
+    }
+
     const currentTableKey = [
       selectedBank,
       selectedProduct,
@@ -684,7 +740,8 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     selectedSector,
     selectedProduct,
     selectedBank,
-    isLoaded
+    isLoaded,
+    isDirty
   ]);
 
   // Database updater to match exact core rules compatibility
