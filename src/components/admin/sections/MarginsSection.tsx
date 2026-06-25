@@ -61,7 +61,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
   const [selectedBank, setSelectedBank] = useState<string>(banks[0]?.id || 'alahli');
   const [selectedProduct, setSelectedProduct] = useState<ProductId>('real_estate_only');
   const [selectedSupport, setSelectedSupport] = useState<SupportType>('none');
-  const [selectedSector, setSelectedSector] = useState<string>('');
+  const [selectedSector, setSelectedSector] = useState<string>('all');
   const [selectedYearsMode, setSelectedYearsMode] = useState<'yearly' | 'key_points' | 'duration_tiers' | ''>('');
   const [selectedCalcMethod, setSelectedCalcMethod] = useState<'linear' | 'fixed'>('fixed');
   const [selectedSalaryTransferStatus, setSelectedSalaryTransferStatus] = useState<'all' | 'salary_transfer' | 'no_salary_transfer'>('all');
@@ -155,12 +155,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
   const [copyDstTransferStatus, setCopyDstTransferStatus] = useState<'all' | 'salary_transfer' | 'no_salary_transfer'>('all');
   const [copyBothTransferTables, setCopyBothTransferTables] = useState<boolean>(false);
 
-  // Handle default selected sector initialization
-  useEffect(() => {
-    if (sectorsList.length > 0 && !selectedSector) {
-      setSelectedSector('all');
-    }
-  }, [sectorsList, selectedSector]);
+
 
   // Auto handle support and salary band dependencies
   useEffect(() => {
@@ -521,11 +516,12 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     calcMethod?: 'linear' | 'fixed';
     salaryTransferStatus?: string;
     salaryBand?: string;
+    sector?: string;
   }) => {
     const targetBank = selectedBank;
     const targetProduct = selectedProduct;
     const targetSupport = selectedSupport;
-    const targetSector = selectedSector;
+    const targetSector = params?.sector !== undefined ? params.sector : selectedSector;
     
     const activeMargins = params?.margins ?? localMargins;
     const activeTiers = params?.tiers ?? localTiers;
@@ -761,52 +757,52 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     return updatedRules;
   };
 
-  // 2. Debounced useEffect for real-time synchronization of edits to AppContext
-  useEffect(() => {
-    if (!isLoaded) return;
+  // 2. Ref timer and manual trigger function for real-time synchronization of edits to AppContext
+  const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Skip if we are currently hydrating/loading the editor from rules (e.g. after bank/product/support navigation)
-    if (isHydratingMarginEditor.current) {
-      isHydratingMarginEditor.current = false;
-      return;
+  const triggerUserChangeSync = (updatedParams?: {
+    margins?: Record<number, string>;
+    tiers?: any[];
+    exceptions?: Record<string, string>;
+    yearsMode?: 'yearly' | 'key_points' | 'duration_tiers' | '';
+    calcMethod?: 'linear' | 'fixed';
+    salaryTransferStatus?: string;
+    salaryBand?: string;
+    sector?: string;
+  }) => {
+    if (syncTimeoutRef.current) {
+      clearTimeout(syncTimeoutRef.current);
     }
+    syncTimeoutRef.current = setTimeout(() => {
+      const activeSector = updatedParams?.sector !== undefined ? updatedParams.sector : selectedSector;
+      const activeSalaryTransferStatus = updatedParams?.salaryTransferStatus !== undefined ? updatedParams.salaryTransferStatus : selectedSalaryTransferStatus;
+      const activeYearsMode = updatedParams?.yearsMode !== undefined ? updatedParams.yearsMode : selectedYearsMode;
+      const activeCalcMethod = updatedParams?.calcMethod !== undefined ? updatedParams.calcMethod : selectedCalcMethod;
+      const activeMargins = updatedParams?.margins !== undefined ? updatedParams.margins : localMargins;
+      const activeTiers = updatedParams?.tiers !== undefined ? updatedParams.tiers : localTiers;
+      const activeExceptions = updatedParams?.exceptions !== undefined ? updatedParams.exceptions : localSectorExceptions;
+      const activeSalaryBand = updatedParams?.salaryBand !== undefined ? updatedParams.salaryBand : selectedSalaryBand;
 
-    // Also skip sync if there are no actual unsaved edits (isDirty is false) to prevent redundant mutations
-    if (!isDirty) {
-      return;
-    }
-
-    const currentTableKey = [
-      selectedBank,
-      selectedProduct,
-      selectedSupport,
-      selectedSector,
-      selectedSalaryBand,
-      selectedSalaryTransferStatus,
-      selectedYearsMode,
-      selectedCalcMethod
-    ].join(':');
-
-    const timer = setTimeout(() => {
-      syncCurrentMarginEditorToGlobalRules();
+      syncCurrentMarginEditorToGlobalRules({
+        margins: activeMargins,
+        tiers: activeTiers,
+        exceptions: activeExceptions,
+        yearsMode: activeYearsMode,
+        calcMethod: activeCalcMethod,
+        salaryTransferStatus: activeSalaryTransferStatus,
+        salaryBand: activeSalaryBand,
+        sector: activeSector
+      });
     }, 300);
+  };
 
-    return () => clearTimeout(timer);
-  }, [
-    localMargins,
-    localTiers,
-    localSectorExceptions,
-    selectedYearsMode,
-    selectedCalcMethod,
-    selectedSalaryTransferStatus,
-    selectedSalaryBand,
-    selectedSupport,
-    selectedSector,
-    selectedProduct,
-    selectedBank,
-    isLoaded,
-    isDirty
-  ]);
+  useEffect(() => {
+    return () => {
+      if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Database updater to match exact core rules compatibility
   const updateGlobalRulesForCombo = (
@@ -1618,7 +1614,11 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
               <label className="block text-[11px] font-bold text-gray-500">القطاع الفعال:</label>
               <select
                 value={selectedSector}
-                onChange={(e) => setSelectedSector(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSelectedSector(val);
+                  triggerUserChangeSync({ sector: val });
+                }}
                 className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 text-xs font-bold text-slate-800 outline-none focus:ring-1 focus:ring-[#0057B8] cursor-pointer"
               >
                 {sectorsList.map(sec => (
@@ -1671,13 +1671,17 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                       type="button"
                       onClick={() => {
                         setTransferMode(m.id as any);
+                        let nextStatus = selectedSalaryTransferStatus;
                         if (m.id === 'all_only') {
+                          nextStatus = 'all';
                           setSelectedSalaryTransferStatus('all');
                         } else {
                           if (selectedSalaryTransferStatus === 'all') {
+                            nextStatus = 'salary_transfer';
                             setSelectedSalaryTransferStatus('salary_transfer');
                           }
                         }
+                        triggerUserChangeSync({ salaryTransferStatus: nextStatus });
                       }}
                       className={`px-1 py-1.5 rounded-lg border text-[10px] font-bold text-center transition-all cursor-pointer whitespace-nowrap ${
                         isSelected
@@ -1706,7 +1710,10 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                       <button
                         key={status.id}
                         type="button"
-                        onClick={() => setSelectedSalaryTransferStatus(status.id as any)}
+                        onClick={() => {
+                          setSelectedSalaryTransferStatus(status.id as any);
+                          triggerUserChangeSync({ salaryTransferStatus: status.id });
+                        }}
                         className={`px-1 py-1.5 rounded-lg border text-[10px] font-bold text-center transition-all cursor-pointer whitespace-nowrap ${
                           isSelected
                             ? 'bg-[#0057B8]/10 border-[#0057B8] text-[#0057B8] shadow-xs'
@@ -1730,6 +1737,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                   onClick={() => {
                     if (selectedYearsMode === 'duration_tiers' || selectedYearsMode === '') {
                       setSelectedYearsMode('key_points');
+                      triggerUserChangeSync({ yearsMode: 'key_points' });
                     }
                   }}
                   className={`px-3 py-2.5 rounded-xl border text-xs font-bold text-center transition-all cursor-pointer ${
@@ -1745,6 +1753,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                   id="tab-duration-tiers"
                   onClick={() => {
                     setSelectedYearsMode('duration_tiers');
+                    triggerUserChangeSync({ yearsMode: 'duration_tiers' });
                   }}
                   className={`px-3 py-2.5 rounded-xl border text-xs font-bold text-center transition-all cursor-pointer ${
                     selectedYearsMode === 'duration_tiers'
@@ -1763,6 +1772,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                     type="button"
                     onClick={() => {
                       setSelectedYearsMode('key_points');
+                      triggerUserChangeSync({ yearsMode: 'key_points' });
                     }}
                     className={`px-2 py-0.5 text-[10px] font-bold rounded ${
                       selectedYearsMode === 'key_points'
@@ -1776,6 +1786,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                     type="button"
                     onClick={() => {
                       setSelectedYearsMode('yearly');
+                      triggerUserChangeSync({ yearsMode: 'yearly' });
                     }}
                     className={`px-2 py-0.5 text-[10px] font-bold rounded ${
                       selectedYearsMode === 'yearly'
@@ -1804,6 +1815,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                       type="button"
                       onClick={() => {
                         setSelectedCalcMethod(c.id as any);
+                        triggerUserChangeSync({ calcMethod: c.id as any });
                       }}
                       className={`px-1 py-1.5 rounded-lg border text-[10px] font-bold text-center transition-all cursor-pointer ${
                         isSelected
@@ -1843,7 +1855,11 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                       onChange={(e) => {
                         let valStr = e.target.value;
                         valStr = valStr.replace(/[^0-9-]/g, '');
-                        setLocalSectorExceptions(prev => ({ ...prev, [sec.id]: valStr }));
+                        setLocalSectorExceptions(prev => {
+                          const next = { ...prev, [sec.id]: valStr };
+                          triggerUserChangeSync({ exceptions: next });
+                          return next;
+                        });
                       }}
                       className="w-full bg-white border border-gray-300 rounded-lg py-1 pl-8 pr-2 text-center text-xs font-bold font-mono focus:outline-none focus:ring-1 focus:ring-[#0057B8] text-slate-800"
                       placeholder="0"
@@ -1917,17 +1933,21 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    setLocalTiers(prev => [
-                      ...prev,
-                      {
-                        id: `new_tier_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-                        fromMonth: 36,
-                        toMonth: 60,
-                        marginRate: 3.50,
-                        notes: '',
-                        active: true
-                      }
-                    ]);
+                    setLocalTiers(prev => {
+                      const next = [
+                        ...prev,
+                        {
+                          id: `new_tier_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+                          fromMonth: 36,
+                          toMonth: 60,
+                          marginRate: 3.50,
+                          notes: '',
+                          active: true
+                        }
+                      ];
+                      triggerUserChangeSync({ tiers: next });
+                      return next;
+                    });
                   }}
                   className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
                 >
@@ -1964,7 +1984,11 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                               onChange={(e) => {
                                 const raw = toEnglishDigits(e.target.value);
                                 const clean = raw.replace(/[^0-9]/g, '');
-                                setLocalTiers(prev => prev.map(t => t.id === tier.id ? { ...t, fromMonth: clean } : t));
+                                setLocalTiers(prev => {
+                                  const next = prev.map(t => t.id === tier.id ? { ...t, fromMonth: clean } : t);
+                                  triggerUserChangeSync({ tiers: next });
+                                  return next;
+                                });
                               }}
                               className="bg-white border border-gray-300 rounded-lg px-2 py-1 w-full text-xs font-bold font-mono text-center focus:outline-none focus:ring-1 focus:ring-[#0057B8] text-slate-800"
                               placeholder="36"
@@ -1979,7 +2003,11 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                               onChange={(e) => {
                                 const raw = toEnglishDigits(e.target.value);
                                 const clean = raw.replace(/[^0-9]/g, '');
-                                setLocalTiers(prev => prev.map(t => t.id === tier.id ? { ...t, toMonth: clean } : t));
+                                setLocalTiers(prev => {
+                                  const next = prev.map(t => t.id === tier.id ? { ...t, toMonth: clean } : t);
+                                  triggerUserChangeSync({ tiers: next });
+                                  return next;
+                                });
                               }}
                               className="bg-white border border-gray-300 rounded-lg px-2 py-1 w-full text-xs font-bold font-mono text-center focus:outline-none focus:ring-1 focus:ring-[#0057B8] text-slate-800"
                               placeholder="60"
@@ -1999,7 +2027,11 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                                   if (firstDotIdx !== -1) {
                                     clean = clean.substring(0, firstDotIdx + 1) + clean.substring(firstDotIdx + 1).replace(/\./g, '');
                                   }
-                                  setLocalTiers(prev => prev.map(t => t.id === tier.id ? { ...t, marginRate: clean } : t));
+                                  setLocalTiers(prev => {
+                                    const next = prev.map(t => t.id === tier.id ? { ...t, marginRate: clean } : t);
+                                    triggerUserChangeSync({ tiers: next });
+                                    return next;
+                                  });
                                 }}
                                 className="bg-white border border-gray-300 rounded-lg pl-7 pr-2 py-1 w-full text-xs font-bold font-mono text-center focus:outline-none focus:ring-1 focus:ring-[#0057B8] text-slate-800"
                                 placeholder="3.50"
@@ -2014,7 +2046,11 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                               value={tier.notes || ''}
                               onChange={(e) => {
                                 const val = e.target.value;
-                                setLocalTiers(prev => prev.map(t => t.id === tier.id ? { ...t, notes: val } : t));
+                                setLocalTiers(prev => {
+                                  const next = prev.map(t => t.id === tier.id ? { ...t, notes: val } : t);
+                                  triggerUserChangeSync({ tiers: next });
+                                  return next;
+                                });
                               }}
                               className="bg-white border border-gray-300 rounded-lg px-2.5 py-1 w-full text-xs font-bold text-right focus:outline-none focus:ring-1 focus:ring-[#0057B8] text-slate-800"
                               placeholder="ملاحظات توضيحية..."
@@ -2024,7 +2060,11 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                             <button
                               type="button"
                               onClick={() => {
-                                setLocalTiers(prev => prev.filter(t => t.id !== tier.id));
+                                setLocalTiers(prev => {
+                                  const next = prev.filter(t => t.id !== tier.id);
+                                  triggerUserChangeSync({ tiers: next });
+                                  return next;
+                                });
                               }}
                               className="px-2.5 py-1 bg-rose-500 hover:bg-rose-600 text-white rounded-lg text-[10px] font-bold transition-colors cursor-pointer"
                             >
@@ -2080,7 +2120,11 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                                 onChange={(e) => {
                                   const val = e.target.value;
                                   if (val === '' || /^[0-9]*\.?[0-9]*$/.test(val)) {
-                                    setLocalMargins(prev => ({ ...prev, [year]: val }));
+                                    setLocalMargins(prev => {
+                                      const next = { ...prev, [year]: val };
+                                      triggerUserChangeSync({ margins: next });
+                                      return next;
+                                    });
                                   }
                                 }}
                                 className="bg-white border border-gray-300 rounded-lg pl-7 pr-3 py-1.5 w-full text-xs font-bold font-mono focus:outline-none focus:ring-1 focus:ring-[#0057B8] text-left text-slate-800"
