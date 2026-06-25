@@ -1013,9 +1013,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         pensionRules: (settings.pension_rules !== undefined && settings.pension_rules !== null) ? settings.pension_rules : initialData.pensionRules,
         termRules: (settings.term_rules !== undefined && settings.term_rules !== null) ? settings.term_rules : initialData.termRules,
         marginRules: (() => {
-          const raw = settings.margin_rules ?? settings.marginRules ?? null;
+          const raw = settings.marginRules ?? settings.margin_rules ?? null;
           if (raw === null || raw === undefined) {
-            console.warn('[SYNC] margin_rules missing from settings — keeping existing state');
+            console.warn('[SYNC] marginRules missing from settings — keeping existing state');
             return marginRules; // ← ابقَ على الـ state الحالي
           }
           return upgradeMarginRules(raw);
@@ -1272,12 +1272,14 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           case 'products':
             mergedSettingsObject.products = deepClone(products);
             break;
-          case 'margins':
-            mergedSettingsObject.marginRules = upgradeMarginRules(deepClone(overrideMarginRules || marginRules));
-            if ('margin_rules' in mergedSettingsObject) {
-              mergedSettingsObject.margin_rules = upgradeMarginRules(deepClone(overrideMarginRules || marginRules));
+          case 'margins': {
+            const savedRules = upgradeMarginRules(deepClone(overrideMarginRules || marginRules));
+            mergedSettingsObject.marginRules = savedRules;
+            if ('margin_rules' in mergedSettingsObject || (latestSettings && 'margin_rules' in latestSettings)) {
+              mergedSettingsObject.margin_rules = savedRules;
             }
             break;
+          }
           case 'dsr':
             mergedSettingsObject.dsrRules = deepClone(dsrRules);
             if ('dsr_rules' in mergedSettingsObject) {
@@ -1370,9 +1372,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
         // Stage 4 Overwrite Protection: If active page is NOT margins, guarantee marginRules are NOT overwritten
         if (adminSubPage !== 'margins') {
-          mergedSettingsObject.marginRules = latestSettings.marginRules ?? latestSettings.margin_rules ?? [];
-          if ('margin_rules' in mergedSettingsObject) {
-            mergedSettingsObject.margin_rules = latestSettings.marginRules ?? latestSettings.margin_rules ?? [];
+          const preservedRules = latestSettings.marginRules ?? latestSettings.margin_rules ?? [];
+          mergedSettingsObject.marginRules = preservedRules;
+          if ('margin_rules' in mergedSettingsObject || (latestSettings && 'margin_rules' in latestSettings)) {
+            mergedSettingsObject.margin_rules = preservedRules;
           }
         }
 
@@ -1407,6 +1410,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
         const { error } = await supabase.from('system_settings').upsert(payload);
         if (error) throw error;
+        
+        if (adminSubPage === 'margins') {
+          const savedMarginRules = mergedSettingsObject.marginRules ?? mergedSettingsObject.margin_rules ?? [];
+          const savedHash = calculateMarginsHash(savedMarginRules);
+          setLoadedMarginsHash(savedHash);
+        }
         
         console.log("All settings successfully synced to centralized app_settings in system_settings database");
         console.log('[SETTINGS] admin saved key successfully: app_settings');
