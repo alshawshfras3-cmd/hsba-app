@@ -237,8 +237,77 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       }, 500);
     }
 
-    // Filter broader and related rules to determine transferMode and selectedSalaryTransferStatus
-    const relatedRules = marginRules.filter(r => {
+    // 1. Filter ALL rules matching the base combo (bank + product + support + salary band)
+    const baseComboRules = marginRules.filter(r => {
+      if (r.isExceptionOnly) return false;
+
+      let pId = r.productId as string;
+      if (pId === 'real_estate') pId = 'real_estate_only';
+      else if (pId === 'both') pId = 'real_estate_with_new_personal';
+      else if (r.productId === 'real_estate_with_personal_existing' || r.productId === 'real_estate_with_personal_existing') pId = 'real_estate_with_existing_personal';
+
+      let sType = r.supportType as string;
+      if (sType === 'down_payment') sType = 'downpayment';
+
+      const rSB = r.salaryBand || (r.salaryTier === 'below_25000' ? 'below_25000' : r.salaryTier === 'above_or_equal_25000' ? 'from_25000' : 'all');
+
+      return (
+        r.bankId === selectedBank &&
+        pId === selectedProduct &&
+        normSupport(sType) === normSupportVal &&
+        rSB === selectedSalaryBand
+      );
+    });
+
+    // 2. Find any saved config rule
+    const savedConfigRule = baseComboRules.find(r => r.isConfigOnly === true);
+    const savedRegularRule = baseComboRules.find(r => !r.isConfigOnly);
+
+    // 3. Determine config parameters
+    let determinedTransferMode: 'all_only' | 'split_transfer' = 'all_only';
+    const hasSplit = baseComboRules.some(r => r.salaryTransferStatus === 'salary_transfer' || r.salaryTransferStatus === 'no_salary_transfer');
+    if (hasSplit) {
+      determinedTransferMode = 'split_transfer';
+    }
+
+    let determinedSalaryTransferStatus = 'all';
+    if (determinedTransferMode === 'split_transfer') {
+      determinedSalaryTransferStatus = 'salary_transfer';
+    }
+
+    let determinedSector = 'all';
+    if (savedConfigRule && savedConfigRule.sectorId) {
+      determinedSector = savedConfigRule.sectorId;
+    }
+
+    let determinedYearsMode: 'yearly' | 'key_points' | 'duration_tiers' | '' = 'key_points';
+    if (savedConfigRule) {
+      determinedYearsMode = (savedConfigRule.marginInputMode || savedConfigRule.calculationMode) as any;
+    } else if (savedRegularRule) {
+      determinedYearsMode = (savedRegularRule.marginInputMode || savedRegularRule.calculationMode || getRuleInputMode(savedRegularRule)) as any;
+    }
+
+    let determinedCalcMethod: 'fixed' | 'linear' = 'fixed';
+    if (savedConfigRule) {
+      determinedCalcMethod = (savedConfigRule.calculationMethod || savedConfigRule.calcType) as any;
+    } else if (savedRegularRule) {
+      determinedCalcMethod = (savedRegularRule.calculationMethod || savedRegularRule.calcType) as any;
+    }
+
+    // Fallbacks if blank
+    if (!determinedYearsMode) determinedYearsMode = 'key_points';
+    if (!determinedCalcMethod) determinedCalcMethod = 'fixed';
+
+    // Bypassing obsolete/duplicate block safely to avoid line spacing errors
+    const SKIP_OLD_BLOCK = true;
+    const relatedRules = [] as any[];
+    const broaderRules = [] as any[];
+    const currentBaseSelectionKey = '';
+    const exactRules = [] as any[];
+
+    if (false) {
+      // Filter broader and related rules to determine transferMode and selectedSalaryTransferStatus
+      const relatedRules = marginRules.filter(r => {
       if (r.isExceptionOnly) return false;
       
       let pId = r.productId as string;
@@ -318,46 +387,48 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
 
     const exactRules = relatedRules.filter(r => (r.salaryTransferStatus || 'all') === determinedSalaryTransferStatus);
     
-    let determinedYearsMode = selectedYearsMode;
-    let determinedCalcMethod = selectedCalcMethod;
+    } // Closes the if (false) block safely bypassing obsolete rules filtering
 
-    const configRule = exactRules.find(r => r.isConfigOnly === true);
-    const regularRule = exactRules.find(r => !r.isConfigOnly);
-    const resolvedRule = configRule || regularRule;
+    // 4. Resolve active parameters to use for data loading
+    const activeSector = (navOptionsChanged || !isLoaded) ? determinedSector : selectedSector;
+    const activeTransferMode = (navOptionsChanged || !isLoaded) ? determinedTransferMode : transferMode;
+    const activeSalaryTransferStatus = (navOptionsChanged || !isLoaded) ? determinedSalaryTransferStatus : selectedSalaryTransferStatus;
+    const activeYearsMode = (navOptionsChanged || !isLoaded) ? determinedYearsMode : selectedYearsMode;
+    const activeCalcMethod = (navOptionsChanged || !isLoaded) ? determinedCalcMethod : selectedCalcMethod;
 
-    if (resolvedRule && !selectedYearsMode) {
-      determinedYearsMode = resolvedRule.marginInputMode || resolvedRule.calculationMode || getRuleInputMode(resolvedRule);
-      determinedCalcMethod = resolvedRule.calculationMethod || resolvedRule.calcType || 'fixed';
-    } else if (!selectedYearsMode) {
-      const fallbackRule = relatedRules.find(r => !r.isExceptionOnly);
-      if (fallbackRule) {
-        determinedYearsMode = fallbackRule.marginInputMode || fallbackRule.calculationMode || getRuleInputMode(fallbackRule);
-        determinedCalcMethod = fallbackRule.calculationMethod || fallbackRule.calcType || 'fixed';
-      } else {
-        determinedYearsMode = 'key_points';
-        determinedCalcMethod = 'fixed';
-      }
-    }
-
-    if (!selectedYearsMode) {
+    // Apply resolved options to the active state if navigating or first load
+    if (navOptionsChanged || !isLoaded) {
+      setSelectedSector(determinedSector);
+      setTransferMode(determinedTransferMode);
+      setSelectedSalaryTransferStatus(determinedSalaryTransferStatus);
       setSelectedYearsMode(determinedYearsMode);
-    }
-    // Note: Do not override user manual calc method unless initializing first time
-    if (!selectedCalcMethod) {
       setSelectedCalcMethod(determinedCalcMethod);
+
+      // Set baselines to avoid isDirty being true on navigation
+      setInitialSector(determinedSector);
+      setInitialTransferMode(determinedTransferMode);
+      setInitialYearsMode(determinedYearsMode);
+      setInitialCalcMethod(determinedCalcMethod);
     }
 
-    // Now, let's load the actual margins / data for this exact combo (which includes determinedYearsMode)
-    const currentModeRules = exactRules.filter(r => {
+    // 5. Load the actual margin rules for the active sector, status, and years mode
+    const sectorRelatedRules = baseComboRules.filter(r =>
+      normSector(r.sectorId) === normSector(activeSector) &&
+      (r.salaryTransferStatus || 'all') === activeSalaryTransferStatus
+    );
+
+    const activeModeRules = sectorRelatedRules.filter(r => {
       const rMode = r.marginInputMode || getRuleInputMode(r);
-      return rMode === (selectedYearsMode || determinedYearsMode);
+      return rMode === activeYearsMode;
     });
+
+    const activeCalcMethodResolved = activeCalcMethod;
+
+    const currentModeRules = activeModeRules;
 
     let initialMargins: Record<number, string> = {};
     let initialTiers: any[] = [];
     let initialExceptions: Record<string, string> = {};
-
-    const activeYearsMode = selectedYearsMode || determinedYearsMode;
 
     if (activeYearsMode !== '') {
       const yearsRules = currentModeRules.filter(r => !isTiersRule(r));
@@ -394,15 +465,13 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       initialExceptions[sec.id] = exRule && exRule.exceptionBps !== undefined ? exRule.exceptionBps.toString() : '0';
     });
 
-    const activeCalcMethod = selectedCalcMethod || determinedCalcMethod;
-
     const currentTableKey = [
       selectedBank,
       selectedProduct,
       selectedSupport,
-      selectedSector,
+      activeSector,
       selectedSalaryBand,
-      determinedSalaryTransferStatus,
+      activeSalaryTransferStatus,
       activeYearsMode,
       activeCalcMethod
     ].join(':');
