@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Copy, Loader2 } from 'lucide-react';
 import { Bank, ProductId, SupportType, SectorId, MarginRule, Sector } from '../../../types';
 import { calculateMargin } from '../../../lib/finance-engine/margin';
+import { useAppState } from '../../../context/AppContext';
 
 function toEnglishDigits(str: string): string {
   return str
@@ -88,6 +89,20 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
 
   const [isLoaded, setIsLoaded] = useState(false);
   const lastBaseSelectionKeyRef = useRef<string>('');
+  const lastLoadedTableKeyRef = useRef<string>('');
+
+  const { hasUnsavedChanges } = useAppState();
+
+  // Automatically reset initial baseline states when a global save completes or cancel is pressed
+  useEffect(() => {
+    if (!hasUnsavedChanges) {
+      setInitialMargins(localMargins);
+      setInitialTiers(localTiers);
+      setInitialExceptions(localSectorExceptions);
+      setInitialCalcMethod(selectedCalcMethod);
+      setInitialYearsMode(selectedYearsMode);
+    }
+  }, [hasUnsavedChanges]);
 
   const isDirty = useMemo(() => {
     return (
@@ -341,16 +356,32 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       initialExceptions[sec.id] = exRule && exRule.exceptionBps !== undefined ? exRule.exceptionBps.toString() : '0';
     });
 
-    setLocalMargins(initialMargins);
-    setLocalTiers(initialTiers);
-    setLocalSectorExceptions(initialExceptions);
+    const activeCalcMethod = selectedCalcMethod || determinedCalcMethod;
 
-    // Also store initial baselines for direct local isDirty comparison!
-    setInitialMargins(initialMargins);
-    setInitialTiers(initialTiers);
-    setInitialExceptions(initialExceptions);
-    setInitialCalcMethod(selectedCalcMethod || determinedCalcMethod);
-    setInitialYearsMode(activeYearsMode);
+    const currentTableKey = [
+      selectedBank,
+      selectedProduct,
+      selectedSupport,
+      selectedSector,
+      selectedSalaryBand,
+      determinedSalaryTransferStatus,
+      activeYearsMode,
+      activeCalcMethod
+    ].join(':');
+
+    if (currentTableKey !== lastLoadedTableKeyRef.current || !isLoaded) {
+      lastLoadedTableKeyRef.current = currentTableKey;
+      setLocalMargins(initialMargins);
+      setLocalTiers(initialTiers);
+      setLocalSectorExceptions(initialExceptions);
+      
+      // Also store initial baselines for direct local isDirty comparison!
+      setInitialMargins(initialMargins);
+      setInitialTiers(initialTiers);
+      setInitialExceptions(initialExceptions);
+      setInitialCalcMethod(activeCalcMethod);
+      setInitialYearsMode(activeYearsMode);
+    }
 
     setIsLoaded(true);
 
@@ -363,7 +394,297 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     selectedSalaryTransferStatus,
     transferMode,
     selectedYearsMode,
+    selectedCalcMethod,
     marginRules
+  ]);
+
+  // 1. Sync helper function to build and update rules in marginRules
+  const syncCurrentMarginEditorToGlobalRules = (params?: {
+    margins?: Record<number, string>;
+    tiers?: any[];
+    exceptions?: Record<string, string>;
+    yearsMode?: 'yearly' | 'key_points' | 'duration_tiers' | '';
+    calcMethod?: 'linear' | 'fixed';
+    salaryTransferStatus?: string;
+    salaryBand?: string;
+  }) => {
+    const targetBank = selectedBank;
+    const targetProduct = selectedProduct;
+    const targetSupport = selectedSupport;
+    const targetSector = selectedSector;
+    
+    const activeMargins = params?.margins ?? localMargins;
+    const activeTiers = params?.tiers ?? localTiers;
+    const activeExceptions = params?.exceptions ?? localSectorExceptions;
+    const activeYearsMode = params?.yearsMode !== undefined ? params.yearsMode : selectedYearsMode;
+    const activeCalcMethod = params?.calcMethod !== undefined ? params.calcMethod : selectedCalcMethod;
+    const activeSalaryTransferStatus = params?.salaryTransferStatus !== undefined ? params.salaryTransferStatus : selectedSalaryTransferStatus;
+    const activeSalaryBand = params?.salaryBand !== undefined ? params.salaryBand : selectedSalaryBand;
+
+    if (activeYearsMode === '') {
+      return marginRules;
+    }
+    const normSupportVal = normSupport(targetSupport);
+
+    const remainingRules = marginRules.filter(r => {
+      const rST = r.salaryTransferStatus || 'all';
+      const rSB = r.salaryBand || (r.salaryTier === 'below_25000' ? 'below_25000' : r.salaryTier === 'above_or_equal_25000' ? 'from_25000' : 'all');
+      const rMode = r.marginInputMode || r.calculationMode || getRuleInputMode(r);
+
+      const isBaseComboMatch = r.bankId === targetBank &&
+                               r.productId === targetProduct &&
+                               normSupport(r.supportType) === normSupportVal &&
+                               normSector(r.sectorId) === normSector(targetSector) &&
+                               rST === activeSalaryTransferStatus &&
+                               rSB === activeSalaryBand;
+
+      if (isBaseComboMatch) {
+        if (r.isConfigOnly) {
+          // Config-only rules define the active margin table mode; they are not used as numeric margin rules.
+          // We always remove old config rules for this combo to update it to the new active mode.
+          return false;
+        }
+        if (!r.isExceptionOnly && rMode === activeYearsMode) {
+          // Only remove numeric rules for the active mode being saved, keeping other modes intact.
+          return false;
+        }
+      }
+
+      const isExceptionForCombo = r.bankId === targetBank &&
+                                  r.isExceptionOnly === true;
+
+      return !isExceptionForCombo;
+    });
+
+    const newRulesForThisCombo: MarginRule[] = [];
+
+    // Check if table actually contains data rules
+    let hasActualData = false;
+    if (activeYearsMode === 'duration_tiers') {
+      hasActualData = activeTiers.some(t => t.active !== false && t.marginRate !== '' && Number(t.marginRate) > 0);
+    } else {
+      const yearsToExtract = activeYearsMode === 'yearly'
+        ? Array.from({ length: 26 }, (_, i) => 5 + i)
+        : [5, 10, 15, 20, 25, 30];
+      const filledYears = yearsToExtract.filter(year => {
+        const val = activeMargins[year];
+        return val !== undefined && val !== '' && !isNaN(parseFloat(val)) && parseFloat(val) > 0;
+      });
+      hasActualData = filledYears.length > 0;
+    }
+
+    // Always append the config rule for the current mode
+    newRulesForThisCombo.push({
+      id: `config_margin_${targetBank}_${targetProduct}_${normSupportVal}_${targetSector}_${activeSalaryBand}_${activeSalaryTransferStatus}`,
+      bankId: targetBank,
+      productId: targetProduct,
+      supportType: normSupportVal as any,
+      sectorId: targetSector as any,
+      fromTermMonths: 0,
+      toTermMonths: 0,
+      startMargin: 0,
+      endMargin: 0,
+      calcType: activeCalcMethod,
+      isActive: false,
+      isConfigOnly: true,
+      marginInputMode: activeYearsMode as any,
+      calculationMode: activeYearsMode as any,
+      calculationMethod: activeCalcMethod,
+      salaryTransferStatus: activeSalaryTransferStatus,
+      salaryBand: activeSalaryBand,
+      productType: targetProduct as any,
+      salaryTier: (activeSalaryBand === 'below_25000' ? 'below_25000' : activeSalaryBand === 'from_25000' ? 'above_or_equal_25000' : 'not_applicable') as any,
+      annualMargin: 0,
+      baseMargin: 0,
+      exceptionBps: 0
+    });
+
+    if (hasActualData) {
+      if (activeYearsMode === 'duration_tiers') {
+        activeTiers.forEach((tier, index) => {
+          const numFrom = Number(tier.fromMonth) || 0;
+          const numTo = Number(tier.toMonth) || 0;
+          const numRate = Number(tier.marginRate) || 0;
+          
+          newRulesForThisCombo.push({
+            id: tier.id || `tier_margin_${targetBank}_${targetProduct}_${normSupportVal}_${targetSector}_${activeSalaryBand}_t${numFrom}_${numTo}_${index}_${activeSalaryTransferStatus}_${activeYearsMode}`,
+            bankId: targetBank,
+            productId: targetProduct,
+            supportType: normSupportVal as any,
+            sectorId: targetSector as any,
+            fromTermMonths: numFrom,
+            toTermMonths: numTo,
+            startMargin: numRate,
+            endMargin: numRate,
+            calcType: 'fixed',
+            isActive: tier.active !== false,
+            salaryTier: (activeSalaryBand === 'below_25000' ? 'below_25000' : activeSalaryBand === 'from_25000' ? 'above_or_equal_25000' : 'not_applicable') as any,
+            productType: targetProduct as any,
+            marginInputMode: 'duration_tiers',
+            calculationMode: 'duration_tiers',
+            calculationMethod: 'fixed',
+            termMonths: numTo,
+            annualMargin: numRate,
+            exceptionBps: 0,
+            baseMargin: Number((numRate / 100).toFixed(6)),
+            fromMonth: numFrom,
+            toMonth: numTo,
+            marginRate: numRate,
+            active: tier.active !== false,
+            notes: tier.notes || '',
+            salaryTransferStatus: activeSalaryTransferStatus,
+            salaryBand: activeSalaryBand
+          });
+        });
+      } else {
+        const yearsToExtract = activeYearsMode === 'yearly'
+          ? Array.from({ length: 26 }, (_, i) => 5 + i)
+          : [5, 10, 15, 20, 25, 30];
+
+        const filledYears = yearsToExtract.filter(year => {
+          const val = activeMargins[year];
+          return val !== undefined && val !== '' && !isNaN(parseFloat(val)) && parseFloat(val) > 0;
+        });
+
+        filledYears.sort((a, b) => a - b);
+
+        if (filledYears.length > 0) {
+          const definitions: Array<{ from: number, to: number, start: number, end: number, calcType: 'fixed' | 'linear', yearPoint: number }> = [];
+
+          for (let i = 0; i < filledYears.length; i++) {
+            const currentYear = filledYears[i];
+            const currentMarginStr = activeMargins[currentYear];
+            const currentMarginVal = parseFloat(currentMarginStr) || 0;
+
+            if (i === 0) {
+              definitions.push({
+                from: 0,
+                to: currentYear * 12,
+                start: currentMarginVal,
+                end: currentMarginVal,
+                calcType: 'fixed' as const,
+                yearPoint: currentYear
+              });
+            } else {
+              const prevYear = filledYears[i - 1];
+              const prevMarginStr = activeMargins[prevYear];
+              const prevMarginVal = parseFloat(prevMarginStr) || 0;
+
+              const fromMonths = prevYear * 12 + 1;
+              const toMonths = currentYear * 12;
+
+              definitions.push({
+                from: fromMonths,
+                to: toMonths,
+                start: activeCalcMethod === 'fixed' ? currentMarginVal : prevMarginVal,
+                end: currentMarginVal,
+                calcType: activeCalcMethod,
+                yearPoint: currentYear
+              });
+            }
+          }
+
+          const lastYear = filledYears[filledYears.length - 1];
+          const lastMarginStr = activeMargins[lastYear];
+          const lastMarginVal = parseFloat(lastMarginStr) || 0;
+
+          definitions.push({
+            from: lastYear * 12 + 1,
+            to: 9999,
+            start: lastMarginVal,
+            end: lastMarginVal,
+            calcType: 'fixed' as const,
+            yearPoint: lastYear
+          });
+
+          definitions.forEach((def, index) => {
+            newRulesForThisCombo.push({
+              id: `gen_margin_${targetBank}_${targetProduct}_${normSupportVal}_${targetSector}_${activeSalaryBand}_t${def.from}_${def.to}_${index}_${activeSalaryTransferStatus}_${activeYearsMode}`,
+              bankId: targetBank,
+              productId: targetProduct,
+              supportType: normSupportVal as any,
+              sectorId: targetSector as any,
+              fromTermMonths: def.from,
+              toTermMonths: def.to,
+              startMargin: def.start,
+              endMargin: def.end,
+              calcType: def.calcType,
+              isActive: true,
+              salaryTier: (activeSalaryBand === 'below_25000' ? 'below_25000' : activeSalaryBand === 'from_25000' ? 'above_or_equal_25000' : 'not_applicable') as any,
+              productType: targetProduct as any,
+              marginInputMode: activeYearsMode as any,
+              calculationMode: activeYearsMode as any,
+              calculationMethod: activeCalcMethod,
+              year: def.yearPoint,
+              termMonths: def.to === 9999 ? (def.yearPoint * 12) : def.to,
+              annualMargin: def.end,
+              exceptionBps: 0,
+              baseMargin: Number((def.end / 100).toFixed(6)),
+              salaryTransferStatus: activeSalaryTransferStatus,
+              salaryBand: activeSalaryBand
+            });
+          });
+        }
+      }
+    }
+
+    const newExceptionRules: MarginRule[] = [];
+    sectorsList.filter(s => s.id !== 'all').forEach(secObj => {
+      const secId = secObj.id;
+      const parsedBps = parseInt(activeExceptions[secId] || '0', 10);
+      newExceptionRules.push({
+        id: `exception_${targetBank}_${secId}`,
+        bankId: targetBank,
+        sectorId: secId as SectorId,
+        isActive: true,
+        isExceptionOnly: true,
+        exceptionBps: parsedBps
+      } as any);
+    });
+
+    const updatedRules = [...remainingRules, ...newRulesForThisCombo, ...newExceptionRules];
+    setMarginRules(updatedRules);
+    return updatedRules;
+  };
+
+  // 2. Debounced useEffect for real-time synchronization of edits to AppContext
+  useEffect(() => {
+    if (!isLoaded) return;
+
+    const currentTableKey = [
+      selectedBank,
+      selectedProduct,
+      selectedSupport,
+      selectedSector,
+      selectedSalaryBand,
+      selectedSalaryTransferStatus,
+      selectedYearsMode,
+      selectedCalcMethod
+    ].join(':');
+
+    // Skip sync if loading is still in progress for a different combination
+    if (currentTableKey !== lastLoadedTableKeyRef.current) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      syncCurrentMarginEditorToGlobalRules();
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [
+    localMargins,
+    localTiers,
+    localSectorExceptions,
+    selectedYearsMode,
+    selectedCalcMethod,
+    selectedSalaryTransferStatus,
+    selectedSalaryBand,
+    selectedSupport,
+    selectedSector,
+    selectedProduct,
+    selectedBank,
+    isLoaded
   ]);
 
   // Database updater to match exact core rules compatibility
@@ -378,224 +699,13 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     method: 'linear' | 'fixed' = 'fixed',
     inputMode: 'yearly' | 'key_points' | 'duration_tiers' | '' = 'key_points'
   ) => {
-    if (inputMode === '') {
-      return marginRules;
-    }
-    const normSupportVal = normSupport(targetSupport);
-
-    const remainingRules = marginRules.filter(r => {
-      const rST = r.salaryTransferStatus || 'all';
-      const rSB = r.salaryBand || (r.salaryTier === 'below_25000' ? 'below_25000' : r.salaryTier === 'above_or_equal_25000' ? 'from_25000' : 'all');
-      const rMode = r.marginInputMode || r.calculationMode || getRuleInputMode(r);
-
-      const isBaseComboMatch = r.bankId === targetBank &&
-                               r.productId === targetProduct &&
-                               normSupport(r.supportType) === normSupportVal &&
-                               normSector(r.sectorId) === normSector(targetSector) &&
-                               rST === selectedSalaryTransferStatus &&
-                               rSB === targetSalaryBand &&
-                               rMode === inputMode &&
-                               !r.isExceptionOnly;
-
-      if (isBaseComboMatch) {
-        return false;
-      }
-
-      const isExceptionForCombo = r.bankId === targetBank &&
-                                  r.isExceptionOnly === true;
-
-      return !isExceptionForCombo;
+    return syncCurrentMarginEditorToGlobalRules({
+      margins: marginsRecord,
+      exceptions: sectorExceptionsRecord,
+      calcMethod: method,
+      yearsMode: inputMode,
+      salaryBand: targetSalaryBand
     });
-
-    const newRulesForThisCombo: MarginRule[] = [];
-
-    // Check if table actually contains data rules
-    let hasActualData = false;
-    if (inputMode === 'duration_tiers') {
-      hasActualData = localTiers.some(t => t.active !== false && t.marginRate !== '' && Number(t.marginRate) > 0);
-    } else {
-      const yearsToExtract = inputMode === 'yearly'
-        ? Array.from({ length: 26 }, (_, i) => 5 + i)
-        : [5, 10, 15, 20, 25, 30];
-      const filledYears = yearsToExtract.filter(year => {
-        const val = marginsRecord[year];
-        return val !== undefined && val !== '' && !isNaN(parseFloat(val)) && parseFloat(val) > 0;
-      });
-      hasActualData = filledYears.length > 0;
-    }
-
-    if (!hasActualData) {
-      const durationDistributionType = inputMode === 'duration_tiers' ? 'month_ranges' : 'years';
-      newRulesForThisCombo.push({
-        id: `config_margin_${targetBank}_${targetProduct}_${normSupportVal}_${targetSector}_${targetSalaryBand}_${selectedSalaryTransferStatus}_${durationDistributionType}_${method}`,
-        bankId: targetBank,
-        productId: targetProduct,
-        supportType: normSupportVal as any,
-        sectorId: targetSector as any,
-        fromTermMonths: 0,
-        toTermMonths: 0,
-        startMargin: 0,
-        endMargin: 0,
-        calcType: method,
-        isActive: false,
-        isConfigOnly: true,
-        marginInputMode: inputMode as any,
-        calculationMode: inputMode as any,
-        calculationMethod: method,
-        salaryTransferStatus: selectedSalaryTransferStatus,
-        salaryBand: targetSalaryBand,
-        productType: targetProduct as any,
-        salaryTier: (targetSalaryBand === 'below_25000' ? 'below_25000' : targetSalaryBand === 'from_25000' ? 'above_or_equal_25000' : 'not_applicable') as any,
-        annualMargin: 0,
-        baseMargin: 0,
-        exceptionBps: 0
-      });
-    } else {
-      if (inputMode === 'duration_tiers') {
-        localTiers.forEach((tier, index) => {
-          const numFrom = Number(tier.fromMonth) || 0;
-          const numTo = Number(tier.toMonth) || 0;
-          const numRate = Number(tier.marginRate) || 0;
-          
-          newRulesForThisCombo.push({
-            id: tier.id || `tier_margin_${targetBank}_${targetProduct}_${normSupportVal}_${targetSector}_${targetSalaryBand}_t${numFrom}_${numTo}_${index}_${selectedSalaryTransferStatus}_${inputMode}`,
-            bankId: targetBank,
-            productId: targetProduct,
-            supportType: normSupportVal as any,
-            sectorId: targetSector as any,
-            fromTermMonths: numFrom,
-            toTermMonths: numTo,
-            startMargin: numRate,
-            endMargin: numRate,
-            calcType: 'fixed',
-            isActive: tier.active !== false,
-            salaryTier: (targetSalaryBand === 'below_25000' ? 'below_25000' : targetSalaryBand === 'from_25000' ? 'above_or_equal_25000' : 'not_applicable') as any,
-            productType: targetProduct as any,
-            marginInputMode: 'duration_tiers',
-            calculationMode: 'duration_tiers',
-            calculationMethod: 'fixed',
-            termMonths: numTo,
-            annualMargin: numRate,
-            exceptionBps: 0,
-            baseMargin: Number((numRate / 100).toFixed(6)),
-            fromMonth: numFrom,
-            toMonth: numTo,
-            marginRate: numRate,
-            active: tier.active !== false,
-            notes: tier.notes || '',
-            salaryTransferStatus: selectedSalaryTransferStatus,
-            salaryBand: targetSalaryBand
-          });
-        });
-      } else {
-        const yearsToExtract = inputMode === 'yearly'
-          ? Array.from({ length: 26 }, (_, i) => 5 + i)
-          : [5, 10, 15, 20, 25, 30];
-
-        const filledYears = yearsToExtract.filter(year => {
-          const val = marginsRecord[year];
-          return val !== undefined && val !== '' && !isNaN(parseFloat(val)) && parseFloat(val) > 0;
-        });
-
-        filledYears.sort((a, b) => a - b);
-
-        if (filledYears.length > 0) {
-          const definitions: Array<{ from: number, to: number, start: number, end: number, calcType: 'fixed' | 'linear', yearPoint: number }> = [];
-
-          for (let i = 0; i < filledYears.length; i++) {
-            const currentYear = filledYears[i];
-            const currentMarginStr = marginsRecord[currentYear];
-            const currentMarginVal = parseFloat(currentMarginStr) || 0;
-
-            if (i === 0) {
-              definitions.push({
-                from: 0,
-                to: currentYear * 12,
-                start: currentMarginVal,
-                end: currentMarginVal,
-                calcType: 'fixed' as const,
-                yearPoint: currentYear
-              });
-            } else {
-              const prevYear = filledYears[i - 1];
-              const prevMarginStr = marginsRecord[prevYear];
-              const prevMarginVal = parseFloat(prevMarginStr) || 0;
-
-              const fromMonths = prevYear * 12 + 1;
-              const toMonths = currentYear * 12;
-
-              definitions.push({
-                from: fromMonths,
-                to: toMonths,
-                start: method === 'fixed' ? currentMarginVal : prevMarginVal,
-                end: currentMarginVal,
-                calcType: method,
-                yearPoint: currentYear
-              });
-            }
-          }
-
-          const lastYear = filledYears[filledYears.length - 1];
-          const lastMarginStr = marginsRecord[lastYear];
-          const lastMarginVal = parseFloat(lastMarginStr) || 0;
-
-          definitions.push({
-            from: lastYear * 12 + 1,
-            to: 9999,
-            start: lastMarginVal,
-            end: lastMarginVal,
-            calcType: 'fixed' as const,
-            yearPoint: lastYear
-          });
-
-          definitions.forEach((def, index) => {
-            newRulesForThisCombo.push({
-              id: `gen_margin_${targetBank}_${targetProduct}_${normSupportVal}_${targetSector}_${targetSalaryBand}_t${def.from}_${def.to}_${index}_${selectedSalaryTransferStatus}_${inputMode}`,
-              bankId: targetBank,
-              productId: targetProduct,
-              supportType: normSupportVal as any,
-              sectorId: targetSector as any,
-              fromTermMonths: def.from,
-              toTermMonths: def.to,
-              startMargin: def.start,
-              endMargin: def.end,
-              calcType: def.calcType,
-              isActive: true,
-              salaryTier: (targetSalaryBand === 'below_25000' ? 'below_25000' : targetSalaryBand === 'from_25000' ? 'above_or_equal_25000' : 'not_applicable') as any,
-              productType: targetProduct as any,
-              marginInputMode: inputMode as any,
-              calculationMode: inputMode as any,
-              calculationMethod: method,
-              year: def.yearPoint,
-              termMonths: def.to === 9999 ? (def.yearPoint * 12) : def.to,
-              annualMargin: def.end,
-              exceptionBps: 0,
-              baseMargin: Number((def.end / 100).toFixed(6)),
-              salaryTransferStatus: selectedSalaryTransferStatus,
-              salaryBand: targetSalaryBand
-            });
-          });
-        }
-      }
-    }
-
-    const newExceptionRules: MarginRule[] = [];
-    sectorsList.filter(s => s.id !== 'all').forEach(secObj => {
-      const secId = secObj.id;
-      const parsedBps = parseInt(sectorExceptionsRecord[secId] || '0', 10);
-      newExceptionRules.push({
-        id: `exception_${targetBank}_${secId}`,
-        bankId: targetBank,
-        sectorId: secId as SectorId,
-        isActive: true,
-        isExceptionOnly: true,
-        exceptionBps: parsedBps
-      } as any);
-    });
-
-    const updatedRules = [...remainingRules, ...newRulesForThisCombo, ...newExceptionRules];
-    setMarginRules(updatedRules);
-    return updatedRules;
   };
 
   // Main save action for basic margins + exceptions

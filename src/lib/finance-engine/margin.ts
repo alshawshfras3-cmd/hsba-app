@@ -173,6 +173,202 @@ export function resolveConfiguredMarginMode(params: {
   netSalary?: number;
   salaryBankId?: string | null;
 }): 'duration_tiers' | 'yearly' | 'key_points' {
+  // Normalize Product ID
+  let normProduct = params.productId;
+  if (normProduct === 'real_estate' || normProduct === 'real_estate_only') {
+    normProduct = 'real_estate_only';
+  } else if (normProduct === 'both' || normProduct === 'real_estate_with_new_personal') {
+    normProduct = 'real_estate_with_new_personal';
+  } else if (normProduct === 'real_estate_with_personal_existing' || normProduct === 'real_estate_with_existing_personal') {
+    normProduct = 'real_estate_with_existing_personal';
+  }
+
+  // Normalize Support Type
+  const normSup = (s?: string) => {
+    if (!s || s === 'none') return 'none';
+    if (s === 'down_payment' || s === 'downpayment') return 'downpayment';
+    return s;
+  };
+  const targetSupportNorm = normSup(params.supportType);
+
+  // Determine Salary Band
+  let salaryBand: 'below_25000' | 'from_25000' | 'all' = 'all';
+  if (params.netSalary !== undefined) {
+    salaryBand = params.netSalary < 25000 ? 'below_25000' : 'from_25000';
+  }
+
+  // Determine Salary Transfer Status
+  const salaryTransferStatus = resolveSalaryTransferStatus(params.bankId, params.salaryBankId);
+
+  // Extractors to match rules consistently
+  const getRuleSalaryTransferStatus = (r: MarginRule): 'all' | 'salary_transfer' | 'no_salary_transfer' => {
+    return r.salaryTransferStatus || 'all';
+  };
+
+  const getRuleSalaryBand = (r: MarginRule): 'all' | 'below_25000' | 'from_25000' => {
+    if (r.salaryBand) return r.salaryBand;
+    if (r.salaryTier === 'below_25000') return 'below_25000';
+    if (r.salaryTier === 'above_or_equal_25000') return 'from_25000';
+    return 'all';
+  };
+
+  const getRuleSupportType = (r: MarginRule): 'all' | 'none' | 'monthly' | 'downpayment' => {
+    const s = r.supportType;
+    if (!s || s === 'all') return 'all';
+    if (s === 'none') return 'none';
+    if (s === 'monthly') return 'monthly';
+    if (s === 'downpayment' || s === 'down_payment') return 'downpayment';
+    return 'all';
+  };
+
+  const getRuleSectorId = (r: MarginRule): string => {
+    return r.sectorId || 'all';
+  };
+  const targetSectorNorm = params.sectorId || 'all';
+
+  // Config-only rules define the active margin table mode; they are not used as numeric margin rules.
+  const configRules = params.marginRules.filter(r => r.isConfigOnly === true);
+
+  const findConfigRule = (): MarginRule | undefined => {
+    // 1. Exact match including sectorId
+    let found = configRules.find(
+      r => r.bankId === params.bankId &&
+           r.productId === normProduct &&
+           getRuleSalaryTransferStatus(r) === salaryTransferStatus &&
+           getRuleSalaryBand(r) === salaryBand &&
+           (getRuleSupportType(r) === 'all' || getRuleSupportType(r) === targetSupportNorm) &&
+           getRuleSectorId(r) === targetSectorNorm
+    );
+    if (found) return found;
+
+    // 2. Exact match with sectorId = 'all' fallback
+    found = configRules.find(
+      r => r.bankId === params.bankId &&
+           r.productId === normProduct &&
+           getRuleSalaryTransferStatus(r) === salaryTransferStatus &&
+           getRuleSalaryBand(r) === salaryBand &&
+           (getRuleSupportType(r) === 'all' || getRuleSupportType(r) === targetSupportNorm) &&
+           getRuleSectorId(r) === 'all'
+    );
+    if (found) return found;
+
+    // 3. Status = 'all' with exact band and sector
+    found = configRules.find(
+      r => r.bankId === params.bankId &&
+           r.productId === normProduct &&
+           getRuleSalaryTransferStatus(r) === 'all' &&
+           getRuleSalaryBand(r) === salaryBand &&
+           (getRuleSupportType(r) === 'all' || getRuleSupportType(r) === targetSupportNorm) &&
+           getRuleSectorId(r) === targetSectorNorm
+    );
+    if (found) return found;
+
+    // 4. Status = 'all' with exact band and sector fallback to 'all'
+    found = configRules.find(
+      r => r.bankId === params.bankId &&
+           r.productId === normProduct &&
+           getRuleSalaryTransferStatus(r) === 'all' &&
+           getRuleSalaryBand(r) === salaryBand &&
+           (getRuleSupportType(r) === 'all' || getRuleSupportType(r) === targetSupportNorm) &&
+           getRuleSectorId(r) === 'all'
+    );
+    if (found) return found;
+
+    // 5. Band = 'all' with exact status and sector
+    found = configRules.find(
+      r => r.bankId === params.bankId &&
+           r.productId === normProduct &&
+           getRuleSalaryTransferStatus(r) === salaryTransferStatus &&
+           getRuleSalaryBand(r) === 'all' &&
+           (getRuleSupportType(r) === 'all' || getRuleSupportType(r) === targetSupportNorm) &&
+           getRuleSectorId(r) === targetSectorNorm
+    );
+    if (found) return found;
+
+    // 6. Band = 'all' with exact status and sector fallback to 'all'
+    found = configRules.find(
+      r => r.bankId === params.bankId &&
+           r.productId === normProduct &&
+           getRuleSalaryTransferStatus(r) === salaryTransferStatus &&
+           getRuleSalaryBand(r) === 'all' &&
+           (getRuleSupportType(r) === 'all' || getRuleSupportType(r) === targetSupportNorm) &&
+           getRuleSectorId(r) === 'all'
+    );
+    if (found) return found;
+
+    // 7. Both status and band = 'all' with exact sector
+    found = configRules.find(
+      r => r.bankId === params.bankId &&
+           r.productId === normProduct &&
+           getRuleSalaryTransferStatus(r) === 'all' &&
+           getRuleSalaryBand(r) === 'all' &&
+           (getRuleSupportType(r) === 'all' || getRuleSupportType(r) === targetSupportNorm) &&
+           getRuleSectorId(r) === targetSectorNorm
+    );
+    if (found) return found;
+
+    // 8. Both status and band = 'all' with sector fallback to 'all'
+    found = configRules.find(
+      r => r.bankId === params.bankId &&
+           r.productId === normProduct &&
+           getRuleSalaryTransferStatus(r) === 'all' &&
+           getRuleSalaryBand(r) === 'all' &&
+           (getRuleSupportType(r) === 'all' || getRuleSupportType(r) === targetSupportNorm) &&
+           getRuleSectorId(r) === 'all'
+    );
+    if (found) return found;
+
+    // 9. supportType = 'all' fallback with exact status, band, and sector
+    found = configRules.find(
+      r => r.bankId === params.bankId &&
+           r.productId === normProduct &&
+           getRuleSalaryTransferStatus(r) === salaryTransferStatus &&
+           (getRuleSalaryBand(r) === salaryBand || getRuleSalaryBand(r) === 'all') &&
+           getRuleSupportType(r) === 'all' &&
+           getRuleSectorId(r) === targetSectorNorm
+    );
+    if (found) return found;
+
+    // 10. supportType = 'all' fallback with exact status, band, and sector fallback to 'all'
+    found = configRules.find(
+      r => r.bankId === params.bankId &&
+           r.productId === normProduct &&
+           getRuleSalaryTransferStatus(r) === salaryTransferStatus &&
+           (getRuleSalaryBand(r) === salaryBand || getRuleSalaryBand(r) === 'all') &&
+           getRuleSupportType(r) === 'all' &&
+           getRuleSectorId(r) === 'all'
+    );
+    if (found) return found;
+
+    // 11. supportType = 'all' fallback with status = 'all', band = 'all', and sector fallback to 'all'
+    found = configRules.find(
+      r => r.bankId === params.bankId &&
+           r.productId === normProduct &&
+           getRuleSalaryTransferStatus(r) === 'all' &&
+           getRuleSalaryBand(r) === 'all' &&
+           getRuleSupportType(r) === 'all' &&
+           getRuleSectorId(r) === 'all'
+    );
+    if (found) return found;
+
+    // 12. Global fallback rule matching bankId === 'all'
+    found = configRules.find(
+      r => r.bankId === 'all' &&
+           r.productId === normProduct
+    );
+    return found;
+  };
+
+  const configRule = findConfigRule();
+  if (configRule) {
+    const mode = configRule.marginInputMode || configRule.calculationMode;
+    if (mode === 'duration_tiers' || mode === 'yearly' || mode === 'key_points') {
+      // Config-only rules define the active margin table mode; they are not used as numeric margin rules.
+      return mode;
+    }
+  }
+
+  // Fallback to original matching logic
   const matchingRules = resolveMatchingRules(params);
 
   const withInputMode = matchingRules.find(r => r.marginInputMode);
@@ -222,13 +418,18 @@ export function calculateMargin(params: {
   let selectedMarginYear = Math.round(termMonths / 12);
   selectedMarginYear = Math.min(Math.max(selectedMarginYear, 5), 30);
 
-  // Retrieve sequenced matching rules
+  // Retrieve sequenced matching rules filtered strictly by the configured calculationMode
+  const filteredMarginRules = marginRules.filter(r => {
+    if (r.isConfigOnly || r.isExceptionOnly) return true;
+    return getRuleInputMode(r) === calculationMode;
+  });
+
   const rules = resolveMatchingRules({
     bankId,
     productId,
     supportType,
     sectorId,
-    marginRules,
+    marginRules: filteredMarginRules,
     netSalary,
     salaryBankId
   });
