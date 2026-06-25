@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Copy, Loader2 } from 'lucide-react';
 import { Bank, ProductId, SupportType, SectorId, MarginRule, Sector } from '../../../types';
 import { calculateMargin } from '../../../lib/finance-engine/margin';
-import { useAppState } from '../../../context/AppContext';
+import { useAppState, normalizeBeforeCompare } from '../../../context/AppContext';
 
 function toEnglishDigits(str: string): string {
   return str
@@ -101,7 +101,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
   const lastBaseSelectionKeyRef = useRef<string>('');
   const lastLoadedTableKeyRef = useRef<string>('');
 
-  const { hasUnsavedChanges } = useAppState();
+  const { hasUnsavedChanges, savedSettings } = useAppState();
 
   // Automatically reset initial baseline states when a global save completes or cancel is pressed
   useEffect(() => {
@@ -117,6 +117,16 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
   }, [hasUnsavedChanges]);
 
   const isDirty = useMemo(() => {
+    // 1. Check if global margin rules differ from database saved margin rules
+    if (savedSettings && savedSettings.marginRules) {
+      const currentNorm = normalizeBeforeCompare(marginRules || []);
+      const savedNorm = normalizeBeforeCompare(savedSettings.marginRules || []);
+      if (JSON.stringify(currentNorm) !== JSON.stringify(savedNorm)) {
+        return true;
+      }
+    }
+
+    // 2. Fallback to local in-progress edits
     return (
       JSON.stringify(localMargins) !== JSON.stringify(initialMargins) ||
       JSON.stringify(localTiers) !== JSON.stringify(initialTiers) ||
@@ -127,6 +137,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       transferMode !== initialTransferMode
     );
   }, [
+    marginRules, savedSettings,
     localMargins, initialMargins,
     localTiers, initialTiers,
     localSectorExceptions, initialExceptions,
@@ -1712,7 +1723,6 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                         type="button"
                         onClick={() => {
                           setSelectedSalaryTransferStatus(status.id as any);
-                          triggerUserChangeSync({ salaryTransferStatus: status.id });
                         }}
                         className={`px-1 py-1.5 rounded-lg border text-[10px] font-bold text-center transition-all cursor-pointer whitespace-nowrap ${
                           isSelected

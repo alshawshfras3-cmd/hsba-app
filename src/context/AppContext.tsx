@@ -133,6 +133,7 @@ interface AppContextType {
   authLoading: boolean;
   isSettingsLoading: boolean;
   signOut: () => Promise<void>;
+  savedSettings: AdminSettings;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -335,7 +336,7 @@ function normalizeSettingsForDirtyCompare(rawSettings: any): AdminSettings {
   return removeUndefinedDeep(settings);
 }
 
-function normalizeBeforeCompare(val: any): any {
+export function normalizeBeforeCompare(val: any): any {
   if (val === null || val === undefined) return null;
   if (Array.isArray(val)) {
     const normalizedArr = val.map(normalizeBeforeCompare);
@@ -1545,7 +1546,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         userRole,
         authLoading,
         isSettingsLoading,
-        signOut
+        signOut,
+        savedSettings
       }}
     >
       <div dir="rtl" className="min-h-screen bg-[#F5F7FA] font-sans antialiased text-[#111827]">
