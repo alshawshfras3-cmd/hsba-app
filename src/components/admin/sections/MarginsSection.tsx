@@ -417,12 +417,12 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       setInitialMargins(initialMargins);
       setInitialTiers(initialTiers);
       setInitialExceptions(initialExceptions);
-      setInitialCalcMethod(activeCalcMethod);
-      setInitialYearsMode(activeYearsMode);
 
-      // Only update sector and transferMode baselines when starting fresh navigation loads.
+      // Only update sector, calcMethod, yearsMode, and transferMode baselines when starting fresh navigation loads.
       // This ensures manual changes inside the context correctly flag the component as dirty!
       if (navOptionsChanged || !isLoaded) {
+        setInitialCalcMethod(activeCalcMethod);
+        setInitialYearsMode(activeYearsMode);
         setInitialSector(selectedSector);
         setInitialTransferMode(determinedTransferMode);
       }
@@ -717,11 +717,6 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       selectedYearsMode,
       selectedCalcMethod
     ].join(':');
-
-    // Skip sync if loading is still in progress for a different combination
-    if (currentTableKey !== lastLoadedTableKeyRef.current) {
-      return;
-    }
 
     const timer = setTimeout(() => {
       syncCurrentMarginEditorToGlobalRules();
