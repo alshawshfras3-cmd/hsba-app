@@ -100,7 +100,7 @@ export default function BankSectorRulesTab({
             type="button"
             onClick={() => {
               saveBankSectorRulesToStorage(bankSectorRules);
-              showToast("تم حفظ جميع قواعد البنوك والقطاعات بنجاح! 🎉", "success");
+              showToast("تم تطبيق التعديل في المسودة — اضغط حفظ التغييرات لتثبيته.", "success");
             }}
             className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-xs font-extrabold transition-all shadow-md active:scale-95 flex items-center gap-1.5 cursor-pointer font-sans"
           >
@@ -694,7 +694,7 @@ export default function BankSectorRulesTab({
 
                   setBankSectorRules([...filteredRules, ...clonedRules]);
                   setIsCopyBankModalOpen(false);
-                  showToast("تم استيراد كافة إعدادات البنك بنجاح! اضغط على حفظ تغييرات الربط للمزامنة.", "success");
+                  showToast("تم نسخ الإعدادات إلى المسودة — لم يتم الحفظ النهائي بعد.", "success");
                 }}
                 className="bg-[#0057B8] hover:bg-blue-755 text-white px-5 py-2.5 rounded-xl transition-all cursor-pointer shadow-sm"
               >

@@ -375,19 +375,7 @@ export function normalizeBeforeCompare(val: any): any {
       // For MarginRules, ignore purely UI metadata/transient keys and generated/arbitrary IDs
       if (isMarginRule && [
         'id',
-        'productType',
-        'marginInputMode',
-        'calculationMethod',
-        'year',
-        'termMonths',
-        'annualMargin',
-        'fromMonth',
-        'toMonth',
-        'marginRate',
-        'notes',
-        'active',
-        'isActive',
-        'yearPoint'
+        'notes'
       ].includes(key)) {
         continue;
       }
@@ -1001,11 +989,19 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     return () => { active = false; };
   }, []);
 
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
+  const baselineSettingsRef = useRef<string | null>(null);
+
   // Sync settings when loaded from the useSettings hook
   useEffect(() => {
     const meritsSync = !supabaseValuesSynced || (supabaseLoadStatus === 'success' && syncedForStatusRef.current !== 'success');
 
     if (settingsInitialized && supabaseFetched && tiersLoaded && meritsSync) {
+      if (hasUnsavedChanges) {
+        console.log('[SYNC] Prevented late database load from overwriting unsaved changes.');
+        return;
+      }
+
       const merged: AdminSettings = {
         banks: (settings.banks !== undefined && settings.banks !== null) ? settings.banks : initialData.banks,
         products: (settings.product_acceptance !== undefined && settings.product_acceptance !== null) ? settings.product_acceptance : initialData.products,
@@ -1061,12 +1057,17 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       const computedHash = calculateMarginsHash(merged.marginRules || []);
       setLoadedMarginsHash(computedHash);
 
+      const normalizedStr = JSON.stringify(
+        normalizeBeforeCompare(normalizeSettingsForDirtyCompare(merged))
+      );
+      baselineSettingsRef.current = normalizedStr;
+
       applySettingsState(merged);
       setHasSynced(true);
       setSupabaseValuesSynced(true);
       syncedForStatusRef.current = supabaseLoadStatus || '';
     }
-  }, [settingsInitialized, supabaseFetched, tiersLoaded, settings, supabaseValuesSynced, housingSupportTiers, advancePaymentTiers, supabaseLoadStatus]);
+  }, [settingsInitialized, supabaseFetched, tiersLoaded, settings, supabaseValuesSynced, housingSupportTiers, advancePaymentTiers, supabaseLoadStatus, hasUnsavedChanges]);
 
   useEffect(() => {
     if (!isSettingsLoading) {
@@ -1129,32 +1130,21 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     sectorMappings,
   ]);
 
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
-  const baselineSettingsRef = useRef<string | null>(null);
-
   useEffect(() => {
-    if (isSettingsLoading) {
+    if (!baselineSettingsRef.current) {
       setHasUnsavedChanges(false);
-      baselineSettingsRef.current = null;
       return;
     }
     const currentStr = JSON.stringify(
       normalizeBeforeCompare(normalizeSettingsForDirtyCompare(currentSettings))
     );
-    const savedStr = JSON.stringify(
-      normalizeBeforeCompare(normalizeSettingsForDirtyCompare(savedSettings))
-    );
-
-    if (!baselineSettingsRef.current || baselineSettingsRef.current !== savedStr) {
-      baselineSettingsRef.current = savedStr;
-    }
 
     if (currentStr !== baselineSettingsRef.current) {
       setHasUnsavedChanges(true);
     } else {
       setHasUnsavedChanges(false);
     }
-  }, [currentSettings, savedSettings, isSettingsLoading]);
+  }, [currentSettings]);
 
   const saveChanges = async (
     overrideMarginRules?: MarginRule[],
@@ -1218,10 +1208,18 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           throw new Error('🚫 تم منع الحفظ: فشل تأكيد الاتصال الآمن بـ Supabase');
         }
 
-        const currentMarginCount = Array.isArray(overrideMarginRules || marginRules) ? (overrideMarginRules || marginRules).length : 0;
+        const finalMarginRules = overrideMarginRules || marginRules;
+        const currentMarginCount = Array.isArray(finalMarginRules) ? finalMarginRules.length : 0;
 
-        // DB safeguards validation - only when editing the margins page
-        if (adminSubPage === 'margins') {
+        const dbMarginRules = latestSettings.marginRules ?? latestSettings.margin_rules ?? [];
+        dbMarginCount = Array.isArray(dbMarginRules) ? dbMarginRules.length : 0;
+
+        const dbMarginHash = calculateMarginsHash(dbMarginRules);
+        const currentMarginHash = calculateMarginsHash(finalMarginRules || []);
+        const marginsChanged = dbMarginHash !== currentMarginHash;
+
+        // DB safeguards validation - only run if margins are actually changed
+        if (marginsChanged) {
           if (dbMarginCount > 10 && currentMarginCount < dbMarginCount * 0.7) {
             throw new Error(`حماية سلامة البيانات: تم منع الحفظ بسبب تفاوت كبير في عدد الهوامش! يحتوي السيرفر على (${dbMarginCount}) هامش بينما تحتوي النسخة الحالية على (${currentMarginCount}) هوامش فقط (أقل من 70%). لمنع تصفير القواعد بالخطأ، يرجى إعادة تحميل الصفحة واستعادتها.`);
           }
@@ -1230,154 +1228,139 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           }
 
           // Stage 5: Hash protection check for concurrent modifications
-          const dbMarginRules = latestSettings.marginRules ?? latestSettings.margin_rules ?? [];
-          const currentDbHash = calculateMarginsHash(dbMarginRules);
-          
-          if (loadedMarginsHash && currentDbHash !== loadedMarginsHash) {
+          if (loadedMarginsHash && dbMarginHash !== loadedMarginsHash) {
             throw new Error('عذراً، تم تعديل قيم الهوامش من جلسة إدارة أخرى أو جهاز آخر متصل بقاعدة البيانات. لتجنب تضارب وحذف التعديلات، يرجى إعادة تحميل الصفحة قبل حفظ تعديلاتك.');
           }
         }
 
-        // Stage 4: Construct payload base strictly from Latest Settings in DB, modifying only active sub-page keys
+        // Stage 4: Construct payload base strictly from Latest Settings in DB, modifying all active states (full snapshot integration)
         const initialData = getInitialSettings();
         const mergedSettingsObject = latestSettings && typeof latestSettings === 'object' && Object.keys(latestSettings).length > 0
           ? deepClone(latestSettings)
-          : {
-              banks: deepClone(initialData.banks),
-              products: deepClone(initialData.products),
-              militaryRanks: deepClone(initialData.militaryRanks),
-              salaryRules: deepClone(initialData.salaryRules),
-              pensionRules: deepClone(initialData.pensionRules),
-              termRules: deepClone(initialData.termRules),
-              marginRules: [],
-              dsrRules: deepClone(initialData.dsrRules),
-              supportSettings: deepClone(initialData.supportSettings),
-              subscriptionSettings: deepClone(initialData.subscriptionSettings),
-              housingSupportTiers: deepClone(initialData.housingSupportTiers),
-              advancePaymentTiers: deepClone(initialData.advancePaymentTiers),
-              personalRules: deepClone(initialData.personalRules),
-              advancedRules: deepClone(initialData.advancedRules),
-              customSectors: deepClone(initialData.customSectors),
-              bankSectorRules: [],
-              pensionRulesLibrary: deepClone(initialData.pensionRulesLibrary),
-              approvedSalaryRules: [],
-              pensionDbRules: [],
-              sectorMappings: [],
-            };
+          : {};
 
-        // Inject only active subpage sections
-        switch (adminSubPage) {
-          case 'banks':
-            mergedSettingsObject.banks = sanitizeBanksForPersistence(deepClone(banks));
-            break;
-          case 'products':
-            mergedSettingsObject.products = deepClone(products);
-            break;
-          case 'margins': {
-            const savedRules = upgradeMarginRules(deepClone(overrideMarginRules || marginRules));
-            mergedSettingsObject.marginRules = savedRules;
-            if ('margin_rules' in mergedSettingsObject || (latestSettings && 'margin_rules' in latestSettings)) {
-              mergedSettingsObject.margin_rules = savedRules;
-            }
-            break;
-          }
-          case 'dsr':
-            mergedSettingsObject.dsrRules = deepClone(dsrRules);
-            if ('dsr_rules' in mergedSettingsObject) {
-              mergedSettingsObject.dsr_rules = deepClone(dsrRules);
-            }
-            break;
-          case 'terms':
-            mergedSettingsObject.termRules = deepClone(termRules);
-            if ('term_rules' in mergedSettingsObject) {
-              mergedSettingsObject.term_rules = deepClone(termRules);
-            }
-            break;
-          case 'support':
-            mergedSettingsObject.supportSettings = deepClone(supportSettings);
-            if ('support_settings' in mergedSettingsObject) {
-              mergedSettingsObject.support_settings = deepClone(supportSettings);
-            }
-            break;
-          case 'personal':
-            mergedSettingsObject.personalRules = deepClone(personalRules);
-            if ('personal_finance_rules' in mergedSettingsObject) {
-              mergedSettingsObject.personal_finance_rules = deepClone(personalRules);
-            }
-            break;
-          case 'advanced':
-            mergedSettingsObject.advancedRules = deepClone(advancedRules);
-            if ('advanced_rules' in mergedSettingsObject) {
-              mergedSettingsObject.advanced_rules = deepClone(advancedRules);
-            }
-            break;
-          case 'subscriptions':
-            mergedSettingsObject.subscriptionSettings = deepClone(subscriptionSettings);
-            mergedSettingsObject.userSubscriptions = deepClone(userSubscriptions);
-            if ('subscription_settings' in mergedSettingsObject) {
-              mergedSettingsObject.subscription_settings = deepClone(subscriptionSettings);
-            }
-            if ('user_subscriptions' in mergedSettingsObject) {
-              mergedSettingsObject.user_subscriptions = deepClone(userSubscriptions);
-            }
-            break;
-          case 'salary':
-            mergedSettingsObject.salaryRules = deepClone(salaryRules);
-            mergedSettingsObject.approvedSalaryRules = deepClone(overrideApprovedSalaryRules || approvedSalaryRules);
-            if ('salary_rules' in mergedSettingsObject) {
-              mergedSettingsObject.salary_rules = deepClone(salaryRules);
-            }
-            if ('approved_salary_rules' in mergedSettingsObject) {
-              mergedSettingsObject.approved_salary_rules = deepClone(overrideApprovedSalaryRules || approvedSalaryRules);
-            }
-            break;
-          case 'pension':
-            mergedSettingsObject.pensionRules = deepClone(pensionRules);
-            mergedSettingsObject.bankSectorRules = deepClone(overrideBankSectorRules || bankSectorRules);
-            mergedSettingsObject.pensionRulesLibrary = deepClone(pensionRulesLibrary);
-            mergedSettingsObject.pensionDbRules = deepClone(overridePensionDbRules || pensionDbRules);
-            mergedSettingsObject.customSectors = deepClone(customSectors);
-            mergedSettingsObject.sectorMappings = deepClone(sectorMappings);
-            if ('pension_rules' in mergedSettingsObject) {
-              mergedSettingsObject.pension_rules = deepClone(pensionRules);
-            }
-            if ('bank_sector_pension_rules' in mergedSettingsObject) {
-              mergedSettingsObject.bank_sector_pension_rules = deepClone(overrideBankSectorRules || bankSectorRules);
-            }
-            if ('pension_rules_library' in mergedSettingsObject) {
-              mergedSettingsObject.pension_rules_library = deepClone(pensionRulesLibrary);
-            }
-            if ('hasba_custom_sectors' in mergedSettingsObject) {
-              mergedSettingsObject.hasba_custom_sectors = deepClone(customSectors);
-            }
-            break;
-          default:
-            mergedSettingsObject.banks = sanitizeBanksForPersistence(deepClone(banks));
-            mergedSettingsObject.products = deepClone(products);
-            mergedSettingsObject.dsrRules = deepClone(dsrRules);
-            mergedSettingsObject.supportSettings = deepClone(supportSettings);
-            mergedSettingsObject.subscriptionSettings = deepClone(subscriptionSettings);
-            mergedSettingsObject.personalRules = deepClone(personalRules);
-            mergedSettingsObject.advancedRules = deepClone(advancedRules);
-            mergedSettingsObject.userSubscriptions = deepClone(userSubscriptions);
-            mergedSettingsObject.salaryRules = deepClone(salaryRules);
-            mergedSettingsObject.approvedSalaryRules = deepClone(overrideApprovedSalaryRules || approvedSalaryRules);
-            mergedSettingsObject.pensionRules = deepClone(pensionRules);
-            mergedSettingsObject.bankSectorRules = deepClone(overrideBankSectorRules || bankSectorRules);
-            mergedSettingsObject.pensionRulesLibrary = deepClone(pensionRulesLibrary);
-            mergedSettingsObject.pensionDbRules = deepClone(overridePensionDbRules || pensionDbRules);
-            mergedSettingsObject.customSectors = deepClone(customSectors);
-            mergedSettingsObject.sectorMappings = deepClone(sectorMappings);
-            break;
+        // Merge all current states / overrides over the base latestSettings
+        mergedSettingsObject.banks = sanitizeBanksForPersistence(deepClone(banks));
+        
+        mergedSettingsObject.products = deepClone(products);
+        if ('product_acceptance' in mergedSettingsObject || (latestSettings && 'product_acceptance' in latestSettings)) {
+          mergedSettingsObject.product_acceptance = deepClone(products);
         }
 
-        // Stage 4 Overwrite Protection: If active page is NOT margins, guarantee marginRules are NOT overwritten
-        if (adminSubPage !== 'margins') {
-          const preservedRules = latestSettings.marginRules ?? latestSettings.margin_rules ?? [];
-          mergedSettingsObject.marginRules = preservedRules;
-          if ('margin_rules' in mergedSettingsObject || (latestSettings && 'margin_rules' in latestSettings)) {
-            mergedSettingsObject.margin_rules = preservedRules;
-          }
+        mergedSettingsObject.militaryRanks = deepClone(militaryRanks);
+        if ('military_ranks' in mergedSettingsObject || (latestSettings && 'military_ranks' in latestSettings)) {
+          mergedSettingsObject.military_ranks = deepClone(militaryRanks);
+        }
+
+        mergedSettingsObject.salaryRules = deepClone(salaryRules);
+        if ('salary_rules' in mergedSettingsObject || (latestSettings && 'salary_rules' in latestSettings)) {
+          mergedSettingsObject.salary_rules = deepClone(salaryRules);
+        }
+
+        mergedSettingsObject.pensionRules = deepClone(pensionRules);
+        if ('pension_rules' in mergedSettingsObject || (latestSettings && 'pension_rules' in latestSettings)) {
+          mergedSettingsObject.pension_rules = deepClone(pensionRules);
+        }
+
+        mergedSettingsObject.termRules = deepClone(termRules);
+        if ('term_rules' in mergedSettingsObject || (latestSettings && 'term_rules' in latestSettings)) {
+          mergedSettingsObject.term_rules = deepClone(termRules);
+        }
+
+        // Margin Rules
+        if (finalMarginRules && finalMarginRules.length > 0) {
+          const upgraded = upgradeMarginRules(deepClone(finalMarginRules));
+          mergedSettingsObject.marginRules = upgraded;
+          mergedSettingsObject.margin_rules = upgraded;
+        } else if (dbMarginRules && dbMarginRules.length > 0) {
+          mergedSettingsObject.marginRules = dbMarginRules;
+          mergedSettingsObject.margin_rules = dbMarginRules;
+        }
+
+        mergedSettingsObject.dsrRules = deepClone(dsrRules);
+        if ('dsr_rules' in mergedSettingsObject || (latestSettings && 'dsr_rules' in latestSettings)) {
+          mergedSettingsObject.dsr_rules = deepClone(dsrRules);
+        }
+
+        mergedSettingsObject.supportSettings = deepClone(supportSettings);
+        if ('support_settings' in mergedSettingsObject || (latestSettings && 'support_settings' in latestSettings)) {
+          mergedSettingsObject.support_settings = deepClone(supportSettings);
+        }
+
+        mergedSettingsObject.subscriptionSettings = deepClone(subscriptionSettings);
+        if ('subscription_settings' in mergedSettingsObject || (latestSettings && 'subscription_settings' in latestSettings)) {
+          mergedSettingsObject.subscription_settings = deepClone(subscriptionSettings);
+        }
+
+        mergedSettingsObject.housingSupportTiers = deepClone(housingSupportTiers);
+        if ('housing_support_tiers' in mergedSettingsObject || (latestSettings && 'housing_support_tiers' in latestSettings)) {
+          mergedSettingsObject.housing_support_tiers = deepClone(housingSupportTiers);
+        }
+
+        mergedSettingsObject.advancePaymentTiers = deepClone(advancePaymentTiers);
+        if ('advance_payment_tiers' in mergedSettingsObject || (latestSettings && 'advance_payment_tiers' in latestSettings)) {
+          mergedSettingsObject.advance_payment_tiers = deepClone(advancePaymentTiers);
+        }
+
+        mergedSettingsObject.personalRules = deepClone(personalRules);
+        if ('personal_rules' in mergedSettingsObject || (latestSettings && 'personal_rules' in latestSettings)) {
+          mergedSettingsObject.personal_rules = deepClone(personalRules);
+        }
+        if ('personal_finance_rules' in mergedSettingsObject || (latestSettings && 'personal_finance_rules' in latestSettings)) {
+          mergedSettingsObject.personal_finance_rules = deepClone(personalRules);
+        }
+
+        mergedSettingsObject.advancedRules = deepClone(advancedRules);
+        if ('advanced_rules' in mergedSettingsObject || (latestSettings && 'advanced_rules' in latestSettings)) {
+          mergedSettingsObject.advanced_rules = deepClone(advancedRules);
+        }
+
+        mergedSettingsObject.userSubscriptions = deepClone(userSubscriptions);
+        if ('user_subscriptions' in mergedSettingsObject || (latestSettings && 'user_subscriptions' in latestSettings)) {
+          mergedSettingsObject.user_subscriptions = deepClone(userSubscriptions);
+        }
+
+        mergedSettingsObject.customSectors = deepClone(customSectors);
+        if ('custom_sectors' in mergedSettingsObject || (latestSettings && 'custom_sectors' in latestSettings)) {
+          mergedSettingsObject.custom_sectors = deepClone(customSectors);
+        }
+        if ('hasba_custom_sectors' in mergedSettingsObject || (latestSettings && 'hasba_custom_sectors' in latestSettings)) {
+          mergedSettingsObject.hasba_custom_sectors = deepClone(customSectors);
+        }
+
+        const activeBankSectorRules = overrideBankSectorRules || bankSectorRules;
+        mergedSettingsObject.bankSectorRules = deepClone(activeBankSectorRules);
+        if ('bank_sector_rules' in mergedSettingsObject || (latestSettings && 'bank_sector_rules' in latestSettings)) {
+          mergedSettingsObject.bank_sector_rules = deepClone(activeBankSectorRules);
+        }
+        if ('bank_sector_pension_rules' in mergedSettingsObject || (latestSettings && 'bank_sector_pension_rules' in latestSettings)) {
+          mergedSettingsObject.bank_sector_pension_rules = deepClone(activeBankSectorRules);
+        }
+
+        mergedSettingsObject.pensionRulesLibrary = deepClone(pensionRulesLibrary);
+        if ('pension_rules_library' in mergedSettingsObject || (latestSettings && 'pension_rules_library' in latestSettings)) {
+          mergedSettingsObject.pension_rules_library = deepClone(pensionRulesLibrary);
+        }
+
+        const activeApprovedSalary = overrideApprovedSalaryRules || approvedSalaryRules;
+        mergedSettingsObject.approvedSalaryRules = deepClone(activeApprovedSalary);
+        if ('approved_salary_rules' in mergedSettingsObject || (latestSettings && 'approved_salary_rules' in latestSettings)) {
+          mergedSettingsObject.approved_salary_rules = deepClone(activeApprovedSalary);
+        }
+        mergedSettingsObject.approvedSalaryDbRules = deepClone(activeApprovedSalary);
+        if ('approved_salary_db_rules' in mergedSettingsObject || (latestSettings && 'approved_salary_db_rules' in latestSettings)) {
+          mergedSettingsObject.approved_salary_db_rules = deepClone(activeApprovedSalary);
+        }
+
+        const activePensionDbRules = overridePensionDbRules || pensionDbRules;
+        mergedSettingsObject.pensionDbRules = deepClone(activePensionDbRules);
+        if ('pension_db_rules' in mergedSettingsObject || (latestSettings && 'pension_db_rules' in latestSettings)) {
+          mergedSettingsObject.pension_db_rules = deepClone(activePensionDbRules);
+        }
+
+        mergedSettingsObject.sectorMappings = deepClone(sectorMappings);
+        if ('sector_mappings' in mergedSettingsObject || (latestSettings && 'sector_mappings' in latestSettings)) {
+          mergedSettingsObject.sector_mappings = deepClone(sectorMappings);
         }
 
         const updated_by_user = user?.email || user?.id || null;
@@ -1412,11 +1395,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         const { error } = await supabase.from('system_settings').upsert(payload);
         if (error) throw error;
         
-        if (adminSubPage === 'margins') {
-          const savedMarginRules = mergedSettingsObject.marginRules ?? mergedSettingsObject.margin_rules ?? [];
-          const savedHash = calculateMarginsHash(savedMarginRules);
-          setLoadedMarginsHash(savedHash);
-        }
+        // Update margins loaded hash to match the saved rules
+        const savedMarginRules = mergedSettingsObject.marginRules ?? mergedSettingsObject.margin_rules ?? [];
+        const savedHash = calculateMarginsHash(savedMarginRules);
+        setLoadedMarginsHash(savedHash);
         
         console.log("All settings successfully synced to centralized app_settings in system_settings database");
         console.log('[SETTINGS] admin saved key successfully: app_settings');
@@ -1428,10 +1410,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         } catch (e) {}
 
         // Construct a clean normalized snapshot from the newly merged and saved settings
-        const savedSnapshot = normalizeSettingsForDirtyCompare({
-          ...currentSettings,
-          ...mergedSettingsObject
-        });
+        const savedSnapshot = normalizeSettingsForDirtyCompare(mergedSettingsObject);
 
         // Instantly update local saved state snapshot and baseline-compare string before fetching, to clear loading spinner and dirty flag immediately
         setSavedSettings(savedSnapshot);

@@ -103,18 +103,29 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
 
   const { hasUnsavedChanges, savedSettings } = useAppState();
 
+  // Keep track of the last known savedSettings JSON string
+  const lastSavedSettingsStrRef = useRef<string>('');
+
   // Automatically reset initial baseline states when a global save completes or cancel is pressed
   useEffect(() => {
-    if (!hasUnsavedChanges) {
-      setInitialMargins(localMargins);
-      setInitialTiers(localTiers);
-      setInitialExceptions(localSectorExceptions);
-      setInitialCalcMethod(selectedCalcMethod);
-      setInitialYearsMode(selectedYearsMode);
-      setInitialSector(selectedSector);
-      setInitialTransferMode(transferMode);
+    const currentSavedStr = JSON.stringify(savedSettings || {});
+    const isFirstLoad = !lastSavedSettingsStrRef.current;
+    
+    if (currentSavedStr !== lastSavedSettingsStrRef.current) {
+      lastSavedSettingsStrRef.current = currentSavedStr;
+      
+      // Only reset the baselines if it's the very first load, OR if we have no unsaved changes globally
+      if (isFirstLoad || !hasUnsavedChanges) {
+        setInitialMargins(localMargins);
+        setInitialTiers(localTiers);
+        setInitialExceptions(localSectorExceptions);
+        setInitialCalcMethod(selectedCalcMethod);
+        setInitialYearsMode(selectedYearsMode);
+        setInitialSector(selectedSector);
+        setInitialTransferMode(transferMode);
+      }
     }
-  }, [hasUnsavedChanges]);
+  }, [savedSettings, hasUnsavedChanges]);
 
   const isDirty = useMemo(() => {
     // 1. Check if global margin rules differ from database saved margin rules
@@ -480,11 +491,23 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     }
 
     // Synchronize sector exceptions
+    const normSupSelected = normSupport(selectedSupport);
     sectorsList.forEach(sec => {
-      const exRule = marginRules.find(r =>
+      const exRule = marginRules.find(r => {
+        const rST = r.salaryTransferStatus || 'all';
+        const rSB = r.salaryBand || (r.salaryTier === 'below_25000' ? 'below_25000' : r.salaryTier === 'above_or_equal_25000' ? 'from_25000' : 'all');
+        return r.bankId === selectedBank &&
+               r.sectorId === sec.id &&
+               r.isExceptionOnly === true &&
+               r.productId === selectedProduct &&
+               normSupport(r.supportType) === normSupSelected &&
+               rST === activeSalaryTransferStatus &&
+               rSB === selectedSalaryBand;
+      }) || marginRules.find(r => 
         r.bankId === selectedBank &&
         r.sectorId === sec.id &&
-        r.isExceptionOnly === true
+        r.isExceptionOnly === true &&
+        (!r.productId || r.productId === selectedProduct)
       );
       initialExceptions[sec.id] = exRule && exRule.exceptionBps !== undefined ? exRule.exceptionBps.toString() : '0';
     });
@@ -592,7 +615,11 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       }
 
       const isExceptionForCombo = r.bankId === targetBank &&
-                                  r.isExceptionOnly === true;
+                                  r.isExceptionOnly === true &&
+                                  r.productId === targetProduct &&
+                                  normSupport(r.supportType) === normSupportVal &&
+                                  rST === activeSalaryTransferStatus &&
+                                  rSB === activeSalaryBand;
 
       return !isExceptionForCombo;
     });
@@ -796,8 +823,12 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       const secId = secObj.id;
       const parsedBps = parseInt(activeExceptions[secId] || '0', 10);
       newExceptionRules.push({
-        id: `exception_${targetBank}_${secId}`,
+        id: `exception_${targetBank}_${targetProduct}_${normSupportVal}_${activeSalaryTransferStatus}_${activeSalaryBand}_${secId}`,
         bankId: targetBank,
+        productId: targetProduct,
+        supportType: normSupportVal as any,
+        salaryTransferStatus: activeSalaryTransferStatus,
+        salaryBand: activeSalaryBand,
         sectorId: secId as SectorId,
         isActive: true,
         isExceptionOnly: true,
@@ -953,7 +984,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
         selectedYearsMode
       );
 
-      showToast('✔️ تم تطبيق القاعدة بنجاح وحفظها مؤقتاً بالذاكرة! يرجى النقر على زر "حفظ الإعدادات" بالأعلى لاعتمادها نهائياً في Supabase.', 'success');
+      showToast('تم تطبيق القاعدة في المسودة — اضغط حفظ التغييرات لتثبيتها.', 'success');
     } catch (e: any) {
       console.error(e);
       showToast(`حدث خطأ أثناء تطبيق البيانات: ${e?.message || e}`, 'refuse');
@@ -990,7 +1021,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
         }));
 
         setMarginRules([...remainingRules, ...cloned]);
-        showToast('تم استنساخ هوامش وقواعد البنك كاملة بنجاح!', 'success');
+        showToast('تم تطبيق الاستنساخ في المسودة — اضغط حفظ التغييرات لتثبيته.', 'success');
         setShowCloneCard(false);
       } catch (e) {
         console.error(e);

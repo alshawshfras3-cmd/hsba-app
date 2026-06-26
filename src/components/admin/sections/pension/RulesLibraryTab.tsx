@@ -507,7 +507,7 @@ export default function RulesLibraryTab({
                   saveLibraryRulesToStorage(updated);
                   setIsLibraryModalOpen(false);
                   setEditingLibraryRule(null);
-                  showToast("تم حفظ قالب قاعدة التقاعد بنجاح بالمكتبة! 🎉", "success");
+                  showToast("تم تطبيق التعديل في المسودة — اضغط حفظ التغييرات لتثبيته.", "success");
                 }}
                 className="bg-[#0057B8] hover:bg-blue-705 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-sm"
               >

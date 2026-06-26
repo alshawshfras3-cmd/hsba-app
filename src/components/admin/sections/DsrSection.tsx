@@ -88,7 +88,7 @@ export default function DsrSection({
   const handleDeleteDsrRule = (id: string) => {
     if (window.confirm('هل أنت متأكد من رغبتك في حذف قاعدة الاستقطاع هذه؟')) {
       setDsrRules(prev => prev.filter(r => r.id !== id));
-      showToast('تم حذف قاعدة الاستقطاع بنجاح!', 'success');
+      showToast('تم تطبيق التعديل في المسودة — اضغط حفظ التغييرات لتثبيته.', 'success');
     }
   };
 
@@ -110,7 +110,7 @@ export default function DsrSection({
       }
     }
     setDsrRules(prev => prev.map(r => r.id === id ? { ...r, active: !r.active } : r));
-    showToast('تم تحديث حالة تفعيل القاعدة بنجاح!', 'success');
+    showToast('تم تطبيق التعديل في المسودة — اضغط حفظ التغييرات لتثبيته.', 'success');
   };
 
   const handleSaveDsrForm = () => {
@@ -153,10 +153,10 @@ export default function DsrSection({
 
     if (editingDsrRule) {
       setDsrRules(prev => prev.map(r => r.id === editingDsrRule.id ? newRule : r));
-      showToast('تم تعديل قاعدة DSR بنجاح!', 'success');
+      showToast('تم تطبيق التعديل في المسودة — اضغط حفظ التغييرات لتثبيته.', 'success');
     } else {
       setDsrRules(prev => [newRule, ...prev]);
-      showToast('تم إضافة قاعدة DSR جديدة بنجاح!', 'success');
+      showToast('تم تطبيق التعديل في المسودة — اضغط حفظ التغييرات لتثبيته.', 'success');
     }
 
     setIsDsrModalOpen(false);

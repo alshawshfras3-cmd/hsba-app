@@ -294,7 +294,7 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
 
     if (editingPfRule) {
       setPersonalRules(prev => prev.map(r => (r.id === editingPfRule.id || (!r.id && r.bankId === editingPfRule.bankId && r.pathType === editingPfRule.pathType && r.customerStatus === editingPfRule.customerStatus)) ? ruleData : r));
-      showToast('تم حفظ قاعدة التمويل الشخصي بنجاح', 'success');
+      showToast('تم تطبيق التعديل في المسودة — اضغط حفظ التغييرات لتثبيته.', 'success');
     } else {
       const exists = personalRules.some(r => r.bankId === formPfBankId && r.pathType === formPfPathType && r.customerStatus === formPfCustomerStatus);
       if (exists) {
@@ -302,7 +302,7 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
         return;
       }
       setPersonalRules(prev => [...prev, ruleData]);
-      showToast('تم حفظ قاعدة التمويل الشخصي بنجاح', 'success');
+      showToast('تم تطبيق التعديل في المسودة — اضغط حفظ التغييرات لتثبيته.', 'success');
     }
 
     setIsPfModalOpen(false);
@@ -312,7 +312,7 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
   const deletePfRule = (ruleId: string) => {
     if (window.confirm('هل أنت متأكد من رغبتك في حذف هذه القاعدة للتمويل الشخصي؟')) {
       setPersonalRules(prev => prev.filter(r => r.id !== ruleId));
-      showToast('تم حذف القاعدة بنجاح!', 'success');
+      showToast('تم تطبيق التعديل في المسودة — اضغط حفظ التغييرات لتثبيته.', 'success');
     }
   };
 

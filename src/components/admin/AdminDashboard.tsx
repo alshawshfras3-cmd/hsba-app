@@ -646,7 +646,7 @@ export default function AdminDashboard() {
       if (copySections.includes('pension')) setPensionDbRules(results.nextPensionDbRules);
 
       setShowCopyModal(false);
-      showToast('تمت عملية النسخ والمزامنة بنجاح!', 'success');
+      showToast('تم نسخ الإعدادات إلى المسودة — لم يتم الحفظ النهائي بعد.', 'success');
     } catch (err: any) {
       console.error(err);
       showToast('فشل عملية النسخ: ' + (err.message || err), 'refuse');
@@ -704,7 +704,7 @@ export default function AdminDashboard() {
       if (version.table_name === 'approved_salary_source_rules') setApprovedSalaryDbRules(results.nextApprovedSalaryDbRules);
       if (version.table_name === 'pension_calculation_rules') setPensionDbRules(results.nextPensionDbRules);
 
-      showToast('تمت استعادة الإصدار السابق وحفظه بنجاح!', 'success');
+      showToast('تمت الاستعادة في المسودة — اضغط حفظ التغييرات لتثبيتها.', 'success');
       setShowHistoryModal(false);
     } catch (err: any) {
       console.error(err);
@@ -733,7 +733,7 @@ export default function AdminDashboard() {
 
       setShowImportModal(false);
       setImportData(null);
-      showToast('تم استيراد إعدادات البنك ومزامنتها بنجاح!', 'success');
+      showToast('تم نسخ الإعدادات إلى المسودة — لم يتم الحفظ النهائي بعد.', 'success');
     } catch (err: any) {
       console.error(err);
       showToast('فشل استيراد التكوينات: ' + (err.message || err), 'refuse');
@@ -1992,7 +1992,7 @@ export default function AdminDashboard() {
                       setApprovedSalaryDbRules(updated);
                       try {
                         await saveChanges(undefined, undefined, undefined, updated);
-                        showToast('تم إضافة قطاع جديد وحفظ التغييرات بنجاح في النظام وسحابة Supabase! 🎉', 'success');
+                        showToast('تم حفظ الإعدادات بنجاح', 'success');
                       } catch (err: any) {
                         showToast('تم إضافة القطاع مؤقتاً بالمتصفح، وفشلت المزامنة: ' + (err.message || err), 'refuse');
                       }
@@ -2091,7 +2091,7 @@ export default function AdminDashboard() {
                         setEditingSalaryRule(null);
                         try {
                           await saveChanges(undefined, undefined, undefined, updated);
-                          showToast('تم حفظ وتعديل قاعدة احتساب الراتب المعتمد بنجاح في النظام وسحابة Supabase! 🎉', 'success');
+                          showToast('تم حفظ الإعدادات بنجاح', 'success');
                         } catch (err: any) {
                           showToast('تم تطبيق التعديل مؤقتاً بالمتصفح، وفشلت المزامنة: ' + (err.message || err), 'refuse');
                         }
@@ -2356,7 +2356,7 @@ export default function AdminDashboard() {
                             setPensionDbRules(updated);
                             try {
                               await saveChanges(undefined, undefined, updated);
-                              showToast('تم تغيير طريقة الحساب للبنك وحفظها بنجاح في النظام وسحابة Supabase! 🎉', 'success');
+                              showToast('تم حفظ الإعدادات بنجاح', 'success');
                             } catch (err: any) {
                               showToast('تم تطبيق التعديلي مؤقتاً بالمتصفح، وفشلت المزامنة: ' + (err.message || err), 'refuse');
                             }
@@ -2518,7 +2518,7 @@ export default function AdminDashboard() {
                         setEditingPensionRule(null);
                         try {
                           await saveChanges(undefined, undefined, updated);
-                          showToast('تم حفظ وتحديث قاعدة المعاش التقاعدي بنجاح في النظام وسحابة Supabase! 🎉', 'success');
+                          showToast('تم حفظ الإعدادات بنجاح', 'success');
                         } catch (err: any) {
                           showToast('تم تطبيق التعديلات مؤقتاً بالمتصفح، وفشلت المزامنة: ' + (err.message || err), 'refuse');
                         }
@@ -2835,7 +2835,7 @@ export default function AdminDashboard() {
                       const missingCount = synchronized.length - bankSectorRules.length;
                       if (missingCount > 0) {
                         setBankSectorRules(synchronized);
-                        showToast(`تم إنشاء عدد ${missingCount} قاعدة ناقصة بنجاح! لا تنس النقر على زر حفظ تغييرات الربط لتأكيدها.`, "success");
+                        showToast(`تم تطبيق التعديل في المسودة — اضغط حفظ التغييرات لتثبيته. (تم إنشاء عدد ${missingCount} قاعدة ناقصة)`, "success");
                       } else {
                         showToast("جميع القواعد للقطاعات والبنوك مكتملة بالفعل!", "refuse");
                       }
@@ -2895,7 +2895,7 @@ export default function AdminDashboard() {
                       const missingCount = synchronized.length - bankSectorRules.length;
                       if (missingCount > 0) {
                         setBankSectorRules(synchronized);
-                        showToast(`تم إنشاء عدد ${missingCount} قاعدة ناقصة بنجاح! لا تنس النقر على زر حفظ التغييرات من الشريط السفلي لتأكيدها.`, "success");
+                        showToast(`تم تطبيق التعديل في المسودة — اضغط حفظ التغييرات لتثبيته. (تم إنشاء عدد ${missingCount} قاعدة ناقصة)`, "success");
                       } else {
                         showToast("جميع القواعد للقطاعات والبنوك مكتملة بالفعل!", "refuse");
                       }
@@ -3050,7 +3050,7 @@ export default function AdminDashboard() {
                                  setBankSectorRules(updated);
                                  try {
                                    await saveChanges(undefined, updated);
-                                   showToast("تم تحديث حالة التفعيل لمحددات احتساب التقاعد وحفظها بنجاح في النظام وسحابة Supabase! 🎉", "success");
+                                   showToast('تم حفظ الإعدادات بنجاح', 'success');
                                  } catch (err: any) {
                                    showToast("تم تطبيق تحديث حالة التفعيل محلياً بالمتصفح، وفشلت المزامنة: " + (err.message || err), "refuse");
                                  }
@@ -4140,7 +4140,7 @@ export default function AdminDashboard() {
 
                           setTermRules([...termRules, newRule]);
                           setIsAddingTermRule(false);
-                          showToast("تم إضافة قاعدة قطاع جديدة بنجاح في المسودة.", "success");
+                          showToast("تم تطبيق التعديل في المسودة — اضغط حفظ التغييرات لتثبيته.", "success");
                         } else if (editingTermRuleIndex !== null) {
                           const updated = [...termRules];
                           updated[editingTermRuleIndex] = {
@@ -4162,7 +4162,7 @@ export default function AdminDashboard() {
                           setTermRules(updated);
                           setEditingTermRule(null);
                           setEditingTermRuleIndex(null);
-                          showToast("تم تطبيق التعديل بنجاح في المسودة.", "success");
+                          showToast("تم تطبيق التعديل في المسودة — اضغط حفظ التغييرات لتثبيته.", "success");
                         }
                       }}
                       className="px-5 py-2 bg-[#0057B8] hover:bg-[#004bb0] text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer"
@@ -4724,7 +4724,7 @@ export default function AdminDashboard() {
                     setEditingBankSectorRule(null);
                     try {
                       await saveChanges(undefined, updated);
-                      showToast("تم حفظ وتحديث محددات احتساب التقاعد لهذا القطاع بنجاح في النظام وسحابة Supabase! 🎉", "success");
+                      showToast('تم حفظ الإعدادات بنجاح', 'success');
                     } catch (err: any) {
                       showToast("تم تطبيق التعديلات محلياً بالمتصفح، وفشلت المزامنة: " + (err.message || err), "refuse");
                     }
