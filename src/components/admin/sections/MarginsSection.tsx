@@ -1039,6 +1039,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
         r.productId === srcProduct && 
         (r.supportType === normSrcSupport || r.supportType === 'all') &&
         !r.isExceptionOnly &&
+        !r.isConfigOnly &&
         getRuleSalaryTransferStatus(r) === 'salary_transfer'
       );
       const srcNoTransRules = normalisedRules.filter(r => 
@@ -1046,6 +1047,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
         r.productId === srcProduct && 
         (r.supportType === normSrcSupport || r.supportType === 'all') &&
         !r.isExceptionOnly &&
+        !r.isConfigOnly &&
         getRuleSalaryTransferStatus(r) === 'no_salary_transfer'
       );
 
@@ -1066,6 +1068,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
         r.productId === srcProduct && 
         (r.supportType === normSrcSupport || r.supportType === 'all') &&
         !r.isExceptionOnly &&
+        !r.isConfigOnly &&
         getRuleSalaryTransferStatus(r) === srcSalaryTransferStatus
       );
 
@@ -1080,14 +1083,12 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     const targetSalaryTiers: Array<'below_25000' | 'above_or_equal_25000' | 'not_applicable'> = 
       normDstSupport === 'none' ? ['not_applicable'] : ['below_25000', 'above_or_equal_25000'];
 
-    let currentRules = [...normalisedRules];
-    const newRulesForDst: MarginRule[] = [];
+    const getSalaryBandFromTier = (tier: string) => {
+      if (tier === 'below_25000') return 'below_25000';
+      if (tier === 'above_or_equal_25000') return 'from_25000';
+      return 'all';
+    };
 
-    const shouldCopyTiers = copyTableType === 'duration_tiers' || copyTableType === 'all';
-    const shouldCopyKeyPoints = copyTableType === 'key_points' || copyTableType === 'all';
-    const shouldCopyYearly = copyTableType === 'yearly' || copyTableType === 'all';
-
-    // Helper to target the correct source salary tier matching the target salary tier
     const getSrcSalaryTierForTarget = (targetTier: string) => {
       if (normSrcSupport === 'none') {
         return 'not_applicable';
@@ -1098,12 +1099,24 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       return 'below_25000';
     };
 
+    let currentRules = [...normalisedRules];
+    const newRulesForDst: MarginRule[] = [];
+
+    const shouldCopyTiers = copyTableType === 'duration_tiers' || copyTableType === 'all';
+    const shouldCopyKeyPoints = copyTableType === 'key_points' || copyTableType === 'all';
+    const shouldCopyYearly = copyTableType === 'yearly' || copyTableType === 'all';
+
+    // Track final activeMode and activeCalcMethod for forcing UI updates
+    let finalActiveMode: 'yearly' | 'key_points' | 'duration_tiers' = 'key_points';
+    let finalActiveCalcMethod: 'fixed' | 'linear' = 'fixed';
+
     runs.forEach(({ srcStatus, dstStatus }) => {
       const relevantSrcRules = normalisedRules.filter(r => 
         r.bankId === srcBank && 
         r.productId === srcProduct && 
         (r.supportType === normSrcSupport || r.supportType === 'all') &&
         (!r.isExceptionOnly) &&
+        (!r.isConfigOnly) && // Crucial: Ignore config rules when building numeric rules
         getRuleSalaryTransferStatus(r) === srcStatus
       );
 
@@ -1118,6 +1131,10 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
            !r.isExceptionOnly;
 
         if (!isTargetBaseRule) return true;
+
+        if (r.isConfigOnly === true) {
+          return false; // delete old config to recreate it with correct values
+        }
 
         const rMode = r.marginInputMode || getRuleInputMode(r);
         if (copyTableType === 'duration_tiers') return rMode !== 'duration_tiers';
@@ -1400,6 +1417,92 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
           }
         });
       }
+
+      // 4. Create target's configuration-only rules (one per targetSalaryTier/targetSalaryBand)
+      targetSalaryTiers.forEach(targetSalaryTier => {
+        const targetSalaryBand = getSalaryBandFromTier(targetSalaryTier);
+        
+        let activeMode: 'yearly' | 'key_points' | 'duration_tiers' = 'key_points';
+        let activeCalcMethod: 'fixed' | 'linear' = 'fixed';
+        let activeTransferMode: 'all_only' | 'split_transfer' = 'all_only';
+
+        if (copyTableType === 'duration_tiers') {
+          activeMode = 'duration_tiers';
+          activeCalcMethod = 'fixed';
+        } else if (copyTableType === 'yearly') {
+          activeMode = 'yearly';
+          const foundYearlyMethod = relevantSrcRules.find(r => (r.marginInputMode || getRuleInputMode(r)) === 'yearly' && (r.calculationMethod || r.calcType));
+          activeCalcMethod = (foundYearlyMethod?.calculationMethod || foundYearlyMethod?.calcType) as any || 'fixed';
+        } else if (copyTableType === 'key_points') {
+          activeMode = 'key_points';
+          const foundKeyPointsMethod = relevantSrcRules.filter(r => (r.marginInputMode || getRuleInputMode(r)) === 'key_points' && (r.calculationMethod || r.calcType));
+          // Use the first valid calc type if found
+          const foundMethod = foundKeyPointsMethod.find(r => r.calculationMethod || r.calcType);
+          activeCalcMethod = (foundMethod?.calculationMethod || foundMethod?.calcType) as any || 'fixed';
+        } else {
+          // copyTableType === 'all'
+          // We copy the active mode and calculation method from the source config rule
+          const srcSalaryBand = getSalaryBandFromTier(getSrcSalaryTierForTarget(targetSalaryTier));
+          const srcConfigRule = normalisedRules.find(r => 
+            r.bankId === srcBank &&
+            r.productId === srcProduct &&
+            (r.supportType === normSrcSupport || r.supportType === 'all') &&
+            r.isConfigOnly === true &&
+            (r.salaryBand || 'all') === srcSalaryBand &&
+            (r.salaryTransferStatus || 'all') === srcStatus
+          );
+          if (srcConfigRule) {
+            activeMode = (srcConfigRule.marginInputMode || srcConfigRule.calculationMode || 'key_points') as any;
+            activeCalcMethod = (srcConfigRule.calculationMethod || srcConfigRule.calcType || 'fixed') as any;
+            activeTransferMode = srcConfigRule.transferMode || 'all_only';
+          } else {
+            // fallback: find any regular numeric rule in source to determine mode
+            const firstRegularRule = relevantSrcRules.find(r => !r.isConfigOnly && !r.isExceptionOnly);
+            if (firstRegularRule) {
+              activeMode = getRuleInputMode(firstRegularRule);
+              activeCalcMethod = (firstRegularRule.calculationMethod || firstRegularRule.calcType || 'fixed') as any;
+            }
+          }
+        }
+
+        if (copyBothTransferTables) {
+          activeTransferMode = 'split_transfer';
+        } else if (dstStatus === 'all') {
+          activeTransferMode = 'all_only';
+        } else {
+          activeTransferMode = 'split_transfer';
+        }
+
+        finalActiveMode = activeMode;
+        finalActiveCalcMethod = activeCalcMethod;
+
+        // Add Target Config Rule
+        newRulesForDst.push({
+          id: `config_margin_${dstBank}_${dstProduct}_${normDstSupport}_all_${targetSalaryBand}_${dstStatus}`,
+          bankId: dstBank,
+          productId: dstProduct,
+          supportType: normDstSupport as any,
+          sectorId: 'all',
+          fromTermMonths: 0,
+          toTermMonths: 0,
+          startMargin: 0,
+          endMargin: 0,
+          calcType: activeCalcMethod,
+          isActive: false,
+          isConfigOnly: true,
+          marginInputMode: activeMode,
+          calculationMode: activeMode,
+          calculationMethod: activeCalcMethod,
+          salaryTransferStatus: dstStatus,
+          salaryBand: targetSalaryBand,
+          productType: dstProduct as any,
+          salaryTier: targetSalaryTier as any,
+          annualMargin: 0,
+          baseMargin: 0,
+          exceptionBps: 0,
+          transferMode: activeTransferMode
+        });
+      });
     });
 
     setMarginRules([...currentRules, ...newRulesForDst]);
@@ -1427,6 +1530,10 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
         setSelectedSalaryTransferStatus(dstSalaryTransferStatus);
       }
     }
+
+    // Also explicitly force the years mode and calculation method of the target to be shown in the UI immediately
+    setSelectedYearsMode(finalActiveMode);
+    setSelectedCalcMethod(finalActiveCalcMethod);
 
     const getSupportName = (s: SupportType) => {
       if (s === 'monthly') return 'دعم شهري';
