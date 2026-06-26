@@ -166,7 +166,13 @@ export function isProductEnabledForBank(bank: Bank, prodId: ProductId, activePro
       : undefined;
     if (!rule || rule.isActive === false) return false;
     if (supportType) {
-      if (!ruleSupportsSupportType(rule, supportType)) return false;
+      if (!ruleSupportsSupportType(rule, supportType)) {
+        if ((supportType === 'downpayment' || supportType === 'down_payment' as any) && ruleSupportsSupportType(rule, 'monthly')) {
+          // Fallback allowed
+        } else {
+          return false;
+        }
+      }
     }
     return bank.realEstateFinanceEnabled !== false;
   }
@@ -187,7 +193,13 @@ export function isProductEnabledForBank(bank: Bank, prodId: ProductId, activePro
 
     if (bankSupportsCombined) {
       if (supportType) {
-        if (!ruleSupportsSupportType(combinedRule, supportType)) return false;
+        if (!ruleSupportsSupportType(combinedRule, supportType)) {
+          if ((supportType === 'downpayment' || supportType === 'down_payment' as any) && ruleSupportsSupportType(combinedRule, 'monthly')) {
+            // Fallback allowed
+          } else {
+            return false;
+          }
+        }
       }
       return true;
     }
@@ -200,7 +212,13 @@ export function isProductEnabledForBank(bank: Bank, prodId: ProductId, activePro
 
     if (bankSupportsREOnly) {
       if (supportType && reOnlyRule) {
-        if (!ruleSupportsSupportType(reOnlyRule, supportType)) return false;
+        if (!ruleSupportsSupportType(reOnlyRule, supportType)) {
+          if ((supportType === 'downpayment' || supportType === 'down_payment' as any) && ruleSupportsSupportType(reOnlyRule, 'monthly')) {
+            // Fallback allowed
+          } else {
+            return false;
+          }
+        }
       }
       return true;
     }
@@ -785,6 +803,27 @@ export function calculateBanksFinancing(params: {
       normalizeProductId(p.productId) === acceptanceProductId
     );
 
+    // Determine effectiveSupportType and fallback
+    let effectiveSupportType = supportType;
+    let didFallbackSupportType = false;
+    
+    if (supportType === 'downpayment' || supportType === 'down_payment' as any) {
+      const activeRuleForCheckingFallback = (normalizedProductId === 'real_estate_with_new_personal' && !isCombinedFallbackToRealEstateOnly)
+        ? (products.find(p => p.bankId === bank.id && normalizeProductId(p.productId) === 'real_estate_with_new_personal') || acceptance)
+        : acceptance;
+      
+      if (activeRuleForCheckingFallback) {
+        const supportsDownpayment = ruleSupportsSupportType(activeRuleForCheckingFallback, supportType);
+        if (!supportsDownpayment) {
+          const supportsMonthly = ruleSupportsSupportType(activeRuleForCheckingFallback, 'monthly');
+          if (supportsMonthly) {
+            effectiveSupportType = 'monthly';
+            didFallbackSupportType = true;
+          }
+        }
+      }
+    }
+
     // 4. Resolve Term Rule and calculate Mortgage duration limit
     const matchedTermRule = getMatchedTermRule({
       bankId: bank.id,
@@ -792,7 +831,7 @@ export function calculateBanksFinancing(params: {
       militarySubType,
       rankId: rankId || 'all',
       productId: isCombinedFallbackToRealEstateOnly ? 'real_estate_only' : normalizedProductId,
-      supportType,
+      supportType: effectiveSupportType,
       termRules
     });
 
@@ -815,7 +854,7 @@ export function calculateBanksFinancing(params: {
         const matchingMarginRules = resolveMatchingRules({
           bankId: bank.id,
           productId: isCombinedFallbackToRealEstateOnly ? 'real_estate_only' : normalizedProductId,
-          supportType,
+          supportType: effectiveSupportType,
           sectorId,
           marginRules,
           netSalary: solvedNetSalary,
@@ -871,7 +910,7 @@ export function calculateBanksFinancing(params: {
     // 5. Calculate Housing Support (Sakani) subsidies
     const supportResult = calculateHousingSupport({
       netSalary: solvedNetSalary,
-      supportType,
+      supportType: effectiveSupportType,
       settings: supportSettings,
       housingSupportTiers,
       advancePaymentTiers
@@ -882,7 +921,7 @@ export function calculateBanksFinancing(params: {
       bankId: bank.id,
       productId: isCombinedFallbackToRealEstateOnly ? 'real_estate_only' : normalizedProductId,
       sectorId,
-      supportType,
+      supportType: effectiveSupportType,
       phase: sectorId === 'retired' ? 'retired' : 'before_retirement',
       netSalary: solvedNetSalary,
       dsrRules
@@ -892,7 +931,7 @@ export function calculateBanksFinancing(params: {
       bankId: bank.id,
       productId: isCombinedFallbackToRealEstateOnly ? 'real_estate_only' : normalizedProductId,
       sectorId,
-      supportType,
+      supportType: effectiveSupportType,
       phase: sectorId === 'retired' ? 'retired' : 'after_retirement',
       netSalary: correctedPensionSalary,
       dsrRules
@@ -904,7 +943,7 @@ export function calculateBanksFinancing(params: {
       const marginMode = resolveConfiguredMarginMode({
         bankId: bank.id,
         productId: isCombinedFallbackToRealEstateOnly ? 'real_estate_only' : normalizedProductId,
-        supportType,
+        supportType: effectiveSupportType,
         sectorId,
         marginRules,
         netSalary: solvedNetSalary,
@@ -914,7 +953,7 @@ export function calculateBanksFinancing(params: {
       marginResult = calculateMargin({
         bankId: bank.id,
         productId: isCombinedFallbackToRealEstateOnly ? 'real_estate_only' : normalizedProductId,
-        supportType,
+        supportType: effectiveSupportType,
         sectorId,
         termMonths: termResult.totalMonths,
         marginRules,
@@ -1079,7 +1118,7 @@ export function calculateBanksFinancing(params: {
 
         installmentBefore = realEstateStage1;
         installmentAfter = realEstateStage3;
-        purchasingPower = reLoanAmount + (supportType === 'downpayment' ? supportResult.downPaymentSupport : 0);
+        purchasingPower = reLoanAmount + (effectiveSupportType === 'downpayment' ? supportResult.downPaymentSupport : 0);
 
         totalInstallmentStage1 = totalCustomerStage1;
         totalInstallmentStage2 = realEstateStage2;
@@ -1100,7 +1139,7 @@ export function calculateBanksFinancing(params: {
           monthsAfterRetirement: termResult.monthsAfterRetirement,
           annualMargin: marginResult.annualMargin,
           obligations: adjustedObligationsBeforeVal,
-          supportType
+          supportType: effectiveSupportType
         });
 
         if ((normalizedProductId === 'both' || normalizedProductId === 'real_estate_with_new_personal') && !isCombinedFallbackToRealEstateOnly) {
@@ -1108,11 +1147,11 @@ export function calculateBanksFinancing(params: {
           const monthsOutsidePersonal = Math.max(0, termResult.monthsBeforeRetirement - personalMonths);
           const monthsAfterRetirementAdjusted = Math.max(0, termResult.totalMonths - Math.max(termResult.monthsBeforeRetirement, personalMonths));
 
-          const effectiveSalaryBefore = solvedNetSalary + (supportType === 'monthly' ? supportResult.monthlySupport : 0);
+          const effectiveSalaryBefore = solvedNetSalary + (effectiveSupportType === 'monthly' ? supportResult.monthlySupport : 0);
           const installmentWithPersonal = Math.max(0, (effectiveSalaryBefore * (dsrBeforeResult.dsrPercentage / 100)) - effectiveObligationsBefore - personalInstallment);
           const installmentWithoutPersonal = Math.max(0, (effectiveSalaryBefore * (dsrBeforeResult.dsrPercentage / 100)) - effectiveObligationsBefore);
 
-          const effectiveSalaryAfter = correctedPensionSalary + (supportType === 'monthly' ? supportResult.monthlySupport : 0);
+          const effectiveSalaryAfter = correctedPensionSalary + (effectiveSupportType === 'monthly' ? supportResult.monthlySupport : 0);
           let currentInstallmentAfter = 0;
           if (termResult.monthsAfterRetirement > 0) {
             currentInstallmentAfter = Math.max(0, effectiveSalaryAfter * (dsrAfterResult.dsrPercentage / 100));
@@ -1124,7 +1163,7 @@ export function calculateBanksFinancing(params: {
           reLoanAmount = Math.round(totalDualCashflow / denominator);
           installmentBefore = installmentWithPersonal;
           installmentAfter = currentInstallmentAfter;
-          purchasingPower = reLoanAmount + (supportType === 'downpayment' ? supportResult.downPaymentSupport : 0);
+          purchasingPower = reLoanAmount + (effectiveSupportType === 'downpayment' ? supportResult.downPaymentSupport : 0);
 
           totalInstallmentStage1 = installmentWithPersonal + personalInstallment;
           totalInstallmentStage2 = installmentWithoutPersonal;
@@ -1161,7 +1200,7 @@ export function calculateBanksFinancing(params: {
       realEstateStage1 = Math.round(realEstateStage1 * ratio);
       realEstateStage2 = Math.round(realEstateStage2 * ratio);
       realEstateStage3 = Math.round(realEstateStage3 * ratio);
-      purchasingPower = reLoanAmount + (supportType === 'downpayment' ? supportResult.downPaymentSupport : 0);
+      purchasingPower = reLoanAmount + (effectiveSupportType === 'downpayment' ? supportResult.downPaymentSupport : 0);
       
       if (normalizedProductId === 'both' || normalizedProductId === 'real_estate_with_new_personal') {
         totalInstallmentStage1 = installmentBefore + personalInstallment;
@@ -1200,7 +1239,7 @@ export function calculateBanksFinancing(params: {
       acceptance,
       sectorId,
       productId: normalizedProductId,
-      supportType,
+      supportType: effectiveSupportType,
       netSalary: solvedNetSalary,
       currentAgeYears,
       serviceMonths: serviceMonthsCurrent,
@@ -1212,6 +1251,13 @@ export function calculateBanksFinancing(params: {
       maxAgeAtApplication: matchedTermRule?.maxAgeAtApplication,
       applicationAgeYears: computedApplicationAge
     });
+
+    if (didFallbackSupportType) {
+      diag.messages.push("هذه الجهة التمويلية لا تقبل دعم الدفعة المقدمة، وتم احتساب النتيجة على الدعم الشهري بدلًا من ذلك.");
+      if (diag.status === 'approved') {
+        diag.status = 'warning';
+      }
+    }
 
     const dsrError = dsrBeforeResult.error || dsrAfterResult.error;
     if (dsrError) {
@@ -1278,7 +1324,7 @@ export function calculateBanksFinancing(params: {
       diag.messages.push("هذه الجهة لا تدعم اعتزاز، وتم احتساب التمويل بدون دعم اعتزاز.");
     }
 
-    const isProductSupported = isProductEnabledForBank(bank, normalizedProductId, products, supportType);
+    const isProductSupported = isProductEnabledForBank(bank, normalizedProductId, products, effectiveSupportType);
     if (!isProductSupported) {
       diag.status = 'rejected';
       diag.messages.unshift('المنتج المطلوب غير مفعّل لدى هذه الجهة.');
@@ -1329,8 +1375,8 @@ export function calculateBanksFinancing(params: {
       isEligible,
       realEstateAmount: isEligible ? reLoanAmount : 0,
       personalAmount: isEligible ? personalLoanAmount : 0,
-      housingSupportAmount: isEligible ? (supportType === 'downpayment' ? supportResult.downPaymentSupport : supportResult.monthlySupport) : 0,
-      supportType: supportType,
+      housingSupportAmount: isEligible ? (effectiveSupportType === 'downpayment' ? supportResult.downPaymentSupport : supportResult.monthlySupport) : 0,
+      supportType: effectiveSupportType,
       totalPurchasingPower: isEligible ? (isPersonalOnly ? personalLoanAmount : (purchasingPower + personalLoanAmount + effectiveEtizazAmount)) : 0,
       etizazAmount: isEligible ? effectiveEtizazAmount : 0,
       monthlyInstallmentBeforeRetirement: totalInstallmentStage1,
