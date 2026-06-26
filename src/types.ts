@@ -155,6 +155,7 @@ export interface MarginRule {
   salaryTransferStatus?: 'all' | 'salary_transfer' | 'no_salary_transfer';
   salaryBand?: 'all' | 'below_25000' | 'from_25000';
   isConfigOnly?: boolean;
+  transferMode?: 'all_only' | 'split_transfer';
 }
 
 export interface DsrRule {

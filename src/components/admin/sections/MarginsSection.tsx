@@ -271,9 +271,14 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
 
     // 3. Determine config parameters
     let determinedTransferMode: 'all_only' | 'split_transfer' = 'all_only';
-    const hasSplit = baseComboRules.some(r => r.salaryTransferStatus === 'salary_transfer' || r.salaryTransferStatus === 'no_salary_transfer');
-    if (hasSplit) {
-      determinedTransferMode = 'split_transfer';
+    const configWithTransferMode = baseComboRules.find(r => r.isConfigOnly === true && r.transferMode !== undefined);
+    if (configWithTransferMode && configWithTransferMode.transferMode) {
+      determinedTransferMode = configWithTransferMode.transferMode;
+    } else {
+      const hasSplit = baseComboRules.some(r => r.salaryTransferStatus === 'salary_transfer' || r.salaryTransferStatus === 'no_salary_transfer');
+      if (hasSplit) {
+        determinedTransferMode = 'split_transfer';
+      }
     }
 
     let determinedSalaryTransferStatus = 'all';
@@ -528,6 +533,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     salaryTransferStatus?: string;
     salaryBand?: string;
     sector?: string;
+    transferMode?: 'all_only' | 'split_transfer';
   }) => {
     const targetBank = selectedBank;
     const targetProduct = selectedProduct;
@@ -541,6 +547,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     const activeCalcMethod = params?.calcMethod !== undefined ? params.calcMethod : selectedCalcMethod;
     const activeSalaryTransferStatus = params?.salaryTransferStatus !== undefined ? params.salaryTransferStatus : selectedSalaryTransferStatus;
     const activeSalaryBand = params?.salaryBand !== undefined ? params.salaryBand : selectedSalaryBand;
+    const activeTransferMode = params?.transferMode !== undefined ? params.transferMode : transferMode;
 
     if (activeYearsMode === '') {
       return marginRules;
@@ -617,7 +624,8 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       salaryTier: (activeSalaryBand === 'below_25000' ? 'below_25000' : activeSalaryBand === 'from_25000' ? 'above_or_equal_25000' : 'not_applicable') as any,
       annualMargin: 0,
       baseMargin: 0,
-      exceptionBps: 0
+      exceptionBps: 0,
+      transferMode: activeTransferMode
     });
 
     if (hasActualData) {
@@ -763,7 +771,23 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       } as any);
     });
 
-    const updatedRules = [...remainingRules, ...newRulesForThisCombo, ...newExceptionRules];
+    const updatedRemainingRules = remainingRules.map(r => {
+      const rSB = r.salaryBand || (r.salaryTier === 'below_25000' ? 'below_25000' : r.salaryTier === 'above_or_equal_25000' ? 'from_25000' : 'all');
+      if (r.isConfigOnly &&
+          r.bankId === targetBank &&
+          r.productId === targetProduct &&
+          normSupport(r.supportType) === normSupportVal &&
+          normSector(r.sectorId) === normSector(targetSector) &&
+          rSB === activeSalaryBand) {
+        return {
+          ...r,
+          transferMode: activeTransferMode
+        };
+      }
+      return r;
+    });
+
+    const updatedRules = [...updatedRemainingRules, ...newRulesForThisCombo, ...newExceptionRules];
     setMarginRules(updatedRules);
     return updatedRules;
   };
@@ -780,6 +804,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     salaryTransferStatus?: string;
     salaryBand?: string;
     sector?: string;
+    transferMode?: 'all_only' | 'split_transfer';
   }) => {
     if (syncTimeoutRef.current) {
       clearTimeout(syncTimeoutRef.current);
@@ -793,6 +818,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
       const activeTiers = updatedParams?.tiers !== undefined ? updatedParams.tiers : localTiers;
       const activeExceptions = updatedParams?.exceptions !== undefined ? updatedParams.exceptions : localSectorExceptions;
       const activeSalaryBand = updatedParams?.salaryBand !== undefined ? updatedParams.salaryBand : selectedSalaryBand;
+      const activeTransferMode = updatedParams?.transferMode !== undefined ? updatedParams.transferMode : transferMode;
 
       syncCurrentMarginEditorToGlobalRules({
         margins: activeMargins,
@@ -802,7 +828,8 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
         calcMethod: activeCalcMethod,
         salaryTransferStatus: activeSalaryTransferStatus,
         salaryBand: activeSalaryBand,
-        sector: activeSector
+        sector: activeSector,
+        transferMode: activeTransferMode
       });
     }, 300);
   };
@@ -1692,7 +1719,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                             setSelectedSalaryTransferStatus('salary_transfer');
                           }
                         }
-                        triggerUserChangeSync({ salaryTransferStatus: nextStatus });
+                        triggerUserChangeSync({ salaryTransferStatus: nextStatus, transferMode: m.id as any });
                       }}
                       className={`px-1 py-1.5 rounded-lg border text-[10px] font-bold text-center transition-all cursor-pointer whitespace-nowrap ${
                         isSelected
