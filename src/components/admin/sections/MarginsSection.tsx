@@ -191,6 +191,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
   const normSalaryTier = (t?: string) => (!t || t === 'not_applicable') ? 'not_applicable' : t;
 
   const isTiersRule = (r: MarginRule) => {
+    if (r.isConfigOnly) return false;
     const mode = getRuleInputMode(r);
     return mode === 'duration_tiers';
   };
@@ -442,7 +443,7 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     let initialExceptions: Record<string, string> = {};
 
     if (activeYearsMode !== '') {
-      const yearsRules = currentModeRules.filter(r => !isTiersRule(r));
+      const yearsRules = currentModeRules.filter(r => !isTiersRule(r) && !r.isConfigOnly);
       const yearsListFull = Array.from({ length: 26 }, (_, i) => 5 + i);
 
       yearsListFull.forEach(year => {
@@ -454,7 +455,15 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
         }
       });
 
-      const tierRules = currentModeRules.filter(r => isTiersRule(r));
+      const tierRules = currentModeRules.filter(r => {
+        if (!isTiersRule(r)) return false;
+        if (r.isConfigOnly) return false;
+        const fromM = r.fromMonth ?? r.fromTermMonths ?? 0;
+        const toM = r.toMonth ?? r.toTermMonths ?? 0;
+        const rate = r.marginRate ?? r.endMargin ?? r.annualMargin ?? 0;
+        if (Number(fromM) === 0 && Number(toM) === 0 && Number(rate) === 0) return false;
+        return true;
+      });
       initialTiers = tierRules.map((r, idx) => ({
         id: r.id || `tier_${idx}_${Date.now()}`,
         fromMonth: r.fromMonth ?? r.fromTermMonths ?? 0,
@@ -463,7 +472,11 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
         notes: r.notes || '',
         active: r.active !== false && r.isActive !== false
       }));
-      initialTiers.sort((a, b) => a.fromMonth - b.fromMonth);
+      initialTiers.sort((a, b) => {
+        const aVal = Number(a.fromMonth) || 0;
+        const bVal = Number(b.fromMonth) || 0;
+        return aVal - bVal;
+      });
     }
 
     // Synchronize sector exceptions
@@ -586,10 +599,29 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
 
     const newRulesForThisCombo: MarginRule[] = [];
 
+    const isValidTier = (tier: any) => {
+      const fromStr = String(tier.fromMonth ?? '').trim();
+      const toStr = String(tier.toMonth ?? '').trim();
+      const rateStr = String(tier.marginRate ?? '').trim();
+
+      if (fromStr === '' || toStr === '' || rateStr === '') return false;
+
+      const fNum = Number(fromStr);
+      const tNum = Number(toStr);
+      const rNum = Number(rateStr);
+
+      if (isNaN(fNum) || isNaN(tNum) || isNaN(rNum)) return false;
+
+      // Check if all are zero
+      if (fNum === 0 && tNum === 0 && rNum === 0) return false;
+
+      return true;
+    };
+
     // Check if table actually contains data rules
     let hasActualData = false;
     if (activeYearsMode === 'duration_tiers') {
-      hasActualData = activeTiers.some(t => t.active !== false && t.marginRate !== '' && Number(t.marginRate) > 0);
+      hasActualData = activeTiers.some(t => t.active !== false && isValidTier(t));
     } else {
       const yearsToExtract = activeYearsMode === 'yearly'
         ? Array.from({ length: 26 }, (_, i) => 5 + i)
@@ -631,6 +663,8 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     if (hasActualData) {
       if (activeYearsMode === 'duration_tiers') {
         activeTiers.forEach((tier, index) => {
+          if (!isValidTier(tier)) return;
+
           const numFrom = Number(tier.fromMonth) || 0;
           const numTo = Number(tier.toMonth) || 0;
           const numRate = Number(tier.marginRate) || 0;
@@ -936,7 +970,18 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
     if (window.confirm(`هل أنت متأكد من رغبتك في استنساخ كافة هوامش واستثناءات البنك [${banks.find(b => b.id === cloneFromBank)?.nameAr}] وتطبيقها بدلاً من هوامش البنك [${banks.find(b => b.id === cloneToBank)?.nameAr}]؟`)) {
       try {
         const remainingRules = marginRules.filter(r => r.bankId !== cloneToBank);
-        const sourceRules = marginRules.filter(r => r.bankId === cloneFromBank);
+        const sourceRules = marginRules.filter(r => {
+          if (r.bankId !== cloneFromBank) return false;
+          if (isTiersRule(r)) {
+            const fM = r.fromMonth ?? r.fromTermMonths ?? 0;
+            const tM = r.toMonth ?? r.toTermMonths ?? 0;
+            const rate = r.marginRate ?? r.endMargin ?? r.annualMargin ?? 0;
+            if (Number(fM) === 0 && Number(tM) === 0 && Number(rate) === 0) {
+              return false;
+            }
+          }
+          return true;
+        });
 
         const cloned = sourceRules.map((rule, idx) => ({
           ...rule,
@@ -1151,7 +1196,15 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
             const rMode = r.marginInputMode || getRuleInputMode(r);
             if (rMode !== 'duration_tiers') return false;
             const rTier = r.salaryTier || 'not_applicable';
-            return rTier === matchingSrcTier;
+            if (rTier !== matchingSrcTier) return false;
+
+            const fromM = r.fromMonth ?? r.fromTermMonths ?? 0;
+            const toM = r.toMonth ?? r.toTermMonths ?? 0;
+            const rate = r.marginRate ?? r.annualMargin ?? r.endMargin ?? 0;
+
+            const isAllZeros = Number(fromM) === 0 && Number(toM) === 0 && Number(rate) === 0;
+            const isIncomplete = fromM === '' || toM === '' || rate === '';
+            return !isAllZeros && !isIncomplete;
           });
 
           tierRules.forEach((srcRule, idx) => {
@@ -2082,9 +2135,9 @@ export const MarginsSection: React.FC<MarginsSectionProps> = ({
                         ...prev,
                         {
                           id: `new_tier_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-                          fromMonth: 36,
-                          toMonth: 60,
-                          marginRate: 3.50,
+                          fromMonth: '',
+                          toMonth: '',
+                          marginRate: '',
                           notes: '',
                           active: true
                         }
