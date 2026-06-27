@@ -95,6 +95,7 @@ export function mapPayloadToEngineInput(payload: any, appSettings: any) {
     termMode,
     manualTermMonths,
     etizazAmount,
+    requestedFinanceAmount: (finance.requestedFinanceAmount && Number(finance.requestedFinanceAmount) > 0) ? Number(finance.requestedFinanceAmount) : undefined,
     
     // Pass existing state from appSettings config
     banks: appSettings.banks || [],

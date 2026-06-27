@@ -561,7 +561,15 @@ export const PersonalFinanceSection: React.FC<PersonalFinanceSectionProps> = ({
                         </td>
                         <td className="p-4 text-center">
                           <button
-                            onClick={() => setPersonalRules(prev => prev.map(r => r.id === rule.id ? { ...r, isActive: !r.isActive } : r))}
+                            onClick={() => {
+                              setPersonalRules(prev => prev.map(r => {
+                                const isMatch = (rule.id && r.id)
+                                  ? (r.id === rule.id)
+                                  : (r.bankId === rule.bankId && r.pathType === rule.pathType && r.customerStatus === rule.customerStatus && r.sectorId === rule.sectorId);
+                                return isMatch ? { ...r, isActive: !r.isActive } : r;
+                              }));
+                              showToast("تم تطبيق التعديل في المسودة — اضغط حفظ التغييرات لتثبيته.", 'success');
+                            }}
                             className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                               rule.isActive ? 'bg-[#0057B8]' : 'bg-slate-200'
                             }`}

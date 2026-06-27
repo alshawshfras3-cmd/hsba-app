@@ -302,7 +302,10 @@ function normalizeSettingsForDirtyCompare(rawSettings: any): AdminSettings {
   settings.sectorMappings = settings.sectorMappings ?? settings.sector_mappings ?? [];
   settings.housingSupportTiers = settings.housingSupportTiers ?? settings.housing_support_tiers ?? [];
   settings.advancePaymentTiers = settings.advancePaymentTiers ?? settings.advance_payment_tiers ?? [];
-  settings.personalRules = settings.personalRules ?? settings.personal_finance_rules ?? [];
+  const activePersonalRules = settings.personalRules ?? settings.personal_finance_rules ?? settings.personal_rules ?? [];
+  settings.personalRules = activePersonalRules;
+  settings.personal_rules = activePersonalRules;
+  settings.personal_finance_rules = activePersonalRules;
   settings.advancedRules = settings.advancedRules ?? settings.advanced_rules ?? {};
   settings.userSubscriptions = settings.userSubscriptions ?? settings.user_subscriptions ?? [];
   settings.subscriptionSettings = settings.subscriptionSettings ?? settings.subscription_settings ?? {};
@@ -315,7 +318,6 @@ function normalizeSettingsForDirtyCompare(rawSettings: any): AdminSettings {
   delete settings.dsr_rules;
   delete settings.term_rules;
   delete settings.support_settings;
-  delete settings.personal_finance_rules;
   delete settings.salary_rules;
   delete settings.pension_rules;
   delete settings.advanced_rules;
@@ -1039,7 +1041,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         })(),
         housingSupportTiers: (housingSupportTiers !== undefined && housingSupportTiers !== null && housingSupportTiers.length > 0) ? housingSupportTiers : initialData.housingSupportTiers,
         advancePaymentTiers: (advancePaymentTiers !== undefined && advancePaymentTiers !== null && advancePaymentTiers.length > 0) ? advancePaymentTiers : initialData.advancePaymentTiers,
-        personalRules: (settings.personal_finance_rules !== undefined && settings.personal_finance_rules !== null) ? settings.personal_finance_rules : initialData.personalRules,
+        personalRules: (() => {
+          const val = settings.personalRules ?? settings.personal_finance_rules ?? settings.personal_rules ?? null;
+          return Array.isArray(val) ? val : initialData.personalRules;
+        })(),
         advancedRules: (settings.advanced_rules !== undefined && settings.advanced_rules !== null) ? settings.advanced_rules : initialData.advancedRules,
         userSubscriptions: (settings.user_subscriptions !== undefined && settings.user_subscriptions !== null) ? settings.user_subscriptions : initialData.userSubscriptions,
         subscriptionSettings: settings.subscription_settings ?? settings.subscriptionSettings ?? initialData.subscriptionSettings,
@@ -1302,13 +1307,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           mergedSettingsObject.advance_payment_tiers = deepClone(advancePaymentTiers);
         }
 
-        mergedSettingsObject.personalRules = deepClone(personalRules);
-        if ('personal_rules' in mergedSettingsObject || (latestSettings && 'personal_rules' in latestSettings)) {
-          mergedSettingsObject.personal_rules = deepClone(personalRules);
-        }
-        if ('personal_finance_rules' in mergedSettingsObject || (latestSettings && 'personal_finance_rules' in latestSettings)) {
-          mergedSettingsObject.personal_finance_rules = deepClone(personalRules);
-        }
+        const clonedPersonalRules = deepClone(personalRules);
+        mergedSettingsObject.personalRules = clonedPersonalRules;
+        mergedSettingsObject.personal_rules = clonedPersonalRules;
+        mergedSettingsObject.personal_finance_rules = clonedPersonalRules;
 
         mergedSettingsObject.advancedRules = deepClone(advancedRules);
         if ('advanced_rules' in mergedSettingsObject || (latestSettings && 'advanced_rules' in latestSettings)) {

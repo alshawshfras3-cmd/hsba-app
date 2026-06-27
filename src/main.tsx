@@ -8,15 +8,19 @@ import { runAllStorageMigrations } from './lib/migration';
 runAllStorageMigrations();
 
 // Register Service Worker for PWA
-if ('serviceWorker' in navigator) {
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
-      .then((reg) => {
-        console.log('SW registered successfully:', reg.scope);
-      })
-      .catch((err) => {
-        console.error('SW registration failed:', err);
-      });
+    try {
+      navigator.serviceWorker.register('/sw.js')
+        .then((reg) => {
+          console.log('SW registered successfully:', reg.scope);
+        })
+        .catch((err) => {
+          console.warn('SW registration failed:', err);
+        });
+    } catch (err) {
+      console.warn('SW registration synchronous failure:', err);
+    }
   });
 }
 

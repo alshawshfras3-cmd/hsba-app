@@ -219,6 +219,9 @@ export default function StepWizard() {
   const [personalTenorSelectionMode, setPersonalTenorSelectionMode] = useState<'auto' | 'custom'>(() => getDraftValue<'auto' | 'custom'>('personalTenorSelectionMode', 'auto'));
   const [requestedPersonalTenorMonths, setRequestedPersonalTenorMonths] = useState<number | ''>(() => getDraftValue<number | ''>('requestedPersonalTenorMonths', ''));
 
+  const [financeAmountMode, setFinanceAmountMode] = useState<'max' | 'custom'>(() => getDraftValue<'max' | 'custom'>('financeAmountMode', 'max'));
+  const [requestedFinanceAmount, setRequestedFinanceAmount] = useState<number | ''>(() => getDraftValue<number | ''>('requestedFinanceAmount', ''));
+
   const isPersonalOnlyFlow = mainFinanceType === 'personal_only';
 
   const shouldShowSalaryBankField =
@@ -354,6 +357,8 @@ export default function StepWizard() {
       obligationRemainingMonths,
       personalTenorSelectionMode,
       requestedPersonalTenorMonths,
+      financeAmountMode,
+      requestedFinanceAmount,
       currentStep,
       results
     };
@@ -399,6 +404,8 @@ export default function StepWizard() {
     obligationRemainingMonths,
     personalTenorSelectionMode,
     requestedPersonalTenorMonths,
+    financeAmountMode,
+    requestedFinanceAmount,
     currentStep,
     results
   ]);
@@ -446,6 +453,8 @@ export default function StepWizard() {
     setObligationRemainingMonths(0);
     setPersonalTenorSelectionMode('auto');
     setRequestedPersonalTenorMonths('');
+    setFinanceAmountMode('max');
+    setRequestedFinanceAmount('');
     
     setErrors([]);
     setResults(null);
@@ -835,6 +844,14 @@ export default function StepWizard() {
             fieldId: 'bank-filter-select'
           });
         }
+        if (financeAmountMode === 'custom') {
+          if (!requestedFinanceAmount || Number(requestedFinanceAmount) <= 0) {
+            errorMap.push({
+              message: 'يرجى إدخال مبلغ التمويل المطلوب بشكل صحيح.',
+              fieldId: 'requested-finance-amount-input'
+            });
+          }
+        }
       }
       if (termMode === 'manual') {
         if (!manualTermYears || Number(manualTermYears) < 1 || Number(manualTermYears) > 30) {
@@ -912,6 +929,7 @@ export default function StepWizard() {
       manualTermMonths: (termMode === 'manual' && manualTermYears) ? (Number(manualTermYears) * 12) : undefined,
       personalTenorSelectionMode: mainFinanceType === 'personal_only' ? personalTenorSelectionMode : 'auto',
       requestedPersonalTenorMonths: (mainFinanceType === 'personal_only' && personalTenorSelectionMode === 'custom' && requestedPersonalTenorMonths) ? Number(requestedPersonalTenorMonths) : undefined,
+      requestedFinanceAmount: (mainFinanceType !== 'personal_only' && financeAmountMode === 'custom' && requestedFinanceAmount) ? Number(requestedFinanceAmount) : undefined,
 
       banks,
       products,
@@ -2048,6 +2066,61 @@ export default function StepWizard() {
                     </div>
                   )}
                 </div>
+
+                {/* 4. Requested Finance Amount (Only for Mortgages) */}
+                {mainFinanceType !== 'personal_only' && (
+                  <div className="border border-gray-200 dark:border-slate-800 bg-white dark:bg-[#151F32] rounded-2xl p-5 text-right space-y-3">
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between font-sans">
+                      <span>مبلغ التمويل المطلوب:</span>
+                      <Coins className="w-4 h-4 text-[#0057B8] dark:text-[#0ea5a4]" />
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { id: 'max', label: 'الحد الأعلى المتاح' },
+                        { id: 'custom', label: 'إدخال مبلغ محدد' }
+                      ].map((mode) => (
+                        <button
+                          key={mode.id}
+                          type="button"
+                          onClick={() => {
+                            setFinanceAmountMode(mode.id as 'max' | 'custom');
+                            if (mode.id === 'custom' && !requestedFinanceAmount) {
+                              setRequestedFinanceAmount('');
+                            }
+                          }}
+                          className={`py-2 px-1 text-xs font-bold rounded-lg border text-center transition-all cursor-pointer ${
+                            financeAmountMode === mode.id
+                              ? 'border-[#0057B8] dark:border-[#0ea5a4] bg-[#0057B8]/5 dark:bg-[#0ea5a4]/5 text-[#0057B8] dark:text-[#0ea5a4]'
+                              : 'border-gray-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                          }`}
+                        >
+                          {mode.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {financeAmountMode === 'custom' && (
+                      <div className="pt-2 space-y-1.5 animate-fade-in">
+                        <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 font-sans">مبلغ التمويل المطلوب (ريال):</label>
+                        <div className="relative">
+                          <NumericInput
+                            id="requested-finance-amount-input"
+                            min={1}
+                            allowDecimals={false}
+                            value={requestedFinanceAmount}
+                            onChange={(val) => setRequestedFinanceAmount(val)}
+                            placeholder="مثال: 600000"
+                            className="w-full bg-slate-50 dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0057B8] dark:focus:ring-[#0ea5a4]"
+                          />
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 dark:text-slate-500 font-sans">ريال</span>
+                        </div>
+                        <p className="text-[10px] text-gray-400 dark:text-slate-500 mt-1 leading-relaxed font-sans">
+                          سيتم حساب القسط على المبلغ المطلوب فقط، مع بقاء الهامش كما هو من جدول البنك.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Preferred Bank Filter - FOR BOTH PATHS */}
                 <div className="border border-gray-200 dark:border-slate-800 bg-white dark:bg-[#151F32] rounded-2xl p-5 text-right space-y-3 col-span-1 md:col-span-2">

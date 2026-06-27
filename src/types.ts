@@ -422,6 +422,10 @@ export interface BankCalculationResult {
   personalEligible?: boolean;
   supportsPersonal?: boolean;
   etizazAmount?: number;
+  maxEligibleFinanceAmount?: number;
+  requestedFinanceAmount?: number;
+  finalFinanceAmount?: number;
+  financeAmountAdjusted?: boolean;
 }
 
 export interface SavedResult {

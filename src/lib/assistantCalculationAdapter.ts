@@ -43,6 +43,7 @@ export interface AssistantCalculationInput {
   salaryBankId?: string | null;
   termMode?: TermMode;
   manualTermYears?: number;
+  requestedFinanceAmount?: number;
 }
 
 export interface AssistantValidationResult {
@@ -187,6 +188,7 @@ export function runAssistantCalculation(
     manualTermMonths,
     personalTenorSelectionMode: 'auto' as const,
     requestedPersonalTenorMonths: undefined,
+    requestedFinanceAmount: (input.requestedFinanceAmount && Number(input.requestedFinanceAmount) > 0) ? Number(input.requestedFinanceAmount) : undefined,
     
     // Dynamic settings from state
     banks: context.banks,

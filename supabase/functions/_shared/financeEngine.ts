@@ -720,7 +720,13 @@ function calculateFinanceTerm(params) {
     const requested = manualTermMonths;
     if (requested > absoluteMaxTerm) {
       totalMonths = absoluteMaxTerm;
-      reductionReason = "\u062A\u0645 \u062A\u0642\u0644\u064A\u0635 \u0627\u0644\u0645\u062F\u0629 \u0644\u062A\u062A\u062C\u0627\u0648\u0632 \u0627\u0644\u0636\u0648\u0627\u0628\u0637 \u0627\u0644\u0639\u0645\u0631\u064A\u0629 \u0623\u0648 \u0644\u0648\u0627\u0626\u062D \u062C\u0647\u0629 \u0627\u0644\u0625\u0642\u0631\u0627\u0636.";
+      const reqYears = Math.round(requested / 12);
+      const absYears = Math.round(absoluteMaxTerm / 12);
+      if (absoluteMaxTerm === maxTermMonths) {
+        reductionReason = `\u0627\u062E\u062A\u0627\u0631 \u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645 ${reqYears} \u0633\u0646\u0629\u060C \u0644\u0643\u0646 \u0623\u0642\u0635\u0649 \u0645\u062F\u0629 \u0644\u062F\u0649 \u0627\u0644\u0628\u0646\u0643 ${absYears} \u0633\u0646\u0629\u060C \u0644\u0630\u0644\u0643 \u062A\u0645 \u0627\u0644\u062D\u0633\u0627\u0628 \u0639\u0644\u0649 ${absYears} \u0633\u0646\u0629.`;
+      } else {
+        reductionReason = `\u0627\u062E\u062A\u0627\u0631 \u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645 ${reqYears} \u0633\u0646\u0629\u060C \u0644\u0643\u0646 \u0623\u0642\u0635\u0649 \u0645\u062F\u0629 \u0645\u0633\u0645\u0648\u062D\u0629 \u0628\u0639\u062F \u062A\u0637\u0628\u064A\u0642 \u0627\u0644\u0636\u0648\u0627\u0628\u0637 \u0627\u0644\u0639\u0645\u0631\u064A\u0629 \u0648\u0627\u0644\u0644\u0648\u0627\u0626\u062D \u0647\u064A ${absYears} \u0633\u0646\u0629\u060C \u0644\u0630\u0644\u0643 \u062A\u0645 \u0627\u0644\u062D\u0633\u0627\u0628 \u0639\u0644\u0649 ${absYears} \u0633\u0646\u0629.`;
+      }
     } else {
       totalMonths = Math.max(minTermMonths, requested);
       isAgeLimitingFactor = false;
@@ -1200,6 +1206,19 @@ function calculateDSR(params) {
 }
 
 // src/lib/finance-engine/margin.ts
+var getRuleInputMode = (r) => {
+  if (r.marginInputMode) return r.marginInputMode;
+  if (r.fromMonth !== void 0 || r.toMonth !== void 0) return "duration_tiers";
+  const y = r.year || (r.toTermMonths ? r.toTermMonths / 12 : void 0);
+  if (y !== void 0) {
+    if ([5, 10, 15, 20, 25, 30].includes(y)) {
+      return "key_points";
+    } else if (y >= 5 && y <= 30) {
+      return "yearly";
+    }
+  }
+  return "key_points";
+};
 function resolveSalaryTransferStatus(targetBankId, salaryBankId) {
   if (salaryBankId && salaryBankId === targetBankId) {
     return "salary_transfer";
@@ -1279,6 +1298,104 @@ function resolveMatchingRules(params) {
   return matchGlobal;
 }
 function resolveConfiguredMarginMode(params) {
+  let normProduct = params.productId;
+  if (normProduct === "real_estate" || normProduct === "real_estate_only") {
+    normProduct = "real_estate_only";
+  } else if (normProduct === "both" || normProduct === "real_estate_with_new_personal") {
+    normProduct = "real_estate_with_new_personal";
+  } else if (normProduct === "real_estate_with_personal_existing" || normProduct === "real_estate_with_existing_personal") {
+    normProduct = "real_estate_with_existing_personal";
+  }
+  const normSup = (s) => {
+    if (!s || s === "none") return "none";
+    if (s === "down_payment" || s === "downpayment") return "downpayment";
+    return s;
+  };
+  const targetSupportNorm = normSup(params.supportType);
+  let salaryBand = "all";
+  if (params.netSalary !== void 0) {
+    salaryBand = params.netSalary < 25e3 ? "below_25000" : "from_25000";
+  }
+  const salaryTransferStatus = resolveSalaryTransferStatus(params.bankId, params.salaryBankId);
+  const getRuleSalaryTransferStatus = (r) => {
+    return r.salaryTransferStatus || "all";
+  };
+  const getRuleSalaryBand = (r) => {
+    if (r.salaryBand) return r.salaryBand;
+    if (r.salaryTier === "below_25000") return "below_25000";
+    if (r.salaryTier === "above_or_equal_25000") return "from_25000";
+    return "all";
+  };
+  const getRuleSupportType = (r) => {
+    const s = r.supportType;
+    if (!s || s === "all") return "all";
+    if (s === "none") return "none";
+    if (s === "monthly") return "monthly";
+    if (s === "downpayment" || s === "down_payment") return "downpayment";
+    return "all";
+  };
+  const getRuleSectorId = (r) => {
+    return r.sectorId || "all";
+  };
+  const targetSectorNorm = params.sectorId || "all";
+  const configRules = params.marginRules.filter((r) => r.isConfigOnly === true);
+  const findConfigRule = () => {
+    let found = configRules.find(
+      (r) => r.bankId === params.bankId && r.productId === normProduct && getRuleSalaryTransferStatus(r) === salaryTransferStatus && getRuleSalaryBand(r) === salaryBand && (getRuleSupportType(r) === "all" || getRuleSupportType(r) === targetSupportNorm) && getRuleSectorId(r) === targetSectorNorm
+    );
+    if (found) return found;
+    found = configRules.find(
+      (r) => r.bankId === params.bankId && r.productId === normProduct && getRuleSalaryTransferStatus(r) === salaryTransferStatus && getRuleSalaryBand(r) === salaryBand && (getRuleSupportType(r) === "all" || getRuleSupportType(r) === targetSupportNorm) && getRuleSectorId(r) === "all"
+    );
+    if (found) return found;
+    found = configRules.find(
+      (r) => r.bankId === params.bankId && r.productId === normProduct && getRuleSalaryTransferStatus(r) === "all" && getRuleSalaryBand(r) === salaryBand && (getRuleSupportType(r) === "all" || getRuleSupportType(r) === targetSupportNorm) && getRuleSectorId(r) === targetSectorNorm
+    );
+    if (found) return found;
+    found = configRules.find(
+      (r) => r.bankId === params.bankId && r.productId === normProduct && getRuleSalaryTransferStatus(r) === "all" && getRuleSalaryBand(r) === salaryBand && (getRuleSupportType(r) === "all" || getRuleSupportType(r) === targetSupportNorm) && getRuleSectorId(r) === "all"
+    );
+    if (found) return found;
+    found = configRules.find(
+      (r) => r.bankId === params.bankId && r.productId === normProduct && getRuleSalaryTransferStatus(r) === salaryTransferStatus && getRuleSalaryBand(r) === "all" && (getRuleSupportType(r) === "all" || getRuleSupportType(r) === targetSupportNorm) && getRuleSectorId(r) === targetSectorNorm
+    );
+    if (found) return found;
+    found = configRules.find(
+      (r) => r.bankId === params.bankId && r.productId === normProduct && getRuleSalaryTransferStatus(r) === salaryTransferStatus && getRuleSalaryBand(r) === "all" && (getRuleSupportType(r) === "all" || getRuleSupportType(r) === targetSupportNorm) && getRuleSectorId(r) === "all"
+    );
+    if (found) return found;
+    found = configRules.find(
+      (r) => r.bankId === params.bankId && r.productId === normProduct && getRuleSalaryTransferStatus(r) === "all" && getRuleSalaryBand(r) === "all" && (getRuleSupportType(r) === "all" || getRuleSupportType(r) === targetSupportNorm) && getRuleSectorId(r) === targetSectorNorm
+    );
+    if (found) return found;
+    found = configRules.find(
+      (r) => r.bankId === params.bankId && r.productId === normProduct && getRuleSalaryTransferStatus(r) === "all" && getRuleSalaryBand(r) === "all" && (getRuleSupportType(r) === "all" || getRuleSupportType(r) === targetSupportNorm) && getRuleSectorId(r) === "all"
+    );
+    if (found) return found;
+    found = configRules.find(
+      (r) => r.bankId === params.bankId && r.productId === normProduct && getRuleSalaryTransferStatus(r) === salaryTransferStatus && (getRuleSalaryBand(r) === salaryBand || getRuleSalaryBand(r) === "all") && getRuleSupportType(r) === "all" && getRuleSectorId(r) === targetSectorNorm
+    );
+    if (found) return found;
+    found = configRules.find(
+      (r) => r.bankId === params.bankId && r.productId === normProduct && getRuleSalaryTransferStatus(r) === salaryTransferStatus && (getRuleSalaryBand(r) === salaryBand || getRuleSalaryBand(r) === "all") && getRuleSupportType(r) === "all" && getRuleSectorId(r) === "all"
+    );
+    if (found) return found;
+    found = configRules.find(
+      (r) => r.bankId === params.bankId && r.productId === normProduct && getRuleSalaryTransferStatus(r) === "all" && getRuleSalaryBand(r) === "all" && getRuleSupportType(r) === "all" && getRuleSectorId(r) === "all"
+    );
+    if (found) return found;
+    found = configRules.find(
+      (r) => r.bankId === "all" && r.productId === normProduct
+    );
+    return found;
+  };
+  const configRule = findConfigRule();
+  if (configRule) {
+    const mode = configRule.marginInputMode || configRule.calculationMode;
+    if (mode === "duration_tiers" || mode === "yearly" || mode === "key_points") {
+      return mode;
+    }
+  }
   const matchingRules = resolveMatchingRules(params);
   const withInputMode = matchingRules.find((r) => r.marginInputMode);
   if (withInputMode && withInputMode.marginInputMode) {
@@ -1306,12 +1423,16 @@ function calculateMargin(params) {
   }
   let selectedMarginYear = Math.round(termMonths / 12);
   selectedMarginYear = Math.min(Math.max(selectedMarginYear, 5), 30);
+  const filteredMarginRules = marginRules.filter((r) => {
+    if (r.isConfigOnly || r.isExceptionOnly) return true;
+    return getRuleInputMode(r) === calculationMode;
+  });
   const rules3 = resolveMatchingRules({
     bankId,
     productId,
     supportType,
     sectorId,
-    marginRules,
+    marginRules: filteredMarginRules,
     netSalary,
     salaryBankId
   });
@@ -1931,10 +2052,10 @@ function runDiagnostics(params) {
     status = "rejected";
     messages.push(`\u062A\u0645 \u0631\u0641\u0636 \u0627\u0644\u0637\u0644\u0628: \u0639\u0645\u0631 \u0627\u0644\u0639\u0645\u064A\u0644 (${currentAgeYears} \u0633\u0646\u0629) \u0623\u0642\u0644 \u0645\u0646 \u0627\u0644\u062D\u062F \u0627\u0644\u0623\u062F\u0646\u0649 \u0627\u0644\u0645\u0642\u0628\u0648\u0644 \u0644\u062F\u0649 ${bankName} \u0648\u0627\u0644\u0628\u0627\u0644\u063A ${acceptance.minAge} \u0633\u0646\u0629.`);
   }
-  if (maxAgeAtApplication !== undefined && maxAgeAtApplication !== null && applicationAgeYears !== undefined) {
+  if (maxAgeAtApplication !== void 0 && maxAgeAtApplication !== null && applicationAgeYears !== void 0) {
     if (applicationAgeYears > maxAgeAtApplication) {
       status = "rejected";
-      messages.push("تجاوز العميل أقصى عمر مسموح عند بداية التمويل لدى هذه الجهة.");
+      messages.push("\u062A\u062C\u0627\u0648\u0632 \u0627\u0644\u0639\u0645\u064A\u0644 \u0623\u0642\u0635\u0649 \u0639\u0645\u0631 \u0645\u0633\u0645\u0648\u062D \u0639\u0646\u062F \u0628\u062F\u0627\u064A\u0629 \u0627\u0644\u062A\u0645\u0648\u064A\u0644 \u0644\u062F\u0649 \u0647\u0630\u0647 \u0627\u0644\u062C\u0647\u0629.");
     }
   }
   const normProductId = productId === "personal" || productId === "personal_only" ? "personal_only" : productId;
@@ -2245,6 +2366,7 @@ function calculateBanksFinancing(params) {
     manualTermMonths = 300,
     personalTenorSelectionMode,
     requestedPersonalTenorMonths,
+    requestedFinanceAmount,
     banks,
     products,
     militaryRanks,
@@ -2543,8 +2665,6 @@ function calculateBanksFinancing(params) {
       supportType,
       termRules
     });
-    const isRuleApplied = !!matchedTermRule;
-    const ruleSource = isRuleApplied ? "termRule" : "bankFallback";
     const defaultLimits = {
       maxTermMonths: bank.maxTermMonths ?? (BANK_DEFAULT_LIMITS[bank.id]?.maxTermMonths ?? 360),
       maxAgeAtEnd: bank.maxAgeAtEnd ?? (BANK_DEFAULT_LIMITS[bank.id]?.maxAgeAtEnd ?? 75),
@@ -2552,12 +2672,73 @@ function calculateBanksFinancing(params) {
       allowAfterRetirement: bank.allowAfterRetirement ?? (BANK_DEFAULT_LIMITS[bank.id]?.allowAfterRetirement ?? true),
       calendarType: bank.calendarType ?? (BANK_DEFAULT_LIMITS[bank.id]?.calendarType ?? "gregorian")
     };
-    const maxTermMonths = isRuleApplied ? matchedTermRule.maxTermMonths : defaultLimits.maxTermMonths;
-    const maxAgeAtEnd = isRuleApplied ? matchedTermRule.maxAgeAtEnd : defaultLimits.maxAgeAtEnd;
-    const allowedMonthsAfterRetirement = isRuleApplied ? matchedTermRule.allowedMonthsAfterRetirement : defaultLimits.monthsAfterRetirement;
-    const allowAfterRetirement = isRuleApplied ? matchedTermRule.allowAfterRetirement : defaultLimits.allowAfterRetirement;
-    const calendarType = isRuleApplied ? matchedTermRule.calendarType : defaultLimits.calendarType;
-    const minTermMonths = isRuleApplied ? matchedTermRule.minTermMonths : 12;
+    let maxTermMonths = defaultLimits.maxTermMonths;
+    let maxAgeAtEnd = defaultLimits.maxAgeAtEnd;
+    let allowedMonthsAfterRetirement = defaultLimits.monthsAfterRetirement;
+    let allowAfterRetirement = defaultLimits.allowAfterRetirement;
+    let calendarType = defaultLimits.calendarType;
+    let minTermMonths = 12;
+    let ruleSource = "bankFallback";
+    if (matchedTermRule) {
+      if (matchedTermRule.bankId !== "all") {
+        maxTermMonths = matchedTermRule.maxTermMonths;
+        maxAgeAtEnd = matchedTermRule.maxAgeAtEnd;
+        allowedMonthsAfterRetirement = matchedTermRule.allowedMonthsAfterRetirement;
+        allowAfterRetirement = matchedTermRule.allowAfterRetirement;
+        calendarType = matchedTermRule.calendarType;
+        minTermMonths = matchedTermRule.minTermMonths;
+        ruleSource = "termRule";
+      } else {
+        ruleSource = "termRule";
+        minTermMonths = matchedTermRule.minTermMonths;
+        if (defaultLimits.allowAfterRetirement === false || defaultLimits.monthsAfterRetirement === 0) {
+          allowAfterRetirement = false;
+          allowedMonthsAfterRetirement = 0;
+        } else {
+          allowAfterRetirement = matchedTermRule.allowAfterRetirement;
+          allowedMonthsAfterRetirement = Math.min(matchedTermRule.allowedMonthsAfterRetirement, defaultLimits.monthsAfterRetirement);
+        }
+        maxTermMonths = Math.min(matchedTermRule.maxTermMonths, defaultLimits.maxTermMonths);
+        if (defaultLimits.calendarType === "hijri") {
+          calendarType = "hijri";
+        } else {
+          calendarType = matchedTermRule.calendarType;
+        }
+        maxAgeAtEnd = Math.min(matchedTermRule.maxAgeAtEnd, defaultLimits.maxAgeAtEnd);
+      }
+    }
+    if (hasRealEstate) {
+      try {
+        const matchingMarginRules = resolveMatchingRules({
+          bankId: bank.id,
+          productId: isCombinedFallbackToRealEstateOnly ? "real_estate_only" : normalizedProductId,
+          supportType,
+          sectorId,
+          marginRules,
+          netSalary: solvedNetSalary,
+          salaryBankId
+        });
+        if (matchingMarginRules && matchingMarginRules.length > 0) {
+          let maxFromTiers = 0;
+          let maxFromExact = 0;
+          for (const rule of matchingMarginRules) {
+            if (rule.toMonth !== void 0 && rule.toMonth !== null) {
+              if (rule.toMonth > maxFromTiers) maxFromTiers = rule.toMonth;
+            }
+            if (rule.toTermMonths !== void 0 && rule.toTermMonths !== null) {
+              if (rule.toTermMonths > maxFromExact) maxFromExact = rule.toTermMonths;
+            }
+          }
+          const maxFromMargin = Math.max(maxFromTiers, maxFromExact);
+          if (maxFromMargin > 0 && maxFromMargin < maxTermMonths) {
+            maxTermMonths = maxFromMargin;
+          }
+        }
+      } catch (err) {
+        console.error("Error resolving matching margin rules for maxTermMonths capping:", err);
+      }
+    }
+    const isRuleApplied = ruleSource === "termRule";
     const termResult = calculateFinanceTerm({
       sectorId,
       birthYear,
@@ -2838,7 +3019,6 @@ function calculateBanksFinancing(params) {
       );
       computedApplicationAge = Math.floor(ageMonths / 12);
     }
-
     const diag = runDiagnostics({
       bankName: bank.nameAr,
       acceptance,
@@ -2913,6 +3093,43 @@ function calculateBanksFinancing(params) {
       diag.status = "rejected";
       diag.messages.unshift("\u0627\u0644\u0645\u0646\u062A\u062C \u0627\u0644\u0645\u0637\u0644\u0648\u0628 \u063A\u064A\u0631 \u0645\u0641\u0639\u0651\u0644 \u0644\u062F\u0649 \u0647\u0630\u0647 \u0627\u0644\u062C\u0647\u0629.");
     }
+    const maxEligibleFinanceAmount = hasRealEstate ? reLoanAmount : 0;
+    let finalFinanceAmount = reLoanAmount;
+    let financeAmountAdjusted = false;
+    if (hasRealEstate && requestedFinanceAmount && requestedFinanceAmount > 0 && !isPersonalOnly) {
+      if (requestedFinanceAmount > maxEligibleFinanceAmount) {
+        diag.status = "rejected";
+        diag.messages.unshift("\u0627\u0644\u0645\u0628\u0644\u063A \u0627\u0644\u0645\u0637\u0644\u0648\u0628 \u0623\u0639\u0644\u0649 \u0645\u0646 \u0627\u0644\u062D\u062F \u0627\u0644\u0623\u0639\u0644\u0649 \u0627\u0644\u0645\u062A\u0627\u062D \u0644\u062F\u0649 \u0647\u0630\u0647 \u0627\u0644\u062C\u0647\u0629.");
+        diag.calculationSteps.push(`[\u0627\u0644\u0645\u0628\u0644\u063A \u0627\u0644\u0645\u0637\u0644\u0648\u0628]: \u0627\u0644\u0645\u0628\u0644\u063A \u0627\u0644\u0645\u0637\u0644\u0648\u0628 (${requestedFinanceAmount.toLocaleString("ar-SA")} \u0631\u064A\u0627\u0644) \u0623\u0639\u0644\u0649 \u0645\u0646 \u0627\u0644\u062D\u062F \u0627\u0644\u0623\u0639\u0644\u0649 \u0627\u0644\u0645\u062A\u0627\u062D (${maxEligibleFinanceAmount.toLocaleString("ar-SA")} \u0631\u064A\u0627\u0644).`);
+        reLoanAmount = 0;
+        purchasingPower = 0;
+        installmentBefore = 0;
+        installmentAfter = 0;
+        realEstateStage1 = 0;
+        realEstateStage2 = 0;
+        realEstateStage3 = 0;
+        totalInstallmentStage1 = 0;
+        totalInstallmentStage2 = 0;
+        personalInstallmentDisplay = 0;
+      } else {
+        const ratio = requestedFinanceAmount / maxEligibleFinanceAmount;
+        reLoanAmount = requestedFinanceAmount;
+        installmentBefore = Math.round(installmentBefore * ratio);
+        installmentAfter = Math.round(installmentAfter * ratio);
+        realEstateStage1 = Math.round(realEstateStage1 * ratio);
+        realEstateStage2 = Math.round(realEstateStage2 * ratio);
+        realEstateStage3 = Math.round(realEstateStage3 * ratio);
+        purchasingPower = reLoanAmount + (supportType === "downpayment" ? supportResult.downPaymentSupport : 0);
+        if (normalizedProductId === "both" || normalizedProductId === "real_estate_with_new_personal") {
+          totalInstallmentStage1 = installmentBefore + personalInstallment;
+        } else {
+          totalInstallmentStage1 = installmentBefore;
+        }
+        totalInstallmentStage2 = installmentAfter;
+        finalFinanceAmount = requestedFinanceAmount;
+        financeAmountAdjusted = true;
+      }
+    }
     if (isProductSupported && diag.status !== "rejected") {
       if (hasRealEstate && reLoanAmount < minRE) {
         diag.status = "rejected";
@@ -2957,6 +3174,10 @@ function calculateBanksFinancing(params) {
       supportType,
       totalPurchasingPower: isEligible ? isPersonalOnly ? personalLoanAmount : purchasingPower + personalLoanAmount + effectiveEtizazAmount : 0,
       etizazAmount: isEligible ? effectiveEtizazAmount : 0,
+      maxEligibleFinanceAmount,
+      requestedFinanceAmount,
+      finalFinanceAmount: isEligible ? finalFinanceAmount : 0,
+      financeAmountAdjusted,
       monthlyInstallmentBeforeRetirement: totalInstallmentStage1,
       monthlyInstallmentAfterRetirement: isEligible ? isPersonalOnly ? 0 : installmentAfter : 0,
       monthlyInstallmentAfterPersonal: totalInstallmentStage2,
@@ -3162,12 +3383,72 @@ function calculateAll(params, options) {
     allowAfterRetirement: liveBank?.allowAfterRetirement ?? (BANK_DEFAULT_LIMITS[bankId]?.allowAfterRetirement ?? true),
     calendarType: liveBank?.calendarType ?? (BANK_DEFAULT_LIMITS[bankId]?.calendarType ?? "gregorian")
   };
-  const maxTermMonths = matchedTermRule ? matchedTermRule.maxTermMonths : defaultLimits.maxTermMonths;
-  const maxAgeAtEnd = matchedTermRule ? matchedTermRule.maxAgeAtEnd : defaultLimits.maxAgeAtEnd;
-  const allowedMonthsAfterRetirement = matchedTermRule ? matchedTermRule.allowedMonthsAfterRetirement : defaultLimits.monthsAfterRetirement;
-  const allowAfterRetirement = matchedTermRule ? matchedTermRule.allowAfterRetirement : defaultLimits.allowAfterRetirement;
-  const calendarType = matchedTermRule ? matchedTermRule.calendarType : defaultLimits.calendarType;
-  const minTermMonths = matchedTermRule ? matchedTermRule.minTermMonths : 12;
+  let maxTermMonths = defaultLimits.maxTermMonths;
+  let maxAgeAtEnd = defaultLimits.maxAgeAtEnd;
+  let allowedMonthsAfterRetirement = defaultLimits.monthsAfterRetirement;
+  let allowAfterRetirement = defaultLimits.allowAfterRetirement;
+  let calendarType = defaultLimits.calendarType;
+  let minTermMonths = 12;
+  let ruleSource = "bankFallback";
+  if (matchedTermRule) {
+    if (matchedTermRule.bankId !== "all") {
+      maxTermMonths = matchedTermRule.maxTermMonths;
+      maxAgeAtEnd = matchedTermRule.maxAgeAtEnd;
+      allowedMonthsAfterRetirement = matchedTermRule.allowedMonthsAfterRetirement;
+      allowAfterRetirement = matchedTermRule.allowAfterRetirement;
+      calendarType = matchedTermRule.calendarType;
+      minTermMonths = matchedTermRule.minTermMonths;
+      ruleSource = "termRule";
+    } else {
+      ruleSource = "termRule";
+      minTermMonths = matchedTermRule.minTermMonths;
+      if (defaultLimits.allowAfterRetirement === false || defaultLimits.monthsAfterRetirement === 0) {
+        allowAfterRetirement = false;
+        allowedMonthsAfterRetirement = 0;
+      } else {
+        allowAfterRetirement = matchedTermRule.allowAfterRetirement;
+        allowedMonthsAfterRetirement = Math.min(matchedTermRule.allowedMonthsAfterRetirement, defaultLimits.monthsAfterRetirement);
+      }
+      maxTermMonths = Math.min(matchedTermRule.maxTermMonths, defaultLimits.maxTermMonths);
+      if (defaultLimits.calendarType === "hijri") {
+        calendarType = "hijri";
+      } else {
+        calendarType = matchedTermRule.calendarType;
+      }
+      maxAgeAtEnd = Math.min(matchedTermRule.maxAgeAtEnd, defaultLimits.maxAgeAtEnd);
+    }
+  }
+  if (hasRealEstate) {
+    try {
+      const matchingMarginRules = resolveMatchingRules({
+        bankId,
+        productId: normalizedProductId,
+        supportType: "none",
+        sectorId,
+        marginRules,
+        netSalary: solvedNetSalary,
+        salaryBankId: null
+      });
+      if (matchingMarginRules && matchingMarginRules.length > 0) {
+        let maxFromTiers = 0;
+        let maxFromExact = 0;
+        for (const rule of matchingMarginRules) {
+          if (rule.toMonth !== void 0 && rule.toMonth !== null) {
+            if (rule.toMonth > maxFromTiers) maxFromTiers = rule.toMonth;
+          }
+          if (rule.toTermMonths !== void 0 && rule.toTermMonths !== null) {
+            if (rule.toTermMonths > maxFromExact) maxFromExact = rule.toTermMonths;
+          }
+        }
+        const maxFromMargin = Math.max(maxFromTiers, maxFromExact);
+        if (maxFromMargin > 0 && maxFromMargin < maxTermMonths) {
+          maxTermMonths = maxFromMargin;
+        }
+      }
+    } catch (err) {
+      console.error("Error resolving matching margin rules for maxTermMonths capping in calculateFinanceResult:", err);
+    }
+  }
   const termResult = calculateFinanceTerm({
     sectorId,
     birthYear,
@@ -3184,7 +3465,7 @@ function calculateAll(params, options) {
     minTermMonths,
     selectedMode: "manual",
     manualTermMonths: termYears * 12,
-    ruleSource: matchedTermRule ? "termRule" : "bankFallback",
+    ruleSource,
     postRetirementMode: matchedTermRule?.postRetirementMode
   });
   const dsrBeforeResult = calculateDSR({

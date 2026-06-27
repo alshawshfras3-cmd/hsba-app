@@ -360,6 +360,7 @@ export function calculateBanksFinancing(params: {
   manualTermMonths?: number;
   personalTenorSelectionMode?: 'auto' | 'custom';
   requestedPersonalTenorMonths?: number;
+  requestedFinanceAmount?: number;
 
   // Active configurations state
   banks: Bank[];
@@ -413,6 +414,7 @@ export function calculateBanksFinancing(params: {
     manualTermMonths = 300,
     personalTenorSelectionMode,
     requestedPersonalTenorMonths,
+    requestedFinanceAmount,
 
     banks,
     products,
@@ -796,9 +798,6 @@ export function calculateBanksFinancing(params: {
       termRules
     });
 
-    const isRuleApplied = !!matchedTermRule;
-    const ruleSource = isRuleApplied ? 'termRule' : 'bankFallback';
-
     const defaultLimits = {
       maxTermMonths: bank.maxTermMonths ?? (BANK_DEFAULT_LIMITS[bank.id]?.maxTermMonths ?? 360),
       maxAgeAtEnd: bank.maxAgeAtEnd ?? (BANK_DEFAULT_LIMITS[bank.id]?.maxAgeAtEnd ?? 75),
@@ -807,7 +806,52 @@ export function calculateBanksFinancing(params: {
       calendarType: bank.calendarType ?? (BANK_DEFAULT_LIMITS[bank.id]?.calendarType ?? 'gregorian' as const)
     };
 
-    let maxTermMonths = isRuleApplied ? matchedTermRule.maxTermMonths : defaultLimits.maxTermMonths;
+    let maxTermMonths = defaultLimits.maxTermMonths;
+    let maxAgeAtEnd = defaultLimits.maxAgeAtEnd;
+    let allowedMonthsAfterRetirement = defaultLimits.monthsAfterRetirement;
+    let allowAfterRetirement = defaultLimits.allowAfterRetirement;
+    let calendarType = defaultLimits.calendarType;
+    let minTermMonths = 12;
+    let ruleSource: 'termRule' | 'bankFallback' = 'bankFallback';
+
+    if (matchedTermRule) {
+      if (matchedTermRule.bankId !== 'all') {
+        // 1. Use specific term rule for the bank if matched
+        maxTermMonths = matchedTermRule.maxTermMonths;
+        maxAgeAtEnd = matchedTermRule.maxAgeAtEnd;
+        allowedMonthsAfterRetirement = matchedTermRule.allowedMonthsAfterRetirement;
+        allowAfterRetirement = matchedTermRule.allowAfterRetirement;
+        calendarType = matchedTermRule.calendarType;
+        minTermMonths = matchedTermRule.minTermMonths;
+        ruleSource = 'termRule';
+      } else {
+        // 3. Fallback bankId = "all" rules are used as a general fallback and restricted by bank settings
+        ruleSource = 'termRule';
+        minTermMonths = matchedTermRule.minTermMonths;
+
+        // Apply fallback clamping based on bank's explicit/implicit config:
+        // 4. If bank allowAfterRetirement is false or monthsAfterRetirement is 0, do not allow post-retirement
+        if (defaultLimits.allowAfterRetirement === false || defaultLimits.monthsAfterRetirement === 0) {
+          allowAfterRetirement = false;
+          allowedMonthsAfterRetirement = 0;
+        } else {
+          allowAfterRetirement = matchedTermRule.allowAfterRetirement;
+          allowedMonthsAfterRetirement = Math.min(matchedTermRule.allowedMonthsAfterRetirement, defaultLimits.monthsAfterRetirement);
+        }
+
+        // 5. Capping of maxTermMonths: can not exceed bank's maxTermMonths
+        maxTermMonths = Math.min(matchedTermRule.maxTermMonths, defaultLimits.maxTermMonths);
+
+        // 6. Hijri calendar type cannot be overridden to Gregorian
+        if (defaultLimits.calendarType === 'hijri') {
+          calendarType = 'hijri';
+        } else {
+          calendarType = matchedTermRule.calendarType;
+        }
+
+        maxAgeAtEnd = Math.min(matchedTermRule.maxAgeAtEnd, defaultLimits.maxAgeAtEnd);
+      }
+    }
 
     // Dynamically cap maxTermMonths by matching margin rules (tiers or points) to prevent margin mismatch errors
     if (hasRealEstate) {
@@ -842,11 +886,7 @@ export function calculateBanksFinancing(params: {
       }
     }
 
-    const maxAgeAtEnd = isRuleApplied ? matchedTermRule.maxAgeAtEnd : defaultLimits.maxAgeAtEnd;
-    const allowedMonthsAfterRetirement = isRuleApplied ? matchedTermRule.allowedMonthsAfterRetirement : defaultLimits.monthsAfterRetirement;
-    const allowAfterRetirement = isRuleApplied ? matchedTermRule.allowAfterRetirement : defaultLimits.allowAfterRetirement;
-    const calendarType = isRuleApplied ? matchedTermRule.calendarType : defaultLimits.calendarType;
-    const minTermMonths = isRuleApplied ? matchedTermRule.minTermMonths : 12;
+    const isRuleApplied = ruleSource === 'termRule';
 
     const termResult = calculateFinanceTerm({
       sectorId,
@@ -1284,6 +1324,50 @@ export function calculateBanksFinancing(params: {
       diag.messages.unshift('المنتج المطلوب غير مفعّل لدى هذه الجهة.');
     }
 
+    const maxEligibleFinanceAmount = hasRealEstate ? reLoanAmount : 0;
+    let finalFinanceAmount = reLoanAmount;
+    let financeAmountAdjusted = false;
+
+    if (hasRealEstate && requestedFinanceAmount && requestedFinanceAmount > 0 && !isPersonalOnly) {
+      if (requestedFinanceAmount > maxEligibleFinanceAmount) {
+        diag.status = 'rejected';
+        diag.messages.unshift("المبلغ المطلوب أعلى من الحد الأعلى المتاح لدى هذه الجهة.");
+        diag.calculationSteps.push(`[المبلغ المطلوب]: المبلغ المطلوب (${requestedFinanceAmount.toLocaleString('ar-SA')} ريال) أعلى من الحد الأعلى المتاح (${maxEligibleFinanceAmount.toLocaleString('ar-SA')} ريال).`);
+        
+        reLoanAmount = 0;
+        purchasingPower = 0;
+        installmentBefore = 0;
+        installmentAfter = 0;
+        realEstateStage1 = 0;
+        realEstateStage2 = 0;
+        realEstateStage3 = 0;
+        totalInstallmentStage1 = 0;
+        totalInstallmentStage2 = 0;
+        personalInstallmentDisplay = 0;
+      } else {
+        const ratio = requestedFinanceAmount / maxEligibleFinanceAmount;
+        
+        reLoanAmount = requestedFinanceAmount;
+        installmentBefore = Math.round(installmentBefore * ratio);
+        installmentAfter = Math.round(installmentAfter * ratio);
+        realEstateStage1 = Math.round(realEstateStage1 * ratio);
+        realEstateStage2 = Math.round(realEstateStage2 * ratio);
+        realEstateStage3 = Math.round(realEstateStage3 * ratio);
+        
+        purchasingPower = reLoanAmount + (supportType === 'downpayment' ? supportResult.downPaymentSupport : 0);
+        
+        if (normalizedProductId === 'both' || normalizedProductId === 'real_estate_with_new_personal') {
+          totalInstallmentStage1 = installmentBefore + personalInstallment;
+        } else {
+          totalInstallmentStage1 = installmentBefore;
+        }
+        totalInstallmentStage2 = installmentAfter;
+        
+        finalFinanceAmount = requestedFinanceAmount;
+        financeAmountAdjusted = true;
+      }
+    }
+
     // Financing Limits Rejection Checks
     if (isProductSupported && diag.status !== 'rejected') {
       if (hasRealEstate && reLoanAmount < minRE) {
@@ -1333,6 +1417,10 @@ export function calculateBanksFinancing(params: {
       supportType: supportType,
       totalPurchasingPower: isEligible ? (isPersonalOnly ? personalLoanAmount : (purchasingPower + personalLoanAmount + effectiveEtizazAmount)) : 0,
       etizazAmount: isEligible ? effectiveEtizazAmount : 0,
+      maxEligibleFinanceAmount: maxEligibleFinanceAmount,
+      requestedFinanceAmount: requestedFinanceAmount,
+      finalFinanceAmount: isEligible ? finalFinanceAmount : 0,
+      financeAmountAdjusted: financeAmountAdjusted,
       monthlyInstallmentBeforeRetirement: totalInstallmentStage1,
       monthlyInstallmentAfterRetirement: isEligible ? (isPersonalOnly ? 0 : installmentAfter) : 0,
       monthlyInstallmentAfterPersonal: totalInstallmentStage2,
@@ -1637,7 +1725,52 @@ export function calculateAll(params: {
     calendarType: liveBank?.calendarType ?? (BANK_DEFAULT_LIMITS[bankId]?.calendarType ?? 'gregorian' as const)
   };
 
-  let maxTermMonths = matchedTermRule ? matchedTermRule.maxTermMonths : defaultLimits.maxTermMonths;
+  let maxTermMonths = defaultLimits.maxTermMonths;
+  let maxAgeAtEnd = defaultLimits.maxAgeAtEnd;
+  let allowedMonthsAfterRetirement = defaultLimits.monthsAfterRetirement;
+  let allowAfterRetirement = defaultLimits.allowAfterRetirement;
+  let calendarType = defaultLimits.calendarType;
+  let minTermMonths = 12;
+  let ruleSource: 'termRule' | 'bankFallback' = 'bankFallback';
+
+  if (matchedTermRule) {
+    if (matchedTermRule.bankId !== 'all') {
+      // 1. Use specific term rule for the bank if matched
+      maxTermMonths = matchedTermRule.maxTermMonths;
+      maxAgeAtEnd = matchedTermRule.maxAgeAtEnd;
+      allowedMonthsAfterRetirement = matchedTermRule.allowedMonthsAfterRetirement;
+      allowAfterRetirement = matchedTermRule.allowAfterRetirement;
+      calendarType = matchedTermRule.calendarType;
+      minTermMonths = matchedTermRule.minTermMonths;
+      ruleSource = 'termRule';
+    } else {
+      // 3. Fallback bankId = "all" rules are used as a general fallback and restricted by bank settings
+      ruleSource = 'termRule';
+      minTermMonths = matchedTermRule.minTermMonths;
+
+      // Apply fallback clamping based on bank's explicit/implicit config:
+      // 4. If bank allowAfterRetirement is false or monthsAfterRetirement is 0, do not allow post-retirement
+      if (defaultLimits.allowAfterRetirement === false || defaultLimits.monthsAfterRetirement === 0) {
+        allowAfterRetirement = false;
+        allowedMonthsAfterRetirement = 0;
+      } else {
+        allowAfterRetirement = matchedTermRule.allowAfterRetirement;
+        allowedMonthsAfterRetirement = Math.min(matchedTermRule.allowedMonthsAfterRetirement, defaultLimits.monthsAfterRetirement);
+      }
+
+      // 5. Capping of maxTermMonths: can not exceed bank's maxTermMonths
+      maxTermMonths = Math.min(matchedTermRule.maxTermMonths, defaultLimits.maxTermMonths);
+
+      // 6. Hijri calendar type cannot be overridden to Gregorian
+      if (defaultLimits.calendarType === 'hijri') {
+        calendarType = 'hijri';
+      } else {
+        calendarType = matchedTermRule.calendarType;
+      }
+
+      maxAgeAtEnd = Math.min(matchedTermRule.maxAgeAtEnd, defaultLimits.maxAgeAtEnd);
+    }
+  }
 
   // Let's also dynamically cap it based on margin rules to prevent any margin matching error!
   if (hasRealEstate) {
@@ -1672,12 +1805,6 @@ export function calculateAll(params: {
     }
   }
 
-  const maxAgeAtEnd = matchedTermRule ? matchedTermRule.maxAgeAtEnd : defaultLimits.maxAgeAtEnd;
-  const allowedMonthsAfterRetirement = matchedTermRule ? matchedTermRule.allowedMonthsAfterRetirement : defaultLimits.monthsAfterRetirement;
-  const allowAfterRetirement = matchedTermRule ? matchedTermRule.allowAfterRetirement : defaultLimits.allowAfterRetirement;
-  const calendarType = matchedTermRule ? matchedTermRule.calendarType : defaultLimits.calendarType;
-  const minTermMonths = matchedTermRule ? matchedTermRule.minTermMonths : 12;
-
   const termResult = calculateFinanceTerm({
     sectorId,
     birthYear,
@@ -1694,7 +1821,7 @@ export function calculateAll(params: {
     minTermMonths,
     selectedMode: 'manual',
     manualTermMonths: termYears * 12,
-    ruleSource: matchedTermRule ? 'termRule' : 'bankFallback',
+    ruleSource,
     postRetirementMode: matchedTermRule?.postRetirementMode
   });
 

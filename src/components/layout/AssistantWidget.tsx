@@ -165,8 +165,12 @@ export default function AssistantWidget({ mode }: AssistantWidgetProps) {
   useEffect(() => {
     if (!user) {
       // Clear session storages
-      sessionStorage.removeItem(HISTORY_KEY);
-      sessionStorage.removeItem(STATE_KEY);
+      try {
+        sessionStorage.removeItem(HISTORY_KEY);
+        sessionStorage.removeItem(STATE_KEY);
+      } catch (e) {
+        console.warn('Could not clear session storage:', e);
+      }
       setMessages([]);
       setAssistantState(INITIAL_ASSISTANT_STATE);
     }
@@ -335,8 +339,12 @@ export default function AssistantWidget({ mode }: AssistantWidgetProps) {
   };
 
   const clearChat = () => {
-    sessionStorage.removeItem(HISTORY_KEY);
-    sessionStorage.removeItem(STATE_KEY);
+    try {
+      sessionStorage.removeItem(HISTORY_KEY);
+      sessionStorage.removeItem(STATE_KEY);
+    } catch (e) {
+      console.warn('Could not clear session storage:', e);
+    }
     setAssistantState(INITIAL_ASSISTANT_STATE);
     setMessages([
       {

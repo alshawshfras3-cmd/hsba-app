@@ -504,8 +504,13 @@ export async function getDailyUsage(userId: string, dateStr?: string): Promise<n
   const targetDate = dateStr || new Date().toISOString().split('T')[0];
 
   if (!hasSupabaseKeys) {
-    const cachedUsage = sessionStorage.getItem(`hesba_usage_${userId}_${targetDate}`);
-    return cachedUsage ? parseInt(cachedUsage, 10) : 0;
+    try {
+      const cachedUsage = sessionStorage.getItem(`hesba_usage_${userId}_${targetDate}`);
+      return cachedUsage ? parseInt(cachedUsage, 10) : 0;
+    } catch (e) {
+      console.warn('Could not read session storage usage:', e);
+      return 0;
+    }
   }
 
   try {
@@ -543,7 +548,11 @@ export async function incrementDailyUsage(userId: string, dailyLimit: number | n
   const newCount = currentCount + 1;
 
   if (!hasSupabaseKeys) {
-    sessionStorage.setItem(`hesba_usage_${userId}_${targetDate}`, String(newCount));
+    try {
+      sessionStorage.setItem(`hesba_usage_${userId}_${targetDate}`, String(newCount));
+    } catch (e) {
+      console.warn('Could not write session storage usage:', e);
+    }
     return { success: true, count: newCount };
   }
 

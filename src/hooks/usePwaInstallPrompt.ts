@@ -27,11 +27,15 @@ export function usePwaInstallPrompt() {
     setIsInstalled(checkIsInstalled());
 
     // Check localStorage dismissed timestamp
-    const dismissedAt = localStorage.getItem('hesba_pwa_dismissed_at');
-    if (dismissedAt) {
-      const dismissTime = parseInt(dismissedAt, 10);
-      const isStillDismissed = Date.now() - dismissTime < 7 * 24 * 60 * 60 * 1000; // 7 days
-      setIsDismissed(isStillDismissed);
+    try {
+      const dismissedAt = localStorage.getItem('hesba_pwa_dismissed_at');
+      if (dismissedAt) {
+        const dismissTime = parseInt(dismissedAt, 10);
+        const isStillDismissed = Date.now() - dismissTime < 7 * 24 * 60 * 60 * 1000; // 7 days
+        setIsDismissed(isStillDismissed);
+      }
+    } catch (e) {
+      console.warn('Failed to read hesba_pwa_dismissed_at from localStorage:', e);
     }
 
     const handleBeforeInstallPrompt = (e: Event) => {
@@ -44,7 +48,11 @@ export function usePwaInstallPrompt() {
       setIsInstalled(true);
       setDeferredPrompt(null);
       setCanInstall(false);
-      localStorage.setItem('hesba_pwa_installed', 'true');
+      try {
+        localStorage.setItem('hesba_pwa_installed', 'true');
+      } catch (e) {
+        console.warn('Failed to save hesba_pwa_installed in localStorage:', e);
+      }
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -83,13 +91,21 @@ export function usePwaInstallPrompt() {
   };
 
   const dismissInstallPrompt = () => {
-    localStorage.setItem('hesba_pwa_dismissed_at', Date.now().toString());
+    try {
+      localStorage.setItem('hesba_pwa_dismissed_at', Date.now().toString());
+    } catch (e) {
+      console.warn('Failed to save hesba_pwa_dismissed_at in localStorage:', e);
+    }
     setIsDismissed(true);
   };
 
   // Safe manual trigger to reset dismissal for settings trigger
   const resetDismissalAndPrompt = () => {
-    localStorage.removeItem('hesba_pwa_dismissed_at');
+    try {
+      localStorage.removeItem('hesba_pwa_dismissed_at');
+    } catch (e) {
+      console.warn('Failed to remove hesba_pwa_dismissed_at from localStorage:', e);
+    }
     setIsDismissed(false);
   };
 

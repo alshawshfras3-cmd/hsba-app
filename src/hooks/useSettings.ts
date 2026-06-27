@@ -128,7 +128,9 @@ export function useSettings() {
           dsrRules: normalizeDsrRules(appSettingsObj.dsrRules ?? appSettingsObj.dsr_rules ?? []),
           dsr_rules: normalizeDsrRules(appSettingsObj.dsrRules ?? appSettingsObj.dsr_rules ?? []),
           support_settings: appSettingsObj.supportSettings ?? appSettingsObj.support_settings ?? {},
-          personal_finance_rules: appSettingsObj.personalRules ?? appSettingsObj.personal_finance_rules ?? [],
+          personalRules: appSettingsObj.personalRules ?? appSettingsObj.personal_finance_rules ?? appSettingsObj.personal_rules ?? [],
+          personal_rules: appSettingsObj.personalRules ?? appSettingsObj.personal_finance_rules ?? appSettingsObj.personal_rules ?? [],
+          personal_finance_rules: appSettingsObj.personalRules ?? appSettingsObj.personal_finance_rules ?? appSettingsObj.personal_rules ?? [],
           advanced_rules: appSettingsObj.advancedRules ?? appSettingsObj.advanced_rules ?? [],
           hasba_custom_sectors: appSettingsObj.customSectors ?? appSettingsObj.hasba_custom_sectors ?? [],
           bank_sector_pension_rules: appSettingsObj.bankSectorRules ?? appSettingsObj.bank_sector_pension_rules ?? [],
@@ -167,7 +169,9 @@ export function useSettings() {
               dsrRules: normalizeDsrRules(value.dsrRules ?? value.dsr_rules ?? []),
               dsr_rules: normalizeDsrRules(value.dsrRules ?? value.dsr_rules ?? []),
               support_settings: value.supportSettings ?? value.support_settings ?? {},
-              personal_finance_rules: value.personalRules ?? value.personal_finance_rules ?? [],
+              personalRules: value.personalRules ?? value.personal_finance_rules ?? value.personal_rules ?? [],
+              personal_rules: value.personalRules ?? value.personal_finance_rules ?? value.personal_rules ?? [],
+              personal_finance_rules: value.personalRules ?? value.personal_finance_rules ?? value.personal_rules ?? [],
               advanced_rules: value.advancedRules ?? value.advanced_rules ?? [],
               hasba_custom_sectors: value.customSectors ?? value.hasba_custom_sectors ?? [],
               bank_sector_pension_rules: value.bankSectorRules ?? value.bank_sector_pension_rules ?? [],
@@ -268,30 +272,40 @@ export function useSettings() {
     isTemporaryFallback,
     fetchSettings,
     saveSetting,
-    banks: settings.banks ?? [],
-    marginRules: settings.margin_rules !== undefined && settings.margin_rules !== null
+    banks: Array.isArray(settings.banks) ? settings.banks : [],
+    marginRules: Array.isArray(settings.margin_rules)
       ? (settings.margin_rules as any[]).map((r: any) => ({
           ...r,
           productId: normalizeMemoryProductId(r.productId)
         }))
       : [],
-    dsrRules: normalizeDsrRules(settings.dsrRules ?? settings.dsr_rules ?? []).map((r: any) => ({ ...r, productType: normalizeMemoryProductId(r.productType || r.productId) })),
-    personalRules: (settings.personal_finance_rules ?? []).map((r: any) => ({ ...r, productId: normalizeMemoryProductId(r.productId) })),
-    products: (settings.product_acceptance ?? []).map((r: any) => ({ ...r, productId: normalizeMemoryProductId(r.productId) })),
-    militaryRanks: settings.military_ranks ?? [],
-    pensionRules: settings.pension_rules ?? [],
+    dsrRules: (() => {
+      const rules = normalizeDsrRules(settings.dsrRules ?? settings.dsr_rules ?? []);
+      return Array.isArray(rules) ? rules.map((r: any) => ({ ...r, productType: normalizeMemoryProductId(r.productType || r.productId) })) : [];
+    })(),
+    personalRules: (() => {
+      const rules = settings.personalRules ?? settings.personal_finance_rules ?? settings.personal_rules ?? [];
+      return Array.isArray(rules) ? rules.map((r: any) => ({ ...r, productId: normalizeMemoryProductId(r.productId) })) : [];
+    })(),
+    products: Array.isArray(settings.product_acceptance)
+      ? settings.product_acceptance.map((r: any) => ({ ...r, productId: normalizeMemoryProductId(r.productId) }))
+      : [],
+    militaryRanks: Array.isArray(settings.military_ranks) ? settings.military_ranks : [],
+    pensionRules: Array.isArray(settings.pension_rules) ? settings.pension_rules : [],
     supportSettings: settings.support_settings ?? {},
-    salaryRules: settings.salary_rules ?? [],
-    termRules: (settings.term_rules ?? []).map((r: any) => ({ ...r, productId: normalizeMemoryProductId(r.productId) })),
-    advancedRules: settings.advanced_rules ?? [],
-    userSubscriptions: settings.user_subscriptions ?? [],
-    customSectors: settings.hasba_custom_sectors ?? [],
-    bankSectorRules: settings.bank_sector_pension_rules ?? [],
-    pensionRulesLibrary: settings.pension_rules_library ?? [],
-    housingSupportTiers: settings.housingSupportTiers ?? [],
-    advancePaymentTiers: settings.advancePaymentTiers ?? [],
-    approvedSalaryRules: settings.approvedSalaryRules ?? [],
-    pensionDbRules: settings.pensionDbRules ?? [],
-    sectorMappings: settings.sectorMappings ?? [],
+    salaryRules: Array.isArray(settings.salary_rules) ? settings.salary_rules : [],
+    termRules: Array.isArray(settings.term_rules)
+      ? settings.term_rules.map((r: any) => ({ ...r, productId: normalizeMemoryProductId(r.productId) }))
+      : [],
+    advancedRules: Array.isArray(settings.advanced_rules) ? settings.advanced_rules : [],
+    userSubscriptions: Array.isArray(settings.user_subscriptions) ? settings.user_subscriptions : [],
+    customSectors: Array.isArray(settings.hasba_custom_sectors) ? settings.hasba_custom_sectors : [],
+    bankSectorRules: Array.isArray(settings.bank_sector_pension_rules) ? settings.bank_sector_pension_rules : [],
+    pensionRulesLibrary: Array.isArray(settings.pension_rules_library) ? settings.pension_rules_library : [],
+    housingSupportTiers: Array.isArray(settings.housingSupportTiers) ? settings.housingSupportTiers : [],
+    advancePaymentTiers: Array.isArray(settings.advancePaymentTiers) ? settings.advancePaymentTiers : [],
+    approvedSalaryRules: Array.isArray(settings.approvedSalaryRules) ? settings.approvedSalaryRules : [],
+    pensionDbRules: Array.isArray(settings.pensionDbRules) ? settings.pensionDbRules : [],
+    sectorMappings: Array.isArray(settings.sectorMappings) ? settings.sectorMappings : [],
   };
 }

@@ -145,6 +145,11 @@ export default function ResultsGrid({
       lines.push(`دعم اعتزاز: ${formatNum(resolvedEtizaz)} ريال`);
     }
 
+    if (offer.financeAmountAdjusted === true) {
+      lines.push(`أقصى تمويل متاح: ${formatNum(offer.maxEligibleFinanceAmount || 0)} ريال`);
+      lines.push(`مبلغ التمويل المطلوب: ${formatNum(offer.requestedFinanceAmount || 0)} ريال`);
+    }
+
     lines.push(''); // empty line
 
     if (mainFinanceType === 'personal_only') {
@@ -308,6 +313,11 @@ export default function ResultsGrid({
     const resolvedEtizaz = offer.etizazAmount ?? (offer as any).etizazAmount ?? 0;
     if (resolvedEtizaz > 0) {
       lines.push(`دعم اعتزاز: ${formatNum(resolvedEtizaz)} ريال`);
+    }
+
+    if (offer.financeAmountAdjusted === true) {
+      lines.push(`أقصى تمويل متاح: ${formatNum(offer.maxEligibleFinanceAmount || 0)} ريال`);
+      lines.push(`مبلغ التمويل المطلوب: ${formatNum(offer.requestedFinanceAmount || 0)} ريال`);
     }
 
     lines.push(''); // empty line
@@ -619,6 +629,8 @@ export default function ResultsGrid({
                           ? 'مبلغ التمويل الشخصي المتاح' 
                           : mainFinanceType === 'real_estate_with_existing_personal'
                           ? 'مبلغ التمويل العقاري المتاح'
+                          : offer.financeAmountAdjusted === true
+                          ? 'إجمالي التمويل النهائي (المبلغ المطلوب)'
                           : 'إجمالي مبلغ التمويل المتكامل المتاح'}
                       </span>
                       <div className="flex items-baseline gap-1.5">
@@ -631,6 +643,19 @@ export default function ResultsGrid({
                         </span>
                         <span className="text-xs font-bold text-[#6B7280] dark:text-slate-400">ريال سعودي</span>
                       </div>
+
+                      {offer.financeAmountAdjusted === true && (
+                        <div className="mt-2.5 pt-2 border-t border-dashed border-slate-200 dark:border-slate-800 grid grid-cols-2 gap-2 text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                          <div>
+                            <span className="block text-slate-450 dark:text-slate-500">أقصى تمويل متاح:</span>
+                            <span className="font-extrabold text-slate-700 dark:text-slate-350">{Math.round(offer.maxEligibleFinanceAmount || 0).toLocaleString('ar-SA')} ريال</span>
+                          </div>
+                          <div>
+                            <span className="block text-amber-600 dark:text-amber-400">مبلغ التمويل المطلوب:</span>
+                            <span className="font-extrabold text-amber-600 dark:text-amber-400">{Math.round(offer.requestedFinanceAmount || 0).toLocaleString('ar-SA')} ريال</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Mobile-only Accordion Selector */}
@@ -1062,6 +1087,32 @@ export default function ResultsGrid({
                 </h4>
 
                 <div className="grid grid-cols-2 lg:grid-cols-2 gap-4 text-right font-semibold select-none">
+                  {selectedOffer.financeAmountAdjusted === true && (
+                    <div className="col-span-2 bg-amber-50/50 dark:bg-amber-950/10 border border-amber-100/70 dark:border-amber-900/30 p-4 rounded-xl space-y-3 font-sans">
+                      <div className="flex justify-between items-center border-b border-amber-100/50 dark:border-amber-900/20 pb-2">
+                        <span className="text-xs font-bold text-amber-800 dark:text-amber-400">تعديل مبلغ التمويل المطلوب</span>
+                        <span className="text-[10px] bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 px-2 py-0.5 rounded-md font-bold">معدل</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <span className="text-[10px] text-slate-400 dark:text-slate-500 block mb-1">أقصى تمويل متاح لدى هذه الجهة</span>
+                          <span className="font-extrabold text-slate-800 dark:text-slate-100 text-sm">
+                            {Math.round(selectedOffer.maxEligibleFinanceAmount || 0).toLocaleString('ar-SA')} ريال
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-amber-700 dark:text-amber-400 block mb-1">مبلغ التمويل المطلوب</span>
+                          <span className="font-extrabold text-amber-600 dark:text-amber-400 text-sm">
+                            {Math.round(selectedOffer.requestedFinanceAmount || 0).toLocaleString('ar-SA')} ريال
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed pt-1">
+                        * تم احتساب القسط وهيكل التمويل على المبلغ المطلوب فقط مع بقاء الهامش والامتيازات الأخرى كما هي.
+                      </p>
+                    </div>
+                  )}
+
                   {/* 1. التمويل العقاري */}
                   <div className="bg-slate-50/50 dark:bg-[#0F172A] hover:bg-slate-50 dark:hover:bg-slate-800 p-3.5 rounded-xl border border-slate-100/80 dark:border-slate-800/60 transition-all">
                     <span className="text-[10px] text-slate-400 dark:text-slate-500 block mb-1">التمويل العقاري</span>
