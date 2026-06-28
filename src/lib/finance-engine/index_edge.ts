@@ -1072,6 +1072,22 @@ export function calculateBanksFinancing(params: {
     let realEstateStage2 = 0;
     let realEstateStage3 = 0;
 
+    // Etizaz support config & check
+    const activeRuleForCheckingEtizaz = products && Array.isArray(products)
+      ? products.find(p => p.bankId === bank.id && normalizeProductId(p.productId) === (isCombinedFallbackToRealEstateOnly ? 'real_estate_only' : normalizedProductId) && p.isActive !== false)
+      : undefined;
+
+    const ruleSupportsEtizaz = activeRuleForCheckingEtizaz && Array.isArray(activeRuleForCheckingEtizaz.allowedSupportTypes)
+      ? activeRuleForCheckingEtizaz.allowedSupportTypes.includes('etizaz')
+      : false;
+
+    const bankSupportsEtizaz = bank.etizazSupportEnabled !== false && ruleSupportsEtizaz;
+    const effectiveEtizazAmount = bankSupportsEtizaz ? etizazAmount : 0;
+    const etizazTermMonths = effectiveEtizazAmount > 0 ? termResult.totalMonths : 0;
+    const etizazMonthlyInstallment = (effectiveEtizazAmount > 0 && etizazTermMonths > 0)
+      ? (effectiveEtizazAmount / etizazTermMonths)
+      : 0;
+
     const extObligations = (normalizedProductId === 'real_estate_with_personal_existing' || normalizedProductId === 'real_estate_with_existing_personal') ? (existingMonthlyObligations ?? 0) : 0;
     const extObligationMonths = (normalizedProductId === 'real_estate_with_personal_existing' || normalizedProductId === 'real_estate_with_existing_personal') ? (obligationRemainingMonths ?? 0) : 0;
 
@@ -1089,22 +1105,25 @@ export function calculateBanksFinancing(params: {
         );
         realEstateStage1 = Math.max(
           0,
-          totalAllowedInstallment - blockingInstallment
+          totalAllowedInstallment - blockingInstallment - etizazMonthlyInstallment
         );
-        totalCustomerStage1 = realEstateStage1 + blockingInstallment;
+        totalCustomerStage1 = realEstateStage1 + blockingInstallment + etizazMonthlyInstallment;
 
         // المرحلة 2: بعد انتهاء الالتزام وقبل التقاعد
         stage2Months = Math.max(
           0,
           termResult.monthsBeforeRetirement - extObligationMonths
         );
-        realEstateStage2 = totalAllowedInstallment;
+        realEstateStage2 = Math.max(
+          0,
+          totalAllowedInstallment - etizazMonthlyInstallment
+        );
 
         // المرحلة 3: بعد التقاعد
         stage3Months = termResult.monthsAfterRetirement;
         realEstateStage3 = Math.max(
           0,
-          correctedPensionSalary * dsrAfterResult.dsrPercentage / 100
+          (correctedPensionSalary * dsrAfterResult.dsrPercentage / 100) - etizazMonthlyInstallment
         );
 
         // التمويل الكلي
@@ -1127,7 +1146,7 @@ export function calculateBanksFinancing(params: {
       } else {
         const effectiveObligationsBefore = (dsrBeforeResult?.deductExistingObligations !== false) ? obligations : 0;
         const adjustedProductIdForObligations = isCombinedFallbackToRealEstateOnly ? 'real_estate_only' : normalizedProductId;
-        const adjustedObligationsBeforeVal = (adjustedProductIdForObligations === 'real_estate' || adjustedProductIdForObligations === 'real_estate_only') ? 0 : (effectiveObligationsBefore + ((adjustedProductIdForObligations === 'both' || adjustedProductIdForObligations === 'real_estate_with_new_personal') ? personalInstallment : 0));
+        const adjustedObligationsBeforeVal = (adjustedProductIdForObligations === 'real_estate' || adjustedProductIdForObligations === 'real_estate_only') ? etizazMonthlyInstallment : (effectiveObligationsBefore + etizazMonthlyInstallment + ((adjustedProductIdForObligations === 'both' || adjustedProductIdForObligations === 'real_estate_with_new_personal') ? personalInstallment : 0));
 
         const reCalc = calculateRealEstateFinance({
           netSalaryBefore: solvedNetSalary,
@@ -1149,13 +1168,13 @@ export function calculateBanksFinancing(params: {
           const monthsAfterRetirementAdjusted = Math.max(0, termResult.totalMonths - Math.max(termResult.monthsBeforeRetirement, personalMonths));
 
           const effectiveSalaryBefore = solvedNetSalary + (supportType === 'monthly' ? supportResult.monthlySupport : 0);
-          const installmentWithPersonal = Math.max(0, (effectiveSalaryBefore * (dsrBeforeResult.dsrPercentage / 100)) - effectiveObligationsBefore - personalInstallment);
-          const installmentWithoutPersonal = Math.max(0, (effectiveSalaryBefore * (dsrBeforeResult.dsrPercentage / 100)) - effectiveObligationsBefore);
+          const installmentWithPersonal = Math.max(0, (effectiveSalaryBefore * (dsrBeforeResult.dsrPercentage / 100)) - effectiveObligationsBefore - personalInstallment - etizazMonthlyInstallment);
+          const installmentWithoutPersonal = Math.max(0, (effectiveSalaryBefore * (dsrBeforeResult.dsrPercentage / 100)) - effectiveObligationsBefore - etizazMonthlyInstallment);
 
           const effectiveSalaryAfter = correctedPensionSalary + (supportType === 'monthly' ? supportResult.monthlySupport : 0);
           let currentInstallmentAfter = 0;
           if (termResult.monthsAfterRetirement > 0) {
-            currentInstallmentAfter = Math.max(0, effectiveSalaryAfter * (dsrAfterResult.dsrPercentage / 100));
+            currentInstallmentAfter = Math.max(0, (effectiveSalaryAfter * (dsrAfterResult.dsrPercentage / 100)) - etizazMonthlyInstallment);
           }
 
           const totalDualCashflow = (installmentWithPersonal * monthsInPersonal) + (installmentWithoutPersonal * monthsOutsidePersonal) + (currentInstallmentAfter * monthsAfterRetirementAdjusted);
@@ -1166,8 +1185,8 @@ export function calculateBanksFinancing(params: {
           installmentAfter = currentInstallmentAfter;
           purchasingPower = reLoanAmount + (supportType === 'downpayment' ? supportResult.downPaymentSupport : 0);
 
-          totalInstallmentStage1 = installmentWithPersonal + personalInstallment;
-          totalInstallmentStage2 = installmentWithoutPersonal;
+          totalInstallmentStage1 = installmentWithPersonal + personalInstallment + etizazMonthlyInstallment;
+          totalInstallmentStage2 = installmentWithoutPersonal + etizazMonthlyInstallment;
           personalInstallmentDisplay = personalInstallment;
 
           // Store for output stage tracking
@@ -1177,7 +1196,7 @@ export function calculateBanksFinancing(params: {
           stage1Months = monthsInPersonal;
           stage2Months = monthsOutsidePersonal;
           stage3Months = monthsAfterRetirementAdjusted;
-          totalCustomerStage1 = installmentWithPersonal + personalInstallment;
+          totalCustomerStage1 = installmentWithPersonal + personalInstallment + etizazMonthlyInstallment;
         } else {
           reLoanAmount = reCalc.realEstateFinanceAmount;
           installmentBefore = reCalc.monthlyInstallmentBeforeRetirement;
@@ -1299,23 +1318,15 @@ export function calculateBanksFinancing(params: {
       }
     }
 
-    // Etizaz support config & check
-    const activeRuleForCheckingEtizaz = products && Array.isArray(products)
-      ? products.find(p => p.bankId === bank.id && normalizeProductId(p.productId) === (isCombinedFallbackToRealEstateOnly ? 'real_estate_only' : normalizedProductId) && p.isActive !== false)
-      : undefined;
-
-    const ruleSupportsEtizaz = activeRuleForCheckingEtizaz && Array.isArray(activeRuleForCheckingEtizaz.allowedSupportTypes)
-      ? activeRuleForCheckingEtizaz.allowedSupportTypes.includes('etizaz')
-      : false;
-
-    const bankSupportsEtizaz = bank.etizazSupportEnabled !== false && ruleSupportsEtizaz;
-    const effectiveEtizazAmount = bankSupportsEtizaz ? etizazAmount : 0;
-
     if (etizazAmount > 0 && !bankSupportsEtizaz) {
       if (diag.status === 'approved') {
         diag.status = 'warning';
       }
       diag.messages.push("هذه الجهة لا تدعم اعتزاز، وتم احتساب التمويل بدون دعم اعتزاز.");
+    } else if (effectiveEtizazAmount > 0) {
+      const stepMsg = `[اعتزاز]: مبلغ ${effectiveEtizazAmount.toLocaleString('ar-SA')} ريال دفعة مستردة ÷ ${etizazTermMonths} شهر = ${etizazMonthlyInstallment.toFixed(2)} ريال شهرياً، وتم خصمه من القدرة الاستقطاعية.`;
+      diag.calculationSteps.push(stepMsg);
+      diag.messages.push(`تم احتساب دعم اعتزاز كدفعة مستردة بقسط شهري ${Math.round(etizazMonthlyInstallment).toLocaleString('ar-SA')} ريال.`);
     }
 
     const isProductSupported = isProductEnabledForBank(bank, normalizedProductId, products, supportType);
@@ -1357,11 +1368,11 @@ export function calculateBanksFinancing(params: {
         purchasingPower = reLoanAmount + (supportType === 'downpayment' ? supportResult.downPaymentSupport : 0);
         
         if (normalizedProductId === 'both' || normalizedProductId === 'real_estate_with_new_personal') {
-          totalInstallmentStage1 = installmentBefore + personalInstallment;
+          totalInstallmentStage1 = installmentBefore + personalInstallment + etizazMonthlyInstallment;
         } else {
-          totalInstallmentStage1 = installmentBefore;
+          totalInstallmentStage1 = installmentBefore + etizazMonthlyInstallment;
         }
-        totalInstallmentStage2 = installmentAfter;
+        totalInstallmentStage2 = installmentAfter + etizazMonthlyInstallment;
         
         finalFinanceAmount = requestedFinanceAmount;
         financeAmountAdjusted = true;
@@ -1382,8 +1393,8 @@ export function calculateBanksFinancing(params: {
     const isEligible = diag.status !== 'rejected' && isProductSupported;
 
     if (normalizedProductId !== 'both' && normalizedProductId !== 'real_estate_with_new_personal' && normalizedProductId !== 'real_estate_with_personal_existing' && normalizedProductId !== 'real_estate_with_existing_personal') {
-      totalInstallmentStage1 = isEligible ? (isPersonalOnly ? personalInstallment : installmentBefore) : 0;
-      totalInstallmentStage2 = isEligible ? (isPersonalOnly ? 0 : installmentAfter) : 0;
+      totalInstallmentStage1 = isEligible ? (isPersonalOnly ? personalInstallment : (installmentBefore + etizazMonthlyInstallment)) : 0;
+      totalInstallmentStage2 = isEligible ? (isPersonalOnly ? 0 : (installmentAfter + etizazMonthlyInstallment)) : 0;
       personalInstallmentDisplay = isEligible ? (isPersonalOnly ? personalInstallment : 0) : 0;
     } else if (normalizedProductId === 'both' || normalizedProductId === 'real_estate_with_new_personal') {
       if (!isEligible) {
@@ -1417,6 +1428,9 @@ export function calculateBanksFinancing(params: {
       supportType: supportType,
       totalPurchasingPower: isEligible ? (isPersonalOnly ? personalLoanAmount : (purchasingPower + personalLoanAmount + effectiveEtizazAmount)) : 0,
       etizazAmount: isEligible ? effectiveEtizazAmount : 0,
+      etizazMonthlyInstallment: isEligible ? etizazMonthlyInstallment : 0,
+      etizazTermMonths: isEligible ? etizazTermMonths : 0,
+      etizazIsRefundable: isEligible ? bankSupportsEtizaz : false,
       maxEligibleFinanceAmount: maxEligibleFinanceAmount,
       requestedFinanceAmount: requestedFinanceAmount,
       finalFinanceAmount: isEligible ? finalFinanceAmount : 0,

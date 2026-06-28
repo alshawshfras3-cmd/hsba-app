@@ -48,13 +48,17 @@ export default function SupportSection({
   const [aAmount, setAAmount] = useState<string>('0');
 
   // Etizaz support states
-  const etizaz = supportSettings?.etizaz || {
+  const rawEtizaz = supportSettings?.etizaz || {
     enabled: true,
     amount: 160000,
-    isRefundable: false,
+    isRefundable: true,
     eligibleSectors: ['military'],
     label: 'دعم اعتزاز للعسكريين',
-    notes: 'دعم غير مسترد خاص بالعسكريين المؤهلين'
+    notes: 'دفعة مستردة خاصة بالعسكريين المؤهلين'
+  };
+  const etizaz = {
+    ...rawEtizaz,
+    isRefundable: true
   };
 
   const [localAmount, setLocalAmount] = useState<string>(String(etizaz.amount));
@@ -575,7 +579,7 @@ export default function SupportSection({
           <div>
             <h3 className="font-bold text-sm text-[#111827]">دعم اعتزاز للعسكريين</h3>
             <p className="text-xs text-[#6B7280]">
-              دعم غير مسترد خاص بالعسكريين المؤهلين، يظهر فقط عند اختيار القطاع العسكري في الحاسبة وبشرط التفعيل أدناه.
+              دفعة مستردة خاصة بالعسكريين المؤهلين، يظهر فقط عند اختيار القطاع العسكري في الحاسبة وبشرط التفعيل أدناه.
             </p>
           </div>
         </div>
@@ -644,7 +648,7 @@ export default function SupportSection({
             <div className="space-y-1.5">
               <div className="flex items-center gap-1.5 text-[10px] text-indigo-700 bg-indigo-50 border border-indigo-150 rounded-lg px-2.5 py-1 font-bold">
                 <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                <span>غير مسترد (isRefundable: false)</span>
+                <span>دفعة مستردة (isRefundable: true)</span>
               </div>
               <div className="text-[10px] text-gray-500 font-medium">
                 القطاع المؤهل: <strong className="text-gray-700 font-bold">العسكري فقط</strong>

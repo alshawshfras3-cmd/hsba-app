@@ -245,7 +245,7 @@ function answerForBank(res: AssistantVisibleResult, norm: string): { response: s
   if (hasEtizaz) {
     if (res.etizazAmount > 0) {
       return {
-        response: `مبلغ دعم اعتزاز المخصص للعسكريين في نتيجة **${res.bankName}** هو **${formatMoney(res.etizazAmount)}** مستقل عن الدعم السكني.`
+        response: `دعم اعتزاز في نتيجة **${res.bankName}** هو **دفعة مستردة** بمبلغ **${formatMoney(res.etizazAmount)}**، وبقسط شهري **${formatMoney(res.etizazMonthlyInstallment || 0)}** شهرياً لمدة **${res.etizazTermMonths || 0}** شهراً (يُخصم من القدرة التمويلية العقارية).`
       };
     } else {
       return {
@@ -260,19 +260,19 @@ function answerForBank(res: AssistantVisibleResult, norm: string): { response: s
     if (res.supportType === 'monthly' && res.supportAmount > 0) {
       let msg = `نوع الدعم السكني المطبق في نتيجة **${res.bankName}** هو **دعم شهري ثابت** بقيمة **${formatMoney(res.supportAmount)}** شهريًا.`;
       if (res.etizazAmount > 0) {
-        msg += `\n\nدعم اعتزاز الظاهر في النتيجة: **${formatMoney(res.etizazAmount)}** ريال.`;
+        msg += `\n\nاعتزاز (دفعة مستردة) في النتيجة: **${formatMoney(res.etizazAmount)}** بقسط شهري **${formatMoney(res.etizazMonthlyInstallment || 0)}** لمدة **${res.etizazTermMonths || 0}** شهر.`;
       }
       return { response: msg };
     } else if (res.supportType === 'downpayment' && res.supportAmount > 0) {
       let msg = `نوع الدعم السكني المطبق في نتيجة **${res.bankName}** هو **باقة دعم الدفعة المقدمة** بقيمة **${formatMoney(res.supportAmount)}**.`;
       if (res.etizazAmount > 0) {
-        msg += `\n\nدعم اعتزاز الظاهر في النتيجة: **${formatMoney(res.etizazAmount)}** ريال.`;
+        msg += `\n\nاعتزاز (دفعة مستردة) في النتيجة: **${formatMoney(res.etizazAmount)}** بقسط شهري **${formatMoney(res.etizazMonthlyInstallment || 0)}** لمدة **${res.etizazTermMonths || 0}** شهر.`;
       }
       return { response: msg };
     } else {
       let msg = `نوع الدعم في نتيجة **${res.bankName}** غير محدد أو لا توجد باقة دعم سكني مطبقة حالياً.`;
       if (res.etizazAmount > 0) {
-        msg += `\n\nدعم اعتزاز الظاهر في النتيجة: **${formatMoney(res.etizazAmount)}** ريال.`;
+        msg += `\n\nاعتزاز (دفعة مستردة) في النتيجة: **${formatMoney(res.etizazAmount)}** بقسط شهري **${formatMoney(res.etizazMonthlyInstallment || 0)}** لمدة **${res.etizazTermMonths || 0}** شهر.`;
       }
       return { response: msg };
     }
@@ -294,7 +294,7 @@ function answerForBank(res: AssistantVisibleResult, norm: string): { response: s
     }
 
     if (res.etizazAmount > 0) {
-      responseText += `\n\nدعم اعتزاز الظاهر في النتيجة: **${formatMoney(res.etizazAmount)}** ريال.`;
+      responseText += `\n\nاعتزاز (دفعة مستردة) في النتيجة: **${formatMoney(res.etizazAmount)}** بقسط شهري **${formatMoney(res.etizazMonthlyInstallment || 0)}** لمدة **${res.etizazTermMonths || 0}** شهر.`;
     }
 
     return { response: responseText };

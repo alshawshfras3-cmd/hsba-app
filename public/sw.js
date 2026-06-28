@@ -1,4 +1,4 @@
-const CACHE_NAME = "hesba-pwa-v2";
+const CACHE_NAME = "hesba-pwa-v3";
 const OFFLINE_FALLBACK = "/index.html";
 
 const PRECACHE_ASSETS = [

@@ -1029,15 +1029,22 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         supportSettings: (() => {
           const loadedSupport = settings.support_settings ?? settings.supportSettings ?? null;
           if (loadedSupport === null || loadedSupport === undefined) {
-            return initialData.supportSettings;
-          }
-          if (!loadedSupport.etizaz) {
             return {
-              ...loadedSupport,
-              etizaz: initialData.supportSettings.etizaz
+              ...initialData.supportSettings,
+              etizaz: {
+                ...initialData.supportSettings.etizaz,
+                isRefundable: true
+              }
             };
           }
-          return loadedSupport;
+          const etizazObj = loadedSupport.etizaz || initialData.supportSettings.etizaz;
+          return {
+            ...loadedSupport,
+            etizaz: {
+              ...etizazObj,
+              isRefundable: true
+            }
+          };
         })(),
         housingSupportTiers: (housingSupportTiers !== undefined && housingSupportTiers !== null && housingSupportTiers.length > 0) ? housingSupportTiers : initialData.housingSupportTiers,
         advancePaymentTiers: (advancePaymentTiers !== undefined && advancePaymentTiers !== null && advancePaymentTiers.length > 0) ? advancePaymentTiers : initialData.advancePaymentTiers,

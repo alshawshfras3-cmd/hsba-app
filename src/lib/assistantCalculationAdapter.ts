@@ -252,6 +252,9 @@ export interface AssistantVisibleResult {
   supportType: 'monthly' | 'downpayment' | 'none';
   supportAmount: number;
   etizazAmount: number;
+  etizazMonthlyInstallment?: number;
+  etizazTermMonths?: number;
+  etizazIsRefundable?: boolean;
   rejectionReason: string;
 }
 
@@ -290,6 +293,9 @@ export function mapToAssistantVisibleResults(rawResults: any[] | null | undefine
 
     // 3. Resolve etizaz support independently
     const resolvedEtizazAmount = typeof r.etizazAmount === 'number' ? r.etizazAmount : 0;
+    const resolvedEtizazMonthlyInstallment = typeof r.etizazMonthlyInstallment === 'number' ? r.etizazMonthlyInstallment : 0;
+    const resolvedEtizazTermMonths = typeof r.etizazTermMonths === 'number' ? r.etizazTermMonths : 0;
+    const resolvedEtizazIsRefundable = r.etizazIsRefundable === true;
 
     // 4. Resolve eligibility
     const eligible = r.isEligible === true || r.eligible === true;
@@ -316,6 +322,9 @@ export function mapToAssistantVisibleResults(rawResults: any[] | null | undefine
       supportType: resolvedSupportType,
       supportAmount: resolvedSupportAmount,
       etizazAmount: resolvedEtizazAmount,
+      etizazMonthlyInstallment: resolvedEtizazMonthlyInstallment,
+      etizazTermMonths: resolvedEtizazTermMonths,
+      etizazIsRefundable: resolvedEtizazIsRefundable,
       rejectionReason: r.rejectionReason || ''
     };
   });

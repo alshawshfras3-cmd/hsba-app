@@ -422,6 +422,9 @@ export interface BankCalculationResult {
   personalEligible?: boolean;
   supportsPersonal?: boolean;
   etizazAmount?: number;
+  etizazMonthlyInstallment?: number;
+  etizazTermMonths?: number;
+  etizazIsRefundable?: boolean;
   maxEligibleFinanceAmount?: number;
   requestedFinanceAmount?: number;
   finalFinanceAmount?: number;

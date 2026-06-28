@@ -21,10 +21,10 @@ export const initialSupportSettings: SupportSettings = {
   etizaz: {
     enabled: true,
     amount: 160000,
-    isRefundable: false,
+    isRefundable: true,
     eligibleSectors: ['military'],
     label: 'دعم اعتزاز للعسكريين',
-    notes: 'دعم غير مسترد خاص بالعسكريين المؤهلين'
+    notes: 'دفعة مستردة خاصة بالعسكريين المؤهلين'
   }
 };
 export const initialSupportRules = initialSupportSettings; // Aliasing for clarity
