@@ -812,7 +812,7 @@ export default function ResultsGrid({
 
       {/* Bank Cards Grid with optional Subscription blurred state and relative wrapper */}
       <div className={`relative ${!isSubscribed ? 'min-h-[480px]' : ''}`}>
-        <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 ${!isSubscribed ? 'blur-md pointer-events-none select-none contrast-[0.80]' : ''}`}>
+        <div className={`grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 ${!isSubscribed ? 'blur-md pointer-events-none select-none contrast-[0.80]' : ''}`}>
           {sortedResults.map((offer, index) => {
             const isApp = offer.status === 'approved';
             const isWarn = offer.status === 'warning';
