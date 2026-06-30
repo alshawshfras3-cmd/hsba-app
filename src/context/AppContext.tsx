@@ -600,14 +600,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         const combEnabled = combinedRule ? combinedRule.isActive !== false : bk.combinedFinanceEnabled;
         const existCombEnabled = existingCombinedRule ? existingCombinedRule.isActive !== false : bk.existingPersonalFinanceEnabled;
 
-        const activeBkRules = products.filter(p => p.bankId === bk.id && p.isActive !== false);
-        const supportsEtizaz = activeBkRules.some(r => {
-          if (Array.isArray(r.allowedSupportTypes)) {
-            return r.allowedSupportTypes.includes('etizaz');
-          }
-          return false;
-        });
-
         const minRE = realEstateOnlyRule?.minRealEstateAmount !== undefined ? realEstateOnlyRule.minRealEstateAmount : bk.minRealEstateAmount;
         const maxRE = realEstateOnlyRule?.maxRealEstateAmount !== undefined ? realEstateOnlyRule.maxRealEstateAmount : bk.maxRealEstateAmount;
         const minPE = personalOnlyRule?.minPersonalAmount !== undefined ? personalOnlyRule.minPersonalAmount : bk.minPersonalAmount;
@@ -618,7 +610,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           bk.personalFinanceEnabled !== peEnabled ||
           bk.combinedFinanceEnabled !== combEnabled ||
           bk.existingPersonalFinanceEnabled !== existCombEnabled ||
-          bk.etizazSupportEnabled !== supportsEtizaz ||
           bk.minRealEstateAmount !== minRE ||
           bk.maxRealEstateAmount !== maxRE ||
           bk.minPersonalAmount !== minPE ||
@@ -632,7 +623,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
             personalFinanceEnabled: peEnabled,
             combinedFinanceEnabled: combEnabled,
             existingPersonalFinanceEnabled: existCombEnabled,
-            etizazSupportEnabled: supportsEtizaz,
             minRealEstateAmount: minRE,
             maxRealEstateAmount: maxRE,
             minPersonalAmount: minPE,

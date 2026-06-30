@@ -231,6 +231,7 @@ export default function StepWizard() {
 
   const shouldShowEtizazField =
     !isPersonalOnlyFlow &&
+    (effectiveSectorId === 'military' || sectorId === 'military') &&
     supportSettings.etizaz?.enabled !== false;
 
   // Validation errors
@@ -900,9 +901,10 @@ export default function StepWizard() {
     const calcParams = {
       sectorId: effectiveSectorId,
       militarySubType: ((effectiveSectorId === 'military' || sectorId === 'military') ? ((militarySubtype === 'officer' || militaryType === 'officer') ? 'military_officer' : 'military_individual') : undefined) as 'military_officer' | 'military_individual' | undefined,
-      etizazAmount: (mainFinanceType === 'personal_only')
-        ? 0
-        : ((((supportSettings.etizaz?.eligibleSectors || ['military']).includes(effectiveSectorId)) && isEtizazEligible === 'yes' && supportSettings.etizaz?.enabled !== false) ? (supportSettings.etizaz?.amount ?? 160000) : 0),
+      etizazAmount: (isEtizazEligible === 'yes' && supportSettings.etizaz?.enabled !== false && (effectiveSectorId === 'military' || sectorId === 'military'))
+        ? (supportSettings.etizaz?.amount ?? 160000)
+        : 0,
+      isEtizazEligible: isEtizazEligible === 'yes',
       productId,
       birthYear: Number(birthYear) || 1990,
       birthMonth: Number(birthMonth) || 1,

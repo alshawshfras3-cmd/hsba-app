@@ -155,7 +155,7 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
   const [formAllowUnsupported, setFormAllowUnsupported] = useState(true);
   const [formAllowMonthlySupport, setFormAllowMonthlySupport] = useState(true);
   const [formAllowDownpaymentSupport, setFormAllowDownpaymentSupport] = useState(true);
-  const [formAllowedSupportTypes, setFormAllowedSupportTypes] = useState<('none' | 'monthly' | 'down_payment' | 'etizaz')[]>(['none', 'monthly', 'down_payment']);
+  const [formAllowedSupportTypes, setFormAllowedSupportTypes] = useState<('none' | 'monthly' | 'down_payment')[]>(['none', 'monthly', 'down_payment']);
   const [formAllowedSectors, setFormAllowedSectors] = useState<SectorId[]>(['gov_civil', 'semi_gov', 'companies', 'military', 'retired']);
   const [formRejectionMessage, setFormRejectionMessage] = useState('');
   const [formIsActive, setFormIsActive] = useState(true);
@@ -236,9 +236,9 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
       setFormAllowUnsupported(selectedRule.allowUnsupported !== false);
       setFormAllowMonthlySupport(selectedRule.allowMonthlySupport !== false);
       setFormAllowDownpaymentSupport(selectedRule.allowDownpaymentSupport !== false);
-      let allowedSupportTypes: ('none' | 'monthly' | 'down_payment' | 'etizaz')[] = [];
+      let allowedSupportTypes: ('none' | 'monthly' | 'down_payment')[] = [];
       if (Array.isArray(selectedRule.allowedSupportTypes)) {
-        allowedSupportTypes = [...selectedRule.allowedSupportTypes];
+        allowedSupportTypes = (selectedRule.allowedSupportTypes as any[]).filter(t => t !== 'etizaz') as ('none' | 'monthly' | 'down_payment')[];
       } else {
         if (selectedRule.allowUnsupported !== false) allowedSupportTypes.push('none');
         if (selectedRule.allowMonthlySupport) allowedSupportTypes.push('monthly');
@@ -518,7 +518,6 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
                 <option value="none">غير مدعوم متاح</option>
                 <option value="monthly">دعم شهري متاح</option>
                 <option value="downpayment">دعم دفعة متاح</option>
-                <option value="etizaz">اعتزاز متاح</option>
               </select>
             </div>
           </div>
@@ -559,10 +558,6 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
                     const ruleAllowsDown = p.allowedSupportTypes ? (p.allowedSupportTypes.includes('down_payment') || p.allowedSupportTypes.includes('downpayment' as any)) : p.allowDownpaymentSupport;
                     if (!ruleAllowsDown) return false;
                   }
-                  if (filterSupport === 'etizaz') {
-                    const ruleAllowsEtizaz = p.allowedSupportTypes ? p.allowedSupportTypes.includes('etizaz') : false;
-                    if (!ruleAllowsEtizaz) return false;
-                  }
                   return true;
                 });
 
@@ -596,8 +591,6 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
                       supportsToRender.push({ text: 'دعم شهري', bg: 'bg-sky-100', textCol: 'text-sky-700 font-bold' });
                     } else if (t === 'down_payment' || t === 'downpayment' as any) {
                       supportsToRender.push({ text: 'دعم دفعة', bg: 'bg-indigo-100', textCol: 'text-indigo-700 font-bold' });
-                    } else if (t === 'etizaz') {
-                      supportsToRender.push({ text: 'اعتزاز', bg: 'bg-emerald-100', textCol: 'text-emerald-700 font-extrabold border border-emerald-200 shadow-sm' });
                     }
                   });
 
@@ -1112,22 +1105,6 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
                       className="rounded border-gray-300 text-[#0057B8] focus:ring-[#0057B8]"
                     />
                     <span>دعم دفعة</span>
-                  </label>
-
-                  <label className="inline-flex items-center gap-2 cursor-pointer text-xs font-semibold text-gray-700">
-                    <input
-                      type="checkbox"
-                      checked={formAllowedSupportTypes.includes('etizaz')}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setFormAllowedSupportTypes(prev => [...prev, 'etizaz']);
-                        } else {
-                          setFormAllowedSupportTypes(prev => prev.filter(v => v !== 'etizaz'));
-                        }
-                      }}
-                      className="rounded border-gray-300 text-[#0057B8] focus:ring-[#0057B8]"
-                    />
-                    <span>اعتزاز</span>
                   </label>
                 </div>
                 {formProductId === 'personal_only' && (

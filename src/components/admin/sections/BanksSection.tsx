@@ -37,6 +37,7 @@ export const BanksSection: React.FC<BanksSectionProps> = ({
   const [instLogoText, setInstLogoText] = useState('');
   const [instIsActive, setInstIsActive] = useState(true);
   const [instCalendarType, setInstCalendarType] = useState<'hijri' | 'gregorian'>('gregorian');
+  const [instEtizazSupportEnabled, setInstEtizazSupportEnabled] = useState(true);
   const [instInternalNotes, setInstInternalNotes] = useState('');
   const [instEmployeeWhatsApp, setInstEmployeeWhatsApp] = useState('');
   const [instModalError, setInstModalError] = useState('');
@@ -51,6 +52,7 @@ export const BanksSection: React.FC<BanksSectionProps> = ({
     setInstLogoText('');
     setInstIsActive(true);
     setInstCalendarType('gregorian');
+    setInstEtizazSupportEnabled(true);
     setInstInternalNotes('');
     setInstEmployeeWhatsApp('');
     setInstModalError('');
@@ -67,6 +69,7 @@ export const BanksSection: React.FC<BanksSectionProps> = ({
     setInstLogoText(bank.logoText || '');
     setInstIsActive(bank.isActive !== false);
     setInstCalendarType(bank.calendarType || 'gregorian');
+    setInstEtizazSupportEnabled(bank.etizazSupportEnabled !== false);
     setInstInternalNotes(bank.internalNotes || '');
     setInstEmployeeWhatsApp(bank.employeeWhatsApp || '');
     setInstModalError('');
@@ -100,6 +103,7 @@ export const BanksSection: React.FC<BanksSectionProps> = ({
       logoText: finalLogoText,
       isActive: instIsActive,
       calendarType: instCalendarType,
+      etizazSupportEnabled: instEtizazSupportEnabled,
       displayOrder: editingInstitution ? (editingInstitution.displayOrder || 1) : (banks.length + 1),
       employeeWhatsApp: instEmployeeWhatsApp.trim() || undefined,
     };
@@ -412,6 +416,34 @@ export const BanksSection: React.FC<BanksSectionProps> = ({
                     }`}
                   >
                     غير مفعلة
+                  </button>
+                </div>
+              </div>
+
+              <div className="border-t border-gray-100 pt-3 flex items-center justify-between">
+                <span className="text-xs font-bold text-gray-700">يدعم برنامج اعتزاز للعسكريين (etizazSupportEnabled):</span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setInstEtizazSupportEnabled(true)}
+                    className={`px-3 py-1 text-xs font-bold rounded-lg cursor-pointer ${
+                      instEtizazSupportEnabled 
+                        ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' 
+                        : 'bg-gray-50 text-gray-500 border border-gray-100'
+                    }`}
+                  >
+                    نعم
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setInstEtizazSupportEnabled(false)}
+                    className={`px-3 py-1 text-xs font-bold rounded-lg cursor-pointer ${
+                      !instEtizazSupportEnabled 
+                        ? 'bg-rose-50 text-rose-700 border border-rose-200' 
+                        : 'bg-gray-50 text-gray-500 border border-gray-100'
+                    }`}
+                  >
+                    لا
                   </button>
                 </div>
               </div>

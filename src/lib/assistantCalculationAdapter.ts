@@ -44,6 +44,7 @@ export interface AssistantCalculationInput {
   termMode?: TermMode;
   manualTermYears?: number;
   requestedFinanceAmount?: number;
+  isEtizazEligible?: boolean;
 }
 
 export interface AssistantValidationResult {
@@ -189,6 +190,7 @@ export function runAssistantCalculation(
     personalTenorSelectionMode: 'auto' as const,
     requestedPersonalTenorMonths: undefined,
     requestedFinanceAmount: (input.requestedFinanceAmount && Number(input.requestedFinanceAmount) > 0) ? Number(input.requestedFinanceAmount) : undefined,
+    isEtizazEligible: input.isEtizazEligible,
     
     // Dynamic settings from state
     banks: context.banks,

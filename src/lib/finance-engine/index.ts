@@ -350,6 +350,7 @@ export function calculateBanksFinancing(params: {
   productId: ProductId;
   militarySubType?: 'military_officer' | 'military_individual';
   etizazAmount?: number;
+  isEtizazEligible?: boolean;
   
   birthYear: number;
   birthMonth: number;
@@ -404,6 +405,7 @@ export function calculateBanksFinancing(params: {
     productId,
     militarySubType,
     etizazAmount = 0,
+    isEtizazEligible = false,
     
     birthYear,
     birthMonth,
@@ -1124,67 +1126,72 @@ export function calculateBanksFinancing(params: {
     };
 
     const isEtizazEnabled = etizazConfig.enabled !== false;
-    const clientChoseEtizaz = etizazAmount > 0;
-    const isSectorEligible = (etizazConfig.eligibleSectors || ['military']).includes(sectorId);
-    const isProductNotPersonalOnly = productId !== 'personal_only';
-    
-    const normalizedProdIdForEtizaz = isCombinedFallbackToRealEstateOnly ? 'real_estate_only' : normalizedProductId;
-    const isProductEligible = (etizazConfig.eligibleProducts || ['real_estate', 'real_estate_with_personal', 'real_estate_with_existing_personal']).includes(normalizedProdIdForEtizaz) || (etizazConfig.eligibleProducts || []).includes(normalizedProductId);
-
-    const activeRuleForCheckingEtizaz = products && Array.isArray(products)
-      ? products.find(p => p.bankId === bank.id && normalizeProductId(p.productId) === (isCombinedFallbackToRealEstateOnly ? 'real_estate_only' : normalizedProductId) && p.isActive !== false)
-      : undefined;
-
-    const ruleSupportsEtizaz = activeRuleForCheckingEtizaz && Array.isArray(activeRuleForCheckingEtizaz.allowedSupportTypes)
-      ? activeRuleForCheckingEtizaz.allowedSupportTypes.includes('etizaz')
-      : false;
-
-    const bankSupportsEtizaz = bank.etizazSupportEnabled !== false && ruleSupportsEtizaz;
-    
+    const isMilitary = sectorId === 'military' || (params as any).sector === 'military';
+    const clientChoseEtizaz = isEtizazEligible || etizazAmount > 0;
+    const bankSupportsEtizaz = bank.etizazSupportEnabled !== false;
     const termMonthsForEtizazCheck = termResult.totalMonths;
     const isTermGreaterThanGrace = termMonthsForEtizazCheck > (etizazConfig.graceMonths ?? 24);
 
     let etizazApplied = false;
     let etizazUnsupportedReason = '';
 
+    const tempEtizazAmount = etizazConfig.amount ?? 160000;
+    const tempGraceMonths = etizazConfig.graceMonths ?? 24;
+    const tempRepaymentMonths = Math.max(1, Math.min(etizazConfig.maxRepaymentMonths ?? 216, termMonthsForEtizazCheck - tempGraceMonths));
+    const tempMonthlyInstallment = Math.max(etizazConfig.minMonthlyInstallment ?? 740, tempEtizazAmount / tempRepaymentMonths);
+
+    // DSR capacity check for Etizaz
+    const isRetiredAtEtizazStart = tempGraceMonths > termResult.monthsBeforeRetirement;
+    const activeSalary = isRetiredAtEtizazStart ? correctedPensionSalary : solvedNetSalary;
+    const activeDsrPercent = isRetiredAtEtizazStart ? dsrAfterResult.dsrPercentage : dsrBeforeResult.dsrPercentage;
+    const maxAllowedDsrMonthly = activeSalary * (activeDsrPercent / 100);
+    
+    // Obligations during Etizaz repayment (months > 24)
+    let obligationsAtEtizazStart = (dsrBeforeResult?.deductExistingObligations !== false) ? obligations : 0;
+    if (isRetiredAtEtizazStart) {
+      obligationsAtEtizazStart = 0;
+    }
+    
+    // New personal finance installment
+    const hasNewPersonalForEtizaz = normalizedProductId === 'both' || normalizedProductId === 'real_estate_with_new_personal';
+    const isPersonalActiveAtEtizazStart = hasNewPersonalForEtizaz && !isCombinedFallbackToRealEstateOnly && personalMonths > tempGraceMonths;
+    const activePersonalInstallment = isPersonalActiveAtEtizazStart ? personalInstallment : 0;
+    
+    // Existing personal finance installment
+    const isExistingPersonalPathForEtizaz = normalizedProductId === 'real_estate_with_existing_personal' || normalizedProductId === 'real_estate_with_personal_existing';
+    const extObligations = (normalizedProductId === 'real_estate_with_personal_existing' || normalizedProductId === 'real_estate_with_existing_personal') ? (existingMonthlyObligations ?? 0) : 0;
+    const extObligationMonths = (normalizedProductId === 'real_estate_with_personal_existing' || normalizedProductId === 'real_estate_with_existing_personal') ? (obligationRemainingMonths ?? 0) : 0;
+    const isExistingPersonalActiveAtEtizazStart = isExistingPersonalPathForEtizaz && extObligationMonths > tempGraceMonths;
+    const activeExistingPersonalInstallment = isExistingPersonalActiveAtEtizazStart ? extObligations : 0;
+
+    const totalObligationsWithEtizaz = obligationsAtEtizazStart + activePersonalInstallment + activeExistingPersonalInstallment + tempMonthlyInstallment;
+    const isEtizazDsrExceeded = totalObligationsWithEtizaz > maxAllowedDsrMonthly;
+
     if (!isEtizazEnabled) {
       etizazUnsupportedReason = 'اعتزاز معطّل في الإعدادات العامة.';
+    } else if (!isMilitary) {
+      etizazUnsupportedReason = 'القطاع غير عسكري.';
     } else if (!clientChoseEtizaz) {
       etizazUnsupportedReason = 'لم يتم اختيار اعتزاز من قبل العميل.';
-    } else if (!isSectorEligible) {
-      etizazUnsupportedReason = 'القطاع غير مؤهل لدعم اعتزاز.';
-    } else if (!isProductNotPersonalOnly) {
-      etizazUnsupportedReason = 'دعم اعتزاز غير متاح لمنتج شخصي فقط.';
-    } else if (!isProductEligible) {
-      etizazUnsupportedReason = 'المنتج غير مؤهل لدعم اعتزاز حسب الإعدادات.';
     } else if (!bankSupportsEtizaz) {
-      etizazUnsupportedReason = 'هذه الجهة التمويلية لا تدعم اعتزاز.';
+      etizazUnsupportedReason = 'هذه الجهة لا تدعم اعتزاز.';
     } else if (!(etizazConfig.amount > 0)) {
       etizazUnsupportedReason = 'مبلغ اعتزاز المعتمد أقل من أو يساوي صفر.';
     } else if (!isTermGreaterThanGrace) {
       etizazUnsupportedReason = `مدة التمويل (${termMonthsForEtizazCheck} شهر) أقل من أو تساوي فترة السماح (${etizazConfig.graceMonths ?? 24} شهر).`;
+    } else if (isEtizazDsrExceeded) {
+      etizazUnsupportedReason = 'القسط الإجمالي يتجاوز نسبة الاستقطاع المحددة (DSR) عند بدء سداد قسط اعتزاز.';
     } else {
       etizazApplied = true;
     }
 
-    const effectiveEtizazAmount = etizazApplied ? (etizazConfig.amount ?? 160000) : 0;
-    const etizazGraceMonths = etizazApplied ? (etizazConfig.graceMonths ?? 24) : 0;
-    
-    let etizazRepaymentMonths = 0;
-    let etizazMonthlyInstallment = 0;
-    
-    if (etizazApplied) {
-      const availableMonthsAfterGrace = termResult.totalMonths - etizazGraceMonths;
-      etizazRepaymentMonths = Math.max(1, Math.min(etizazConfig.maxRepaymentMonths ?? 216, availableMonthsAfterGrace));
-      const rawEtizazInstallment = effectiveEtizazAmount / etizazRepaymentMonths;
-      etizazMonthlyInstallment = Math.max(etizazConfig.minMonthlyInstallment ?? 740, rawEtizazInstallment);
-      if (isNaN(etizazMonthlyInstallment) || !isFinite(etizazMonthlyInstallment)) {
-        etizazMonthlyInstallment = 0;
-      }
+    const effectiveEtizazAmount = etizazApplied ? tempEtizazAmount : 0;
+    const etizazGraceMonths = etizazApplied ? tempGraceMonths : 0;
+    const etizazRepaymentMonths = etizazApplied ? tempRepaymentMonths : 0;
+    let etizazMonthlyInstallment = etizazApplied ? tempMonthlyInstallment : 0;
+    if (isNaN(etizazMonthlyInstallment) || !isFinite(etizazMonthlyInstallment)) {
+      etizazMonthlyInstallment = 0;
     }
-
-    const extObligations = (normalizedProductId === 'real_estate_with_personal_existing' || normalizedProductId === 'real_estate_with_existing_personal') ? (existingMonthlyObligations ?? 0) : 0;
-    const extObligationMonths = (normalizedProductId === 'real_estate_with_personal_existing' || normalizedProductId === 'real_estate_with_existing_personal') ? (obligationRemainingMonths ?? 0) : 0;
 
     const isExistingPersonalSupported = bank.existingPersonalFinanceEnabled !== false;
 

@@ -651,17 +651,28 @@ export default function SupportSection({
           {/* 3. Refundability & Sector Static info */}
           <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 flex flex-col justify-between space-y-3">
             <div>
-              <span className="block font-bold text-gray-750 mb-0.5">قابلية الاسترداد والقطاع</span>
-              <span className="text-[10px] text-gray-400 font-medium font-sans">طبيعة وقواعد هذا الدعم في النظام</span>
+              <span className="block font-bold text-gray-750 mb-0.5">قابلية الاسترداد (isRefundable):</span>
+              <span className="text-[10px] text-gray-400 font-medium font-sans">هل يعتبر دعم اعتزاز قرضاً مسترداً؟</span>
             </div>
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-1.5 text-[10px] text-indigo-700 bg-indigo-50 border border-indigo-150 rounded-lg px-2.5 py-1 font-bold">
-                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                <span>دفعة مستردة (isRefundable: true)</span>
-              </div>
-              <div className="text-[10px] text-gray-500 font-medium">
-                القطاع المؤهل: <strong className="text-gray-700 font-bold">العسكري فقط</strong>
-              </div>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-gray-600">قابل للاسترداد؟</span>
+              <button
+                type="button"
+                id="etizaz-is-refundable-toggle"
+                onClick={() => {
+                  const nextVal = etizaz.isRefundable === false ? true : false;
+                  handleUpdateEtizazObj({ ...etizaz, isRefundable: nextVal });
+                }}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  etizaz.isRefundable !== false ? 'bg-indigo-600' : 'bg-slate-200'
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                    etizaz.isRefundable !== false ? '-translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
             </div>
           </div>
 
