@@ -185,7 +185,11 @@ export interface EtizazSettings {
   enabled: boolean;
   amount: number;
   isRefundable: boolean;
+  graceMonths: number;
+  maxRepaymentMonths: number;
+  minMonthlyInstallment: number;
   eligibleSectors: string[];
+  eligibleProducts: string[];
   label: string;
   notes?: string;
 }
@@ -424,7 +428,12 @@ export interface BankCalculationResult {
   etizazAmount?: number;
   etizazMonthlyInstallment?: number;
   etizazTermMonths?: number;
+  etizazGraceMonths?: number;
+  etizazRepaymentMonths?: number;
+  etizazStartsAfterMonth?: number;
   etizazIsRefundable?: boolean;
+  etizazApplied?: boolean;
+  etizazUnsupportedReason?: string;
   maxEligibleFinanceAmount?: number;
   requestedFinanceAmount?: number;
   finalFinanceAmount?: number;
@@ -447,7 +456,7 @@ export interface SavedResult {
   net_salary: number;
   profit_margin: number;
   eligibility_status: string;
-  payload: BankCalculationResult;
+  payload: any;
   customer_name?: string;
 }
 

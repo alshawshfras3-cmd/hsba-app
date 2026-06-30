@@ -22,9 +22,17 @@ export const initialSupportSettings: SupportSettings = {
     enabled: true,
     amount: 160000,
     isRefundable: true,
+    graceMonths: 24,
+    maxRepaymentMonths: 216,
+    minMonthlyInstallment: 740,
     eligibleSectors: ['military'],
+    eligibleProducts: [
+      'real_estate',
+      'real_estate_with_personal',
+      'real_estate_with_existing_personal'
+    ],
     label: 'دعم اعتزاز للعسكريين',
-    notes: 'دفعة مستردة خاصة بالعسكريين المؤهلين'
+    notes: 'قرض حسن للعسكريين المؤهلين يبدأ سداده بعد فترة سماح'
   }
 };
 export const initialSupportRules = initialSupportSettings; // Aliasing for clarity

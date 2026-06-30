@@ -7,7 +7,7 @@ import { convertHijriToGregorian } from '../../lib/date-utils';
 import { SectorId, ProductId, SupportType, TermMode, BankCalculationResult } from '../../types';
 import { 
   Home, User, Coins, Briefcase, Calendar, Scale,
-  ChevronLeft, ChevronRight, HelpCircle, AlertCircle, Info, Calculator, Trash2
+  ChevronLeft, ChevronRight, HelpCircle, AlertCircle, Info, Calculator, Trash2, RotateCcw
 } from 'lucide-react';
 import ResultsGrid from '../results/ResultsGrid';
 import NumericInput from './NumericInput';
@@ -1696,10 +1696,12 @@ export default function StepWizard() {
         onClose={() => setAlertOpen(false)}
         message={alertMessage}
       />
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 flex flex-col w-full">
+      <div className={`mx-auto px-4 sm:px-6 lg:px-8 flex-1 flex flex-col w-full transition-all ${
+        currentStep === flow.length && results ? 'max-w-[1500px] py-4' : 'max-w-6xl py-8'
+      }`}>
         
         {/* Step Wizard visual Progress stepper indicators */}
-        <div className="mb-8 md:mb-10 select-none">
+        <div className={`select-none transition-all ${results ? 'mb-4 md:mb-6' : 'mb-8 md:mb-10'}`}>
           {/* Unified responsive 3-circle stepper */}
           <div className="relative w-full max-w-xl mx-auto flex items-center justify-between px-2 sm:px-6 py-2" dir="rtl">
             {/* Background line segment 1 */}
@@ -1763,7 +1765,9 @@ export default function StepWizard() {
         )}
 
         {/* Main Step Cards Form container */}
-        <div className="bg-white dark:bg-[#111827] rounded-2xl md:rounded-3xl border border-[#E5E7EB] dark:border-slate-800 p-4 sm:p-8 md:p-10 shadow-xs">
+        <div className={`w-full ${results ? 'max-w-[1500px]' : 'max-w-5xl'} mx-auto bg-white dark:bg-[#111827] rounded-2xl md:rounded-3xl border border-[#E5E7EB] dark:border-slate-800 shadow-xs transition-all ${
+          results ? 'p-4 sm:p-5 md:p-6' : 'p-4 sm:p-8 md:p-10'
+        }`}>
           
           {/* STEP 1: Main Type Selection */}
           {activeStepId === 'main_type' && (
@@ -1889,18 +1893,20 @@ export default function StepWizard() {
                       {/* STEP 4: Finance Options & Obligations */}
           {activeStepId === 'finance_options' && (
             <div className="space-y-6 animate-fade-in text-right">
-              <div className="text-center max-w-lg mx-auto mb-8">
-                <h3 className="text-xl font-bold text-[#111827] dark:text-white">تخصيص منتج التمويل والالتزامات</h3>
-                <p className="text-sm text-[#6B7280] dark:text-slate-400 mt-1 font-sans">تتحكم مدة السداد وتفصيل الدعم والالتزامات بجدول الفائدة التراكمية وهوامش أرباح البنوك.</p>
+              <div className={`text-center max-w-lg mx-auto ${results ? 'mb-4' : 'mb-8'}`}>
+                <h3 className={`font-bold text-[#111827] dark:text-white ${results ? 'text-base' : 'text-xl'}`}>تخصيص منتج التمويل والالتزامات</h3>
+                {!results && (
+                  <p className="text-sm text-[#6B7280] dark:text-slate-400 mt-1 font-sans">تتحكم مدة السداد وتفصيل الدعم والالتزامات بجدول الفائدة التراكمية وهوامش أرباح البنوك.</p>
+                )}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className={`grid grid-cols-1 ${results ? 'md:grid-cols-3 gap-4' : 'md:grid-cols-2 gap-6'}`}>
                 
                 {/* 1. Real Estate Product Options Cards (Mortgage Flow Only) */}
                 {mainFinanceType !== 'personal_only' && (
-                  <div className="col-span-1 md:col-span-2 space-y-3">
+                  <div className={`${results ? 'col-span-1 md:col-span-3 space-y-2' : 'col-span-1 md:col-span-2 space-y-3'}`}>
                     <label className="block text-xs font-bold text-gray-700 dark:text-slate-300">نوع منتج التمويل العقاري المطلوب:</label>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className={`grid grid-cols-1 md:grid-cols-3 ${results ? 'gap-2' : 'gap-3'}`}>
                       {[
                         { id: 'real_estate_only', label: 'عقاري فقط', desc: 'للحصول على تمويل شراء المسكن أو العقار السكني المستقل.' },
                         { id: 'real_estate_with_new_personal', label: 'عقاري + شخصي جديد', desc: 'لدمج تمويل شخصي جديد مع العقاري لتكبير قوة الملاءمة والشراء.' },
@@ -1924,7 +1930,9 @@ export default function StepWizard() {
                                 }
                               }
                             }}
-                            className={`p-4 rounded-xl border-2 text-right transition-all flex flex-col justify-between cursor-pointer min-h-[110px] ${
+                            className={`rounded-xl border-2 text-right transition-all flex flex-col justify-between cursor-pointer ${
+                              results ? 'p-2.5 min-h-[75px]' : 'p-4 min-h-[110px]'
+                            } ${
                               isSelected
                                 ? 'border-[#0057B8] dark:border-[#0ea5a4] bg-[#0057B8]/5 dark:bg-[#0ea5a4]/5 text-[#111827] dark:text-white font-extrabold'
                                 : 'border-gray-200 dark:border-slate-800 hover:border-gray-300 dark:hover:border-slate-750 text-gray-600 dark:text-slate-400 bg-white dark:bg-[#111827] dark:hover:bg-slate-800'
@@ -1983,7 +1991,7 @@ export default function StepWizard() {
 
                 {/* Sakani Program (Mortgage support) - ONLY FOR MORTGAGES */}
                 {mainFinanceType !== 'personal_only' && (
-                  <div className="border border-gray-200 dark:border-slate-800 bg-white dark:bg-[#151F32] rounded-2xl p-5 text-right space-y-3">
+                  <div className={`border border-gray-200 dark:border-slate-800 bg-white dark:bg-[#151F32] rounded-2xl text-right col-span-1 ${results ? 'p-3.5 space-y-2' : 'p-5 space-y-3'}`}>
                     <label className="block text-xs font-bold text-gray-750 dark:text-slate-300 flex items-center justify-between font-sans">
                       <span>برنامج الدعم السكني (سكني):</span>
                       <HelpCircle className="w-4.5 h-4.5 text-gray-400 font-sans" />
@@ -2012,7 +2020,7 @@ export default function StepWizard() {
                 )}
 
                 {/* 3. Requested Finance Duration (Always Visible in finance_options step) */}
-                <div className="border border-gray-200 dark:border-slate-800 bg-white dark:bg-[#151F32] rounded-2xl p-5 text-right space-y-3">
+                <div className={`border border-gray-200 dark:border-slate-800 bg-white dark:bg-[#151F32] rounded-2xl text-right col-span-1 ${results ? 'p-3.5 space-y-2' : 'p-5 space-y-3'}`}>
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between font-sans">
                     <span>مدة التمويل المطلوبة:</span>
                     <Calendar className="w-4 h-4 text-[#0057B8] dark:text-[#0ea5a4]" />
@@ -2069,7 +2077,7 @@ export default function StepWizard() {
 
                 {/* 4. Requested Finance Amount (Only for Mortgages) */}
                 {mainFinanceType !== 'personal_only' && (
-                  <div className="border border-gray-200 dark:border-slate-800 bg-white dark:bg-[#151F32] rounded-2xl p-5 text-right space-y-3">
+                  <div className={`border border-gray-200 dark:border-slate-800 bg-white dark:bg-[#151F32] rounded-2xl text-right col-span-1 ${results ? 'p-3.5 space-y-2' : 'p-5 space-y-3'}`}>
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between font-sans">
                       <span>مبلغ التمويل المطلوب:</span>
                       <Coins className="w-4 h-4 text-[#0057B8] dark:text-[#0ea5a4]" />
@@ -2123,7 +2131,7 @@ export default function StepWizard() {
                 )}
 
                 {/* Preferred Bank Filter - FOR BOTH PATHS */}
-                <div className="border border-gray-200 dark:border-slate-800 bg-white dark:bg-[#151F32] rounded-2xl p-5 text-right space-y-3 col-span-1 md:col-span-2">
+                <div className={`border border-gray-200 dark:border-slate-800 bg-white dark:bg-[#151F32] rounded-2xl text-right space-y-3 ${results ? 'col-span-1 md:col-span-3 p-3.5 space-y-2' : 'col-span-1 md:col-span-2 p-5 space-y-3'}`}>
                   <label className="block text-xs font-bold text-gray-700 dark:text-slate-300">جهة التمويل المفضلة:</label>
                   <select
                     id="bank-filter-select"
@@ -2143,7 +2151,9 @@ export default function StepWizard() {
           )}
 
           {/* Stepper Buttons */}
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-8 border-t border-gray-150 dark:border-slate-850 mt-8 font-sans">
+          <div className={`flex flex-col sm:flex-row justify-between items-center gap-4 border-t border-gray-150 dark:border-slate-850 font-sans transition-all ${
+            results ? 'pt-4 mt-4' : 'pt-8 mt-8'
+          }`}>
             <button
               id="prev-step-btn"
               type="button"
@@ -2166,54 +2176,78 @@ export default function StepWizard() {
                 <ChevronLeft className="w-3.5 h-3.5" />
               </button>
             ) : (
-              <button
-                id="calc-submit-btn"
-                type="button"
-                onClick={triggerCalculations}
-                className="w-full sm:w-auto min-h-[44px] justify-center px-8 py-3.5 rounded-xl bg-[#0057B8] dark:bg-[#0ea5a4] text-white font-bold text-sm leading-none hover:bg-[#004494] dark:hover:bg-[#0c8e8d] transition-all cursor-pointer flex items-center gap-2 shadow-sm"
-              >
-                <Calculator className="w-4 h-4" />
-                <span>{results ? 'تحديث وإعادة الحساب' : 'احسب النتائج ومقارنة العروض'}</span>
-              </button>
+              <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+                {results && (
+                  <button
+                    type="button"
+                    onClick={restartWizard}
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-5 py-3 rounded-xl bg-white border border-[#BFDBFE] hover:bg-[#EFF6FF] text-[#0057B8] font-bold text-xs cursor-pointer transition-all duration-200 shadow-xs select-none"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>إعادة تعبئة البيانات</span>
+                  </button>
+                )}
+                <button
+                  id="calc-submit-btn"
+                  type="button"
+                  onClick={triggerCalculations}
+                  className="w-full sm:w-auto min-h-[44px] justify-center px-8 py-3.5 rounded-xl bg-[#0057B8] dark:bg-[#0057B8] text-white font-bold text-sm leading-none hover:bg-[#003B7A] transition-all cursor-pointer flex items-center gap-2 shadow-sm"
+                >
+                  <Calculator className="w-4 h-4 text-white" />
+                  <span>{results ? 'تحديث الحسبة' : 'احسب النتائج ومقارنة العروض'}</span>
+                </button>
+              </div>
             )}
           </div>
 
           {/* RESULTS DISPLAY PAGE */}
-          {currentStep === flow.length && (
-            results ? (
-              <ResultsGrid
-                results={results}
-                productId={productId}
-                onRestart={restartWizard}
-                existingMonthlyObligations={existingMonthlyObligations}
-                obligationRemainingMonths={obligationRemainingMonths}
-                mainFinanceType={mainFinanceType}
-                sectorId={effectiveSectorId || sectorId}
-              />
-            ) : (
-              <div className="max-w-md mx-auto my-16 px-4 text-center select-none animate-fade-in" dir="rtl">
-                <div className="bg-white dark:bg-[#111827] border border-[#E5E7EB] dark:border-slate-800 rounded-3xl p-8 shadow-xl space-y-6">
-                  <div className="w-16 h-16 bg-blue-50 dark:bg-slate-800 text-[#0057B8] dark:text-[#0ea5a4] rounded-full flex items-center justify-center mx-auto border border-blue-100/50 dark:border-slate-700/50">
-                    <Calculator className="w-7 h-7 text-[#0057B8] dark:text-[#0ea5a4]" />
-                  </div>
-                  <div className="space-y-2">
-                    <h3 className="font-sans font-black text-xl text-gray-950 dark:text-white">لا توجد نتيجة حالية</h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-sans">
-                      الرجاء إدخال بياناتك بالكامل في الخطوات والضغط على الزر أدناه لحساب مبالغ التمويل ومقارنة العروض تلقائياً.
-                    </p>
-                  </div>
-                  <button
-                    onClick={restartWizard}
-                    className="w-full py-3.5 bg-[#0057B8] dark:bg-[#0ea5a4] hover:bg-[#004bb0] dark:hover:bg-[#0c8e8d] text-white text-xs font-extrabold rounded-2xl transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
-                  >
-                    <span>إجراء حسبة جديدة</span>
-                  </button>
+          {currentStep === flow.length && !results && (
+            <div className="max-w-md mx-auto my-16 px-4 text-center select-none animate-fade-in" dir="rtl">
+              <div className="bg-white dark:bg-[#111827] border border-[#E5E7EB] dark:border-slate-800 rounded-3xl p-8 shadow-xl space-y-6">
+                <div className="w-16 h-16 bg-blue-50 dark:bg-slate-800 text-[#0057B8] dark:text-[#0ea5a4] rounded-full flex items-center justify-center mx-auto border border-blue-100/50 dark:border-slate-700/50">
+                  <Calculator className="w-7 h-7 text-[#0057B8] dark:text-[#0ea5a4]" />
                 </div>
+                <div className="space-y-2">
+                  <h3 className="font-sans font-black text-xl text-gray-950 dark:text-white">لا توجد نتيجة حالية</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-sans">
+                    الرجاء إدخال بياناتك بالكامل في الخطوات والضغط على الزر أدناه لحساب مبالغ التمويل ومقارنة العروض تلقائياً.
+                  </p>
+                </div>
+                <button
+                  onClick={restartWizard}
+                  className="w-full py-3.5 bg-[#0057B8] dark:bg-[#0ea5a4] hover:bg-[#004bb0] dark:hover:bg-[#0c8e8d] text-white text-xs font-extrabold rounded-2xl transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <span>إجراء حسبة جديدة</span>
+                </button>
               </div>
-            )
+            </div>
           )}
 
         </div>
+
+        {/* Render ResultsGrid beneath the existing calculator form card */}
+        {currentStep === flow.length && results && (
+          <div className="mt-8 w-full">
+            <ResultsGrid
+              results={results}
+              productId={productId}
+              onRestart={restartWizard}
+              existingMonthlyObligations={existingMonthlyObligations}
+              obligationRemainingMonths={obligationRemainingMonths}
+              mainFinanceType={mainFinanceType}
+              sectorId={effectiveSectorId || sectorId}
+              birthYear={birthYear}
+              birthMonth={birthMonth}
+              birthDay={birthDay}
+              birthCalendar={birthCalendar}
+              appointmentYear={appointmentYear}
+              appointmentMonth={appointmentMonth}
+              appointmentDay={appointmentDay}
+              appointmentCalendar={appointmentCalendar}
+              retirementAge={retirementAge}
+            />
+          </div>
+        )}
 
         {/* 5. Trust Banner (شريط الثقة أسفل البطاقة) */}
         {currentStep === 1 && (

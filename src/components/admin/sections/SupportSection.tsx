@@ -52,6 +52,9 @@ export default function SupportSection({
     enabled: true,
     amount: 160000,
     isRefundable: true,
+    graceMonths: 24,
+    maxRepaymentMonths: 216,
+    minMonthlyInstallment: 740,
     eligibleSectors: ['military'],
     label: 'دعم اعتزاز للعسكريين',
     notes: 'دفعة مستردة خاصة بالعسكريين المؤهلين'
@@ -64,12 +67,18 @@ export default function SupportSection({
   const [localAmount, setLocalAmount] = useState<string>(String(etizaz.amount));
   const [localNotes, setLocalNotes] = useState<string>(etizaz.notes || '');
   const [localLabel, setLocalLabel] = useState<string>(etizaz.label || 'دعم اعتزاز للعسكريين');
+  const [localGraceMonths, setLocalGraceMonths] = useState<string>(String(etizaz.graceMonths ?? 24));
+  const [localMaxRepaymentMonths, setLocalMaxRepaymentMonths] = useState<string>(String(etizaz.maxRepaymentMonths ?? 216));
+  const [localMinMonthlyInstallment, setLocalMinMonthlyInstallment] = useState<string>(String(etizaz.minMonthlyInstallment ?? 740));
 
   React.useEffect(() => {
     if (supportSettings?.etizaz) {
       setLocalAmount(String(supportSettings.etizaz.amount));
       setLocalNotes(supportSettings.etizaz.notes || '');
       setLocalLabel(supportSettings.etizaz.label || 'دعم اعتزاز للعسكريين');
+      setLocalGraceMonths(String(supportSettings.etizaz.graceMonths ?? 24));
+      setLocalMaxRepaymentMonths(String(supportSettings.etizaz.maxRepaymentMonths ?? 216));
+      setLocalMinMonthlyInstallment(String(supportSettings.etizaz.minMonthlyInstallment ?? 740));
     }
   }, [supportSettings?.etizaz]);
 
@@ -674,6 +683,81 @@ export default function SupportSection({
                   handleUpdateEtizazObj({ ...etizaz, label: val });
                 }}
               />
+            </div>
+          </div>
+        </div>
+
+        {/* New parameters for Etizaz loan repayment */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-semibold border-t border-gray-100 pt-4">
+          {/* Grace Months */}
+          <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 flex flex-col justify-between space-y-3">
+            <div>
+              <label htmlFor="etizaz-grace-input" className="block font-bold text-gray-700 mb-1">فترة سماح اعتزاز:</label>
+              <span className="text-[10px] text-gray-400 font-medium font-sans block mb-1">عدد الأشهر قبل بدء استقطاع قسط اعتزاز</span>
+            </div>
+            <div className="relative">
+              <input
+                id="etizaz-grace-input"
+                type="text"
+                inputMode="numeric"
+                className="w-full bg-white border border-gray-200 rounded-xl px-3 py-1.5 focus:outline-none text-left font-mono font-bold text-xs"
+                value={localGraceMonths}
+                onChange={(e) => {
+                  const rawVal = normalizeNumberInput(e.target.value);
+                  setLocalGraceMonths(rawVal);
+                  const parsed = parseNumberInput(rawVal, 24);
+                  handleUpdateEtizazObj({ ...etizaz, graceMonths: parsed });
+                }}
+              />
+              <span className="absolute left-3 top-2 text-[10px] text-gray-400 font-sans pointer-events-none font-bold">شهر</span>
+            </div>
+          </div>
+
+          {/* Max Repayment Months */}
+          <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 flex flex-col justify-between space-y-3">
+            <div>
+              <label htmlFor="etizaz-repayment-input" className="block font-bold text-gray-700 mb-1">الحد الأقصى لأشهر السداد:</label>
+              <span className="text-[10px] text-gray-400 font-medium font-sans block mb-1">أقصى مدة مسموحة لسداد قرض اعتزاز</span>
+            </div>
+            <div className="relative">
+              <input
+                id="etizaz-repayment-input"
+                type="text"
+                inputMode="numeric"
+                className="w-full bg-white border border-gray-200 rounded-xl px-3 py-1.5 focus:outline-none text-left font-mono font-bold text-xs"
+                value={localMaxRepaymentMonths}
+                onChange={(e) => {
+                  const rawVal = normalizeNumberInput(e.target.value);
+                  setLocalMaxRepaymentMonths(rawVal);
+                  const parsed = parseNumberInput(rawVal, 216);
+                  handleUpdateEtizazObj({ ...etizaz, maxRepaymentMonths: parsed });
+                }}
+              />
+              <span className="absolute left-3 top-2 text-[10px] text-gray-400 font-sans pointer-events-none font-bold">شهر</span>
+            </div>
+          </div>
+
+          {/* Min Monthly Installment */}
+          <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 flex flex-col justify-between space-y-3">
+            <div>
+              <label htmlFor="etizaz-min-installment-input" className="block font-bold text-gray-700 mb-1">الحد الأدنى للقسط الشهري:</label>
+              <span className="text-[10px] text-gray-400 font-medium font-sans block mb-1">أقل قيمة قسط شهري مقبول لسداد اعتزاز</span>
+            </div>
+            <div className="relative">
+              <input
+                id="etizaz-min-installment-input"
+                type="text"
+                inputMode="decimal"
+                className="w-full bg-white border border-gray-200 rounded-xl px-3 py-1.5 focus:outline-none text-left font-mono font-bold text-xs"
+                value={localMinMonthlyInstallment}
+                onChange={(e) => {
+                  const rawVal = normalizeNumberInput(e.target.value);
+                  setLocalMinMonthlyInstallment(rawVal);
+                  const parsed = parseNumberInput(rawVal, 740);
+                  handleUpdateEtizazObj({ ...etizaz, minMonthlyInstallment: parsed });
+                }}
+              />
+              <span className="absolute left-3 top-2 text-[10px] text-gray-400 font-sans pointer-events-none font-bold">ريال</span>
             </div>
           </div>
         </div>

@@ -7,8 +7,12 @@ import {
 import { SavedResult, BankCalculationResult } from "../types";
 import { 
   Building2, Trash2, Calendar, User, Info, Calculator, 
-  Lock, Sparkles, ChevronLeft, CreditCard, Clock, Percent, Bookmark
+  Lock, Sparkles, ChevronLeft, CreditCard, Clock, Percent, Bookmark, AlertTriangle
 } from "lucide-react";
+
+export function isCalculationGroupPayload(payload: any): boolean {
+  return payload?.kind === "calculation_group" && Array.isArray(payload?.results);
+}
 
 export function ResultsPage() {
   const { user, setResults, setCurrentStep, authLoading } = useAppState();
@@ -249,7 +253,7 @@ export function ResultsPage() {
               if (!item) return null;
               const isEligible = item.eligibility_status === 'eligible';
               
-              // Safe parsing check in case payload is stored as a string instead of object
+               // Safe parsing check in case payload is stored as a string instead of object
               let offer = item.payload;
               if (typeof offer === 'string') {
                 try {
@@ -257,6 +261,138 @@ export function ResultsPage() {
                 } catch {
                   offer = null;
                 }
+              }
+
+              const isGroup = isCalculationGroupPayload(offer);
+
+              if (isGroup) {
+                const resultsCount = offer.results_count || offer.results?.length || 0;
+                
+                // Get the best offer from the payload results to show best funding power
+                const activeResults = offer.results || [];
+                const eligibleResults = activeResults.filter((r: any) => r.status === 'approved' || r.status === 'warning');
+                const sourceResults = eligibleResults.length > 0 ? eligibleResults : activeResults;
+                
+                // Sort by purchasing power descending to find the highest / best offer
+                const sortedGroupResults = [...sourceResults].sort((a: any, b: any) => {
+                  const aVal = a.totalPurchasingPower || (a.realEstateAmount + a.personalAmount) || 0;
+                  const bVal = b.totalPurchasingPower || (b.realEstateAmount + b.personalAmount) || 0;
+                  return bVal - aVal;
+                });
+                const bestGroupOffer = sortedGroupResults[0];
+
+                const bestFundingAmount = bestGroupOffer 
+                  ? (bestGroupOffer.totalPurchasingPower || (bestGroupOffer.realEstateAmount + bestGroupOffer.personalAmount) || 0)
+                  : Number(item.real_estate_amount || 0);
+
+                const bestInstallment = bestGroupOffer
+                  ? (bestGroupOffer.monthlyInstallmentBeforeRetirement || 0)
+                  : Number(item.monthly_installment || 0);
+
+                return (
+                  <div 
+                    key={item.id}
+                    className="bg-white dark:bg-[#111827] border-2 border-emerald-500/25 dark:border-emerald-500/15 rounded-3xl overflow-hidden shadow-xs hover:shadow-premium dark:hover:shadow-none hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between relative"
+                  >
+                    {/* Visual badge for group comparison */}
+                    <div className="absolute top-0 right-4 bg-emerald-500 text-white text-[9px] font-black px-3 py-1 rounded-b-xl shadow-xs select-none">
+                      مقارنة جميع البنوك
+                    </div>
+
+                    {/* Card Top Banner with Group Identity */}
+                    <div className="p-4 bg-gradient-to-r from-emerald-600 to-teal-700 text-white flex justify-between items-center shadow-xs pt-6">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 bg-white/20 backdrop-blur-md rounded-lg flex items-center justify-center font-black text-xs select-none">
+                          كل
+                        </div>
+                        <div>
+                          <h3 className="font-extrabold text-sm leading-tight">مقارنة جميع البنوك</h3>
+                          <p className="text-[10px] text-emerald-100 font-medium">حفظ جماعي لكافة جهات التمويل</p>
+                        </div>
+                      </div>
+                      
+                      <span className="px-2.5 py-1 rounded-full text-[9px] font-black uppercase select-none tracking-wider bg-emerald-500/25 text-emerald-100 border border-emerald-400/20">
+                        {resultsCount} جهات تمويل
+                      </span>
+                    </div>
+
+                    {/* Card Body */}
+                    <div className="p-5 text-right space-y-4 flex-1">
+                      {/* Calculation custom Title */}
+                      <div>
+                        <h4 className="font-extrabold text-xs text-slate-800 dark:text-slate-200 leading-snug">{item.title || 'مقارنة عروض التمويل الشاملة'}</h4>
+                        {item.customer_name && (
+                          <div className="flex items-center gap-1.5 text-slate-400 mt-2">
+                            <User className="w-3.5 h-3.5 text-emerald-500" />
+                            <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">العميل: {item.customer_name}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Finance values blocks */}
+                      <div className="grid grid-cols-2 gap-3 bg-emerald-50/20 dark:bg-emerald-950/5 border border-emerald-500/10 dark:border-emerald-500/5 p-3 rounded-2xl">
+                        <div className="space-y-0.5 text-right">
+                          <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 font-bold block">أعلى تمويل متاح:</span>
+                          <span className="text-xs font-black text-emerald-600 dark:text-emerald-400" dir="ltr">
+                            {Math.round(bestFundingAmount).toLocaleString('ar-SA')} ريال
+                          </span>
+                        </div>
+
+                        <div className="space-y-0.5 text-right">
+                          <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 font-bold block">قسط أفضل عرض:</span>
+                          <span className="text-xs font-black text-[#0057B8] dark:text-[#0ea5a4]" dir="ltr">
+                            {Math.round(bestInstallment).toLocaleString('ar-SA')} ريال / شهر
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Supporting parameters */}
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[11px] font-semibold text-slate-600 dark:text-slate-300 border-t border-slate-100 dark:border-slate-800 pt-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-400 dark:text-slate-500 font-sans">قطاع الوظيفة:</span>
+                          <span className="font-extrabold text-slate-800 dark:text-slate-100">{item.sector || '-'}</span>
+                        </div>
+
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-400 dark:text-slate-500 font-sans">عدد العروض:</span>
+                          <span className="font-extrabold text-slate-800 dark:text-slate-100">{resultsCount} عروض</span>
+                        </div>
+
+                        <div className="flex justify-between items-center col-span-2 mt-0.5 pt-1.5 border-t border-dotted border-slate-100 dark:border-slate-800">
+                          <span className="text-slate-400 dark:text-slate-500 font-sans">نوع الدعم السكني:</span>
+                          <span className="font-extrabold text-slate-800 dark:text-slate-100">
+                            {item.support_type === 'none' ? 'بدون دعم' : item.support_type === 'monthly' ? 'دعم شهري' : 'دعم مخصص عيني دفعة'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Saved Date */}
+                      <div className="flex items-center gap-1 text-slate-400 dark:text-slate-500 text-[10px] pt-1">
+                        <Calendar className="w-3.5 h-3.5" />
+                        <span>حُفظ بتاريخ: {formatDate(item.created_at)}</span>
+                      </div>
+                    </div>
+
+                    {/* Card Controls */}
+                    <div className="px-5 pb-5 pt-1 flex gap-2 w-full border-t border-slate-100 dark:border-slate-800/80">
+                      <button
+                        onClick={() => setSelectedResult(item)}
+                        className="flex-3 text-center py-2 bg-emerald-500/10 dark:bg-emerald-950/20 hover:bg-emerald-600 text-emerald-750 dark:text-emerald-450 hover:text-white border border-emerald-500/20 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1"
+                      >
+                        <Info className="w-3.5 h-3.5 shrink-0" />
+                        <span>عرض كل النتائج</span>
+                      </button>
+
+                      <button
+                        onClick={() => setDeleteConfirmId(item.id)}
+                        className="flex-1 text-center py-2 bg-red-50 dark:bg-red-955/20 hover:bg-red-600 dark:hover:bg-red-600 text-red-600 dark:text-red-400 hover:text-white dark:hover:text-white border border-red-100 dark:border-red-900/30 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center"
+                        title="حذف النتيجة"
+                      >
+                        <Trash2 className="w-4 h-4 shrink-0" />
+                      </button>
+                    </div>
+                  </div>
+                );
               }
               
               const logoColor = offer?.logoColor || "from-blue-600 to-blue-800";
@@ -361,7 +497,7 @@ export function ResultsPage() {
 
                     <button
                       onClick={() => setDeleteConfirmId(item.id)}
-                      className="flex-1 text-center py-2 bg-red-50 dark:bg-red-950/20 hover:bg-red-600 dark:hover:bg-red-600 text-red-600 dark:text-red-400 hover:text-white dark:hover:text-white border border-red-100 dark:border-red-900/30 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center"
+                      className="flex-1 text-center py-2 bg-red-50 dark:bg-red-955/20 hover:bg-red-600 dark:hover:bg-red-600 text-red-600 dark:text-red-400 hover:text-white dark:hover:text-white border border-red-100 dark:border-red-900/30 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center"
                       title="حذف النتيجة"
                     >
                       <Trash2 className="w-4 h-4 shrink-0" />
@@ -389,9 +525,12 @@ export function ResultsPage() {
             offer = null;
           }
         }
+
+        const isGroup = isCalculationGroupPayload(offer);
         
-        const logoColor = offer?.logoColor || "from-slate-700 to-slate-900";
-        const logoText = offer?.logoText || "H";
+        const logoColor = isGroup ? "from-emerald-600 to-teal-700" : (offer?.logoColor || "from-slate-700 to-slate-900");
+        const logoText = isGroup ? "كل" : (offer?.logoText || "H");
+        const bankDisplayName = isGroup ? "مقارنة جميع البنوك" : (selectedResult.bank_name || "جهة غير معروفة");
 
         const realEstateAmount = Number(selectedResult.real_estate_amount || offer?.realEstateAmount || 0);
         const personalAmount = Number(selectedResult.personal_amount || offer?.personalAmount || 0);
@@ -412,8 +551,8 @@ export function ResultsPage() {
                     {logoText}
                   </div>
                   <div>
-                    <h3 className="text-xl font-bold">{selectedResult.bank_name}</h3>
-                    <p className="text-xs text-white/85">التقرير التاريخي لدراسة الحسبة المعتمدة</p>
+                    <h3 className="text-xl font-bold">{bankDisplayName}</h3>
+                    <p className="text-xs text-white/85">{isGroup ? "تقرير المقارنة وحفظ النتائج الجماعية" : "التقرير التاريخي لدراسة الحسبة المعتمدة"}</p>
                   </div>
                 </div>
 
@@ -433,11 +572,11 @@ export function ResultsPage() {
                   <div className="flex justify-between items-center pb-2.5 border-b border-slate-100 dark:border-slate-800">
                     <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-200">{selectedResult.title || 'دراسة ائتمان مقارنة البنوك'}</h3>
                     <span className={`px-2.5 py-1 rounded-full text-[10px] font-black ${
-                      selectedResult.eligibility_status === 'eligible' 
+                      isGroup || selectedResult.eligibility_status === 'eligible' 
                         ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-450 border border-emerald-100 dark:border-emerald-900/30' 
                         : 'bg-red-50 dark:bg-red-955/15 text-red-700 dark:text-red-400 border border-red-100 dark:border-red-900/30'
                     }`}>
-                      {selectedResult.eligibility_status === 'eligible' ? 'مكتمل ومقبول' : 'ائتمان غير متطابق'}
+                      {isGroup ? 'مقارنة شاملة' : selectedResult.eligibility_status === 'eligible' ? 'مكتمل ومقبول' : 'ائتمان غير متطابق'}
                     </span>
                   </div>
 
@@ -449,11 +588,134 @@ export function ResultsPage() {
                   </div>
                 </div>
 
-                {/* Purchasing Power Card */}
-                <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800/80 rounded-2xl p-6 space-y-6 shadow-xs">
-                  <div className="pb-4 border-b border-slate-100 dark:border-slate-800">
-                    <h4 className="font-black text-slate-900 dark:text-white text-sm">القوة الشرائية والملاءمة التمويلية المقدرة</h4>
-                    <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">الحد الأقصى للتسهيلات المالية وفقاً للوائح الـ DSR المعتمدة</p>
+                {isGroup ? (
+                  /* 🏛️ Group Comparison Banks Detail View */
+                  <div className="space-y-6">
+                    <div className="pb-2 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                      <h4 className="font-black text-slate-900 dark:text-white text-sm">العروض المحسوبة من كافة البنوك لطلب العميل:</h4>
+                      <span className="text-xs text-slate-500 dark:text-slate-400 font-bold">{offer.results?.length || 0} جهات تمويلية</span>
+                    </div>
+
+                    <div className="space-y-4">
+                      {((offer.results || []) as any[]).map((bankOffer: any, index: number) => {
+                        const isApp = bankOffer.status === 'approved';
+                        const isWarn = bankOffer.status === 'warning';
+                        const isRej = bankOffer.status === 'rejected';
+                        
+                        const statusBadgeColor = isApp 
+                          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                          : isWarn
+                          ? "bg-amber-500/10 text-amber-600 dark:text-amber-450 border border-amber-500/20"
+                          : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20";
+                          
+                        const statusLabel = isApp ? "مقبول" : isWarn ? "مقبول مبدئيًا" : "مرفوض";
+
+                        const bankLogoColor = bankOffer.logoColor || "from-blue-600 to-blue-800";
+                        const bankLogoText = bankOffer.logoText || "بنك";
+
+                        const bankRealEstateAmount = bankOffer.realEstateAmount || 0;
+                        const bankPersonalAmount = bankOffer.personalAmount || 0;
+                        const bankTotalPurchasingPower = bankOffer.totalPurchasingPower || (bankRealEstateAmount + bankPersonalAmount);
+                        const bankMonthlyInstallment = bankOffer.monthlyInstallmentBeforeRetirement || bankOffer.monthlyInstallment || 0;
+                        const bankTermMonths = bankOffer.termMonths || 0;
+                        const bankAnnualMargin = bankOffer.annualMargin || 0;
+                        const bankSupportAmount = bankOffer.housingSupportAmount || bankOffer.supportAmount || 0;
+                        const bankRefusalReason = bankOffer.rejectionReason || bankOffer.rejectionMessage || null;
+
+                        return (
+                          <div 
+                            key={bankOffer.bankId || index}
+                            className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4 shadow-xs"
+                          >
+                            {/* Bank Header inside list */}
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${bankLogoColor} text-white flex items-center justify-center font-bold text-xs select-none shadow-xs`}>
+                                  {bankLogoText}
+                                </div>
+                                <div>
+                                  <h5 className="font-extrabold text-sm text-[#111827] dark:text-white">{bankOffer.bankName}</h5>
+                                  <p className="text-[10px] text-slate-400 dark:text-slate-500">
+                                    {bankTermMonths > 0 ? `${Math.round(bankTermMonths / 12)} سنة (${bankTermMonths} شهراً)` : '-'}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase ${statusBadgeColor}`}>
+                                {statusLabel}
+                              </span>
+                            </div>
+
+                            {/* Numbers & values */}
+                            {!isRej ? (
+                              <>
+                                <div className="grid grid-cols-2 gap-3 bg-slate-50 dark:bg-[#0f172a] border border-slate-100 dark:border-slate-800/80 p-3 rounded-xl text-right">
+                                  <div className="space-y-0.5">
+                                    <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 font-bold block">إجمالي القدرة التمويلية:</span>
+                                    <span className="text-xs font-black text-[#0057B8] dark:text-[#0ea5a4]" dir="ltr">
+                                      {Math.round(bankTotalPurchasingPower).toLocaleString('ar-SA')} ريال
+                                    </span>
+                                  </div>
+
+                                  <div className="space-y-0.5">
+                                    <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 font-bold block">القسط الشهري الجاري:</span>
+                                    <span className="text-xs font-black text-emerald-600 dark:text-emerald-450" dir="ltr">
+                                      {Math.round(bankMonthlyInstallment).toLocaleString('ar-SA')} ريال / شهر
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[10px] font-semibold text-slate-500 dark:text-slate-400 pt-1">
+                                  {bankRealEstateAmount > 0 && (
+                                    <div className="flex justify-between items-center">
+                                      <span className="text-slate-400 dark:text-slate-500">تمويل عقاري:</span>
+                                      <span className="font-extrabold text-slate-800 dark:text-slate-200">{Math.round(bankRealEstateAmount).toLocaleString('ar-SA')} ريال</span>
+                                    </div>
+                                  )}
+
+                                  {bankPersonalAmount > 0 && (
+                                    <div className="flex justify-between items-center">
+                                      <span className="text-slate-400 dark:text-slate-500">تمويل شخصي:</span>
+                                      <span className="font-extrabold text-slate-800 dark:text-slate-200">{Math.round(bankPersonalAmount).toLocaleString('ar-SA')} ريال</span>
+                                    </div>
+                                  )}
+
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-slate-400 dark:text-slate-500">هامش الربح السنوي:</span>
+                                    <span className="font-extrabold text-slate-800 dark:text-slate-200">{bankAnnualMargin}%</span>
+                                  </div>
+
+                                  {bankSupportAmount > 0 && (
+                                    <div className="flex justify-between items-center">
+                                      <span className="text-slate-400 dark:text-slate-500">الدعم السكني المقدر:</span>
+                                      <span className="font-extrabold text-emerald-600 dark:text-emerald-400">{Math.round(bankSupportAmount).toLocaleString('ar-SA')} ريال</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </>
+                            ) : (
+                              <div className="p-3 bg-red-50/50 dark:bg-red-955/10 border border-red-100 dark:border-red-900/30 rounded-xl text-xs flex items-start gap-2 leading-relaxed">
+                                <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0 mt-0.5" />
+                                <span className="text-red-700 dark:text-red-450 font-bold">
+                                  {bankRefusalReason || "العرض مرفوض لعدم مطابقة المعايير الائتمانية أو تخطي السن النظامي للتمويل."}
+                                </span>
+                              </div>
+                            )}
+
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  /* 📊 Individual Single Bank Detail View */
+                  <>
+                    {/* Purchasing Power Card */}
+                    <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800/80 rounded-2xl p-6 space-y-6 shadow-xs">
+                      <div className="pb-4 border-b border-slate-100 dark:border-slate-800">
+                        <h4 className="font-black text-slate-900 dark:text-white text-sm">القوة الشرائية والملاءمة التمويلية المقدرة</h4>
+                        <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">الحد الأقصى للتسهيلات المالية وفقاً للوائح الـ DSR المعتمدة</p>
+
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -516,24 +778,7 @@ export function ResultsPage() {
                   </div>
                 </div>
 
-                {/* Technical diagnostics and log messages */}
-                <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800/80 rounded-2xl p-6 space-y-4 shadow-xs">
-                  <h4 className="font-black text-slate-900 dark:text-white text-sm pb-2 border-b border-slate-100 dark:border-slate-800">المقاييس الفنية والتحقق الائتماني:</h4>
 
-                  {diagnosticMessages.length > 0 ? (
-                    <div className="space-y-2 pt-2">
-                      <span className="text-xs font-bold text-slate-400 dark:text-slate-500">إشارات الفحص المالي:</span>
-                      {diagnosticMessages.map((msg: string, i: number) => (
-                        <div key={i} className="p-3 bg-blue-50/50 dark:bg-blue-950/15 border border-blue-100 dark:border-blue-900/30 rounded-xl text-xs flex items-start gap-2 leading-relaxed">
-                          <Info className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[#0057B8] dark:text-[#0ea5a4]" />
-                          <span className="text-slate-700 dark:text-slate-300 font-bold">{msg}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-slate-400 mt-2 font-bold select-none text-right">لا توجد رسائل ائتمانية تشخيصية للنتيجة الحالية.</p>
-                  )}
-                </div>
 
                 {/* النتائج المعروضة تقديرية بناء على البيانات المدخلة وقواعد النظام */}
                 <div className="bg-amber-50/60 dark:bg-amber-950/10 border border-amber-200/55 dark:border-amber-900/30 rounded-2xl p-5 flex items-start gap-3 select-none" dir="rtl">
@@ -546,7 +791,10 @@ export function ResultsPage() {
                   </div>
                 </div>
 
-              </div>
+              </>
+            )}
+
+          </div>
 
             </div>
           </div>

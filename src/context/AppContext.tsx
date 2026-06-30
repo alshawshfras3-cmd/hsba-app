@@ -1028,21 +1028,38 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         ),
         supportSettings: (() => {
           const loadedSupport = settings.support_settings ?? settings.supportSettings ?? null;
+          const defaultEtizaz = initialData.supportSettings.etizaz || {
+            enabled: true,
+            amount: 160000,
+            isRefundable: true,
+            graceMonths: 24,
+            maxRepaymentMonths: 216,
+            minMonthlyInstallment: 740,
+            eligibleSectors: ['military'],
+            eligibleProducts: [
+              'real_estate',
+              'real_estate_with_personal',
+              'real_estate_with_existing_personal'
+            ],
+            label: 'دعم اعتزاز للعسكريين',
+            notes: 'قرض حسن للعسكريين المؤهلين يبدأ سداده بعد فترة سماح'
+          };
           if (loadedSupport === null || loadedSupport === undefined) {
             return {
               ...initialData.supportSettings,
               etizaz: {
-                ...initialData.supportSettings.etizaz,
+                ...defaultEtizaz,
                 isRefundable: true
               }
             };
           }
-          const etizazObj = loadedSupport.etizaz || initialData.supportSettings.etizaz;
+          const etizazObj = loadedSupport.etizaz || {};
           return {
             ...loadedSupport,
             etizaz: {
+              ...defaultEtizaz,
               ...etizazObj,
-              isRefundable: true
+              isRefundable: etizazObj.isRefundable !== undefined ? etizazObj.isRefundable : true
             }
           };
         })(),

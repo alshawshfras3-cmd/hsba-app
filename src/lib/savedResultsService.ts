@@ -140,3 +140,128 @@ export async function deleteSavedResult(id: string, userId: string): Promise<boo
     return false;
   }
 }
+
+/**
+ * Saves all results inside a single row in `saved_results` as a comparison group.
+ */
+export async function saveCalculationResultsGroup(params: {
+  userId: string;
+  userEmail: string;
+  results: BankCalculationResult[];
+  title: string;
+  customerName: string;
+  financeType: string;
+  sector: string;
+  productId?: string;
+  mainFinanceType?: string;
+  supportType?: string;
+  netSalary?: number;
+}): Promise<{ success: boolean; data?: SavedResult; error?: string }> {
+  const { 
+    userId, 
+    userEmail, 
+    results, 
+    title, 
+    customerName, 
+    financeType, 
+    sector, 
+    productId, 
+    mainFinanceType, 
+    supportType, 
+    netSalary 
+  } = params;
+
+  if (!hasSupabaseKeys || !userId) {
+    return { 
+      success: false, 
+      error: 'تعذر حفظ النتيجة. الرجاء المحاولة مرة أخرى.' 
+    };
+  }
+
+  if (!results || results.length === 0) {
+    return {
+      success: false,
+      error: 'لا توجد نتائج لحفظها.'
+    };
+  }
+
+  const bestOffer = results.find(r => r.isEligible) || results[0];
+
+  const groupPayload = {
+    kind: "calculation_group",
+    version: 1,
+    customer_name: customerName,
+    title: title,
+    results_count: results.length,
+    results: results,
+    saved_at: new Date().toISOString(),
+    finance_type: financeType,
+    sector: sector,
+    product_id: productId,
+    main_finance_type: mainFinanceType,
+    support_type: supportType || bestOffer.supportType || 'none',
+    net_salary: netSalary || bestOffer.netSalary || 0
+  };
+
+  const newResult: SavedResult = {
+    id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 11),
+    user_id: userId,
+    created_at: new Date().toISOString(),
+    title,
+    finance_type: financeType,
+    sector,
+    bank_name: `مقارنة ${results.length} جهات تمويل`,
+    real_estate_amount: bestOffer.realEstateAmount || 0,
+    personal_amount: bestOffer.personalAmount || 0,
+    monthly_installment: bestOffer.monthlyInstallmentBeforeRetirement || 0,
+    term_months: bestOffer.termMonths || 0,
+    support_type: supportType || bestOffer.supportType || 'none',
+    net_salary: netSalary || bestOffer.netSalary || 0,
+    profit_margin: bestOffer.annualMargin || 0,
+    eligibility_status: bestOffer.isEligible ? 'eligible' : 'ineligible',
+    payload: groupPayload,
+    customer_name: customerName
+  };
+
+  try {
+    const { data, error } = await supabase
+      .from('saved_results')
+      .insert({
+        id: newResult.id,
+        user_id: userId,
+        title: newResult.title,
+        finance_type: newResult.finance_type,
+        sector: newResult.sector,
+        bank_name: newResult.bank_name,
+        real_estate_amount: newResult.real_estate_amount,
+        personal_amount: newResult.personal_amount,
+        monthly_installment: newResult.monthly_installment,
+        term_months: newResult.term_months,
+        support_type: newResult.support_type,
+        net_salary: newResult.net_salary,
+        profit_margin: newResult.profit_margin,
+        eligibility_status: newResult.eligibility_status,
+        payload: groupPayload,
+        customer_name: customerName
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.warn("Could not save results group to Supabase saved_results table:", error);
+      return { 
+        success: false, 
+        error: 'تعذر حفظ النتيجة. الرجاء المحاولة مرة أخرى.' 
+      };
+    }
+
+    return { success: true, data: data as SavedResult };
+  } catch (err: any) {
+    console.warn("Supabase query crash during saving results group", err);
+    return { 
+      success: false, 
+      error: 'تعذر حفظ النتيجة. الرجاء المحاولة مرة أخرى.' 
+    };
+  }
+}
+

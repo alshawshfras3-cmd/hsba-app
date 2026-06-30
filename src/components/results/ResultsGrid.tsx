@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { BankCalculationResult, ProductId } from '../../types';
 import { 
   Building2, CheckCircle, XCircle, AlertTriangle, ArrowLeftRight, Clock, Percent, ListCollapse,
-  Download, HelpCircle, Activity, Info, Users, ChevronDown, Award, Bookmark, Copy, Share2, MessageCircle
+  Download, HelpCircle, Activity, Info, Users, ChevronDown, Award, Bookmark, Copy, Share2, MessageCircle,
+  User, RotateCcw
 } from 'lucide-react';
 import { useAppState } from '../../context/AppContext';
-import { saveCalculationResult } from '../../lib/savedResultsService';
+import { saveCalculationResult, saveCalculationResultsGroup } from '../../lib/savedResultsService';
+import { convertHijriToGregorian } from '../../lib/date-utils';
 
 interface ResultsGridProps {
   results: BankCalculationResult[];
@@ -15,6 +17,15 @@ interface ResultsGridProps {
   obligationRemainingMonths?: number;
   mainFinanceType?: 'real_estate' | 'personal_only' | 'real_estate_with_existing_personal';
   sectorId?: string;
+  birthYear?: number | '';
+  birthMonth?: number | '';
+  birthDay?: number | '';
+  birthCalendar?: 'gregorian' | 'hijri';
+  appointmentYear?: number | '';
+  appointmentMonth?: number | '';
+  appointmentDay?: number | '';
+  appointmentCalendar?: 'gregorian' | 'hijri';
+  retirementAge?: number | '';
 }
 
 export default function ResultsGrid({ 
@@ -24,7 +35,16 @@ export default function ResultsGrid({
   existingMonthlyObligations = 0,
   obligationRemainingMonths = 0,
   mainFinanceType = 'real_estate',
-  sectorId = 'gov_civil'
+  sectorId = 'gov_civil',
+  birthYear = '',
+  birthMonth = '',
+  birthDay = '',
+  birthCalendar = 'gregorian',
+  appointmentYear = '',
+  appointmentMonth = '',
+  appointmentDay = '',
+  appointmentCalendar = 'gregorian',
+  retirementAge = ''
 }: ResultsGridProps) {
   // Normalize legacy aliases for display-only compatibility
   const productId = (rawProductId === 'both' as any)
@@ -50,6 +70,14 @@ export default function ResultsGrid({
   const [saveStatus, setSaveStatus] = useState<'success' | 'error' | null>(null);
   const [saveErrorText, setSaveErrorText] = useState<string>('');
   const [showAuthRequiredAlert, setShowAuthRequiredAlert] = useState<boolean>(false);
+
+  // Group Saved Results states
+  const [showGroupSaveModal, setShowGroupSaveModal] = useState<boolean>(false);
+  const [groupSaveTitle, setGroupSaveTitle] = useState<string>('حسبة عميل - مقارنة جميع البنوك');
+  const [groupSaveCustomerName, setGroupSaveCustomerName] = useState<string>('');
+  const [isGroupSaving, setIsGroupSaving] = useState<boolean>(false);
+  const [groupSaveStatus, setGroupSaveStatus] = useState<'success' | 'error' | null>(null);
+  const [groupSaveErrorText, setGroupSaveErrorText] = useState<string>('');
 
   const currentSub = userSubscriptions?.find(sub => sub.email === user?.email);
   const isSubscribed = true;
@@ -144,7 +172,7 @@ export default function ResultsGrid({
     if (resolvedEtizaz > 0) {
       lines.push(`اعتزاز دفعة مستردة: ${formatNum(resolvedEtizaz)} ريال`);
       if (offer.etizazMonthlyInstallment && offer.etizazMonthlyInstallment > 0) {
-        lines.push(`قسط اعتزاز الشهري: ${formatNum(Math.round(offer.etizazMonthlyInstallment))} ريال (لمدة ${offer.etizazTermMonths || 0} شهراً)`);
+        lines.push(`قسط اعتزاز الشهري: ${formatNum(Math.round(offer.etizazMonthlyInstallment))} ريال (يبدأ بعد فترة سماح ${offer.etizazGraceMonths ?? 24} شهراً، ولمدة سداد ${offer.etizazTermMonths || 0} شهراً)`);
       }
     }
 
@@ -324,7 +352,7 @@ export default function ResultsGrid({
     if (resolvedEtizaz > 0) {
       lines.push(`اعتزاز دفعة مستردة: ${formatNum(resolvedEtizaz)} ريال`);
       if (offer.etizazMonthlyInstallment && offer.etizazMonthlyInstallment > 0) {
-        lines.push(`قسط اعتزاز الشهري: ${formatNum(Math.round(offer.etizazMonthlyInstallment))} ريال (لمدة ${offer.etizazTermMonths || 0} شهراً)`);
+        lines.push(`قسط اعتزاز الشهري: ${formatNum(Math.round(offer.etizazMonthlyInstallment))} ريال (يبدأ بعد فترة سماح ${offer.etizazGraceMonths ?? 24} شهراً، ولمدة سداد ${offer.etizazTermMonths || 0} شهراً)`);
       }
     }
 
@@ -482,6 +510,71 @@ export default function ResultsGrid({
     }
   };
 
+  const handleOpenGroupSaveModal = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (window.navigator && window.navigator.vibrate) {
+      window.navigator.vibrate(12);
+    }
+    
+    if (!user) {
+      setShowAuthRequiredAlert(true);
+      return;
+    }
+
+    setGroupSaveTitle('حسبة عميل - مقارنة جميع البنوك');
+    setGroupSaveCustomerName(user?.user_metadata?.full_name || '');
+    setGroupSaveStatus(null);
+    setGroupSaveErrorText('');
+    setShowGroupSaveModal(true);
+  };
+
+  const executeSaveGroupResults = async () => {
+    if (!user) return;
+    if (!groupSaveCustomerName.trim()) {
+      setGroupSaveStatus('error');
+      setGroupSaveErrorText('يرجى إدخال اسم العميل.');
+      return;
+    }
+
+    setIsGroupSaving(true);
+    setGroupSaveStatus(null);
+
+    const fTypeArabic = getFinanceTypeArabicName(mainFinanceType, productId);
+    const sectorArabic = getSectorArabicName(sectorId);
+
+    try {
+      const res = await saveCalculationResultsGroup({
+        userId: user.id,
+        userEmail: user.email || '',
+        results: results,
+        title: groupSaveTitle || 'حسبة عميل - مقارنة جميع البنوك',
+        customerName: groupSaveCustomerName,
+        financeType: fTypeArabic,
+        sector: sectorArabic,
+        productId: productId,
+        mainFinanceType: mainFinanceType,
+        supportType: results[0]?.supportType || 'none',
+        netSalary: results[0]?.netSalary || 0
+      });
+
+      if (res.success) {
+        setGroupSaveStatus('success');
+        setTimeout(() => {
+          setShowGroupSaveModal(false);
+          setGroupSaveStatus(null);
+        }, 2200);
+      } else {
+        setGroupSaveStatus('error');
+        setGroupSaveErrorText(res.error || 'حدث خطأ غير متوقع أثناء معالجة الطلب.');
+      }
+    } catch (err: any) {
+      setGroupSaveStatus('error');
+      setGroupSaveErrorText(err.message || 'فشل الاتصال وحفظ التقرير.');
+    } finally {
+      setIsGroupSaving(false);
+    }
+  };
+
   // Apply sorting
   const sortedResults = [...results].sort((a, b) => {
     // Keep ineligible at the bottom
@@ -506,70 +599,220 @@ export default function ResultsGrid({
     }
   });
 
+  const summaryOffer = results.find(r => r.isEligible) || results[0];
+  
+  const sectorArabic = getSectorArabicName(sectorId);
+  const financeTypeArabic = getFinanceTypeArabicName(mainFinanceType, productId);
+  const netSalaryVal = summaryOffer?.netSalary || 0;
+  const obligationsVal = existingMonthlyObligations || 0;
+
+  const resolvedSupportAmount = summaryOffer ? (summaryOffer.housingSupportAmount 
+    ?? (summaryOffer as any).supportAmount 
+    ?? (summaryOffer as any).monthlySupport 
+    ?? (summaryOffer as any).downPaymentSupport
+    ?? (summaryOffer.diagnostics?.monthlySupport || summaryOffer.diagnostics?.downPaymentSupport)
+    ?? 0) : 0;
+
+  let resolvedSupportType = summaryOffer?.supportType || 'none';
+  if (summaryOffer && (resolvedSupportType === 'none' || !summaryOffer.supportType)) {
+    if ((summaryOffer as any).monthlySupport && (summaryOffer as any).monthlySupport > 0) {
+      resolvedSupportType = 'monthly';
+    } else if ((summaryOffer as any).downPaymentSupport && (summaryOffer as any).downPaymentSupport > 0) {
+      resolvedSupportType = 'downpayment';
+    } else if (summaryOffer.diagnostics?.monthlySupport && summaryOffer.diagnostics?.monthlySupport > 0) {
+      resolvedSupportType = 'monthly';
+    } else if (summaryOffer.diagnostics?.downPaymentSupport && summaryOffer.diagnostics?.downPaymentSupport > 0) {
+      resolvedSupportType = 'downpayment';
+    }
+  }
+
+  const currentYear = new Date().getFullYear();
+  const hijriToGregLocal = (y: number, calendar: 'gregorian' | 'hijri'): number => {
+    if (calendar === 'hijri') {
+      try {
+        return convertHijriToGregorian(y, 1, 1).year;
+      } catch (e) {
+        return y + 579;
+      }
+    }
+    return y;
+  };
+
+  const computedAge = birthYear ? (currentYear - hijriToGregLocal(Number(birthYear), birthCalendar || 'gregorian')) : 0;
+  const ageDisplay = computedAge ? `${computedAge} سنة` : 'غير محدد';
+  
+  const birthDateDisplay = birthYear && birthMonth 
+    ? `${birthYear}/${String(birthMonth).padStart(2, '0')} (${birthCalendar === 'hijri' ? 'هـ' : 'م'})`
+    : 'غير محدد';
+
+  const appointmentDateDisplay = appointmentYear && appointmentMonth
+    ? `${appointmentYear}/${String(appointmentMonth).padStart(2, '0')} (${appointmentCalendar === 'hijri' ? 'هـ' : 'م'})`
+    : (sectorId === 'retired' ? 'متقاعد' : 'غير محدد');
+
+  const retirementAgeDisplay = retirementAge ? `${retirementAge} سنة` : 'غير محدد';
+
   return (
     <div className="w-full">
-      {/* Header and Sorting */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-6 border-b border-[#E5E7EB] dark:border-slate-800">
-        <div>
-          <h2 className="text-xl font-bold text-[#111827] dark:text-white">نتائج الحسبة وعروض جهات التمويل</h2>
-          <p className="text-sm text-[#6B7280] dark:text-slate-400">تم حساب أفضل عروض وبدائل القروض من كافة البنوك النشطة بناءً على ضوابط ساما ومؤسسة التقاعد.</p>
-        </div>
-        <button
-          onClick={onRestart}
-          className="self-start text-sm underline text-[#0057B8] dark:text-[#0ea5a4] font-medium hover:text-[#0a4891] dark:hover:text-cyan-400 cursor-pointer"
-        >
-          إعادة تعبئة البيانات
-        </button>
-      </div>
+      <div className="flex flex-col lg:flex-row gap-5 lg:gap-6 items-start" dir="rtl">
+        
+        {/* Right Sidebar on Desktop/Laptop/Tablet (RTL) - Summary Card */}
+        <aside className="hidden lg:block w-[320px] shrink-0">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-xs flex flex-col justify-between">
+            <div className="space-y-6">
+              <div className="flex items-center gap-2 pb-4 border-b border-slate-100 dark:border-slate-800">
+                <User className="w-5 h-5 text-[#0057B8] dark:text-[#60A5FA]" />
+                <h3 className="font-extrabold text-sm text-slate-900 dark:text-white font-sans">ملخص بياناتك</h3>
+              </div>
 
-      {/* Sorting Tabs */}
-      <div className="flex flex-wrap items-center gap-2 mb-6 justify-start">
-        <span className="text-xs font-bold text-[#6B7280] dark:text-slate-400 ml-2">ترتيب النتائج:</span>
-        <button
-          onClick={() => setActiveSort('power')}
-          className={`px-4 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all ${
-            activeSort === 'power'
-              ? 'bg-[#0057B8] dark:bg-[#0ea5a4] text-white shadow-xs'
-              : 'bg-white dark:bg-[#111827] text-[#6B7280] dark:text-slate-300 border border-[#E5E7EB] dark:border-slate-800 hover:bg-gray-50 dark:hover:bg-slate-800'
-          }`}
-        >
-          أعلى تمويل وقدرة شراء
-        </button>
-        <button
-          onClick={() => setActiveSort('installment')}
-          className={`px-4 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all ${
-            activeSort === 'installment'
-              ? 'bg-[#0057B8] dark:bg-[#0ea5a4] text-white shadow-xs'
-              : 'bg-white dark:bg-[#111827] text-[#6B7280] dark:text-slate-300 border border-[#E5E7EB] dark:border-slate-800 hover:bg-gray-50 dark:hover:bg-slate-800'
-          }`}
-        >
-          أقل قسط شهري
-        </button>
-        <button
-          onClick={() => setActiveSort('margin')}
-          className={`px-4 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all ${
-            activeSort === 'margin'
-              ? 'bg-[#0057B8] dark:bg-[#0ea5a4] text-white shadow-xs'
-              : 'bg-white dark:bg-[#111827] text-[#6B7280] dark:text-slate-300 border border-[#E5E7EB] dark:border-slate-800 hover:bg-gray-50 dark:hover:bg-slate-800'
-          }`}
-        >
-          أقل هامش فائدة
-        </button>
-        <button
-          onClick={() => setActiveSort('term')}
-          className={`px-4 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all ${
-            activeSort === 'term'
-              ? 'bg-[#0057B8] dark:bg-[#0ea5a4] text-white shadow-xs'
-              : 'bg-white dark:bg-[#111827] text-[#6B7280] dark:text-slate-300 border border-[#E5E7EB] dark:border-slate-800 hover:bg-gray-50 dark:hover:bg-slate-800'
-          }`}
-        >
-          أطول فترة سداد
-        </button>
-      </div>
+              <div className="space-y-4">
+                {/* العمر */}
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-[#6B7280] dark:text-slate-400 font-bold">العمر:</span>
+                  <span className="font-extrabold text-[#111827] dark:text-slate-100">{ageDisplay}</span>
+                </div>
+
+                {/* تاريخ الميلاد */}
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-[#6B7280] dark:text-slate-400 font-bold">تاريخ الميلاد:</span>
+                  <span className="font-extrabold text-[#111827] dark:text-slate-100">{birthDateDisplay}</span>
+                </div>
+
+                {/* تاريخ التعيين */}
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-[#6B7280] dark:text-slate-400 font-bold">تاريخ التعيين:</span>
+                  <span className="font-extrabold text-[#111827] dark:text-slate-100">{appointmentDateDisplay}</span>
+                </div>
+
+                {/* المنتج */}
+                <div className="flex justify-between items-start text-xs gap-4">
+                  <span className="text-[#6B7280] dark:text-slate-400 font-bold shrink-0">المنتج:</span>
+                  <span className="font-extrabold text-[#111827] dark:text-slate-100 text-left leading-tight">{financeTypeArabic || "غير محدد"}</span>
+                </div>
+
+                {/* الدعم */}
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-[#6B7280] dark:text-slate-400 font-bold">الدعم:</span>
+                  <span className="font-extrabold text-[#0057B8] dark:text-[#60A5FA]">
+                    {resolvedSupportAmount > 0 
+                      ? `${Math.round(resolvedSupportAmount).toLocaleString('ar-SA')} ريال ${resolvedSupportType === 'monthly' ? '/ شهر' : '(دفعة)'}`
+                      : "غير مدعوم"}
+                  </span>
+                </div>
+
+                {/* عمر التقاعد */}
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-[#6B7280] dark:text-slate-400 font-bold">عمر التقاعد:</span>
+                  <span className="font-extrabold text-[#111827] dark:text-slate-100">{retirementAgeDisplay}</span>
+                </div>
+
+                {/* القطاع */}
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-[#6B7280] dark:text-slate-400 font-bold">القطاع:</span>
+                  <span className="font-extrabold text-[#111827] dark:text-slate-100">{sectorArabic || "غير محدد"}</span>
+                </div>
+
+                {/* صافي الراتب الشهري */}
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-[#6B7280] dark:text-slate-400 font-bold">صافي الراتب الشهري:</span>
+                  <span className="font-extrabold text-[#111827] dark:text-slate-100 font-sans tabular-nums tracking-tight" dir="ltr">
+                    {netSalaryVal > 0 ? `${Math.round(netSalaryVal).toLocaleString('ar-SA')} ريال` : "غير محدد"}
+                  </span>
+                </div>
+
+                {/* الالتزامات الشهرية */}
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-[#6B7280] dark:text-slate-400 font-bold">الالتزامات الشهرية:</span>
+                  <span className="font-extrabold text-[#111827] dark:text-slate-100 font-sans tabular-nums tracking-tight" dir="ltr">
+                    {obligationsVal > 0 ? `${Math.round(obligationsVal).toLocaleString('ar-SA')} ريال` : "0 ريال"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-6 border-t border-slate-100 dark:border-slate-800 mt-6">
+              <button
+                onClick={onRestart}
+                className="w-full py-2.5 rounded-xl border border-[#0057B8] hover:bg-[#EFF6FF] text-[#0057B8] font-extrabold text-xs cursor-pointer text-center transition-all duration-200 bg-white"
+              >
+                تعديل البيانات
+              </button>
+            </div>
+          </div>
+        </aside>
+
+        {/* Left Column on Desktop (RTL) / Main Results Section on Mobile */}
+        <main className="min-w-0 flex-1 w-full space-y-6">
+          {/* Desktop/Tablet Header & Actions Row */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6 pb-6 border-b border-[#E5E7EB] dark:border-slate-800">
+            <div>
+              <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-sans tracking-tight">نتائج الحسبة وعروض جهات التمويل</h2>
+              <p className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 mt-1 sm:mt-1.5 font-sans leading-relaxed">تم حساب أفضل عروض وبدائل القروض من كافة البنوك النشطة بناءً على ضوابط ساما ومؤسسة التقاعد.</p>
+            </div>
+            
+            {/* Desktop Action Row Buttons */}
+            <div className="flex flex-wrap items-center gap-3">
+              {/* "حفظ كل نتائج العميل" button - clearly visible */}
+              <button
+                id="save-all-results-btn"
+                onClick={handleOpenGroupSaveModal}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#0057B8] hover:bg-[#003B7A] text-white font-extrabold text-xs shadow-md shadow-blue-600/10 hover:shadow-blue-600/20 cursor-pointer active:scale-98 transition-all"
+              >
+                <Bookmark className="w-4 h-4" />
+                <span>حفظ كل نتائج العميل</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Sorting Tabs Row */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <div className="flex flex-wrap items-center gap-2 justify-start">
+              <span className="text-xs font-bold text-[#6B7280] dark:text-slate-400 ml-2">ترتيب النتائج:</span>
+              <button
+                onClick={() => setActiveSort('power')}
+                className={`px-4 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all ${
+                  activeSort === 'power'
+                    ? 'bg-[#0057B8] dark:bg-[#0057B8] text-white shadow-xs'
+                    : 'bg-white dark:bg-[#111827] text-[#6B7280] dark:text-slate-300 border border-[#E5E7EB] dark:border-slate-800 hover:bg-gray-50 dark:hover:bg-slate-800'
+                }`}
+              >
+                أعلى تمويل وقدرة شراء
+              </button>
+              <button
+                onClick={() => setActiveSort('installment')}
+                className={`px-4 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all ${
+                  activeSort === 'installment'
+                    ? 'bg-[#0057B8] dark:bg-[#0057B8] text-white shadow-xs'
+                    : 'bg-white dark:bg-[#111827] text-[#6B7280] dark:text-slate-300 border border-[#E5E7EB] dark:border-slate-800 hover:bg-gray-50 dark:hover:bg-slate-800'
+                }`}
+              >
+                أقل قسط شهري
+              </button>
+              <button
+                onClick={() => setActiveSort('margin')}
+                className={`px-4 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all ${
+                  activeSort === 'margin'
+                    ? 'bg-[#0057B8] dark:bg-[#0057B8] text-white shadow-xs'
+                    : 'bg-white dark:bg-[#111827] text-[#6B7280] dark:text-slate-300 border border-[#E5E7EB] dark:border-slate-800 hover:bg-gray-50 dark:hover:bg-slate-800'
+                }`}
+              >
+                أقل هامش فائدة
+              </button>
+              <button
+                onClick={() => setActiveSort('term')}
+                className={`px-4 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all ${
+                  activeSort === 'term'
+                    ? 'bg-[#0057B8] dark:bg-[#0057B8] text-white shadow-xs'
+                    : 'bg-white dark:bg-[#111827] text-[#6B7280] dark:text-slate-300 border border-[#E5E7EB] dark:border-slate-800 hover:bg-gray-50 dark:hover:bg-slate-800'
+                }`}
+              >
+                أطول فترة سداد
+              </button>
+            </div>
+          </div>
 
       {/* Bank Cards Grid with optional Subscription blurred state and relative wrapper */}
       <div className={`relative ${!isSubscribed ? 'min-h-[480px]' : ''}`}>
-        <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 ${!isSubscribed ? 'blur-md pointer-events-none select-none contrast-[0.80]' : ''}`}>
+        <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 ${!isSubscribed ? 'blur-md pointer-events-none select-none contrast-[0.80]' : ''}`}>
           {sortedResults.map((offer, index) => {
             const isApp = offer.status === 'approved';
             const isWarn = offer.status === 'warning';
@@ -580,71 +823,91 @@ export default function ResultsGrid({
               <div
                 key={offer.bankId}
                 onClick={() => setSelectedOffer(offer)}
-                className={`bg-white dark:bg-[#111827] rounded-3xl border transition-all duration-300 p-6 relative flex flex-col justify-between cursor-pointer group hover:-translate-y-1 ${
+                className={`bg-white dark:bg-[#111827] rounded-2xl border transition-all duration-300 p-4 flex flex-col justify-between cursor-pointer group hover:-translate-y-1 ${
                   isBestOffer
-                    ? 'border-[#0057B8] bg-gradient-to-tr from-[#0057B8]/[0.01] to-[#0057B8]/[0.03] dark:from-[#0ea5a4]/5 dark:to-[#0ea5a4]/10 ring-1 ring-[#0057B8]/20 dark:ring-[#0ea5a4]/30 shadow-premium hover:shadow-card-hover dark:shadow-none'
+                    ? 'border-[#0057B8] bg-gradient-to-tr from-[#0057B8]/[0.01] to-[#0057B8]/[0.03] dark:from-[#0057B8]/5 dark:to-[#0057B8]/10 ring-1 ring-[#0057B8]/20 dark:ring-[#0057B8]/30 shadow-premium hover:shadow-card-hover dark:shadow-none'
                     : offer.isEligible
-                    ? 'border-slate-250/70 dark:border-slate-800 hover:border-[#0057B8]/80 dark:hover:border-[#0ea5a4]/85 hover:shadow-premium dark:shadow-none'
+                    ? 'border-[#E5E7EB] dark:border-slate-800 hover:border-[#0057B8]/80 dark:hover:border-[#0057B8]/85 hover:shadow-premium dark:shadow-none'
                     : 'border-rose-100 dark:border-red-950 bg-rose-50/10 dark:bg-rose-950/5'
                 }`}
               >
-                {/* Outstanding Best Offer Badge */}
-                {isBestOffer && (
-                  <div className="absolute top-4 right-4 flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black bg-gradient-to-l from-amber-500 to-yellow-500 text-white shadow-xs">
-                    <span>⭐ أفضل خيار مرشح</span>
-                  </div>
-                )}
+                {/* Clean Header Area with Badges on Top and Bank Info underneath */}
+                <div className="flex flex-col gap-2.5 mb-3">
+                  {/* Badges Area (Top Row) */}
+                  <div className="flex items-center justify-between gap-1.5 flex-wrap min-h-[26px]">
+                    {/* Right side in RTL: Promo/Best Badge */}
+                    <div className="flex items-center gap-1">
+                      {isBestOffer && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-[#FFB000] text-[#0B1B34] border border-[#F59E0B] shadow-sm">
+                          <span>⭐ أفضل خيار مرشح</span>
+                        </span>
+                      )}
+                      {!isBestOffer && offer.bankId === 'alarabi' && offer.isEligible && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-[#FFB000] text-[#0B1B34] border border-[#F59E0B] shadow-sm">
+                          <span>⭐ أفضل قسط شهري</span>
+                        </span>
+                      )}
+                    </div>
 
-                {/* Badge */}
-                <div className={`absolute top-4 ${isBestOffer ? 'left-4' : 'left-4'}`}>
-                  {isApp && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60">
-                      <CheckCircle className="w-3.5 h-3.5" />
-                      <span>مقبول</span>
-                    </span>
-                  )}
-                  {isWarn && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-450 border border-amber-200 dark:border-amber-900/40">
-                      <AlertTriangle className="w-3.5 h-3.5" />
-                      <span>مقبول مبدئيًا</span>
-                    </span>
-                  )}
-                  {isRej && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900/45">
-                      <XCircle className="w-3.5 h-3.5" />
-                      <span>مرفوض</span>
-                    </span>
-                  )}
-                </div>
-
-                {/* Bank Logo / Header */}
-                <div className="flex items-center gap-4 mb-5">
-                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${offer.logoColor} text-white flex items-center justify-center font-bold text-center text-sm p-1 select-none shadow-xs group-hover:scale-105 transition-transform`}>
-                    {offer.logoText}
+                    {/* Left side in RTL: Eligibility Badge */}
+                    <div>
+                      {isApp && (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-[#ECFDF5] border border-[#A7F3D0] text-[#047857]">
+                          <CheckCircle className="w-3.5 h-3.5 text-[#047857]" />
+                          <span>مقبول</span>
+                        </span>
+                      )}
+                      {isWarn && (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-[#FFF7ED] border border-[#FED7AA] text-[#C2410C]">
+                          <AlertTriangle className="w-3.5 h-3.5 text-[#C2410C]" />
+                          <span>مقبول مبدئيًا</span>
+                        </span>
+                      )}
+                      {isRej && (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-50 dark:bg-red-950/20 text-red-750 dark:text-red-450 border border-red-200 dark:border-red-900/40">
+                          <XCircle className="w-3.5 h-3.5" />
+                          <span>مرفوض</span>
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-extrabold text-[#111827] dark:text-white text-lg flex items-center gap-2">
-                      <span>{offer.bankName}</span>
-                    </h3>
-                    <p className={`text-xs ${offer.isAgeLimitingFactor ? 'text-rose-600 dark:text-rose-450 font-bold animate-pulse' : 'text-[#6B7280] dark:text-slate-400'}`}>
-                      {mainFinanceType === 'personal_only' 
-                        ? 'مدة التمويل الشخصي: 5 سنوات (60 شهراً)' 
-                        : `مدة التمويل العقاري: ${Math.floor(offer.termMonths / 12)} سنة ${Math.round(offer.termMonths % 12) > 0 ? `و ${Math.round(offer.termMonths % 12)} أشهر` : ''}`}
-                    </p>
-                    {offer.isAgeLimitingFactor && (
-                      <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-extrabold text-[#991B1B] dark:text-red-400 bg-red-100/50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 px-2 py-0.5 rounded-md">
+
+                  {/* Bank Identity Row */}
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${offer.logoColor} text-white flex items-center justify-center font-bold text-center text-xs p-1 select-none shadow-xs group-hover:scale-105 transition-transform shrink-0`}>
+                      {offer.logoText}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-extrabold text-[#0B1B34] dark:text-white text-sm flex items-center gap-2 truncate">
+                        <span>{offer.bankName}</span>
+                      </h3>
+                      <p className={`text-[10px] ${offer.isAgeLimitingFactor ? 'text-rose-600 dark:text-rose-450 font-bold animate-pulse' : 'text-[#6B7280] dark:text-slate-400'}`}>
+                        {mainFinanceType === 'personal_only' 
+                          ? 'مدة التمويل الشخصي: 5 سنوات (60 شهراً)' 
+                          : `مدة التمويل العقاري: ${Math.floor(offer.termMonths / 12)} سنة ${Math.round(offer.termMonths % 12) > 0 ? `و ${Math.round(offer.termMonths % 12)} أشهر` : ''}`}
+                      </p>
+                    </div>
+                  </div>
+
+                  {offer.isAgeLimitingFactor && (
+                    <div className="mt-0.5">
+                      <span className="inline-flex items-center gap-1 text-[8px] font-extrabold text-[#991B1B] dark:text-red-400 bg-red-100/50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 px-1.5 py-0.5 rounded">
                         ⚠️ العمر يحدّ من مدة سداد التمويل
                       </span>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Main Numbers */}
                 {offer.isEligible ? (
-                  <div className="space-y-4 mb-6 flex-1 flex flex-col justify-between">
+                  <div className="space-y-3 mb-4 flex-1 flex flex-col justify-between">
                     {/* Total budget (Always visible, prominent at the beginning) */}
-                    <div className="bg-gradient-to-br from-slate-50 to-slate-100/30 dark:from-[#0F172A] dark:to-slate-900/40 px-4 py-4 md:py-3.5 rounded-xl border border-slate-200/50 dark:border-slate-800/60">
-                      <span className="text-[11px] text-[#6B7280] dark:text-slate-400 font-extrabold block mb-1">
+                    <div className={`px-3.5 py-3 rounded-xl border transition-all ${
+                      isBestOffer
+                        ? 'bg-[#EFF6FF] border-[#BFDBFE] dark:bg-blue-950/15 dark:border-blue-900/30'
+                        : 'bg-slate-50 border-[#E5E7EB] dark:bg-[#0F172A]/40 dark:border-slate-800/60'
+                    }`}>
+                      <span className="text-[10px] text-[#6B7280] dark:text-slate-400 font-extrabold block mb-0.5">
                         {mainFinanceType === 'personal_only' 
                           ? 'مبلغ التمويل الشخصي المتاح' 
                           : mainFinanceType === 'real_estate_with_existing_personal'
@@ -654,7 +917,7 @@ export default function ResultsGrid({
                           : 'إجمالي مبلغ التمويل المتكامل المتاح'}
                       </span>
                       <div className="flex items-baseline gap-1.5">
-                        <span className="text-2xl font-black text-[#0057B8] dark:text-[#0ea5a4] leading-none shrink-0">
+                        <span className="text-2xl font-black text-[#0057B8] dark:text-[#60A5FA] leading-none shrink-0 font-sans tabular-nums tracking-tight">
                           {Math.round(mainFinanceType === 'personal_only' 
                             ? offer.personalAmount 
                             : mainFinanceType === 'real_estate_with_existing_personal'
@@ -668,11 +931,11 @@ export default function ResultsGrid({
                         <div className="mt-2.5 pt-2 border-t border-dashed border-slate-200 dark:border-slate-800 grid grid-cols-2 gap-2 text-[10px] font-semibold text-slate-500 dark:text-slate-400">
                           <div>
                             <span className="block text-slate-450 dark:text-slate-500">أقصى تمويل متاح:</span>
-                            <span className="font-extrabold text-slate-700 dark:text-slate-350">{Math.round(offer.maxEligibleFinanceAmount || 0).toLocaleString('ar-SA')} ريال</span>
+                            <span className="font-extrabold text-slate-700 dark:text-slate-350 font-sans tabular-nums tracking-tight">{Math.round(offer.maxEligibleFinanceAmount || 0).toLocaleString('ar-SA')} ريال</span>
                           </div>
                           <div>
-                            <span className="block text-amber-600 dark:text-amber-400">مبلغ التمويل المطلوب:</span>
-                            <span className="font-extrabold text-amber-600 dark:text-amber-400">{Math.round(offer.requestedFinanceAmount || 0).toLocaleString('ar-SA')} ريال</span>
+                            <span className="block text-[#0057B8] dark:text-[#60A5FA]">مبلغ التمويل المطلوب:</span>
+                            <span className="font-extrabold text-[#003B7A] dark:text-[#60A5FA] font-sans tabular-nums tracking-tight">{Math.round(offer.requestedFinanceAmount || 0).toLocaleString('ar-SA')} ريال</span>
                           </div>
                         </div>
                       )}
@@ -683,63 +946,57 @@ export default function ResultsGrid({
                       <button
                         type="button"
                         onClick={(e) => toggleCardExpansion(offer.bankId, e)}
-                        className="w-full flex justify-between items-center px-4 py-3 rounded-xl bg-slate-50 dark:bg-[#0F172A] border border-slate-200/50 dark:border-slate-800/60 text-[#0057B8] dark:text-[#0ea5a4] text-xs font-bold hover:bg-slate-100/80 dark:hover:bg-slate-800 active:scale-98 transition-all cursor-pointer"
+                        className="w-full flex justify-between items-center px-4 py-3 rounded-xl bg-slate-50 dark:bg-[#0F172A] border border-slate-200/50 dark:border-slate-800/60 text-[#0057B8] dark:text-[#60A5FA] text-xs font-bold hover:bg-slate-100/80 dark:hover:bg-slate-800 active:scale-98 transition-all cursor-pointer"
                       >
                         <span>{expandedCards[offer.bankId] ? 'إخفاء تفاصيل الحسبة والقسط' : 'عرض تفاصيل الحسبة ومؤشر الاقتطاع'}</span>
-                        <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${expandedCards[offer.bankId] ? 'rotate-180 text-[#0a4891] dark:text-cyan-400' : 'text-[#0057B8] dark:text-[#0ea5a4]'}`} />
+                        <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${expandedCards[offer.bankId] ? 'rotate-180 text-[#0a4891] dark:text-[#60A5FA]' : 'text-[#0057B8] dark:text-[#60A5FA]'}`} />
                       </button>
                     </div>
 
                     {/* Collapsible Details Container */}
-                    <div className={`${expandedCards[offer.bankId] ? 'block' : 'hidden'} sm:block space-y-4 animate-fade-in`}>
-                      {/* Components */}
-                      <div className="grid grid-cols-2 gap-4">
+                    <div className={`${expandedCards[offer.bankId] ? 'block' : 'hidden'} sm:block space-y-3 animate-fade-in`}>
+                      {/* Components Grid (2x2) */}
+                      <div className="grid grid-cols-2 gap-2">
                         {mainFinanceType === 'personal_only' ? (
                           <>
-                            {/* 2. قسط التمويل الشخصي */}
-                            <div className="border border-emerald-100 dark:border-emerald-900/30 bg-emerald-50/30 dark:bg-emerald-950/10 rounded-xl p-3 col-span-2 flex justify-between items-center">
-                              <span className="text-xs font-semibold text-[#065F46] dark:text-emerald-400">قسط التمويل الشخصي:</span>
-                              <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                                {Math.round(offer.monthlyInstallmentBeforeRetirement).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال / شهر
+                            {/* 1. قسط التمويل الشخصي */}
+                            <div className="border border-[#BFDBFE] bg-[#EFF6FF] dark:border-blue-900/30 dark:bg-blue-950/15 rounded-xl p-2.5 col-span-2 flex justify-between items-center text-xs">
+                              <span className="font-extrabold text-[#0057B8] dark:text-[#60A5FA]">قسط التمويل الشخصي:</span>
+                              <span className="font-black text-[#0057B8] dark:text-[#60A5FA] font-sans tabular-nums tracking-tight">
+                                {Math.round(offer.monthlyInstallmentBeforeRetirement).toLocaleString('ar-SA')} ريال / شهر
                               </span>
                             </div>
 
-                            {/* 3. إجمالي الأرباح */}
-                            <div className="border border-[#E5E7EB] dark:border-slate-800 rounded-xl p-3 col-span-2 flex justify-between items-center bg-gray-50/50 dark:bg-[#0F172A]">
-                              <span className="text-xs font-semibold text-[#6B7280] dark:text-slate-400">إجمالي الأرباح:</span>
-                              <span className="font-bold text-rose-600 dark:text-rose-400">
-                                {Math.round(offer.personalProfitAmount !== undefined ? offer.personalProfitAmount : (offer.personalAmount * (offer.annualMargin / 100) * (offer.termMonths / 12))).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال
+                            {/* 2. إجمالي الأرباح */}
+                            <div className="border border-[#E5E7EB] dark:border-slate-800 rounded-xl p-2.5 col-span-2 flex justify-between items-center bg-slate-50/50 dark:bg-[#0F172A]/40 text-xs">
+                              <span className="font-extrabold text-[#6B7280] dark:text-slate-400">إجمالي الأرباح:</span>
+                              <span className="font-bold text-rose-600 dark:text-rose-450 font-sans tabular-nums tracking-tight">
+                                {Math.round(offer.personalProfitAmount !== undefined ? offer.personalProfitAmount : (offer.personalAmount * (offer.annualMargin / 100) * (offer.termMonths / 12))).toLocaleString('ar-SA')} ريال
                               </span>
                             </div>
 
-                            {/* 4. إجمالي السداد */}
-                            <div className="border border-[#E5E7EB] dark:border-slate-800 rounded-xl p-3 col-span-2 flex justify-between items-center bg-gray-50/50 dark:bg-[#0F172A]">
-                              <span className="text-xs font-semibold text-[#6B7280] dark:text-slate-400">إجمالي السداد:</span>
-                              <span className="font-bold text-slate-800 dark:text-slate-200">
-                                {Math.round(offer.personalTotalRepayment !== undefined ? offer.personalTotalRepayment : (offer.personalAmount + (offer.personalAmount * (offer.annualMargin / 100) * (offer.termMonths / 12)))).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال
+                            {/* 3. إجمالي السداد */}
+                            <div className="border border-[#E5E7EB] dark:border-slate-800 rounded-xl p-2.5 col-span-2 flex justify-between items-center bg-slate-50/50 dark:bg-[#0F172A]/40 text-xs">
+                              <span className="font-extrabold text-[#6B7280] dark:text-slate-400">إجمالي السداد:</span>
+                              <span className="font-bold text-[#0B1B34] dark:text-slate-100 font-sans tabular-nums tracking-tight">
+                                {Math.round(offer.personalTotalRepayment !== undefined ? offer.personalTotalRepayment : (offer.personalAmount + (offer.personalAmount * (offer.annualMargin / 100) * (offer.termMonths / 12)))).toLocaleString('ar-SA')} ريال
                               </span>
                             </div>
 
-                            {/* 5. نسبة الاستقطاع المعتمدة */}
-                            <div className="border border-[#E5E7EB] dark:border-slate-800 rounded-xl p-3">
-                              <span className="text-xs text-[#6B7280] dark:text-slate-400 block mb-0.5">نسبة الاستقطاع المعتمدة</span>
-                              <span className="font-bold text-[#111827] dark:text-white">{offer.dsrUsed}%</span>
+                            {/* 4. نسبة الاستقطاع المعتمدة */}
+                            <div className="border border-[#E5E7EB] dark:border-slate-800 rounded-xl p-2.5 bg-slate-50/50 dark:bg-[#0F172A]/40 flex flex-col justify-between">
+                              <span className="text-[10px] text-[#6B7280] dark:text-slate-400 block mb-0.5 font-extrabold">نسبة الاستقطاع</span>
+                              <span className="font-extrabold text-[#0B1B34] dark:text-white text-xs font-sans tabular-nums tracking-tight">{offer.dsrUsed}%</span>
                             </div>
 
-                            {/* 6. نسبة الربح السنوية */}
-                            <div className="border border-[#E5E7EB] dark:border-slate-800 rounded-xl p-3">
-                              <span className="text-xs text-[#6B7280] dark:text-slate-400 block mb-0.5">نسبة الربح السنوية</span>
-                              <span className="font-bold text-[#0057B8] dark:text-[#0ea5a4]">{offer.annualMargin}%</span>
-                            </div>
-
-                            {/* 7. مدة التمويل */}
-                            <div className="border border-[#E5E7EB] dark:border-slate-800 rounded-xl p-3 border-dashed">
-                              <span className="text-xs text-[#6B7280] dark:text-slate-400 block mb-0.5">مدة التمويل</span>
-                              <span className="font-bold text-[#111827] dark:text-white">{offer.termMonths} شهراً</span>
+                            {/* 5. نسبة الربح السنوية */}
+                            <div className="border border-[#E5E7EB] dark:border-slate-800 rounded-xl p-2.5 bg-slate-50/50 dark:bg-[#0F172A]/40 flex flex-col justify-between">
+                              <span className="text-[10px] text-[#6B7280] dark:text-slate-400 block mb-0.5 font-extrabold">هامش الربح</span>
+                              <span className="font-extrabold text-[#0057B8] dark:text-[#60A5FA] text-xs font-sans tabular-nums tracking-tight">{offer.annualMargin}%</span>
                             </div>
 
                             {offer.personalDiagnostics?.source === 'fallback' && (
-                              <div className="col-span-2 bg-amber-50 dark:bg-amber-950/10 border border-amber-200 dark:border-amber-900/30 rounded-xl p-3 flex items-start gap-2 text-xs text-amber-800 dark:text-amber-500">
+                              <div className="col-span-2 bg-amber-50 dark:bg-amber-950/10 border border-amber-200 dark:border-amber-900/30 rounded-xl p-2.5 flex items-start gap-2 text-xs text-amber-850 dark:text-amber-500">
                                 <span className="font-bold text-sm leading-none mt-0.5">⚠️</span>
                                 <div>
                                   <span className="font-bold block mb-0.5">تنبيه النظام:</span>
@@ -750,42 +1007,73 @@ export default function ResultsGrid({
                           </>
                         ) : (
                           <>
-                            {productId !== 'personal_only' && (
-                              <div className="border border-[#E5E7EB] dark:border-slate-800 rounded-xl p-3">
-                                <span className="text-xs text-[#6B7280] dark:text-slate-400 block mb-0.5">القرض العقاري</span>
-                                <span className="font-bold text-[#111827] dark:text-slate-100">{Math.round(offer.realEstateAmount).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال</span>
-                              </div>
-                            )}
-                            {productId !== 'real_estate_only' && mainFinanceType !== 'real_estate_with_existing_personal' && (
-                              <div className="border border-[#E5E7EB] dark:border-slate-800 rounded-xl p-3">
-                                <span className="text-xs text-[#6B7280] dark:text-slate-400 block mb-0.5">القرض الشخصي</span>
-                                <span className={offer.supportsPersonal === false ? "font-bold text-rose-600 text-xs dark:text-rose-450" : "font-bold text-[#111827] dark:text-slate-100"}>
-                                  {offer.supportsPersonal === false ? "غير متوفر لدى هذه الجهة" : `${Math.round(offer.personalAmount).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال`}
+                            {/* Box 1: التمويل العقاري */}
+                            <div className="border border-[#E5E7EB] dark:border-slate-800 rounded-xl p-2.5 bg-slate-50/50 dark:bg-[#0F172A]/40 flex flex-col justify-between">
+                              <span className="text-[10px] text-[#6B7280] dark:text-slate-400 font-extrabold block mb-0.5">التمويل العقاري</span>
+                              <span className="font-extrabold text-[#0B1B34] dark:text-white text-[11px] truncate font-sans tabular-nums tracking-tight">
+                                {Math.round(offer.realEstateAmount).toLocaleString('ar-SA')} ريال
+                              </span>
+                            </div>
+
+                            {/* Box 2: التمويل الشخصي أو الالتزامات القائمة */}
+                            <div className="border border-[#E5E7EB] dark:border-slate-800 rounded-xl p-2.5 bg-slate-50/50 dark:bg-[#0F172A]/40 flex flex-col justify-between">
+                              {mainFinanceType === 'real_estate_with_existing_personal' ? (
+                                <>
+                                  <span className="text-[10px] text-[#6B7280] dark:text-slate-400 font-extrabold block mb-0.5">الالتزامات القائمة</span>
+                                  <span className="font-extrabold text-rose-600 dark:text-rose-450 text-[11px] truncate font-sans tabular-nums tracking-tight">
+                                    {Math.round(existingMonthlyObligations).toLocaleString('ar-SA')} ريال
+                                  </span>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="text-[10px] text-[#6B7280] dark:text-slate-400 font-extrabold block mb-0.5">التمويل الشخصي</span>
+                                  <span className={offer.supportsPersonal === false ? "font-bold text-rose-600 dark:text-rose-450 text-[10px]" : "font-extrabold text-[#0B1B34] dark:text-white text-[11px] truncate font-sans tabular-nums tracking-tight"}>
+                                    {offer.supportsPersonal === false ? "غير متوفر" : `${Math.round(offer.personalAmount).toLocaleString('ar-SA')} ريال`}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+
+                            {/* Box 3: هامش الربح */}
+                            <div className="border border-[#E5E7EB] dark:border-slate-800 rounded-xl p-2.5 bg-slate-50/50 dark:bg-[#0F172A]/40 flex flex-col justify-between">
+                              <span className="text-[10px] text-[#6B7280] dark:text-slate-400 font-extrabold block mb-0.5">هامش الربح</span>
+                              <span className="font-extrabold text-[#0057B8] dark:text-[#60A5FA] text-[11px] font-sans tabular-nums tracking-tight">
+                                {offer.annualMargin}%
+                              </span>
+                            </div>
+
+                            {/* Box 4: الدعم السكني */}
+                            {offer.housingSupportAmount > 0 ? (
+                              <div className="border border-[#BFDBFE] bg-[#EFF6FF] dark:bg-blue-950/15 dark:border-blue-900/30 rounded-xl p-2.5 flex flex-col justify-between">
+                                <span className="text-[10px] text-[#0057B8] dark:text-[#60A5FA] font-extrabold block mb-0.5">الدعم السكني</span>
+                                <span className="font-extrabold text-[#0057B8] dark:text-[#60A5FA] text-[11px] truncate font-sans tabular-nums tracking-tight">
+                                  {Math.round(offer.housingSupportAmount).toLocaleString('ar-SA')} {offer.supportType === 'monthly' ? 'ريال / شهر' : 'ريال'}
                                 </span>
                               </div>
-                            )}
-                            {mainFinanceType === 'real_estate_with_existing_personal' && (
-                              <div className="border border-[#E5E7EB] dark:border-slate-800 rounded-xl p-3">
-                                <span className="text-xs text-[#6B7280] dark:text-slate-400 block mb-0.5">التزامات قائمة</span>
-                                <span className="font-bold text-rose-600 dark:text-rose-400">{Math.round(existingMonthlyObligations).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال</span>
+                            ) : (
+                              <div className="border border-[#E5E7EB] dark:border-slate-800 rounded-xl p-2.5 bg-slate-50/50 dark:bg-[#0F172A]/40 flex flex-col justify-between">
+                                <span className="text-[10px] text-[#6B7280] dark:text-slate-400 font-extrabold block mb-0.5">الدعم السكني</span>
+                                <span className="font-bold text-slate-450 dark:text-slate-500 text-[11px]">غير مدعوم</span>
                               </div>
                             )}
-                            {offer.housingSupportAmount > 0 && (
-                              <div className="col-span-2 bg-[#E6F4F4]/40 dark:bg-[#0EA5A4]/10 border border-[#0EA5A4]/20 dark:border-[#0EA5A4]/20 rounded-xl p-3 flex justify-between items-center text-xs">
-                                <span className="text-[#0ea5a4] font-bold">{offer.supportType === 'monthly' ? 'الدعم السكني الشهري:' : 'دعم الدفعة المباشرة:'}</span>
-                                <span className="font-bold text-[#0EA5A4] dark:text-[#0ea5a4]">{Math.round(offer.housingSupportAmount).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال{offer.supportType === 'monthly' ? ' / شهر' : ''}</span>
-                              </div>
-                            )}
+
+                            {/* Optional Etizaz Box (Full width when active) */}
                             {offer.etizazAmount !== undefined && offer.etizazAmount > 0 && (
-                              <div className="col-span-2 bg-indigo-50 dark:bg-indigo-950/10 border border-indigo-100 dark:border-indigo-900/30 rounded-xl p-3 text-xs space-y-1">
+                              <div className="col-span-2 bg-indigo-50/70 dark:bg-indigo-950/10 border border-indigo-100 dark:border-indigo-900/30 rounded-xl p-2.5 text-xs space-y-1">
                                 <div className="flex justify-between items-center">
-                                  <span className="text-indigo-700 dark:text-indigo-400 font-bold">اعتزاز دفعة مستردة:</span>
-                                  <span className="font-bold text-indigo-700 dark:text-indigo-400">{Math.round(offer.etizazAmount).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال</span>
+                                  <span className="text-indigo-700 dark:text-indigo-400 font-extrabold">اعتزاز دفعة مستردة:</span>
+                                  <span className="font-black text-indigo-700 dark:text-indigo-400 font-sans tabular-nums tracking-tight">{Math.round(offer.etizazAmount).toLocaleString('ar-SA')} ريال</span>
                                 </div>
                                 {offer.etizazMonthlyInstallment !== undefined && offer.etizazMonthlyInstallment > 0 && (
-                                  <div className="flex justify-between items-center text-[11px] text-indigo-600 dark:text-indigo-300 border-t border-indigo-100/50 dark:border-indigo-900/10 pt-1">
-                                    <span>قسط اعتزاز الشهري:</span>
-                                    <span className="font-semibold">{Math.round(offer.etizazMonthlyInstallment).toLocaleString('ar-SA')} ريال / شهر ({offer.etizazTermMonths || 0} شهراً)</span>
+                                  <div className="flex flex-col gap-1 text-[11px] text-indigo-600 dark:text-indigo-300 border-t border-indigo-100/50 dark:border-indigo-900/10 pt-1.5">
+                                    <div className="flex justify-between items-center">
+                                      <span>قسط سداد اعتزاز:</span>
+                                      <span className="font-bold font-sans tabular-nums tracking-tight">{Math.round(offer.etizazMonthlyInstallment).toLocaleString('ar-SA')} ريال / شهر</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-[10px] text-indigo-500/80 dark:text-indigo-400/80">
+                                      <span>فترة السماح / السداد:</span>
+                                      <span>سماح {offer.etizazGraceMonths ?? 24} ش ⚡ سداد {offer.etizazTermMonths || 0} ش</span>
+                                    </div>
                                   </div>
                                 )}
                               </div>
@@ -794,103 +1082,109 @@ export default function ResultsGrid({
                         )}
                       </div>
 
-                      {/* Installments */}
-                      <div className="pt-2 flex flex-col gap-1 text-sm">
+                      {/* Installments Breakdown */}
+                      <div className="pt-1.5 flex flex-col gap-1 text-sm">
                         {mainFinanceType === 'real_estate_with_existing_personal' || productId === 'real_estate_with_existing_personal' ? (
-                          <div className="space-y-1.5 bg-[#F9FAFB] dark:bg-[#0F172A] border border-[#F3F4F6] dark:border-slate-800/80 rounded-xl p-3 animate-fade-in">
-                            <div className="flex justify-between items-center">
-                              <span className="font-bold text-[#374151] dark:text-slate-300">قسط المرحلة 1 مدمج:</span>
-                              <span className="font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/30 px-2 py-0.5 rounded">
-                                {Math.round(offer.totalCustomerStage1 || 0).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال
+                          <div className="space-y-1.5 bg-slate-50/60 dark:bg-[#0F172A]/40 border border-[#E5E7EB] dark:border-slate-800 rounded-xl p-3 animate-fade-in">
+                            <div className="flex justify-between items-center pb-1 border-b border-dashed border-slate-200 dark:border-slate-800">
+                              <span className="font-extrabold text-[#0B1B34] dark:text-slate-300 text-xs">قسط المرحلة 1 مدمج:</span>
+                              <span className="font-black text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/30 px-2 py-0.5 rounded text-xs font-sans tabular-nums tracking-tight">
+                                {Math.round(offer.totalCustomerStage1 || 0).toLocaleString('ar-SA')} ريال
                               </span>
                             </div>
-                            <div className="text-[11px] text-[#4B5563] dark:text-slate-400 pl-2 space-y-1">
+                            <div className="text-[10px] text-[#4B5563] dark:text-slate-400 space-y-1 pl-1">
                               <div className="flex justify-between items-center">
                                 <span>├─ قسط العقاري:</span>
-                                <span>{Math.round(offer.realEstateStage1 || 0).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال</span>
+                                <span className="font-sans tabular-nums tracking-tight">{Math.round(offer.realEstateStage1 || 0).toLocaleString('ar-SA')} ريال</span>
                               </div>
                               <div className="flex justify-between items-center">
                                 <span>├─ قسط الالتزام الشهري:</span>
-                                <span>{Math.round(offer.existingMonthlyObligations || 0).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال</span>
+                                <span className="font-sans tabular-nums tracking-tight">{Math.round(offer.existingMonthlyObligations || 0).toLocaleString('ar-SA')} ريال</span>
                               </div>
                               {offer.etizazAmount !== undefined && offer.etizazAmount > 0 && offer.etizazMonthlyInstallment !== undefined && offer.etizazMonthlyInstallment > 0 && (
                                 <div className="flex justify-between items-center text-indigo-700 dark:text-indigo-400">
                                   <span>├─ قسط اعتزاز الشهري:</span>
-                                  <span>{Math.round(offer.etizazMonthlyInstallment).toLocaleString('ar-SA')} ريال</span>
+                                  <span className="font-sans tabular-nums tracking-tight">{Math.round(offer.etizazMonthlyInstallment).toLocaleString('ar-SA')} ريال</span>
                                 </div>
                               )}
-                              <div className="flex justify-between items-center text-amber-700 dark:text-amber-450 font-medium">
+                              <div className="flex justify-between items-center text-slate-600 dark:text-slate-450 font-semibold">
                                 <span>└─ مدة المرحلة الأولى:</span>
                                 <span>{offer.stage1Months || 0} شهر</span>
                               </div>
                             </div>
 
                             {offer.stage2Months > 0 && (
-                              <div className="flex justify-between items-center text-xs border-t border-dashed border-[#E5E7EB] dark:border-slate-800 pt-1.5 text-[#1F2937] dark:text-slate-300">
-                                <span className="font-medium text-[#4B5563] dark:text-slate-400">قسط المرحلة 2 (صافي):</span>
-                                <span className="font-bold text-emerald-600 dark:text-emerald-400">{Math.round(offer.realEstateStage2 || 0).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال <span className="text-[10px] text-gray-400 dark:text-slate-500">({offer.stage2Months} ش)</span></span>
+                              <div className="flex justify-between items-center text-xs border-t border-dashed border-[#E5E7EB] dark:border-slate-800 pt-1.5 text-[#0B1B34] dark:text-slate-300">
+                                <span className="font-semibold text-[#4B5563] dark:text-slate-400">قسط المرحلة 2 (صافي):</span>
+                                <span className="font-black text-[#0057B8] dark:text-[#60A5FA] font-sans tabular-nums tracking-tight">{Math.round(offer.realEstateStage2 || 0).toLocaleString('ar-SA')} ريال <span className="text-[9px] text-gray-450 dark:text-slate-500">({offer.stage2Months} ش)</span></span>
                               </div>
                             )}
 
                             {offer.stage3Months > 0 && (
-                              <div className="flex justify-between items-center text-xs border-t border-dashed border-[#E5E7EB] dark:border-slate-800 pt-1.5 text-[#1F2937] dark:text-slate-300 bg-amber-50/50 dark:bg-amber-950/15 p-1.5 rounded-lg">
-                                <span className="font-medium text-amber-800 dark:text-amber-400">قسط المرحلة 3 (تقاعد):</span>
-                                <span className="font-bold text-amber-800 dark:text-amber-400">{Math.round(offer.realEstateStage3 || 0).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال <span className="text-[10px]">({offer.stage3Months} ش)</span></span>
+                              <div className="flex justify-between items-center text-xs border-t border-dashed border-[#BFDBFE] dark:border-slate-800 pt-1.5 text-[#0057B8] dark:text-[#60A5FA] bg-[#EFF6FF] dark:bg-[#1E3A8A]/15 p-1.5 rounded-lg border border-[#BFDBFE] dark:border-[#3B82F6]/30">
+                                <span className="font-semibold text-[#0057B8] dark:text-[#60A5FA]">قسط المرحلة 3 (تقاعد):</span>
+                                <span className="font-bold font-sans tabular-nums tracking-tight text-[#003B7A] dark:text-[#60A5FA]">{Math.round(offer.realEstateStage3 || 0).toLocaleString('ar-SA')} ريال <span className="text-[9px] font-normal">({offer.stage3Months} ش)</span></span>
                               </div>
                             )}
                           </div>
                         ) : productId === 'real_estate_with_new_personal' ? (
-                          <div className="space-y-1.5 bg-[#F9FAFB] dark:bg-[#0F172A] border border-[#F3F4F6] dark:border-slate-800/80 rounded-xl p-3">
-                            <div className="flex justify-between items-center">
-                              <span className="font-bold text-[#374151] dark:text-slate-300">القسط الشهري الإجمالي:</span>
-                              <span className="font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 rounded">
-                                {Math.round(offer.monthlyInstallmentBeforeRetirement).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال
+                          <div className="space-y-1.5 bg-slate-50/60 dark:bg-[#0F172A]/40 border border-[#E5E7EB] dark:border-slate-800 rounded-xl p-3">
+                            <div className="flex justify-between items-center pb-1 border-b border-dashed border-slate-200 dark:border-slate-800">
+                              <span className="font-extrabold text-[#0B1B34] dark:text-slate-300 text-xs">القسط الشهري الإجمالي:</span>
+                              <span className="font-black text-[#0057B8] dark:text-[#60A5FA] bg-blue-50 dark:bg-[#1E3A8A]/20 px-2 py-0.5 rounded text-xs font-sans tabular-nums tracking-tight">
+                                {Math.round(offer.monthlyInstallmentBeforeRetirement).toLocaleString('ar-SA')} ريال
                               </span>
                             </div>
-                            <div className="flex justify-between items-center text-xs pl-2 text-[#4B5563] dark:text-slate-400">
-                              <span>├─ قسط العقاري:</span>
-                              <span>{Math.round(offer.realEstateInstallmentOnly || 0).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال</span>
-                            </div>
-                            <div className="flex justify-between items-center text-xs pl-2 text-[#4B5563] dark:text-slate-400">
-                              <span>├─ قسط الشخصي:</span>
-                              <span>{offer.supportsPersonal === false ? "غير متوفر لدى هذه الجهة (تم احتساب العقاري فقط)" : `${Math.round(offer.personalInstallmentAmount || 0).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال`}</span>
-                            </div>
-                            {offer.etizazAmount !== undefined && offer.etizazAmount > 0 && offer.etizazMonthlyInstallment !== undefined && offer.etizazMonthlyInstallment > 0 && (
-                              <div className="flex justify-between items-center text-xs pl-2 text-indigo-700 dark:text-indigo-400 font-medium">
-                                <span>└─ قسط اعتزاز الشهري:</span>
-                                <span>{Math.round(offer.etizazMonthlyInstallment).toLocaleString('ar-SA')} ريال</span>
+                            <div className="text-[10px] text-[#4B5563] dark:text-slate-400 space-y-1 pl-1">
+                              <div className="flex justify-between items-center">
+                                <span>├─ قسط العقاري:</span>
+                                <span className="font-sans tabular-nums tracking-tight">{Math.round(offer.realEstateInstallmentOnly || 0).toLocaleString('ar-SA')} ريال</span>
                               </div>
-                            )}
+                              <div className="flex justify-between items-center">
+                                <span>├─ قسط الشخصي:</span>
+                                <span className={offer.supportsPersonal === false ? "text-rose-600 dark:text-rose-450 font-bold" : "font-sans tabular-nums tracking-tight"}>
+                                  {offer.supportsPersonal === false ? "غير متوفر" : `${Math.round(offer.personalInstallmentAmount || 0).toLocaleString('ar-SA')} ريال`}
+                                </span>
+                              </div>
+                              {offer.etizazAmount !== undefined && offer.etizazAmount > 0 && offer.etizazMonthlyInstallment !== undefined && offer.etizazMonthlyInstallment > 0 && (
+                                <div className="flex justify-between items-center text-indigo-700 dark:text-indigo-400 font-semibold">
+                                  <span>└─ قسط اعتزاز الشهري:</span>
+                                  <span className="font-sans tabular-nums tracking-tight">{Math.round(offer.etizazMonthlyInstallment).toLocaleString('ar-SA')} ريال</span>
+                                </div>
+                              )}
+                            </div>
+
                             {offer.monthlyInstallmentAfterPersonal !== undefined && offer.monthlyInstallmentAfterPersonal > 0 && (
-                              <div className="flex justify-between items-center text-xs border-t border-dashed border-[#E5E7EB] dark:border-slate-800 pt-1.5 text-[#1F2937] dark:text-slate-300">
-                                <span className="font-medium text-[#4B5563] dark:text-slate-400">بعد انتهاء الشخصي:</span>
-                                <span className="font-semibold">{Math.round(offer.monthlyInstallmentAfterPersonal).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال</span>
+                              <div className="flex justify-between items-center text-xs border-t border-dashed border-[#E5E7EB] dark:border-slate-800 pt-1.5 text-[#0B1B34] dark:text-slate-300">
+                                <span className="font-semibold text-[#4B5563] dark:text-slate-400">بعد انتهاء الشخصي:</span>
+                                <span className="font-bold text-[#0B1B34] dark:text-white font-sans tabular-nums tracking-tight">{Math.round(offer.monthlyInstallmentAfterPersonal).toLocaleString('ar-SA')} ريال</span>
                               </div>
                             )}
+
                             {offer.monthlyInstallmentAfterRetirement > 0 && (
-                              <div className="flex justify-between items-center text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/15 rounded-lg p-2 mt-1 border border-amber-100 dark:border-amber-900/30">
+                              <div className="flex justify-between items-center text-xs text-[#0057B8] dark:text-[#60A5FA] bg-[#EFF6FF] dark:bg-[#1E3A8A]/15 rounded-lg p-2 mt-1 border border-[#BFDBFE] dark:border-[#3B82F6]/30">
                                 <span>القسط التقاعدي:</span>
-                                <span className="font-bold">{Math.round(offer.monthlyInstallmentAfterRetirement).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال</span>
+                                <span className="font-bold font-sans tabular-nums tracking-tight text-[#003B7A] dark:text-[#60A5FA]">{Math.round(offer.monthlyInstallmentAfterRetirement).toLocaleString('ar-SA')} ريال</span>
                               </div>
                             )}
                           </div>
                         ) : mainFinanceType === 'personal_only' ? null : (
-                          <>
-                            <div className="flex justify-between items-center">
-                              <span className="text-[#6B7280] dark:text-slate-400">قسط التمويل العقاري:</span>
-                              <span className="font-bold text-emerald-600 dark:text-emerald-400">{Math.round(offer.monthlyInstallmentBeforeRetirement).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال</span>
+                          <div className="space-y-1.5">
+                            {/* Prominent Real Estate Monthly Installment Banner */}
+                            <div className="bg-[#EFF6FF] border border-[#BFDBFE] dark:bg-blue-950/10 dark:border-blue-900/30 rounded-xl p-2.5 flex justify-between items-center text-xs">
+                              <span className="font-extrabold text-[#0057B8] dark:text-[#60A5FA]">القسط العقاري الشهري:</span>
+                              <span className="font-black text-[#0057B8] dark:text-[#60A5FA] font-sans tabular-nums tracking-tight">
+                                {Math.round(offer.monthlyInstallmentBeforeRetirement).toLocaleString('ar-SA')} ريال / شهر
+                              </span>
                             </div>
+
                             {offer.monthlyInstallmentAfterRetirement > 0 && (
-                              <div className="flex justify-between items-center text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/15 rounded-lg p-2.5 mt-1 border border-amber-100 dark:border-amber-900/30">
+                              <div className="flex justify-between items-center text-xs text-[#0057B8] dark:text-[#60A5FA] bg-[#EFF6FF] dark:bg-[#1E3A8A]/15 rounded-lg p-2.5 border border-[#BFDBFE] dark:border-[#3B82F6]/30">
                                 <span>القسط التقاعدي العقاري:</span>
-                                <span className="font-bold">{Math.round(offer.monthlyInstallmentAfterRetirement).toLocaleString('ar-SA', { maximumFractionDigits: 0 })} ريال / شهر</span>
+                                <span className="font-bold font-sans tabular-nums tracking-tight text-[#003B7A] dark:text-[#60A5FA]">{Math.round(offer.monthlyInstallmentAfterRetirement).toLocaleString('ar-SA')} ريال / شهر</span>
                               </div>
                             )}
-                            <div className="flex justify-between items-center text-xs mt-1">
-                              <span className="text-[#6B7280] dark:text-slate-400">هامش الربح السنوي العقاري:</span>
-                              <span className="font-bold text-[#111827] dark:text-slate-300">{offer.annualMargin}%</span>
-                            </div>
-                          </>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -912,34 +1206,34 @@ export default function ResultsGrid({
                   {/* Row 1 */}
                   <button 
                     onClick={() => setSelectedOffer(offer)}
-                    className="text-center py-2.5 rounded-xl border border-[#0057B8]/20 dark:border-[#0ea5a4]/30 text-[#0057B8] dark:text-[#0ea5a4] font-bold text-[11px] transition-all hover:bg-[#0057B8]/10 dark:hover:bg-[#0ea5a4]/10 cursor-pointer flex items-center justify-center gap-1 select-none"
+                    className="text-center py-2.5 rounded-xl bg-white border border-[#BFDBFE] dark:border-slate-750 text-[#0057B8] font-bold text-[11px] transition-all hover:bg-[#EFF6FF] cursor-pointer flex items-center justify-center gap-1 select-none"
                   >
-                    <Info className="w-3.5 h-3.5 shrink-0" />
+                    <Info className="w-3.5 h-3.5 shrink-0 text-[#0057B8]" />
                     <span>التفاصيل والمخطط</span>
                   </button>
                   
                   <button 
                     onClick={(e) => handleSaveClick(offer, e)}
-                    className="text-center py-2.5 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/20 hover:bg-emerald-600 dark:hover:bg-emerald-600 border border-emerald-100 dark:border-emerald-900/30 text-emerald-700 dark:text-emerald-400 hover:text-white dark:hover:text-white font-bold text-[11px] transition-all cursor-pointer flex items-center justify-center gap-1 select-none"
+                    className="text-center py-2.5 rounded-xl bg-white border border-[#BFDBFE] dark:border-slate-750 text-[#0057B8] font-bold text-[11px] transition-all hover:bg-[#EFF6FF] cursor-pointer flex items-center justify-center gap-1 select-none"
                   >
-                    <Bookmark className="w-3.5 h-3.5 shrink-0" />
+                    <Bookmark className="w-3.5 h-3.5 shrink-0 text-[#0057B8]" />
                     <span>حفظ النتيجة</span>
                   </button>
 
                   {/* Row 2 */}
                   <button 
                     onClick={(e) => handleCopyText(offer, e)}
-                    className="text-center py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 text-slate-700 dark:text-slate-300 font-bold text-[11px] transition-all hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer flex items-center justify-center gap-1 select-none"
+                    className="text-center py-2.5 rounded-xl bg-white border border-[#BFDBFE] dark:border-slate-750 text-[#0057B8] font-bold text-[11px] transition-all hover:bg-[#EFF6FF] cursor-pointer flex items-center justify-center gap-1 select-none"
                   >
-                    <Copy className="w-3.5 h-3.5 shrink-0" />
+                    <Copy className="w-3.5 h-3.5 shrink-0 text-[#0057B8]" />
                     <span>نسخ الحسبة</span>
                   </button>
 
                   <button 
                     onClick={(e) => handleShare(offer, e)}
-                    className="text-center py-2.5 rounded-xl bg-cyan-50/50 dark:bg-cyan-950/20 hover:bg-cyan-600 dark:hover:bg-cyan-700 border border-cyan-100/70 dark:border-cyan-900/30 text-cyan-700 dark:text-cyan-400 hover:text-white dark:hover:text-white font-bold text-[11px] transition-all cursor-pointer flex items-center justify-center gap-2 select-none"
+                    className="text-center py-2.5 rounded-xl bg-white border border-[#BFDBFE] dark:border-slate-750 text-[#0057B8] font-bold text-[11px] transition-all hover:bg-[#EFF6FF] cursor-pointer flex items-center justify-center gap-2 select-none"
                   >
-                    <Share2 className="w-3.5 h-3.5 shrink-0" />
+                    <Share2 className="w-3.5 h-3.5 shrink-0 text-[#0057B8]" />
                     <span>مشاركة الحسبة</span>
                   </button>
 
@@ -947,9 +1241,9 @@ export default function ResultsGrid({
                   {getWhatsAppContactInfo(offer.bankId) && (
                     <button 
                       onClick={(e) => handleWhatsAppContact(offer, e)}
-                      className="text-center py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs transition-all duration-200 shadow-lg shadow-emerald-100/50 dark:shadow-none hover:shadow-xl cursor-pointer flex items-center justify-center gap-2 select-none col-span-2"
+                      className="text-center py-3 rounded-xl bg-[#003B7A] hover:bg-[#002b5c] text-white font-black text-xs transition-all duration-200 shadow-lg shadow-blue-900/10 dark:shadow-none hover:shadow-xl cursor-pointer flex items-center justify-center gap-2 select-none col-span-2"
                     >
-                      <MessageCircle className="w-4 h-4 shrink-0" />
+                      <MessageCircle className="w-4 h-4 shrink-0 text-white" />
                       <span>تواصل مع الموظف</span>
                     </button>
                   )}
@@ -974,7 +1268,7 @@ export default function ResultsGrid({
         {!isSubscribed && (
           <div className="absolute inset-0 z-20 flex items-start justify-center pt-8 md:pt-16 px-4 bg-gradient-to-b from-transparent via-[#F5F7FA]/75 to-[#F5F7FA]/95 dark:via-[#0B0F19]/75 dark:to-[#0B0F19]/95">
             <div className="w-full max-w-md bg-white dark:bg-[#111827] rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl p-6 text-center animate-slide-up sticky top-6 sm:top-12">
-              <div className="w-14 h-14 bg-blue-50 dark:bg-blue-950/20 text-[#0057B8] dark:text-[#0ea5a4] rounded-full flex items-center justify-center mx-auto mb-4 border border-blue-100/50 dark:border-blue-900/30">
+              <div className="w-14 h-14 bg-blue-50 dark:bg-blue-950/20 text-[#0057B8] dark:text-[#60A5FA] rounded-full flex items-center justify-center mx-auto mb-4 border border-blue-100/50 dark:border-blue-900/30">
                 <Award className="w-7 h-7" />
               </div>
               
@@ -995,7 +1289,7 @@ export default function ResultsGrid({
                     }
                     alert("ميزة الاشتراك ستتوفر قريباً للعموم عبر بوابات الدفع الرسمية.");
                   }}
-                  className="w-full py-3.5 px-4 rounded-xl bg-[#0057B8] dark:bg-[#0ea5a4] text-white font-black text-xs hover:bg-[#004494] dark:hover:bg-cyan-600 shadow-lg shadow-blue-100/50 dark:shadow-none transition-all cursor-pointer active:scale-98"
+                  className="w-full py-3.5 px-4 rounded-xl bg-[#0057B8] dark:bg-[#0057B8] text-white font-black text-xs hover:bg-[#004494] dark:hover:bg-[#004494] shadow-lg shadow-blue-100/50 dark:shadow-none transition-all cursor-pointer active:scale-98"
                 >
                   اشترك الآن
                 </button>
@@ -1043,8 +1337,8 @@ export default function ResultsGrid({
         )}
       </div>
 
-      {/* Sticky Bottom Save Results Button on Mobile */}
-      <div className="fixed bottom-16 left-0 right-0 p-4 bg-white/95 dark:bg-[#111827]/95 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800/80 z-40 sm:hidden flex gap-3 shadow-[0_-4px_12px_rgba(0,0,0,0.05)]">
+      {/* Sticky Bottom Save Results Button on Mobile - Hidden per requirement */}
+      <div className="hidden">
         <button 
           onClick={() => {
             if (window.navigator && window.navigator.vibrate) {
@@ -1057,6 +1351,9 @@ export default function ResultsGrid({
           <Download className="w-4 h-4" />
           <span>حفظ ومشاركة النتيجة الحالية</span>
         </button>
+      </div>
+
+        </main>
       </div>
       {selectedOffer && (
         <div id="drawer-overlay" className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex justify-end">
@@ -1088,7 +1385,7 @@ export default function ResultsGrid({
                 <div className="text-right w-full md:w-auto">
                   <span className="text-xs font-bold text-slate-400 dark:text-slate-500 block mb-1">إجمالي التمويل المتاح</span>
                   <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-extrabold text-[#0057B8] dark:text-[#0ea5a4]">
+                    <span className="text-3xl font-extrabold text-[#0057B8] dark:text-[#60A5FA]">
                       {Math.round(selectedOffer.realEstateAmount + (selectedOffer.supportsPersonal !== false ? selectedOffer.personalAmount : 0)).toLocaleString('ar-SA', { maximumFractionDigits: 0 })}
                     </span>
                     <span className="text-xs font-bold text-slate-500 dark:text-slate-400">ريال سعودي</span>
@@ -1122,16 +1419,16 @@ export default function ResultsGrid({
               {/* Detatils Grid */}
               <div className="bg-white dark:bg-[#111827] p-6 rounded-2xl border border-slate-200 dark:border-slate-800/80 shadow-xs space-y-5">
                 <h4 className="font-sans font-black text-sm text-[#111827] dark:text-white pb-2 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
-                  <div className="w-1.5 h-4 bg-[#0057B8] dark:bg-[#0ea5a4] rounded-full"></div>
+                  <div className="w-1.5 h-4 bg-[#0057B8] dark:bg-[#60A5FA] rounded-full"></div>
                   <span>تفاصيل نتيجة الحسبة</span>
                 </h4>
 
                 <div className="grid grid-cols-2 lg:grid-cols-2 gap-4 text-right font-semibold select-none">
                   {selectedOffer.financeAmountAdjusted === true && (
-                    <div className="col-span-2 bg-amber-50/50 dark:bg-amber-950/10 border border-amber-100/70 dark:border-amber-900/30 p-4 rounded-xl space-y-3 font-sans">
-                      <div className="flex justify-between items-center border-b border-amber-100/50 dark:border-amber-900/20 pb-2">
-                        <span className="text-xs font-bold text-amber-800 dark:text-amber-400">تعديل مبلغ التمويل المطلوب</span>
-                        <span className="text-[10px] bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 px-2 py-0.5 rounded-md font-bold">معدل</span>
+                    <div className="col-span-2 bg-[#EFF6FF] dark:bg-[#1E3A8A]/15 border border-[#BFDBFE] dark:border-[#3B82F6]/30 p-4 rounded-xl space-y-3 font-sans">
+                      <div className="flex justify-between items-center border-b border-blue-100/30 dark:border-blue-900/10 pb-2">
+                        <span className="text-xs font-bold text-[#0057B8] dark:text-[#60A5FA]">تعديل مبلغ التمويل المطلوب</span>
+                        <span className="text-[10px] bg-blue-100 dark:bg-blue-900/40 text-[#0057B8] dark:text-[#60A5FA] px-2 py-0.5 rounded-md font-bold">معدل</span>
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div>
@@ -1141,8 +1438,8 @@ export default function ResultsGrid({
                           </span>
                         </div>
                         <div>
-                          <span className="text-[10px] text-amber-700 dark:text-amber-400 block mb-1">مبلغ التمويل المطلوب</span>
-                          <span className="font-extrabold text-amber-600 dark:text-amber-400 text-sm">
+                          <span className="text-[10px] text-[#0057B8] dark:text-[#60A5FA] block mb-1">مبلغ التمويل المطلوب</span>
+                          <span className="font-extrabold text-[#003B7A] dark:text-[#60A5FA] text-sm font-sans tabular-nums tracking-tight">
                             {Math.round(selectedOffer.requestedFinanceAmount || 0).toLocaleString('ar-SA')} ريال
                           </span>
                         </div>
@@ -1172,17 +1469,17 @@ export default function ResultsGrid({
                   </div>
 
                   {/* 3. الدعم السكني */}
-                  <div className="bg-[#0EA5A4]/5 dark:bg-[#0EA5A4]/10 hover:bg-[#0EA5A4]/15 p-3.5 rounded-xl border border-[#0EA5A4]/10 dark:border-[#0EA5A4]/20 transition-all">
-                    <span className="text-[10px] text-[#0EA5A4] dark:text-[#0ea5a4] block mb-1">الدعم السكني</span>
-                    <span className="font-bold text-[#0EA5A4] dark:text-[#0ea5a4] text-sm">
+                  <div className="bg-[#EFF6FF] dark:bg-[#1E3A8A]/20 hover:bg-[#EFF6FF]/80 p-3.5 rounded-xl border border-[#BFDBFE] dark:border-[#3B82F6]/30 transition-all">
+                    <span className="text-[10px] text-[#0057B8] dark:text-[#60A5FA] block mb-1">الدعم السكني</span>
+                    <span className="font-bold text-[#0057B8] dark:text-[#60A5FA] text-sm">
                       {Math.round(selectedOffer.housingSupportAmount).toLocaleString('ar-SA')} ريال
                     </span>
                   </div>
 
                   {/* 4. القسط الشهري */}
-                  <div className="bg-emerald-50/40 dark:bg-[#064e3b]/15 hover:bg-emerald-50/60 dark:hover:bg-emerald-950/20 p-3.5 rounded-xl border border-emerald-100/70 dark:border-emerald-900/30 transition-all">
-                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 block mb-1">القسط الشهري الإجمالي</span>
-                    <span className="font-bold text-emerald-600 dark:text-emerald-400 text-sm">
+                  <div className="bg-[#EFF6FF] dark:bg-[#1E3A8A]/20 hover:bg-[#EFF6FF]/80 p-3.5 rounded-xl border border-[#BFDBFE] dark:border-[#3B82F6]/30 transition-all">
+                    <span className="text-[10px] text-[#0057B8] dark:text-[#60A5FA] block mb-1">القسط الشهري الإجمالي</span>
+                    <span className="font-bold text-[#0057B8] dark:text-[#60A5FA] text-sm">
                       {Math.round(selectedOffer.monthlyInstallmentBeforeRetirement).toLocaleString('ar-SA')} ريال
                     </span>
                   </div>
@@ -1209,9 +1506,9 @@ export default function ResultsGrid({
 
                   {/* 7. القسط بعد انتهاء الشخصي */}
                   {selectedOffer.monthlyInstallmentAfterPersonal !== undefined && selectedOffer.monthlyInstallmentAfterPersonal > 0 && (
-                    <div className="bg-[#0057B8]/5 dark:bg-[#0ea5a4]/5 hover:bg-[#0057B8]/10 dark:hover:bg-[#0ea5a4]/10 p-3.5 rounded-xl border border-[#0057B8]/10 dark:border-[#0ea5a4]/20 transition-all">
-                      <span className="text-[10px] text-[#0057B8] dark:text-[#0ea5a4] block mb-1">القسط بعد انتهاء الشخصي</span>
-                      <span className="font-bold text-[#0057B8] dark:text-[#0ea5a4] text-sm">
+                    <div className="bg-[#0057B8]/5 dark:bg-[#1E3A8A]/10 hover:bg-[#0057B8]/10 dark:hover:bg-[#1E3A8A]/20 p-3.5 rounded-xl border border-[#0057B8]/10 dark:border-[#3B82F6]/30 transition-all">
+                      <span className="text-[10px] text-[#0057B8] dark:text-[#60A5FA] block mb-1">القسط بعد انتهاء الشخصي</span>
+                      <span className="font-bold text-[#0057B8] dark:text-[#60A5FA] text-sm">
                         {Math.round(selectedOffer.monthlyInstallmentAfterPersonal).toLocaleString('ar-SA')} ريال
                       </span>
                     </div>
@@ -1245,7 +1542,7 @@ export default function ResultsGrid({
                   {/* 9. هامش الربح */}
                   <div className="bg-slate-50/50 dark:bg-[#0F172A] hover:bg-slate-50 dark:hover:bg-slate-800 p-3.5 rounded-xl border border-slate-100/80 dark:border-slate-800/60 transition-all">
                     <span className="text-[10px] text-slate-400 dark:text-slate-500 block mb-1">هامش الربح السنوي</span>
-                    <span className="font-bold text-[#0057B8] dark:text-[#0ea5a4] text-sm">
+                    <span className="font-bold text-[#0057B8] dark:text-[#60A5FA] text-sm">
                       {selectedOffer.annualMargin}%
                     </span>
                   </div>
@@ -1260,9 +1557,9 @@ export default function ResultsGrid({
 
                   {/* 11. تفاصيل التقدم للتقاعد */}
                   {selectedOffer.monthlyInstallmentAfterRetirement > 0 && (
-                    <div className="bg-amber-50/50 dark:bg-amber-950/15 hover:bg-amber-50 dark:hover:bg-amber-900/10 p-3.5 rounded-xl border border-amber-100/70 dark:border-amber-900/30 transition-all col-span-2">
-                      <span className="text-[10px] text-amber-600 dark:text-amber-400 block mb-1">القسط التقاعدي اللاحق</span>
-                      <span className="font-bold text-amber-700 dark:text-amber-450 text-sm">
+                    <div className="bg-[#EFF6FF] dark:bg-[#1E3A8A]/15 hover:bg-blue-50/50 dark:hover:bg-[#1E3A8A]/25 p-3.5 rounded-xl border border-[#BFDBFE] dark:border-[#3B82F6]/30 transition-all col-span-2">
+                      <span className="text-[10px] text-[#0057B8] dark:text-[#60A5FA] block mb-1">القسط التقاعدي اللاحق</span>
+                      <span className="font-bold font-sans tabular-nums tracking-tight text-[#003B7A] dark:text-[#60A5FA] text-sm">
                         {Math.round(selectedOffer.monthlyInstallmentAfterRetirement).toLocaleString('ar-SA')} ريال
                       </span>
                     </div>
@@ -1270,9 +1567,9 @@ export default function ResultsGrid({
 
                   {/* الراتب التقاعدي المتوقع */}
                   {selectedOffer.pensionSalary !== undefined && selectedOffer.pensionSalary > 0 && (
-                    <div className="bg-emerald-50/20 dark:bg-emerald-950/5 hover:bg-emerald-50/35 dark:hover:bg-emerald-900/10 p-3.5 rounded-xl border border-emerald-100/50 dark:border-emerald-900/20 transition-all col-span-2">
-                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 block mb-1">الراتب التقاعدي المتوقع</span>
-                      <span className="font-bold text-emerald-700 dark:text-emerald-350 text-sm">
+                    <div className="bg-blue-50/30 dark:bg-[#1E3A8A]/15 hover:bg-blue-50/50 dark:hover:bg-[#1E3A8A]/25 p-3.5 rounded-xl border border-[#BFDBFE] dark:border-[#3B82F6]/30 transition-all col-span-2">
+                      <span className="text-[10px] text-[#0057B8] dark:text-[#60A5FA] block mb-1">الراتب التقاعدي المتوقع</span>
+                      <span className="font-bold text-[#003B7A] dark:text-[#60A5FA] text-sm">
                         {Math.round(selectedOffer.pensionSalary).toLocaleString('ar-SA')} ريال
                       </span>
                     </div>
@@ -1290,37 +1587,125 @@ export default function ResultsGrid({
                 </div>
               </div>
 
-              {/* Analysis of Diagnostic Trace */}
-              <div className="bg-white dark:bg-[#111827] rounded-2xl border border-slate-200 dark:border-slate-800/80 p-6 space-y-4 shadow-xs">
-                <h4 className="font-black text-sm text-[#111827] dark:text-white flex items-center gap-2 pb-2 border-b border-slate-100 dark:border-slate-800">
-                  <Activity className="w-4 h-4 text-[#0057B8] dark:text-[#0ea5a4]" />
-                  <span>مؤشرات الملاءمة</span>
-                </h4>
 
-                <div className="space-y-2">
-                  <div className="p-3.5 rounded-2xl text-xs font-semibold leading-relaxed flex items-start gap-2.5 bg-emerald-50/50 dark:bg-emerald-950/10 text-emerald-800 dark:text-emerald-400 border border-emerald-100/80 dark:border-emerald-900/20">
-                    <Info className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
-                    <span className="text-right">تم حساب صافي الراتب والخصومات التقاعدية تلقائيًا.</span>
-                  </div>
-                  {selectedOffer.isEligible ? (
-                    <div className="p-3.5 rounded-2xl text-xs font-semibold leading-relaxed flex items-start gap-2.5 bg-emerald-50/50 dark:bg-[#0ea5a4]/5 text-emerald-800 dark:text-[#0ea5a4] border border-emerald-100/80 dark:border-cyan-900/20">
-                      <Info className="w-4 h-4 shrink-0 mt-0.5 text-[#0057B8] dark:text-[#0ea5a4]" />
-                      <span className="text-right">تم قبول العميل مبدئيًا لدى {selectedOffer.bankName} لتلبية اشتراطات الدخل، العمر، والخدمة والضوابط الائتمانية.</span>
-                    </div>
-                  ) : (
-                    <div className="p-3.5 rounded-2xl text-xs font-semibold leading-relaxed flex items-start gap-2.5 bg-rose-50/50 dark:bg-rose-950/10 text-rose-800 dark:text-rose-400 border border-rose-100/80 dark:border-rose-900/20">
-                      <Info className="w-4 h-4 shrink-0 mt-0.5 text-rose-500 dark:text-rose-450" />
-                      <span className="text-right">نأمل مراجعة دقة البيانات لعدم تلبية بعض الضوابط التمويلية المحددة لدى الجهة.</span>
-                    </div>
-                  )}
-                </div>
-              </div>
 
               {/* Footer notes */}
               <p className="text-[10px] text-[#9CA3AF] dark:text-slate-500 text-center leading-relaxed font-sans">
                 هذه الحسبة مبدئية وتعتمد على الموديل الرياضي لـ "حسبة". تخضع المعايير لمراجعة لائحة السياسة الائتمانية الخاصة بكل جهة تمويلية.
               </p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 💾 Save all customer results modal dialog */}
+      {showGroupSaveModal && (
+        <div id="save-group-result-modal" className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in" dir="rtl">
+          <div className="bg-white dark:bg-[#111827] border border-slate-100 dark:border-slate-800/80 w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-scale-up">
+            
+            {/* Header */}
+            <div className="p-6 text-white text-right bg-gradient-to-r from-[#0057B8] to-[#003B7A] flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center">
+                  <Bookmark className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-sm leading-tight">حفظ كل نتائج العميل</h3>
+                  <p className="text-[10px] text-white/80 mt-0.5">سيتم حفظ مقارنة البنوك كاملة في سجل واحد</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => { setShowGroupSaveModal(false); setGroupSaveStatus(null); }}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center font-bold text-xs cursor-pointer select-none"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-4 text-right">
+              {groupSaveStatus === 'success' ? (
+                <div className="py-6 text-center space-y-4 animate-fade-in">
+                  <div className="w-14 h-14 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-450 rounded-full flex items-center justify-center mx-auto border border-emerald-100 dark:border-emerald-900/30">
+                    <CheckCircle className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <h4 className="font-sans font-black text-sm text-gray-900 dark:text-white">تم حفظ مقارنة جميع البنوك بنجاح!</h4>
+                    <p className="text-xs text-gray-400 dark:text-slate-400 mt-2 font-sans leading-relaxed">
+                      تم حفظ تقرير المقارنة الكاملة للعميل بنجاح. يمكنك عرض وتصفح كافة التفاصيل من صفحة <span className="font-bold text-[#0057B8] dark:text-[#60A5FA]">"نتائجي"</span> في أي وقت.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Form fields */}
+                  <div className="space-y-3 font-medium">
+                    <div className="space-y-1.5 text-right font-medium">
+                      <label className="text-[11px] font-extrabold text-slate-500 dark:text-slate-400 block">
+                        اسم العميل <span className="text-rose-500">*</span> (مطلوب):
+                      </label>
+                      <input 
+                        type="text"
+                        value={groupSaveCustomerName}
+                        onChange={(e) => setGroupSaveCustomerName(e.target.value)}
+                        placeholder="مثال: أبو محمد الودعاني"
+                        className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#0057B8] focus:bg-white dark:focus:bg-[#0f172a] transition-all text-right"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5 text-right font-medium">
+                      <label className="text-[11px] font-extrabold text-slate-500 dark:text-slate-400 block">
+                        عنوان الحسبة (اختياري):
+                      </label>
+                      <input 
+                        type="text"
+                        value={groupSaveTitle}
+                        onChange={(e) => setGroupSaveTitle(e.target.value)}
+                        placeholder="مثال: مقارنة جميع البنوك - فيلا الياسمين"
+                        className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#0057B8] focus:bg-white dark:focus:bg-[#0f172a] transition-all text-right"
+                      />
+                    </div>
+                  </div>
+
+                  {groupSaveStatus === 'error' && (
+                    <div className="p-3 bg-red-50 dark:bg-red-955/15 text-red-800 dark:text-red-400 text-xs rounded-xl border border-red-100 dark:border-red-900/30 flex items-start gap-2 leading-relaxed animate-fade-in text-right">
+                      <XCircle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+                      <span>{groupSaveErrorText}</span>
+                    </div>
+                  )}
+
+                  {/* Buttons controls */}
+                  <div className="flex gap-2.5 pt-2">
+                    <button
+                      onClick={executeSaveGroupResults}
+                      disabled={isGroupSaving || !groupSaveCustomerName.trim()}
+                      className="flex-1 py-3 bg-[#0057B8] hover:bg-[#003B7A] text-white text-xs font-black rounded-xl transition-all shadow-md hover:shadow-blue-100 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 min-h-[44px]"
+                    >
+                      {isGroupSaving ? (
+                        <>
+                          <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                          <span>جاري الحفظ الآمن...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Bookmark className="w-4 h-4" />
+                          <span>تأكيد حفظ المقارنة</span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      onClick={() => setShowGroupSaveModal(false)}
+                      className="px-5 py-3 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 text-xs font-bold rounded-xl transition-all cursor-pointer min-h-[44px]"
+                    >
+                      إلغاء
+                    </button>
+                  </div>
+
+                </div>
+              )}
+            </div>
+
           </div>
         </div>
       )}
@@ -1359,7 +1744,7 @@ export default function ResultsGrid({
                   <div>
                     <h4 className="font-sans font-black text-sm text-gray-900 dark:text-white">تم حفظ نتيجة الحسبة المحاسبية المتكاملة!</h4>
                     <p className="text-xs text-gray-400 dark:text-slate-400 mt-2 font-sans leading-relaxed">
-                      تم تصنيف وحفظ التمويل بنجاح في ملفك الشخصي. يمكنك عرض ومقارنة كافة النتائج من صفحة <span className="font-bold text-[#0057B8] dark:text-[#0ea5a4]">"نتائجي"</span> في أي وقت.
+                      تم تصنيف وحفظ التمويل بنجاح في ملفك الشخصي. يمكنك عرض ومقارنة كافة النتائج من صفحة <span className="font-bold text-[#0057B8] dark:text-[#60A5FA]">"نتائجي"</span> في أي وقت.
                     </p>
                   </div>
                 </div>
@@ -1374,13 +1759,13 @@ export default function ResultsGrid({
                     </div>
                     <div className="flex justify-between border-b border-slate-200/50 dark:border-slate-800/80 pb-1.5">
                       <span className="text-slate-400 dark:text-slate-500">إجمالي حد التمويل:</span>
-                      <span className="font-extrabold text-[#0057B8] dark:text-[#0ea5a4]" dir="ltr">
+                      <span className="font-extrabold text-[#0057B8] dark:text-[#60A5FA]" dir="ltr">
                         {Math.round(mainFinanceType === 'personal_only' ? saveOffer.personalAmount : saveOffer.totalPurchasingPower).toLocaleString('ar-SA')} ريال
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-400 dark:text-slate-500">القسط والقنوات:</span>
-                      <span className="font-extrabold text-emerald-600 dark:text-emerald-400" dir="ltr">
+                      <span className="font-extrabold text-[#0057B8] dark:text-[#60A5FA]" dir="ltr">
                         {Math.round(saveOffer.monthlyInstallmentBeforeRetirement).toLocaleString('ar-SA')} ريال / شهر
                       </span>
                     </div>
@@ -1395,7 +1780,7 @@ export default function ResultsGrid({
                         value={saveTitle}
                         onChange={(e) => setSaveTitle(e.target.value)}
                         placeholder="مثال: فيلا الياسمين - خيار عقاري ممتاز"
-                        className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#0057B8] dark:focus:ring-[#0ea5a4] focus:bg-white dark:focus:bg-[#0f172a] transition-all text-right"
+                        className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#0057B8] dark:focus:ring-[#60A5FA] focus:bg-white dark:focus:bg-[#0f172a] transition-all text-right"
                       />
                     </div>
 
@@ -1406,7 +1791,7 @@ export default function ResultsGrid({
                         value={saveCustomerName}
                         onChange={(e) => setSaveCustomerName(e.target.value)}
                         placeholder="مثال: أبو محمد الودعاني"
-                        className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#0057B8] dark:focus:ring-[#0ea5a4] focus:bg-white dark:focus:bg-[#0f172a] transition-all text-right"
+                        className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#0057B8] dark:focus:ring-[#60A5FA] focus:bg-white dark:focus:bg-[#0f172a] transition-all text-right"
                       />
                     </div>
                   </div>
@@ -1423,7 +1808,7 @@ export default function ResultsGrid({
                     <button
                       onClick={executeSaveResult}
                       disabled={isSaving || !saveTitle.trim()}
-                      className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl transition-all shadow-md hover:shadow-emerald-100 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 min-h-[44px]"
+                      className="flex-1 py-3 bg-[#0057B8] hover:bg-[#003B7A] text-white text-xs font-black rounded-xl transition-all shadow-md hover:shadow-blue-100 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 min-h-[44px]"
                     >
                       {isSaving ? (
                         <>
@@ -1477,7 +1862,7 @@ export default function ResultsGrid({
                   window.history.pushState(null, "", "/login");
                   window.dispatchEvent(new Event("popstate"));
                 }}
-                className="w-full py-3 bg-[#0057B8] dark:bg-[#0ea5a4] text-white text-xs font-extrabold rounded-xl transition-all shadow-md hover:shadow-blue-200 dark:hover:shadow-cyan-950 cursor-pointer text-center"
+                className="w-full py-3 bg-[#0057B8] dark:bg-[#0057B8] text-white text-xs font-extrabold rounded-xl transition-all shadow-md hover:shadow-blue-200 dark:hover:shadow-blue-950 cursor-pointer text-center"
               >
                 تسجيل الدخول / إنشاء حساب جديد
               </button>

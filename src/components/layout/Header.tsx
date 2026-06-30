@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useAppState } from '../../context/AppContext';
-import { Calculator, ShieldAlert, Award, FileText, LogOut, Settings, X, ShieldCheck, User, BarChart3, HelpCircle, Sparkles, Sun, Moon } from 'lucide-react';
+import { Calculator, ShieldAlert, Award, FileText, LogOut, Settings, X, ShieldCheck, User, BarChart3, HelpCircle, Sparkles, Sun, Moon, Bell } from 'lucide-react';
 import { useLocation } from '../../hooks/useLocation';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function Header() {
   const { 
@@ -14,6 +15,8 @@ export default function Header() {
     activeStepLabel,
     userSubscriptions
   } = useAppState();
+
+  const { profile } = useAuth();
 
   const location = useLocation();
   const { theme, setTheme } = useTheme();
@@ -129,18 +132,51 @@ export default function Header() {
           </button>
 
           {user ? (
-            <div className="flex items-center gap-2 bg-[#F1F5F9]/60 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 p-1 pr-3 pl-1 rounded-xl select-none font-sans">
-              <div className="text-right">
-                <span className="text-[10px] text-gray-600 dark:text-slate-200 font-bold block max-w-[140px] truncate leading-none font-mono" title={user.email}>
-                  {user.email}
-                </span>
-              </div>
+            <div className="flex items-center gap-2">
+              {/* Notification Button */}
               <button
-                onClick={signOut}
-                title="تسجيل الخروج"
-                className="w-7 h-7 bg-white dark:bg-slate-700 border border-slate-200/60 dark:border-slate-600 hover:border-red-200 hover:text-red-600 dark:text-slate-200 dark:hover:text-red-400 rounded-lg flex items-center justify-center transition-all cursor-pointer shadow-xs shrink-0"
+                onClick={() => alert("الإشعارات ستتوفر قريبًا")}
+                title="الإشعارات"
+                className="w-8 h-8 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center transition-all cursor-pointer shadow-xs shrink-0"
               >
-                <LogOut className="w-3 h-3" />
+                <Bell className="w-4 h-4" />
+              </button>
+
+              {/* User Profile Pill */}
+              <button
+                onClick={() => location.navigate('/account')}
+                className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200/60 dark:border-slate-700 p-1 pr-1 pl-2.5 rounded-xl select-none font-sans cursor-pointer transition-all active:scale-95 text-right"
+              >
+                {(() => {
+                  const displayName = profile?.full_name || user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || "مستخدم حسبة";
+                  const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url || user?.user_metadata?.picture;
+                  const firstChar = displayName.trim().charAt(0) || "ح";
+
+                  return (
+                    <>
+                      {avatarUrl ? (
+                        <img
+                          src={avatarUrl}
+                          alt={displayName}
+                          referrerPolicy="no-referrer"
+                          className="w-6.5 h-6.5 rounded-lg object-cover border border-slate-200 dark:border-slate-600 shrink-0"
+                        />
+                      ) : (
+                        <div className="w-6.5 h-6.5 rounded-lg bg-gradient-to-br from-[#0057B8] to-indigo-700 text-white font-black text-xs flex items-center justify-center select-none shrink-0">
+                          {firstChar}
+                        </div>
+                      )}
+                      <div className="flex flex-col text-right">
+                        <span className="text-[10px] text-gray-800 dark:text-slate-200 font-extrabold max-w-[90px] truncate leading-none">
+                          {displayName}
+                        </span>
+                        <span className="text-[8px] text-gray-400 dark:text-slate-400 font-bold block leading-none mt-0.5">
+                          {planName}
+                        </span>
+                      </div>
+                    </>
+                  );
+                })()}
               </button>
             </div>
           ) : (
