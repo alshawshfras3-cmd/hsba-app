@@ -1697,7 +1697,7 @@ export default function StepWizard() {
         message={alertMessage}
       />
       <div className={`mx-auto px-4 sm:px-6 lg:px-8 flex-1 flex flex-col w-full transition-all ${
-        currentStep === flow.length && results ? 'max-w-[1500px] py-4' : 'max-w-6xl py-8'
+        currentStep === flow.length && results ? 'max-w-[1600px] py-4' : 'max-w-6xl py-8'
       }`}>
         
         {/* Step Wizard visual Progress stepper indicators */}
@@ -1765,7 +1765,7 @@ export default function StepWizard() {
         )}
 
         {/* Main Step Cards Form container */}
-        <div className={`w-full ${results ? 'max-w-[1500px]' : 'max-w-5xl'} mx-auto bg-white dark:bg-[#111827] rounded-2xl md:rounded-3xl border border-[#E5E7EB] dark:border-slate-800 shadow-xs transition-all ${
+        <div className={`w-full ${results ? 'max-w-[1600px]' : 'max-w-5xl'} mx-auto bg-white dark:bg-[#111827] rounded-2xl md:rounded-3xl border border-[#E5E7EB] dark:border-slate-800 shadow-xs transition-all ${
           results ? 'p-4 sm:p-5 md:p-6' : 'p-4 sm:p-8 md:p-10'
         }`}>
           
@@ -2227,7 +2227,7 @@ export default function StepWizard() {
 
         {/* Render ResultsGrid beneath the existing calculator form card */}
         {currentStep === flow.length && results && (
-          <div className="mt-8 w-full">
+          <div className="mt-5 w-full">
             <ResultsGrid
               results={results}
               productId={productId}

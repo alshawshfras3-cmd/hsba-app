@@ -741,9 +741,9 @@ export default function ResultsGrid({
         </aside>
 
         {/* Left Column on Desktop (RTL) / Main Results Section on Mobile */}
-        <main className="min-w-0 flex-1 w-full space-y-6">
+        <main className="min-w-0 flex-1 w-full space-y-4">
           {/* Desktop/Tablet Header & Actions Row */}
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6 pb-6 border-b border-[#E5E7EB] dark:border-slate-800">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-4 pb-4 border-b border-[#E5E7EB] dark:border-slate-800">
             <div>
               <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-sans tracking-tight">نتائج الحسبة وعروض جهات التمويل</h2>
               <p className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 mt-1 sm:mt-1.5 font-sans leading-relaxed">تم حساب أفضل عروض وبدائل القروض من كافة البنوك النشطة بناءً على ضوابط ساما ومؤسسة التقاعد.</p>
@@ -764,7 +764,7 @@ export default function ResultsGrid({
           </div>
 
           {/* Sorting Tabs Row */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
             <div className="flex flex-wrap items-center gap-2 justify-start">
               <span className="text-xs font-bold text-[#6B7280] dark:text-slate-400 ml-2">ترتيب النتائج:</span>
               <button
