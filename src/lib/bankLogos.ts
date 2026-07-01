@@ -114,22 +114,8 @@ export function getBankLogoCandidates(bankId?: string, bankName?: string, logoUr
   const baseLogo = BANK_LOGOS[key];
   if (baseLogo) {
     candidates.push(baseLogo);
-    const lastDotIdx = baseLogo.lastIndexOf('.');
-    if (lastDotIdx !== -1) {
-      const baseWithoutExt = baseLogo.substring(0, lastDotIdx);
-      if (!baseLogo.endsWith('.svg')) candidates.push(baseWithoutExt + '.svg');
-      if (!baseLogo.endsWith('.png')) candidates.push(baseWithoutExt + '.png');
-      if (!baseLogo.endsWith('.webp')) candidates.push(baseWithoutExt + '.webp');
-      if (!baseLogo.endsWith('.jpg')) candidates.push(baseWithoutExt + '.jpg');
-    }
-  }
-
-  // 3. Use default structured naming conventions in the bank-logos folder
-  if (key) {
+  } else if (key) {
     candidates.push(`/bank-logos/${key}.jpg`);
-    candidates.push(`/bank-logos/${key}.svg`);
-    candidates.push(`/bank-logos/${key}.png`);
-    candidates.push(`/bank-logos/${key}.webp`);
   }
 
   return Array.from(new Set(candidates));
