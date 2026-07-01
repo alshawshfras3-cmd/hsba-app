@@ -1281,7 +1281,7 @@ export default function ResultsGrid({
                   {getWhatsAppContactInfo(offer.bankId) && (
                     <button 
                       onClick={(e) => handleWhatsAppContact(offer, e)}
-                      className="text-center py-3 rounded-xl bg-[#003B7A] hover:bg-[#002b5c] text-white font-black text-xs transition-all duration-200 shadow-lg shadow-blue-900/10 dark:shadow-none hover:shadow-xl cursor-pointer flex items-center justify-center gap-2 select-none col-span-2"
+                      className="text-center py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white border border-green-600 font-black text-xs transition-all duration-200 shadow-lg shadow-green-900/10 dark:shadow-none hover:shadow-xl cursor-pointer flex items-center justify-center gap-2 select-none col-span-2"
                     >
                       <MessageCircle className="w-4 h-4 shrink-0 text-white" />
                       <span>تواصل مع الموظف</span>
