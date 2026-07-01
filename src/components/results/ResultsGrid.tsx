@@ -170,9 +170,12 @@ export default function ResultsGrid({
 
     const resolvedEtizaz = offer.etizazAmount ?? (offer as any).etizazAmount ?? 0;
     if (resolvedEtizaz > 0) {
-      lines.push(`اعتزاز دفعة مستردة: ${formatNum(resolvedEtizaz)} ريال`);
+      lines.push(`دعم اعتزاز (دفعة مستردة)`);
+      lines.push(`مبلغ الدعم: ${formatNum(resolvedEtizaz)} ريال`);
       if (offer.etizazMonthlyInstallment && offer.etizazMonthlyInstallment > 0) {
-        lines.push(`قسط اعتزاز الشهري: ${formatNum(Math.round(offer.etizazMonthlyInstallment))} ريال (يبدأ بعد فترة سماح ${offer.etizazGraceMonths ?? 24} شهراً، ولمدة سداد ${offer.etizazTermMonths || 0} شهراً)`);
+        lines.push(`القسط الشهري لاعتزاز: ${formatNum(Math.round(offer.etizazMonthlyInstallment))} ريال / شهر`);
+        lines.push(`يبدأ الاستقطاع بعد: ${offer.etizazGraceMonths ?? 24} شهرًا`);
+        lines.push(`مدة السداد: ${offer.etizazRepaymentMonths ?? offer.etizazTermMonths ?? 96} شهرًا`);
       }
     }
 
@@ -190,13 +193,13 @@ export default function ResultsGrid({
       lines.push(`├─ قسط العقاري: ${formatNum(offer.realEstateInstallmentOnly || 0)} ريال`);
       lines.push(`├─ قسط الشخصي: ${offer.supportsPersonal === false ? "غير متوفر لدى هذه الجهة (تم احتساب العقاري فقط)" : `${formatNum(offer.personalInstallmentAmount || 0)} ريال`}`);
       if (offer.etizazAmount && offer.etizazAmount > 0 && offer.etizazMonthlyInstallment) {
-        lines.push(`└─ قسط اعتزاز الشهري: ${formatNum(Math.round(offer.etizazMonthlyInstallment))} ريال`);
+        lines.push(`└─ القسط الشهري لاعتزاز: ${formatNum(Math.round(offer.etizazMonthlyInstallment))} ريال`);
       }
     } else {
       lines.push(`القسط الشهري الإجمالي: ${formatNum(offer.monthlyInstallmentBeforeRetirement)} ريال`);
       if (offer.etizazAmount && offer.etizazAmount > 0 && offer.etizazMonthlyInstallment) {
         lines.push(`├─ قسط التمويل العقاري: ${formatNum(offer.realEstateInstallmentOnly || 0)} ريال`);
-        lines.push(`└─ قسط اعتزاز الشهري: ${formatNum(Math.round(offer.etizazMonthlyInstallment))} ريال`);
+        lines.push(`└─ القسط الشهري لاعتزاز: ${formatNum(Math.round(offer.etizazMonthlyInstallment))} ريال`);
       }
     }
 
@@ -350,9 +353,12 @@ export default function ResultsGrid({
 
     const resolvedEtizaz = offer.etizazAmount ?? (offer as any).etizazAmount ?? 0;
     if (resolvedEtizaz > 0) {
-      lines.push(`اعتزاز دفعة مستردة: ${formatNum(resolvedEtizaz)} ريال`);
+      lines.push(`دعم اعتزاز (دفعة مستردة)`);
+      lines.push(`مبلغ الدعم: ${formatNum(resolvedEtizaz)} ريال`);
       if (offer.etizazMonthlyInstallment && offer.etizazMonthlyInstallment > 0) {
-        lines.push(`قسط اعتزاز الشهري: ${formatNum(Math.round(offer.etizazMonthlyInstallment))} ريال (يبدأ بعد فترة سماح ${offer.etizazGraceMonths ?? 24} شهراً، ولمدة سداد ${offer.etizazTermMonths || 0} شهراً)`);
+        lines.push(`القسط الشهري لاعتزاز: ${formatNum(Math.round(offer.etizazMonthlyInstallment))} ريال / شهر`);
+        lines.push(`يبدأ الاستقطاع بعد: ${offer.etizazGraceMonths ?? 24} شهرًا`);
+        lines.push(`مدة السداد: ${offer.etizazRepaymentMonths ?? offer.etizazTermMonths ?? 96} شهرًا`);
       }
     }
 
@@ -370,13 +376,13 @@ export default function ResultsGrid({
       lines.push(`├─ قسط العقاري: ${formatNum(offer.realEstateInstallmentOnly || 0)} ريال`);
       lines.push(`├─ قسط الشخصي: ${offer.supportsPersonal === false ? "غير متوفر لدى هذه الجهة (تم احتساب العقاري فقط)" : `${formatNum(offer.personalInstallmentAmount || 0)} ريال`}`);
       if (offer.etizazAmount && offer.etizazAmount > 0 && offer.etizazMonthlyInstallment) {
-        lines.push(`└─ قسط اعتزاز الشهري: ${formatNum(Math.round(offer.etizazMonthlyInstallment))} ريال`);
+        lines.push(`└─ القسط الشهري لاعتزاز: ${formatNum(Math.round(offer.etizazMonthlyInstallment))} ريال`);
       }
     } else {
       lines.push(`القسط الشهري الإجمالي: ${formatNum(offer.monthlyInstallmentBeforeRetirement)} ريال`);
       if (offer.etizazAmount && offer.etizazAmount > 0 && offer.etizazMonthlyInstallment) {
         lines.push(`├─ قسط التمويل العقاري: ${formatNum(offer.realEstateInstallmentOnly || 0)} ريال`);
-        lines.push(`└─ قسط اعتزاز الشهري: ${formatNum(Math.round(offer.etizazMonthlyInstallment))} ريال`);
+        lines.push(`└─ القسط الشهري لاعتزاز: ${formatNum(Math.round(offer.etizazMonthlyInstallment))} ريال`);
       }
     }
 
@@ -812,7 +818,7 @@ export default function ResultsGrid({
 
       {/* Bank Cards Grid with optional Subscription blurred state and relative wrapper */}
       <div className={`relative ${!isSubscribed ? 'min-h-[480px]' : ''}`}>
-        <div className={`grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 ${!isSubscribed ? 'blur-md pointer-events-none select-none contrast-[0.80]' : ''}`}>
+        <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-5 ${!isSubscribed ? 'blur-md pointer-events-none select-none contrast-[0.80]' : ''}`}>
           {sortedResults.map((offer, index) => {
             const isApp = offer.status === 'approved';
             const isWarn = offer.status === 'warning';
@@ -1059,23 +1065,32 @@ export default function ResultsGrid({
 
                             {/* Optional Etizaz Box (Full width when active) */}
                             {offer.etizazAmount !== undefined && offer.etizazAmount > 0 && (
-                              <div className="col-span-2 bg-indigo-50/70 dark:bg-indigo-950/10 border border-indigo-100 dark:border-indigo-900/30 rounded-xl p-2.5 text-xs space-y-1">
-                                <div className="flex justify-between items-center">
-                                  <span className="text-indigo-700 dark:text-indigo-400 font-extrabold">اعتزاز دفعة مستردة:</span>
-                                  <span className="font-black text-indigo-700 dark:text-indigo-400 font-sans tabular-nums tracking-tight">{Math.round(offer.etizazAmount).toLocaleString('ar-SA')} ريال</span>
+                              <div className="col-span-2 bg-indigo-50/70 dark:bg-indigo-950/10 border border-indigo-100 dark:border-indigo-900/30 rounded-xl p-3 text-xs space-y-2">
+                                <div className="font-extrabold text-indigo-700 dark:text-indigo-400 pb-1 border-b border-indigo-100/50 dark:border-indigo-900/20 text-center">
+                                  دعم اعتزاز (دفعة مستردة)
                                 </div>
-                                {offer.etizazMonthlyInstallment !== undefined && offer.etizazMonthlyInstallment > 0 && (
-                                  <div className="flex flex-col gap-1 text-[11px] text-indigo-600 dark:text-indigo-300 border-t border-indigo-100/50 dark:border-indigo-900/10 pt-1.5">
-                                    <div className="flex justify-between items-center">
-                                      <span>قسط سداد اعتزاز:</span>
-                                      <span className="font-bold font-sans tabular-nums tracking-tight">{Math.round(offer.etizazMonthlyInstallment).toLocaleString('ar-SA')} ريال / شهر</span>
-                                    </div>
-                                    <div className="flex justify-between items-center text-[10px] text-indigo-500/80 dark:text-indigo-400/80">
-                                      <span>فترة السماح / السداد:</span>
-                                      <span>سماح {offer.etizazGraceMonths ?? 24} ش ⚡ سداد {offer.etizazTermMonths || 0} ش</span>
-                                    </div>
+                                <div className="space-y-1 text-[11px] text-indigo-600 dark:text-indigo-300">
+                                  <div className="flex justify-between items-center">
+                                    <span className="font-semibold text-indigo-700 dark:text-indigo-400">مبلغ الدعم:</span>
+                                    <span className="font-black text-indigo-700 dark:text-indigo-400 font-sans tabular-nums tracking-tight">{Math.round(offer.etizazAmount).toLocaleString('ar-SA')} ريال</span>
                                   </div>
-                                )}
+                                  {offer.etizazMonthlyInstallment !== undefined && offer.etizazMonthlyInstallment > 0 && (
+                                    <>
+                                      <div className="flex justify-between items-center">
+                                        <span className="font-semibold text-indigo-700 dark:text-indigo-400">القسط الشهري لاعتزاز:</span>
+                                        <span className="font-black text-indigo-700 dark:text-indigo-400 font-sans tabular-nums tracking-tight">{Math.round(offer.etizazMonthlyInstallment).toLocaleString('ar-SA')} ريال / شهر</span>
+                                      </div>
+                                      <div className="flex justify-between items-center">
+                                        <span className="font-semibold text-indigo-700 dark:text-indigo-400">يبدأ الاستقطاع بعد:</span>
+                                        <span className="font-black text-indigo-700 dark:text-indigo-400 font-sans tabular-nums tracking-tight">{offer.etizazGraceMonths ?? 24} شهرًا</span>
+                                      </div>
+                                      <div className="flex justify-between items-center">
+                                        <span className="font-semibold text-indigo-700 dark:text-indigo-400">مدة السداد:</span>
+                                        <span className="font-black text-indigo-700 dark:text-indigo-400 font-sans tabular-nums tracking-tight">{offer.etizazRepaymentMonths ?? offer.etizazTermMonths ?? 96} شهرًا</span>
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
                               </div>
                             )}
                           </>
@@ -1103,7 +1118,7 @@ export default function ResultsGrid({
                               </div>
                               {offer.etizazAmount !== undefined && offer.etizazAmount > 0 && offer.etizazMonthlyInstallment !== undefined && offer.etizazMonthlyInstallment > 0 && (
                                 <div className="flex justify-between items-center text-indigo-700 dark:text-indigo-400">
-                                  <span>├─ قسط اعتزاز الشهري:</span>
+                                  <span>├─ القسط الشهري لاعتزاز:</span>
                                   <span className="font-sans tabular-nums tracking-tight">{Math.round(offer.etizazMonthlyInstallment).toLocaleString('ar-SA')} ريال</span>
                                 </div>
                               )}
@@ -1148,7 +1163,7 @@ export default function ResultsGrid({
                               </div>
                               {offer.etizazAmount !== undefined && offer.etizazAmount > 0 && offer.etizazMonthlyInstallment !== undefined && offer.etizazMonthlyInstallment > 0 && (
                                 <div className="flex justify-between items-center text-indigo-700 dark:text-indigo-400 font-semibold">
-                                  <span>└─ قسط اعتزاز الشهري:</span>
+                                  <span>└─ القسط الشهري لاعتزاز:</span>
                                   <span className="font-sans tabular-nums tracking-tight">{Math.round(offer.etizazMonthlyInstallment).toLocaleString('ar-SA')} ريال</span>
                                 </div>
                               )}
