@@ -1,13 +1,22 @@
+import snbLogo from "@/assets/bank-logos/snb.jpg";
+import alrajhiLogo from "@/assets/bank-logos/alrajhi.jpg";
+import albiladLogo from "@/assets/bank-logos/albilad.jpg";
+import alinmaLogo from "@/assets/bank-logos/alinma.jpg";
+import fransiLogo from "@/assets/bank-logos/fransi.jpg";
+import alarabiLogo from "@/assets/bank-logos/alarabi.jpg";
+import bidayaLogo from "@/assets/bank-logos/bidaya.jpg";
+import masarLogo from "@/assets/bank-logos/masar.jpg";
+
 export const BANK_LOGOS: Record<string, string> = {
-  snb: "/bank-logos/snb.jpg",
-  alahli: "/bank-logos/snb.jpg",
-  alrajhi: "/bank-logos/alrajhi.jpg",
-  albilad: "/bank-logos/albilad.jpg",
-  alinma: "/bank-logos/alinma.jpg",
-  fransi: "/bank-logos/fransi.jpg",
-  alarabi: "/bank-logos/alarabi.jpg",
-  bidaya: "/bank-logos/bidaya.jpg",
-  masar: "/bank-logos/masar.jpg",
+  snb: snbLogo,
+  alahli: snbLogo,
+  alrajhi: alrajhiLogo,
+  albilad: albiladLogo,
+  alinma: alinmaLogo,
+  fransi: fransiLogo,
+  alarabi: alarabiLogo,
+  bidaya: bidayaLogo,
+  masar: masarLogo,
 };
 
 export function normalizeBankKey(bankId?: string, bankName?: string): string {
@@ -114,8 +123,6 @@ export function getBankLogoCandidates(bankId?: string, bankName?: string, logoUr
   const baseLogo = BANK_LOGOS[key];
   if (baseLogo) {
     candidates.push(baseLogo);
-  } else if (key) {
-    candidates.push(`/bank-logos/${key}.jpg`);
   }
 
   return Array.from(new Set(candidates));
