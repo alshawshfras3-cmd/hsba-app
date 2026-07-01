@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { BankCalculationResult, ProductId } from '../../types';
 import { 
-  Building2, CheckCircle, XCircle, AlertTriangle, ArrowLeftRight, Clock, Percent, ListCollapse,
+  CheckCircle, XCircle, AlertTriangle, ArrowLeftRight, Clock, Percent,
   Download, HelpCircle, Activity, Info, Users, ChevronDown, Award, Bookmark, Copy, Share2, MessageCircle,
   User, RotateCcw
 } from 'lucide-react';
 import { useAppState } from '../../context/AppContext';
 import { saveCalculationResult, saveCalculationResultsGroup } from '../../lib/savedResultsService';
 import { convertHijriToGregorian } from '../../lib/date-utils';
+import BankLogo from '../common/BankLogo';
 
 interface ResultsGridProps {
   results: BankCalculationResult[];
@@ -621,6 +622,8 @@ export default function ResultsGrid({
     }
   });
 
+  const filteredResults = sortedResults;
+
   const summaryOffer = results.find(r => r.isEligible) || results[0];
   
   const sectorArabic = getSectorArabicName(sectorId);
@@ -785,6 +788,8 @@ export default function ResultsGrid({
             </div>
           </div>
 
+
+
           {/* Sorting Tabs Row */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
             <div className="flex flex-wrap items-center gap-2 justify-start">
@@ -835,7 +840,7 @@ export default function ResultsGrid({
       {/* Bank Cards Grid with optional Subscription blurred state and relative wrapper */}
       <div className={`relative ${!isSubscribed ? 'min-h-[480px]' : ''}`}>
         <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-5 ${!isSubscribed ? 'blur-md pointer-events-none select-none contrast-[0.80]' : ''}`}>
-          {sortedResults.map((offer, index) => {
+          {filteredResults.map((offer, index) => {
             const isApp = offer.status === 'approved';
             const isWarn = offer.status === 'warning';
             const isRej = offer.status === 'rejected';
@@ -896,9 +901,7 @@ export default function ResultsGrid({
 
                   {/* Bank Identity Row */}
                   <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${offer.logoColor} text-white flex items-center justify-center font-bold text-center text-xs p-1 select-none shadow-xs group-hover:scale-105 transition-transform shrink-0`}>
-                      {offer.logoText}
-                    </div>
+                    <BankLogo bankId={offer.bankId} bankName={offer.bankName} logoUrl={offer.logoUrl} size="md" className="group-hover:scale-105 transition-transform shrink-0" />
                     <div className="min-w-0 flex-1">
                       <h3 className="font-extrabold text-[#0B1B34] dark:text-white text-sm flex items-center gap-2 truncate">
                         <span>{offer.bankName}</span>
@@ -1401,9 +1404,7 @@ export default function ResultsGrid({
             {/* Drawer Header */}
             <div className={`p-6 text-white bg-gradient-to-r ${selectedOffer.logoColor} sticky top-0 z-10 flex justify-between items-center h-24`}>
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center font-bold text-sm">
-                  {selectedOffer.logoText}
-                </div>
+                <BankLogo bankId={selectedOffer.bankId} bankName={selectedOffer.bankName} logoUrl={selectedOffer.logoUrl} size="md" />
                 <div>
                   <h3 className="text-xl font-bold">{selectedOffer.bankName}</h3>
                   <p className="text-xs text-white/85">ملخص النتيجة</p>
@@ -1758,9 +1759,7 @@ export default function ResultsGrid({
             {/* Header */}
             <div className={`p-6 text-white text-right bg-gradient-to-r ${saveOffer.logoColor} flex items-center justify-between`}>
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center font-bold text-sm">
-                  {saveOffer.logoText}
-                </div>
+                <BankLogo bankId={saveOffer.bankId} bankName={saveOffer.bankName} logoUrl={saveOffer.logoUrl} size="sm" />
                 <div>
                   <h3 className="font-extrabold text-sm leading-tight">حفظ نتيجة الحسبة الحالية</h3>
                   <p className="text-[10px] text-white/80 mt-0.5">سيتم إضافة هذه البيانات لملف نتائجك للرجوع لها لاحقاً</p>

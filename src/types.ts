@@ -17,6 +17,7 @@ export interface Bank {
   nameEn: string;
   logoColor: string; // for custom stylized fintech logos
   logoText: string;
+  logoUrl?: string; // Support custom logo URL
   isActive: boolean;
   calendarType: CalendarType;
   maxTermMonths: number;
@@ -385,6 +386,7 @@ export interface BankCalculationResult {
   bankName: string;
   logoColor: string;
   logoText: string;
+  logoUrl?: string; // Support custom logo URL
   status: CalculationStatus;
   isEligible: boolean;
   realEstateAmount: number;

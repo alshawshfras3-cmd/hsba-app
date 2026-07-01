@@ -7,8 +7,10 @@ import { convertHijriToGregorian } from '../../lib/date-utils';
 import { SectorId, ProductId, SupportType, TermMode, BankCalculationResult } from '../../types';
 import { 
   Home, User, Coins, Briefcase, Calendar, Scale,
-  ChevronLeft, ChevronRight, HelpCircle, AlertCircle, Info, Calculator, Trash2, RotateCcw
+  ChevronLeft, ChevronRight, HelpCircle, AlertCircle, Info, Calculator, Trash2, RotateCcw,
+  Building2
 } from 'lucide-react';
+import BankLogo from '../common/BankLogo';
 import ResultsGrid from '../results/ResultsGrid';
 import NumericInput from './NumericInput';
 import CenteredValidationAlert from './CenteredValidationAlert';
@@ -660,7 +662,7 @@ export default function StepWizard() {
   };
 
   // Handle Step validations
-  const validateStep = (stepNumber: number): boolean => {
+  const validateStep = (stepNumber: number, silent?: boolean): boolean => {
     const errorMap: { message: string; fieldId?: string }[] = [];
     const stepId = flow[stepNumber - 1];
 
@@ -865,9 +867,11 @@ export default function StepWizard() {
     }
 
     const stepErrors = errorMap.map(e => e.message);
-    setErrors(stepErrors);
+    if (!silent) {
+      setErrors(stepErrors);
+    }
 
-    if (errorMap.length > 0) {
+    if (errorMap.length > 0 && !silent) {
       const firstError = errorMap[0];
       setAlertMessage(firstError.message);
       setAlertOpen(true);
@@ -895,8 +899,8 @@ export default function StepWizard() {
   };
 
   // Trigger Calculations
-  const triggerCalculations = async () => {
-    if (!validateStep(currentStep)) return;
+  const triggerCalculations = async (silentValidation = false) => {
+    if (!validateStep(currentStep, silentValidation)) return;
 
     const calcParams = {
       sectorId: effectiveSectorId,
@@ -975,6 +979,22 @@ export default function StepWizard() {
 
     setCurrentStep(flow.length);
   };
+
+  // Auto-recalculate on discrete selections change if results already exist and we are on the results step
+  useEffect(() => {
+    if (results !== null && currentStep === flow.length) {
+      triggerCalculations(true);
+    }
+  }, [
+    selectedBankId,
+    productId,
+    supportType,
+    isEtizazEligible,
+    termMode,
+    financeAmountMode,
+    currentStep,
+    flow.length
+  ]);
 
   const restartWizard = () => {
     setResults(null);
@@ -1671,17 +1691,55 @@ export default function StepWizard() {
             {/* 2. جهة التمويل المفضلة للتمويل الشخصي */}
             <div className="border border-gray-200 dark:border-slate-800 bg-white dark:bg-[#151F32] rounded-2xl p-5 text-right space-y-3">
               <label className="block text-xs font-bold text-gray-700 dark:text-slate-300">جهة التمويل المفضلة للتمويل الشخصي:</label>
-              <select
-                id="personal-bank-filter-select"
-                value={selectedBankId}
-                onChange={(e) => setSelectedBankId(e.target.value)}
-                className="w-full bg-[#FAFAFA] dark:bg-[#0F172A] border border-gray-200 dark:border-slate-800 text-slate-800 dark:text-slate-100 rounded-xl px-4 py-3.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] dark:focus:ring-[#0ea5a4] focus:border-transparent cursor-pointer font-sans"
-              >
-                <option value="all" className="dark:bg-[#0f172a]">جميع جهات التمويل النشطة المتاحة (مقارنة العروض)</option>
-                {sortedActiveBanks.map(bank => (
-                  <option key={bank.id} value={bank.id} className="dark:bg-[#0f172a]">{bank.nameAr}</option>
-                ))}
-              </select>
+              
+              {/* Web (Desktop/Tablet) Version: Beautiful Custom Chips with Logos */}
+              <div className="hidden md:flex flex-wrap items-center gap-2" dir="rtl">
+                <button
+                  type="button"
+                  onClick={() => setSelectedBankId('all')}
+                  className={`px-3.5 py-2.5 rounded-xl text-xs font-extrabold cursor-pointer transition-all duration-200 flex items-center gap-2 border ${
+                    selectedBankId === 'all' || !selectedBankId
+                      ? 'bg-[#0057B8] text-white border-[#0057B8] shadow-sm shadow-blue-500/10'
+                      : 'bg-[#FAFAFA] dark:bg-[#0F172A] text-slate-700 dark:text-slate-350 border-slate-200 dark:border-slate-800 hover:border-blue-300 dark:hover:border-slate-700 hover:bg-blue-50/50'
+                  }`}
+                >
+                  <Building2 className="w-4 h-4 shrink-0" />
+                  <span>جميع الجهات النشطة</span>
+                </button>
+                {sortedActiveBanks.map((bank) => {
+                  const isSelected = selectedBankId === bank.id;
+                  return (
+                    <button
+                      key={bank.id}
+                      type="button"
+                      onClick={() => setSelectedBankId(bank.id)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-extrabold cursor-pointer transition-all duration-200 flex items-center gap-1.5 border ${
+                        isSelected
+                          ? 'bg-[#0057B8] text-white border-[#0057B8] shadow-sm shadow-blue-500/10'
+                          : 'bg-[#FAFAFA] dark:bg-[#0F172A] text-slate-700 dark:text-slate-350 border-slate-200 dark:border-slate-800 hover:border-blue-300 dark:hover:border-slate-700 hover:bg-blue-50/50'
+                      }`}
+                    >
+                      <BankLogo bankId={bank.id} bankName={bank.nameAr} logoUrl={bank.logoUrl} size="sm" className={isSelected ? 'bg-white border-white/20' : ''} />
+                      <span>{bank.nameAr}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Mobile Version: Select Dropdown */}
+              <div className="md:hidden">
+                <select
+                  id="personal-bank-filter-select"
+                  value={selectedBankId}
+                  onChange={(e) => setSelectedBankId(e.target.value)}
+                  className="w-full bg-[#FAFAFA] dark:bg-[#0F172A] border border-gray-200 dark:border-slate-800 text-slate-800 dark:text-slate-100 rounded-xl px-4 py-3.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] dark:focus:ring-[#0ea5a4] focus:border-transparent cursor-pointer font-sans"
+                >
+                  <option value="all" className="dark:bg-[#0f172a]">جميع جهات التمويل النشطة المتاحة (مقارنة العروض)</option>
+                  {sortedActiveBanks.map(bank => (
+                    <option key={bank.id} value={bank.id} className="dark:bg-[#0f172a]">{bank.nameAr}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
         )}
@@ -2134,18 +2192,56 @@ export default function StepWizard() {
 
                 {/* Preferred Bank Filter - FOR BOTH PATHS */}
                 <div className={`border border-gray-200 dark:border-slate-800 bg-white dark:bg-[#151F32] rounded-2xl text-right space-y-3 ${results ? 'col-span-1 md:col-span-3 p-3.5 space-y-2' : 'col-span-1 md:col-span-2 p-5 space-y-3'}`}>
-                  <label className="block text-xs font-bold text-gray-700 dark:text-slate-300">جهة التمويل المفضلة:</label>
-                  <select
-                    id="bank-filter-select"
-                    value={selectedBankId}
-                    onChange={(e) => setSelectedBankId(e.target.value)}
-                    className="w-full bg-gray-50 dark:bg-[#0F172A] border border-gray-200 dark:border-slate-800 rounded-xl px-4 py-3.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] dark:focus:ring-[#0ea5a4] focus:border-transparent cursor-pointer font-sans dark:text-white"
-                  >
-                    <option value="all" className="dark:bg-[#0f172a]">جميع جهات التمويل النشطة المتاحة (مقارنة العروض)</option>
-                    {sortedActiveBanks.map(bank => (
-                      <option key={bank.id} value={bank.id} className="dark:bg-[#0f172a]">{bank.nameAr}</option>
-                    ))}
-                  </select>
+                  <label className="block text-xs font-bold text-[#374151] dark:text-slate-300">جهة التمويل المفضلة:</label>
+                  
+                  {/* Web (Desktop/Tablet) Version: Beautiful Custom Chips with Logos */}
+                  <div className="hidden md:flex flex-wrap items-center gap-2" dir="rtl">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedBankId('all')}
+                      className={`px-3.5 py-2.5 rounded-xl text-xs font-extrabold cursor-pointer transition-all duration-200 flex items-center gap-2 border ${
+                        selectedBankId === 'all' || !selectedBankId
+                          ? 'bg-[#0057B8] text-white border-[#0057B8] shadow-sm shadow-blue-500/10'
+                          : 'bg-[#FAFAFA] dark:bg-[#0F172A] text-slate-700 dark:text-slate-350 border-slate-200 dark:border-slate-800 hover:border-blue-300 dark:hover:border-slate-700 hover:bg-blue-50/50'
+                      }`}
+                    >
+                      <Building2 className="w-4 h-4 shrink-0" />
+                      <span>جميع الجهات النشطة</span>
+                    </button>
+                    {sortedActiveBanks.map((bank) => {
+                      const isSelected = selectedBankId === bank.id;
+                      return (
+                        <button
+                          key={bank.id}
+                          type="button"
+                          onClick={() => setSelectedBankId(bank.id)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-extrabold cursor-pointer transition-all duration-200 flex items-center gap-1.5 border ${
+                            isSelected
+                              ? 'bg-[#0057B8] text-white border-[#0057B8] shadow-sm shadow-blue-500/10'
+                              : 'bg-[#FAFAFA] dark:bg-[#0F172A] text-slate-700 dark:text-slate-350 border-slate-200 dark:border-slate-800 hover:border-blue-300 dark:hover:border-slate-700 hover:bg-blue-50/50'
+                          }`}
+                        >
+                          <BankLogo bankId={bank.id} bankName={bank.nameAr} logoUrl={bank.logoUrl} size="sm" className={isSelected ? 'bg-white border-white/20' : ''} />
+                          <span>{bank.nameAr}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Mobile Version: Select Dropdown */}
+                  <div className="md:hidden">
+                    <select
+                      id="bank-filter-select"
+                      value={selectedBankId}
+                      onChange={(e) => setSelectedBankId(e.target.value)}
+                      className="w-full bg-gray-50 dark:bg-[#0F172A] border border-gray-200 dark:border-slate-800 rounded-xl px-4 py-3.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0057B8] dark:focus:ring-[#0ea5a4] focus:border-transparent cursor-pointer font-sans dark:text-white"
+                    >
+                      <option value="all" className="dark:bg-[#0f172a]">جميع جهات التمويل النشطة المتاحة (مقارنة العروض)</option>
+                      {sortedActiveBanks.map(bank => (
+                        <option key={bank.id} value={bank.id} className="dark:bg-[#0f172a]">{bank.nameAr}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
               </div>
