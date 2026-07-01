@@ -1,11 +1,11 @@
-import snbLogo from "@/assets/bank-logos/snb.jpg";
-import alrajhiLogo from "@/assets/bank-logos/alrajhi.jpg";
-import albiladLogo from "@/assets/bank-logos/albilad.jpg";
-import alinmaLogo from "@/assets/bank-logos/alinma.jpg";
-import fransiLogo from "@/assets/bank-logos/fransi.jpg";
-import alarabiLogo from "@/assets/bank-logos/alarabi.jpg";
-import bidayaLogo from "@/assets/bank-logos/bidaya.jpg";
-import masarLogo from "@/assets/bank-logos/masar.jpg";
+import snbLogo from "@/assets/images/snb_1782906319473.jpg";
+import alrajhiLogo from "@/assets/images/alrajhi_1782906349287.jpg";
+import albiladLogo from "@/assets/images/albilad_1782906360982.jpg";
+import alinmaLogo from "@/assets/images/alinma_1782906373688.jpg";
+import fransiLogo from "@/assets/images/fransi_1782906385288.jpg";
+import alarabiLogo from "@/assets/images/alarabi_1782906398681.jpg";
+import bidayaLogo from "@/assets/images/bidaya_1782906411827.jpg";
+import masarLogo from "@/assets/images/masar_1782906422129.jpg";
 
 export const BANK_LOGOS: Record<string, string> = {
   snb: snbLogo,
